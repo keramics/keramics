@@ -35,4 +35,5 @@ pub enum VfsPathType {
     NotSet,
     Os,
     Qcow,
+    Vhd,
 }
