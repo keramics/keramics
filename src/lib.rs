@@ -13,6 +13,7 @@
 
 pub mod checksums;
 pub mod compression;
+pub mod formats;
 pub mod formatters;
 pub mod hashes;
 pub mod macros;

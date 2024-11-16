@@ -14,6 +14,7 @@
 use std::collections::HashMap;
 use std::io;
 
+use crate::formats::apm::ApmVolumeSystem;
 use crate::types::SharedValue;
 
 use super::enums::VfsPathType;
@@ -49,6 +50,7 @@ impl VfsContext {
             None => {}
         }
         let mut file_system: Box<dyn VfsFileSystem> = match path.path_type {
+            VfsPathType::Apm => Box::new(ApmVolumeSystem::new()),
             VfsPathType::Os => Box::new(OsVfsFileSystem::new()),
             _ => {
                 return Err(io::Error::new(

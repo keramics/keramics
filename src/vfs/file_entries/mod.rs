@@ -12,5 +12,7 @@
  */
 
 mod os;
+mod wrapper;
 
 pub use os::OsVfsFileEntry;
+pub use wrapper::WrapperVfsFileEntry;
