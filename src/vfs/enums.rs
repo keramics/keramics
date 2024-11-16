@@ -11,11 +11,24 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod types;
-pub mod vfs;
+#[derive(Clone, Default, PartialEq)]
+pub enum VfsFileType {
+    BlockDevice,
+    CharacterDevice,
+    Device,
+    Directory,
+    File,
+    NamedPipe,
+    #[default]
+    NotSet,
+    Socket,
+    SymbolicLink,
+    Whiteout,
+}
+
+#[derive(Clone, Default, PartialEq)]
+pub enum VfsPathType {
+    #[default]
+    NotSet,
+    Os,
+}

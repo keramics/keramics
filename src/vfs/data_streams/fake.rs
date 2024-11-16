@@ -11,11 +11,18 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod types;
-pub mod vfs;
+use std::convert::AsRef;
+use std::io;
+use std::io::Cursor;
+
+use crate::vfs::traits::VfsDataStream;
+
+impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {}
+
+// TODO: consider moving this to a separate file.
+use crate::types::SharedValue;
+use crate::vfs::types::VfsDataStreamReference;
+
+pub fn new_fake_data_stream(data: Vec<u8>) -> io::Result<VfsDataStreamReference> {
+    Ok(SharedValue::new(Box::new(Cursor::new(data))))
+}
