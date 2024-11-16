@@ -10,5 +10,10 @@ license = "Apache-2.0"
 name = "keramics"
 path = "src/lib.rs"
 
+[[bin]]
+name = "keramicshash"
+path = "tools/hashtool.rs"
+
 [dependencies]
+clap = { version = "4.0", features = ["derive"] }
 layout_map = { path = "./layout_map" }

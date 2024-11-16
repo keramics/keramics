@@ -12,7 +12,7 @@
  */
 
 use keramics::formatters::format_as_string;
-use keramics::hashes::Md5Context;
+use keramics::hashes::{DigestHashContext, Md5Context};
 
 const MD5_TEST_VECTORS: [(&'static str, &'static [u8]); 196] = [
     ("d41d8cd98f00b204e9800998ecf8427e", &[]),

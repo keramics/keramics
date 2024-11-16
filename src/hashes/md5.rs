@@ -15,6 +15,8 @@
 //!
 //! Provides support for calculating a MD5 hash (RFC 1321).
 
+use super::traits::DigestHashContext;
+
 /// MD5 block size.
 const MD5_BLOCK_SIZE: usize = 64;
 
@@ -70,41 +72,6 @@ impl Md5Context {
         }
     }
 
-    /// Finalizes the hash calculation.
-    pub fn finalize(&mut self) -> Vec<u8> {
-        let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;
-
-        // Add padding with a size of 56 mod 64
-        let padding_size: usize = MD5_BLOCK_SIZE * if self.block_offset >= 56 { 2 } else { 1 };
-
-        let bit_size_block_offset: usize = padding_size - 8;
-
-        // The first byte of the padding contains 0x80
-        self.block[self.block_offset] = 0x80;
-        self.block[self.block_offset + 1..bit_size_block_offset].fill(0);
-        self.block[bit_size_block_offset..padding_size].copy_from_slice(&bit_size.to_le_bytes());
-
-        for block_offset in (0..padding_size).step_by(MD5_BLOCK_SIZE) {
-            let hash_values: [u32; 4] =
-                self.transform_block(&self.hash_values, &self.block, block_offset);
-
-            self.hash_values.copy_from_slice(&hash_values);
-        }
-        let hash: Vec<u8> = self
-            .hash_values
-            .iter()
-            .map(|hash_value| hash_value.to_le_bytes())
-            .flatten()
-            .collect::<Vec<u8>>();
-
-        self.hash_values = MD5_HASH_VALUES;
-        self.number_of_bytes_hashed = 0;
-        self.block_offset = 0;
-        self.block.fill(0);
-
-        hash
-    }
-
     /// Calculates the hash of a block of data.
     #[inline(always)]
     fn transform_block(
@@ -152,9 +119,46 @@ impl Md5Context {
         }
         block_hashes
     }
+}
 
-    /// Calculates the hash of the data.
-    pub fn update(&mut self, data: &[u8]) {
+impl DigestHashContext for Md5Context {
+    /// Finalizes the digest hash calculation.
+    fn finalize(&mut self) -> Vec<u8> {
+        let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;
+
+        // Add padding with a size of 56 mod 64
+        let padding_size: usize = MD5_BLOCK_SIZE * if self.block_offset >= 56 { 2 } else { 1 };
+
+        let bit_size_block_offset: usize = padding_size - 8;
+
+        // The first byte of the padding contains 0x80
+        self.block[self.block_offset] = 0x80;
+        self.block[self.block_offset + 1..bit_size_block_offset].fill(0);
+        self.block[bit_size_block_offset..padding_size].copy_from_slice(&bit_size.to_le_bytes());
+
+        for block_offset in (0..padding_size).step_by(MD5_BLOCK_SIZE) {
+            let hash_values: [u32; 4] =
+                self.transform_block(&self.hash_values, &self.block, block_offset);
+
+            self.hash_values.copy_from_slice(&hash_values);
+        }
+        let hash: Vec<u8> = self
+            .hash_values
+            .iter()
+            .map(|hash_value| hash_value.to_le_bytes())
+            .flatten()
+            .collect::<Vec<u8>>();
+
+        self.hash_values = MD5_HASH_VALUES;
+        self.number_of_bytes_hashed = 0;
+        self.block_offset = 0;
+        self.block.fill(0);
+
+        hash
+    }
+
+    /// Calculates the digest hash of the data.
+    fn update(&mut self, data: &[u8]) {
         let data_size: usize = data.len();
         let mut data_offset: usize = 0;
 
