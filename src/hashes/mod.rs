@@ -13,6 +13,12 @@
 
 mod md5;
 mod sha1;
+mod sha224;
+mod sha256;
+mod sha512;
 
 pub use md5::Md5Context;
 pub use sha1::Sha1Context;
+pub use sha224::Sha224Context;
+pub use sha256::Sha256Context;
+pub use sha512::Sha512Context;
