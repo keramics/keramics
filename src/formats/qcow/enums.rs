@@ -11,10 +11,18 @@
  * under the License.
  */
 
-// Storage media image formats
-pub mod qcow;
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
+pub enum QcowCompressionMethod {
+    Unknown,
+    #[default]
+    Zlib,
+}
 
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
+pub enum QcowEncryptionMethod {
+    AesCbc128,
+    Luks,
+    #[default]
+    None,
+    Unknown,
+}

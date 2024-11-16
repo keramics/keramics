@@ -11,10 +11,5 @@
  * under the License.
  */
 
-// Storage media image formats
-pub mod qcow;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
+/// QCOW file header signature.
+pub(super) const QCOW_FILE_HEADER_SIGNATURE: [u8; 4] = [0x51, 0x46, 0x49, 0xfb]; // "QFI\xfb"
