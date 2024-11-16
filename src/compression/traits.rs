@@ -11,12 +11,11 @@
  * under the License.
  */
 
-mod adc;
-mod deflate;
-mod huffman;
-mod traits;
-mod zlib;
+/// Bitstream trait.
+pub trait Bitstream {
+    /// Retrieves a bit values.
+    fn get_value(&mut self, number_of_bits: usize) -> u32;
 
-pub use adc::AdcContext;
-pub use deflate::DeflateContext;
-pub use zlib::ZlibContext;
+    /// Skips a number of bits.
+    fn skip_bits(&mut self, number_of_bits: usize);
+}
