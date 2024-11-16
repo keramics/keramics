@@ -11,5 +11,6 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod macros;
+mod adler32;
+
+pub use adler32::Adler32Context;
