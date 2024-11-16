@@ -12,7 +12,13 @@
  */
 
 mod byte_string;
+mod errors;
 mod shared_value;
+mod utf16_string;
+mod uuid;
 
 pub use byte_string::ByteString;
+pub use errors::{InsertError, ParseError};
 pub use shared_value::{SharedValue, SharedValueLockError, SharedValueLockResult};
+pub use utf16_string::Utf16String;
+pub use uuid::Uuid;

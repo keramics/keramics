@@ -13,3 +13,4 @@
 
 // Volume system formats
 pub mod apm;
+pub mod gpt;
