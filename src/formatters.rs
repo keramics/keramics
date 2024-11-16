@@ -136,6 +136,14 @@ pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
     return string_parts.join("");
 }
 
+/// Formats a bytes as a string.
+pub fn format_as_string(data: &[u8]) -> String {
+    data.iter()
+        .map(|byte_value| format!("{:02x}", byte_value))
+        .collect::<Vec<String>>()
+        .join("")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,5 +333,15 @@ mod tests {
 
         let string: String = format_as_hexdump(&test_data, true);
         assert_eq!(string, expected_string);
+    }
+
+    #[test]
+    fn test_format_as_string() {
+        let test_data: [u8; 16] = [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+        let string: String = format_as_string(&test_data);
+        assert_eq!(string, "000102030405060708090a0b0c0d0e0f");
     }
 }

@@ -11,9 +11,6 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
+mod md5;
+
+pub use md5::Md5Context;
