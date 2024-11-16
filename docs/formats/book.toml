@@ -7,3 +7,6 @@ src = "src"
 
 [output.html]
 additional-css = ["custom.css"]
+
+[preprocessor.tables]
+command = "cargo run --manifest-path=mdbook-tables/Cargo.toml --locked"

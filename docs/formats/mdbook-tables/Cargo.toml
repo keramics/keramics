@@ -1,0 +1,10 @@
+[package]
+name = "mdbook-tables"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+mdbook = { version = "0.4.42" }
+pulldown-cmark = { version = "0.12.2" }
+pulldown-cmark-to-cmark = { version = "18.0.0" }
+serde_json = { version = "1.0.132" }
