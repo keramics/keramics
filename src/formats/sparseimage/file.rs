@@ -1,0 +1,493 @@
+/* Copyright 2024 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::io;
+use std::io::{Read, Seek};
+
+use crate::mediator::{Mediator, MediatorReference};
+use crate::types::{BlockTree, SharedValue};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
+
+use super::block_range::SparseImageBlockRange;
+use super::file_header::SparseImageFileHeader;
+
+/// Mac OS sparse image (.sparseimage) file.
+pub struct SparseImageFile {
+    /// Mediator.
+    mediator: MediatorReference,
+
+    /// Data stream.
+    data_stream: VfsDataStreamReference,
+
+    /// Block tree.
+    block_tree: BlockTree<SparseImageBlockRange>,
+
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
+    /// Block size.
+    pub block_size: u32,
+
+    /// Media size.
+    pub media_size: u64,
+
+    /// Media offset.
+    media_offset: u64,
+}
+
+impl SparseImageFile {
+    /// Creates a file.
+    pub fn new() -> Self {
+        Self {
+            mediator: Mediator::current(),
+            data_stream: SharedValue::none(),
+            block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
+            bytes_per_sector: 0,
+            block_size: 0,
+            media_size: 0,
+            media_offset: 0,
+        }
+    }
+
+    /// Opens a file.
+    pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
+        self.data_stream = file_system.open_data_stream(path, None)?;
+
+        self.read_file()
+    }
+
+    /// Reads the file header and bands array.
+    fn read_file(&mut self) -> io::Result<()> {
+        let mut data: [u8; 4096] = [0; 4096];
+
+        match self.data_stream.with_write_lock() {
+            Ok(mut data_stream) => {
+                data_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(0))?
+            }
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        let mut file_header: SparseImageFileHeader = SparseImageFileHeader::new();
+
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "SparseImageFileHeader data of size: 64 at offset: 0 (0x00000000)\n",
+            ));
+            self.mediator.debug_print_data(&data[0..64], true);
+            self.mediator
+                .debug_print(file_header.debug_read_data(&data[0..64]));
+        }
+        file_header.read_data(&data[0..64])?;
+
+        let number_of_bands: u32 = file_header
+            .number_of_sectors
+            .div_ceil(file_header.sectors_per_band);
+
+        if number_of_bands > (4096 - 64) / 4 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid number of bands: {} value out of bounds",
+                    number_of_bands
+                ),
+            ));
+        }
+        if self.mediator.debug_output {
+            let data_size: usize = (number_of_bands as usize) * 4;
+            let data_end_offset: usize = 64 + data_size;
+
+            self.mediator.debug_print(format!(
+                "SparseImageBandNumbersArray data of size: {} at offset: 64 (0x00000040)\n",
+                data_size,
+            ));
+            self.mediator
+                .debug_print_data(&data[64..data_end_offset], true);
+        }
+        self.bytes_per_sector = 512;
+        self.block_size = file_header.sectors_per_band * (self.bytes_per_sector as u32);
+        self.media_size = (file_header.number_of_sectors as u64) * (self.bytes_per_sector as u64);
+
+        let block_tree_size: u64 = (number_of_bands as u64) * (self.block_size as u64);
+
+        self.block_tree = BlockTree::<SparseImageBlockRange>::new(
+            block_tree_size,
+            file_header.sectors_per_band as u64,
+            512,
+        );
+        let mut data_offset: usize = 64;
+
+        if self.mediator.debug_output {
+            self.mediator
+                .debug_print(format!("SparseImageBandNumbersArray {{\n"));
+            self.mediator.debug_print(format!("    band_numbers: [\n"));
+        }
+        for array_index in 0..number_of_bands {
+            let band_number: u32 = crate::bytes_to_u32_be!(data, data_offset);
+            data_offset += 4;
+
+            if self.mediator.debug_output {
+                if array_index % 16 == 0 {
+                    self.mediator
+                        .debug_print(format!("        {}", band_number));
+                } else if array_index % 16 == 15 {
+                    self.mediator.debug_print(format!(", {},\n", band_number));
+                } else {
+                    self.mediator.debug_print(format!(", {}", band_number));
+                }
+            }
+            if band_number == 0 {
+                continue;
+            }
+            let block_media_offset: u64 = ((band_number - 1) as u64) * (self.block_size as u64);
+            let band_data_offset: u64 = 4096 + ((array_index as u64) * (self.block_size as u64));
+
+            let block_range: SparseImageBlockRange =
+                SparseImageBlockRange::new(block_media_offset, band_data_offset);
+            match self.block_tree.insert_value(
+                block_media_offset,
+                self.block_size as u64,
+                block_range,
+            ) {
+                Ok(_) => {}
+                Err(error) => return Err(crate::error_to_io_error!(error)),
+            };
+        }
+        if self.mediator.debug_output {
+            if number_of_bands % 16 != 0 {
+                self.mediator.debug_print(format!("\n"));
+            }
+            self.mediator.debug_print(format!("    ],\n"));
+            self.mediator.debug_print(format!("}}\n"));
+        }
+        Ok(())
+    }
+
+    /// Reads media data based on the block ranges in the block tree.
+    fn read_data_from_bands(&mut self, data: &mut [u8]) -> io::Result<usize> {
+        let read_size: usize = data.len();
+        let mut data_offset: usize = 0;
+        let mut media_offset: u64 = self.media_offset;
+        let mut block_number: u64 = media_offset / (self.block_size as u64);
+        let mut block_offset: u64 = block_number * (self.block_size as u64);
+        let mut range_relative_offset: u64 = media_offset - block_offset;
+        let mut range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
+
+        while data_offset < read_size {
+            if media_offset >= self.media_size {
+                break;
+            }
+            let mut range_read_size: usize = read_size - data_offset;
+
+            if (range_read_size as u64) > range_remainder_size {
+                range_read_size = range_remainder_size as usize;
+            }
+            let data_end_offset: usize = data_offset + range_read_size;
+
+            let block_tree_value: Option<&SparseImageBlockRange> =
+                self.block_tree.get_value(media_offset);
+
+            let range_read_count: usize = match block_tree_value {
+                Some(block_range) => match self.data_stream.with_write_lock() {
+                    Ok(mut data_stream) => data_stream.read_at_position(
+                        &mut data[data_offset..data_end_offset],
+                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                    )?,
+                    Err(error) => return Err(crate::error_to_io_error!(error)),
+                },
+                None => {
+                    data[data_offset..data_end_offset].fill(0);
+
+                    range_read_size
+                }
+            };
+            if range_read_count == 0 {
+                break;
+            }
+            data_offset += range_read_count;
+            media_offset += range_read_count as u64;
+
+            block_number += 1;
+            block_offset += self.block_size as u64;
+            range_relative_offset = 0;
+            range_remainder_size = self.block_size as u64;
+        }
+        Ok(data_offset)
+    }
+}
+
+impl Read for SparseImageFile {
+    /// Reads media data.
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        if self.media_offset >= self.media_size {
+            return Ok(0);
+        }
+        let remaining_media_size: u64 = self.media_size - self.media_offset;
+        let mut read_size: usize = buf.len();
+
+        if (read_size as u64) > remaining_media_size {
+            read_size = remaining_media_size as usize;
+        }
+        let read_count: usize = self.read_data_from_bands(&mut buf[..read_size])?;
+
+        self.media_offset += read_count as u64;
+
+        Ok(read_count)
+    }
+}
+
+impl Seek for SparseImageFile {
+    /// Sets the current position of the media data.
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.media_offset = match pos {
+            io::SeekFrom::Current(relative_offset) => {
+                let mut current_offset: i64 = self.media_offset as i64;
+                current_offset += relative_offset;
+                current_offset as u64
+            }
+            io::SeekFrom::End(relative_offset) => {
+                let mut end_offset: i64 = self.media_size as i64;
+                end_offset += relative_offset;
+                end_offset as u64
+            }
+            io::SeekFrom::Start(offset) => offset,
+        };
+        Ok(self.media_offset)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::vfs::{VfsFileSystemReference, VfsPathType, VfsResolver, VfsResolverReference};
+
+    #[test]
+    fn test_open() -> io::Result<()> {
+        Mediator { debug_output: true }.make_current();
+
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        assert_eq!(file.bytes_per_sector, 512);
+        assert_eq!(file.block_size, 1048576);
+        assert_eq!(file.media_size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_start() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        let offset: u64 = file.seek(io::SeekFrom::Start(1024))?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_end() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        let offset: u64 = file.seek(io::SeekFrom::End(-512))?;
+        assert_eq!(offset, file.media_size - 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_current() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        let offset = file.seek(io::SeekFrom::Start(1024))?;
+        assert_eq!(offset, 1024);
+
+        let offset: u64 = file.seek(io::SeekFrom::Current(-512))?;
+        assert_eq!(offset, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_beyond_media_size() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        let offset: u64 = file.seek(io::SeekFrom::End(512))?;
+        assert_eq!(offset, file.media_size + 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        file.seek(io::SeekFrom::Start(1024))?;
+
+        let mut data: Vec<u8> = vec![0; 512];
+        let read_size: usize = file.read(&mut data)?;
+        assert_eq!(read_size, 512);
+
+        let expected_data: Vec<u8> = vec![
+            0x00, 0x53, 0x46, 0x48, 0x00, 0x00, 0xaa, 0x11, 0xaa, 0x11, 0x00, 0x30, 0x65, 0x43,
+            0xec, 0xac, 0xe6, 0x77, 0xe9, 0x5a, 0xc7, 0xc3, 0x9b, 0x42, 0xbd, 0x1e, 0xf7, 0x4e,
+            0x9d, 0xd7, 0xa2, 0x9e, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x64, 0x00, 0x69, 0x00, 0x73, 0x00, 0x6b, 0x00, 0x20, 0x00, 0x69, 0x00, 0x6d, 0x00,
+            0x61, 0x00, 0x67, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        assert_eq!(data, expected_data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        match vfs_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        file.seek(io::SeekFrom::End(512))?;
+
+        let mut data: Vec<u8> = vec![0; 512];
+        let read_size: usize = file.read(&mut data)?;
+        assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+}
