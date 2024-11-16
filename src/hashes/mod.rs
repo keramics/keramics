@@ -12,5 +12,7 @@
  */
 
 mod md5;
+mod sha1;
 
 pub use md5::Md5Context;
+pub use sha1::Sha1Context;
