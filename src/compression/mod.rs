@@ -12,11 +12,13 @@
  */
 
 mod adc;
+mod bzip2;
 mod deflate;
 mod huffman;
 mod traits;
 mod zlib;
 
 pub use adc::AdcContext;
+pub use bzip2::Bzip2Context;
 pub use deflate::DeflateContext;
 pub use zlib::ZlibContext;
