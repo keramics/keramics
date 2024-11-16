@@ -1,0 +1,13 @@
+[package]
+name = "keramics"
+description = "Analysis of data formats"
+version = "0.0.0"
+edition = "2021"
+authors = ["Joachim Metz <joachim.metz@gmail.com>"]
+license = "Apache-2.0"
+
+[lib]
+name = "keramics"
+path = "src/lib.rs"
+
+[dependencies]
