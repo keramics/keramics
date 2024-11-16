@@ -11,11 +11,6 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod types;
-pub mod vfs;
+mod os;
+
+pub use os::OsVfsFileSystem;

@@ -11,11 +11,22 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod types;
-pub mod vfs;
+mod context;
+mod data_streams;
+mod enums;
+mod file_entries;
+mod file_systems;
+mod path;
+mod resolver;
+mod traits;
+mod types;
+
+pub use context::VfsContext;
+pub use data_streams::*;
+pub use enums::*;
+pub use file_entries::*;
+pub use file_systems::*;
+pub use path::VfsPath;
+pub use resolver::VfsResolver;
+pub use traits::*;
+pub use types::*;

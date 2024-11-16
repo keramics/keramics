@@ -11,11 +11,7 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod types;
-pub mod vfs;
+mod fake;
+pub mod os;
+
+pub use fake::new_fake_data_stream;

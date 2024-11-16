@@ -11,6 +11,14 @@
  * under the License.
  */
 
+/// Converts an error into an io::Error.
+#[macro_export]
+macro_rules! error_to_io_error {
+    ( $error:expr ) => {
+        io::Error::new(io::ErrorKind::Other, $error.to_string())
+    };
+}
+
 /// Copy byte values in big-endian order to a 16-bit signed integer.
 #[macro_export]
 macro_rules! bytes_to_i16_be {
