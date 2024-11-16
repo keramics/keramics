@@ -11,6 +11,35 @@
  * under the License.
  */
 
+/// Formats an array for debugging purposes.
+pub fn debug_format_array(array: &Vec<String>) -> String {
+    // TODO: pass string for indentation?
+    let number_of_values: usize = array.len();
+    let string_value: &String = &array[0];
+    let mut use_short_hand: bool = true;
+
+    for array_value in array.iter() {
+        if string_value != array_value {
+            use_short_hand = false;
+            break;
+        }
+    }
+    if use_short_hand {
+        return format!("[{}; {}]", string_value, number_of_values);
+    }
+    if number_of_values > 16 {
+        let mut string_parts: Vec<String> = Vec::new();
+        let last_value_index: usize = number_of_values - 16;
+        for value_index in (0..last_value_index).step_by(16) {
+            string_parts.push(array[value_index..value_index + 16].join(", "));
+        }
+        string_parts.push(array[last_value_index..].join(", "));
+
+        return format!("[\n        {}\n    ]", string_parts.join(",\n        "));
+    }
+    return format!("[{}]", array.join(", "));
+}
+
 /// Formats a bytes as a hexdump.
 pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
     let mut ascii_values: [char; 16] = ['.'; 16];
@@ -110,6 +139,30 @@ pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_debug_format_array() {
+        let test_data: Vec<String> = ["0"; 16]
+            .iter()
+            .map(|v| v.to_string())
+            .collect::<Vec<String>>();
+
+        let string: String = debug_format_array(&test_data);
+        assert_eq!(string, "[0; 16]");
+
+        let test_data: Vec<String> = [
+            "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15",
+        ]
+        .iter()
+        .map(|v| v.to_string())
+        .collect::<Vec<String>>();
+
+        let string: String = debug_format_array(&test_data);
+        assert_eq!(
+            string,
+            "[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]"
+        );
+    }
 
     #[test]
     fn test_format_as_hexdump_0bytes() {
