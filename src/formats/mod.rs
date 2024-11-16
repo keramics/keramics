@@ -13,6 +13,7 @@
 
 // Storage media image formats
 pub mod qcow;
+pub mod vhd;
 
 // Volume system formats
 pub mod apm;
