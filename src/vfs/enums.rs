@@ -30,6 +30,7 @@ pub enum VfsFileType {
 pub enum VfsPathType {
     Apm,
     Gpt,
+    Mbr,
     #[default]
     NotSet,
     Os,
