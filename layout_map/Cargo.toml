@@ -1,0 +1,19 @@
+[package]
+name = "layout_map"
+description = "Layout map procedural macros"
+version = "0.0.0"
+edition = "2021"
+authors = ["Joachim Metz <joachim.metz@gmail.com>"]
+license = "Apache-2.0"
+
+[lib]
+name = "layout_map"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+darling = { version = "0.20.10" }
+prettyplease = { version = "0.2.24" }
+proc-macro2 = { version = "1.0.88" }
+quote = { version = "1.0.37" }
+syn = { version = "2.0.82" }

@@ -11,3 +11,4 @@ name = "keramics"
 path = "src/lib.rs"
 
 [dependencies]
+layout_map = { path = "./layout_map" }
