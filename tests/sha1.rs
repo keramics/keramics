@@ -12,7 +12,7 @@
  */
 
 use keramics::formatters::format_as_string;
-use keramics::hashes::Sha1Context;
+use keramics::hashes::{DigestHashContext, Sha1Context};
 
 const SHA1_TEST_VECTORS: [(&'static str, &'static [u8]); 196] = [
     ("da39a3ee5e6b4b0d3255bfef95601890afd80709", &[]),

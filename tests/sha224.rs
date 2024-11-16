@@ -12,7 +12,7 @@
  */
 
 use keramics::formatters::format_as_string;
-use keramics::hashes::Sha224Context;
+use keramics::hashes::{DigestHashContext, Sha224Context};
 
 const SHA224_TEST_VECTORS: [(&'static str, &'static [u8]); 196] = [
     (

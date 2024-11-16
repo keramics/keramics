@@ -11,16 +11,11 @@
  * under the License.
  */
 
-mod md5;
-mod sha1;
-mod sha224;
-mod sha256;
-mod sha512;
-mod traits;
+/// Digest hash context trait.
+pub trait DigestHashContext {
+    /// Finalizes the digest hash calculation.
+    fn finalize(&mut self) -> Vec<u8>;
 
-pub use md5::Md5Context;
-pub use sha1::Sha1Context;
-pub use sha224::Sha224Context;
-pub use sha256::Sha256Context;
-pub use sha512::Sha512Context;
-pub use traits::DigestHashContext;
+    /// Calculates the digest hash of the data.
+    fn update(&mut self, data: &[u8]);
+}
