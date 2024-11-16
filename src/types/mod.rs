@@ -11,6 +11,8 @@
  * under the License.
  */
 
+mod byte_string;
 mod shared_value;
 
+pub use byte_string::ByteString;
 pub use shared_value::{SharedValue, SharedValueLockError, SharedValueLockResult};

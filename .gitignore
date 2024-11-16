@@ -1,5 +1,5 @@
 # Ignore auto-generated files and directories.
 *.sw*
 Cargo.lock
+book
 target
-formats/book
