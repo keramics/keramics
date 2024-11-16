@@ -12,5 +12,7 @@
  */
 
 mod adler32;
+mod crc32;
 
 pub use adler32::Adler32Context;
+pub use crc32::{Crc32Context, ReversedCrc32Context};
