@@ -36,4 +36,5 @@ pub enum VfsPathType {
     Os,
     Qcow,
     Vhd,
+    Vhdx,
 }

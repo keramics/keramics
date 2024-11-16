@@ -19,6 +19,7 @@ use crate::formats::gpt::GptVolumeSystem;
 use crate::formats::mbr::MbrVolumeSystem;
 use crate::formats::qcow::QcowImage;
 use crate::formats::vhd::VhdImage;
+use crate::formats::vhdx::VhdxImage;
 use crate::types::SharedValue;
 
 use super::enums::VfsPathType;
@@ -60,6 +61,7 @@ impl VfsContext {
             VfsPathType::Os => Box::new(OsVfsFileSystem::new()),
             VfsPathType::Qcow => Box::new(QcowImage::new()),
             VfsPathType::Vhd => Box::new(VhdImage::new()),
+            VfsPathType::Vhdx => Box::new(VhdxImage::new()),
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
