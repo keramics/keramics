@@ -13,6 +13,7 @@
 
 // Storage media image formats
 pub mod qcow;
+pub mod sparseimage;
 pub mod vhd;
 pub mod vhdx;
 
