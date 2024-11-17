@@ -1,0 +1,542 @@
+/* Copyright 2024 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+// XML plist grammar based on:
+// * https://www.w3.org/TR/xml/
+// * https://www.apple.com/DTDs/PropertyList-1.0.dtd
+
+byte_order_mark = _{
+    "\u{feff}"
+}
+
+character = _{
+    "\u{0009}" |
+    "\u{000a}" |
+    "\u{000d}" |
+    '\u{0020}'..'\u{d7ff}' |
+    '\u{e000}'..'\u{fffd}' |
+    '\u{10000}'..'\u{10ffff}'
+}
+
+equals = {
+    white_space? ~ "=" ~ white_space?
+}
+
+white_space = _{
+    ("\u{0020}" | "\u{0009}" | "\u{000a}" | "\u{000d}")+
+}
+
+name = {
+    name_first_character ~ name_character*
+}
+
+name_character = _{
+    name_first_character |
+    "-" |
+    "." |
+    '0'..'9' |
+    "\u{00b7}" |
+    '\u{0300}'..'\u{036f}' |
+    '\u{203f}'..'\u{2040}'
+}
+
+name_first_character = _{
+    ":" |
+    'A'..'Z' |
+    "_" |
+    'a'..'z' |
+    '\u{00c0}'..'\u{00d6}' |
+    '\u{00d8}'..'\u{00f6}' |
+    '\u{00f8}'..'\u{02ff}' |
+    '\u{0370}'..'\u{037d}' |
+    '\u{037f}'..'\u{1fff}' |
+    '\u{200c}'..'\u{200d}' |
+    '\u{2070}'..'\u{218f}' |
+    '\u{2c00}'..'\u{2fef}' |
+    '\u{3001}'..'\u{d7ff}' |
+    '\u{f900}'..'\u{fdcf}' |
+    '\u{fdf0}'..'\u{fffd}' |
+    '\u{10000}'..'\u{effff}'
+}
+
+name_token = {
+    name_character+
+}
+
+name_tokens = _{
+    name_token ~ ("\u{0020}" ~ name_token)*
+}
+
+names = _{
+    name ~ ("\u{0020}" ~ name)*
+}
+
+attribute = {
+    name ~ equals ~ attribute_value
+}
+
+attribute_value = {
+    ("\"" ~ ( (!("<" | "&" | "\"") ~ character) | reference)* ~ "\"") |
+    ("'" ~ ( (!("<" | "&" | "'") ~ character) | reference)* ~ "'")
+}
+
+entity_first_character = _{
+    !("<" | "&") ~ character
+}
+
+entity_value = {
+    ("\"" ~ ( (!("%" | "&" | "\"") ~ character) | parameter_entity_reference | reference)* ~ "\"") |
+    ("'" ~ ( (!("%" | "&" | "'") ~ character) | parameter_entity_reference | reference)* ~ "'")
+}
+
+system_literal = {
+    ("\"" ~ (!"\"" ~ character)* ~ "\"") |
+    ("'" ~ (!"'" ~ character)* ~ "'")
+}
+
+public_identifier_character = _{
+    "\u{0020}" |
+    "\u{000D}" |
+    "\u{000A}" |
+    'a'..'z' |
+    'A'..'Z' |
+    '0'..'9' |
+    "-" |
+    "'" |
+    "(" |
+    ")" |
+    "+" |
+    "," |
+    "." |
+    "/" |
+    ":" |
+    "=" |
+    "?" |
+    ";" |
+    "!" |
+    "*" |
+    "#" |
+    "@" |
+    "$" |
+    "_" |
+    "%"
+}
+
+public_identifier_literal = {
+    ("\"" ~ (!"\"" ~ public_identifier_character)* ~ "\"") |
+    ("'" ~ (!"'" ~ public_identifier_character)* ~ "'")
+}
+
+character_data = {
+    !((!cdata_section_end ~ entity_first_character)* ~ cdata_section_end) ~ entity_first_character*
+}
+
+comment = {
+    "<!--" ~ ( (!"-" ~ character) |
+    ("-" ~ (!"-" ~ character)))* ~ "-->"
+}
+
+processing_instructions = {
+    "<?" ~ processing_instructions_target ~ (white_space ~ (processing_instructions_data))? ~ "?>"
+}
+
+processing_instructions_data = {
+    (!"?>" ~ character)*
+}
+
+processing_instructions_target = {
+    !( ("X" | "x") ~ ("M" | "m") ~ ("L" | "l") ) ~ name
+}
+
+cdata = {
+    (!cdata_section_end ~ character)*
+}
+
+cdata_section = {
+    cdata_section_start ~ cdata ~ cdata_section_end
+}
+
+cdata_section_end = _{
+    "]]>"
+}
+
+cdata_section_start = _{
+    "<![CDATA["
+}
+
+xml_declaration = {
+    "<?xml" ~ version_information ~ encoding_declaration? ~ standalone_document_declaration? ~ white_space? ~ "?>"
+}
+
+version_number = {
+    "1." ~ ('0'..'9')+
+}
+
+version_information = {
+    white_space ~ "version" ~ equals ~ (("'" ~ version_number ~ "'") |
+    ("\"" ~ version_number ~ "\""))
+}
+
+miscellaneous = {
+    comment | processing_instructions | white_space
+}
+
+doctype_declaration = {
+    "<!DOCTYPE" ~ white_space ~ name ~ (white_space ~ external_identifier)? ~ white_space? ~ ("[" ~ internal_subset ~ "]" ~ white_space?)? ~ ">"
+}
+
+declaration_separator = {
+    parameter_entity_reference | white_space
+}
+
+internal_subset = {
+    (markup_declaration | declaration_separator)*
+}
+
+markup_declaration = {
+    element_declaration | attribute_list_declaration | entity_declaration | notation_declaration | processing_instructions | comment
+}
+
+external_subset = { text_declaration? ~ external_subset_declaration }
+
+external_subset_declaration = { ( markup_declaration | conditional_section | declaration_separator )* }
+
+standalone_document_declaration = {
+    white_space ~ "standalone" ~ equals ~ (("'" ~ ("yes" | "no") ~ "'") | ("\"" ~ ("yes" | "no") ~ "\""))
+}
+
+element_declaration = {
+    "<!ELEMENT" ~ white_space ~ name ~ white_space ~ content_specification ~ white_space? ~ ">"
+}
+
+children = {
+    (choice | sequence) ~ ("?" | "*" | "+")?
+}
+
+choice = {
+    "(" ~ white_space? ~ content_particle ~ ( white_space? ~ "|" ~ white_space? ~ content_particle)+ ~ white_space? ~ ")"
+}
+
+content_particle = {
+    (name | choice | sequence) ~ ("?" | "*" | "+")?
+}
+
+content_specification = {
+    "EMPTY" |
+    "ANY" |
+    mixed_content |
+    children
+}
+
+mixed_content = {
+    ("(" ~ white_space? ~ "#PCDATA" ~ (white_space? ~ "|" ~ white_space? ~ name)* ~ white_space? ~ ")*") |
+    ("(" ~ white_space? ~ "#PCDATA" ~ white_space? ~ ")")
+}
+
+sequence = {
+    "(" ~ white_space? ~ content_particle ~ ( white_space? ~ "," ~ white_space? ~ content_particle )* ~ white_space? ~ ")"
+}
+
+attribute_list_declaration = {
+    "<!ATTLIST" ~ white_space ~ name ~ attribute_definition* ~ white_space? ~ ">"
+}
+
+attribute_definition = {
+    white_space ~ name ~ white_space ~ attribute_type ~ white_space ~ default_declaration
+}
+
+attribute_type = {
+    string_type | tokenized_type | enumerated_type
+}
+
+string_type = {
+    "CDATA"
+}
+
+tokenized_type = {
+    "IDREFS" |
+    "IDREF" |
+    "ID" |
+    "ENTITY" |
+    "ENTITIES" |
+    "NMTOKENS" |
+    "NMTOKEN"
+}
+
+enumerated_type = {
+    notation_type | enumeration
+}
+
+notation_type = {
+    "NOTATION" ~ white_space ~ "(" ~ white_space? ~ name ~ (white_space? ~ "|" ~ white_space? ~ name)* ~ white_space? ~ ")"
+}
+
+enumeration = {
+    "(" ~ white_space? ~ name_token ~ (white_space? ~ "|" ~ white_space? ~ name_token)* ~ white_space? ~ ")"
+}
+
+default_declaration = {
+    "#REQUIRED" | "#IMPLIED" | (("#FIXED" ~ white_space)? ~ attribute_value)
+}
+
+conditional_section = {
+    include_section | ignore_section
+}
+
+include_section = {
+    "<![" ~ white_space? ~ "INCLUDE" ~ white_space? ~ "[" ~ external_subset_declaration ~ "]]>"
+}
+
+// TODO: "<![" ~ white_space? ~ "IGNORE" ~ white_space? ~ "[" ~ ignore_section_contents* ~ "]]>"
+ignore_section = {
+    "<![" ~ white_space? ~ "IGNORE" ~ white_space? ~ "[" ~ ignore_section_contents ~ "]]>"
+}
+
+ignore_section_contents = {
+    ignore ~ ("<![" ~ ignore_section_contents ~ "]]>" ~ ignore)* }
+
+ignore = {
+    !(character* ~ ("<![" | "]]>") ~ character*) ~ character*
+}
+
+character_reference = {
+    ("&#" ~ '0'..'9'+ ~ ";") |
+    ("&#x" ~ ('0'..'9' | 'a'..'f' | 'A'..'F')+ ~ ";")
+}
+
+reference = {
+    entity_reference | character_reference
+}
+
+entity_reference = {
+    "&" ~ name ~ ";"
+}
+
+parameter_entity_reference = {
+    "%" ~ name ~ ";"
+}
+
+entity_declaration = {
+    general_entity_declaration | parsed_entity_declaration
+}
+
+general_entity_declaration = {
+    "<!ENTITY" ~ white_space ~ name ~ white_space ~ entity_definition ~ white_space? ~ ">"
+}
+
+parsed_entity_declaration = {
+    "<!ENTITY" ~ white_space ~ "%" ~ white_space ~ name ~ white_space ~ parsed_entity_definition ~ white_space? ~ ">"
+}
+
+entity_definition = {
+    entity_value | (external_identifier ~ ndata_declaration?)
+}
+
+parsed_entity_definition = {
+    entity_value | external_identifier
+}
+
+external_identifier = {
+    ("SYSTEM" ~ white_space ~ system_literal) |
+    ("PUBLIC" ~ white_space ~ public_identifier_literal ~ white_space ~ system_literal)
+}
+
+ndata_declaration = {
+    white_space ~ "NDATA" ~ white_space ~ name
+}
+
+text_declaration = {
+    "<?xml" ~ version_information? ~ encoding_declaration ~ white_space? ~ "?>"
+}
+
+encoding_declaration = {
+    white_space ~ "encoding" ~ equals ~ ( ("\"" ~ encoding_name ~ "\"") | ("'" ~ encoding_name ~ "'" ) )
+}
+
+encoding_name = {
+    ('A'..'Z' | 'a'..'z') ~ ('A'..'Z' | 'a'..'z' | '0'..'9' | "." | "_" | "-")*
+}
+
+notation_declaration = {
+    "<!NOTATION" ~ white_space ~ name ~ white_space ~ (external_identifier | public_identifier) ~ white_space? ~ ">"
+}
+
+public_identifier = {
+    "PUBLIC" ~ white_space ~ public_identifier_literal
+}
+
+plist_document = {
+    SOI ~ byte_order_mark? ~ plist_prolog ~ plist_element ~ miscellaneous* ~ EOI
+}
+
+plist_prolog = {
+    xml_declaration? ~ miscellaneous* ~ (plist_doctype_declaration ~ miscellaneous*)?
+}
+
+plist_doctype_declaration = {
+    "<!DOCTYPE" ~ white_space ~ "plist" ~ white_space ~ plist_external_identifier  ~ white_space? ~ ">"
+}
+
+plist_external_identifier = {
+    "PUBLIC" ~ white_space ~ plist_public_identifier_literal ~ white_space ~ plist_system_literal
+}
+
+plist_public_identifier_literal = {
+    "\"-//Apple//DTD PLIST 1.0//EN\"" |
+    "'-//Apple//DTD PLIST 1.0//EN'"
+}
+
+plist_system_literal = {
+    "\"http://www.apple.com/DTDs/PropertyList-1.0.dtd\"" |
+    "'http://www.apple.com/DTDs/PropertyList-1.0.dtd'"
+}
+
+plist_element = {
+    plist_element_start_tag ~ plist_content ~ plist_element_end_tag
+}
+
+plist_element_start_tag = {
+    "<plist" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_element_end_tag = {
+    "</plist" ~ white_space? ~ ">"
+}
+
+plist_content = {
+    character_data? ~ ((plist_object_element | reference | cdata_section | processing_instructions | comment) ~ character_data?)*
+}
+
+plist_object_element = {
+    plist_array_element |
+    plist_boolean_false_element |
+    plist_boolean_true_element |
+    plist_data_element |
+    plist_date_element |
+    plist_dict_element |
+    plist_floating_point_element |
+    plist_integer_element |
+    plist_string_element
+}
+
+plist_key_and_object_element_pair = {
+	plist_key_element ~ character_data? ~ plist_object_element
+}
+
+plist_boolean_false_element = {
+    "<false" ~ (white_space ~ attribute)* ~ white_space? ~ "/>"
+}
+
+plist_boolean_true_element = {
+    "<true" ~ (white_space ~ attribute)* ~ white_space? ~ "/>"
+}
+
+plist_array_element = {
+    plist_array_element_start_tag ~ plist_content ~ plist_array_element_end_tag
+}
+
+plist_array_element_start_tag = {
+    "<array" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_array_element_end_tag = {
+    "</array" ~ white_space? ~ ">"
+}
+
+plist_data_element = {
+    plist_data_element_start_tag ~ plist_content ~ plist_data_element_end_tag
+}
+
+plist_data_element_start_tag = {
+    "<data" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_data_element_end_tag = {
+    "</data" ~ white_space? ~ ">"
+}
+
+plist_date_element = {
+    plist_date_element_start_tag ~ plist_content ~ plist_date_element_end_tag
+}
+
+plist_date_element_start_tag = {
+    "<date" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_date_element_end_tag = {
+    "</date" ~ white_space? ~ ">"
+}
+
+plist_dict_element = {
+    plist_dict_element_start_tag ~ plist_dict_content ~ plist_dict_element_end_tag
+}
+
+plist_dict_element_start_tag = {
+    "<dict" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_dict_element_end_tag = {
+    "</dict" ~ white_space? ~ ">"
+}
+
+plist_dict_content = {
+    character_data? ~ ((plist_key_and_object_element_pair | reference | cdata_section | processing_instructions | comment) ~ character_data?)*
+}
+
+plist_floating_point_element = {
+    plist_floating_point_element_start_tag ~ plist_content ~ plist_floating_point_element_end_tag
+}
+
+plist_floating_point_element_start_tag = {
+    "<real" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_floating_point_element_end_tag = {
+    "</real" ~ white_space? ~ ">"
+}
+
+plist_integer_element = {
+    plist_integer_element_start_tag ~ plist_content ~ plist_integer_element_end_tag
+}
+
+plist_integer_element_start_tag = {
+    "<integer" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_integer_element_end_tag = {
+    "</integer" ~ white_space? ~ ">"
+}
+
+plist_key_element = {
+    plist_key_element_start_tag ~ plist_content ~ plist_key_element_end_tag
+}
+
+plist_key_element_start_tag = {
+    "<key" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_key_element_end_tag = {
+    "</key" ~ white_space? ~ ">"
+}
+
+plist_string_element = {
+    plist_string_element_start_tag ~ plist_content ~ plist_string_element_end_tag
+}
+
+plist_string_element_start_tag = {
+    "<string" ~ (white_space ~ attribute)* ~ white_space? ~ ">"
+}
+
+plist_string_element_end_tag = {
+    "</string" ~ white_space? ~ ">"
+}

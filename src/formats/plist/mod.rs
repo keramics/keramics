@@ -11,16 +11,7 @@
  * under the License.
  */
 
-// Data formats used in other formats.
-mod plist;
+mod object;
+mod xmlplist;
 
-// Storage media image formats
-pub mod qcow;
-pub mod sparseimage;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
+pub use xmlplist::XmlPlist;
