@@ -12,7 +12,14 @@
  */
 
 use std::fs::File;
+use std::io;
+use std::io::Seek;
 
 use crate::vfs::traits::VfsDataStream;
 
-impl VfsDataStream for File {}
+impl VfsDataStream for File {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        self.seek(io::SeekFrom::End(0))
+    }
+}

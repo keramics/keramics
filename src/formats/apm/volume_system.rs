@@ -12,13 +12,11 @@
  */
 
 use std::io;
-use std::rc::Rc;
 
 use crate::types::SharedValue;
 use crate::vfs::{
     VfsDataStreamReference, VfsFileEntry, VfsFileEntryReference, VfsFileSystem,
-    VfsFileSystemReference, VfsPath, VfsPathType, VfsResolver, VfsResolverReference,
-    WrapperVfsFileEntry,
+    VfsFileSystemReference, VfsPath, VfsPathType, WrapperVfsFileEntry,
 };
 
 use super::constants::*;
@@ -119,13 +117,6 @@ impl ApmVolumeSystem {
         Ok(Some(partition))
     }
 
-    /// Opens a volume system.
-    pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
-        self.data_stream = file_system.open_data_stream(path, None)?;
-
-        self.read_partition_map()
-    }
-
     /// Reads the partition map.
     fn read_partition_map(&mut self) -> io::Result<()> {
         let mut number_of_entries: u32 = 0;
@@ -191,6 +182,19 @@ impl VfsFileSystem for ApmVolumeSystem {
         }
     }
 
+    /// Opens a file system.
+    fn open(
+        &mut self,
+        parent_file_system: VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()> {
+        self.data_stream = match parent_file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, None)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        self.read_partition_map()
+    }
+
     /// Opens a file entry with the specified path.
     fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference> {
         if path.path_type != VfsPathType::Apm {
@@ -207,42 +211,6 @@ impl VfsFileSystem for ApmVolumeSystem {
 
         Ok(Box::new(file_entry))
     }
-
-    /// Opens a file system.
-    fn open_with_resolver(&mut self, path: &VfsPath) -> io::Result<()> {
-        if path.path_type != VfsPathType::Apm {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        if path.location != "/" {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Location in path is not /",
-            ));
-        }
-        let parent_path: Rc<VfsPath> = match path.get_parent() {
-            Some(value) => value,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing parent path",
-                ));
-            }
-        };
-        let parent_file_system_path: VfsPath = VfsPath::new_from_path(&parent_path, "/");
-
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-        let parent_file_system: VfsFileSystemReference =
-            vfs_resolver.open_file_system(&parent_file_system_path)?;
-
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => self.open(file_system.as_ref(), parent_path.as_ref())?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -254,16 +222,15 @@ mod tests {
     fn get_volume_system() -> io::Result<ApmVolumeSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => volume_system.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        volume_system.open(parent_file_system, &vfs_path)?;
+
         Ok(volume_system)
     }
 
@@ -339,16 +306,15 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => volume_system.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        volume_system.open(parent_file_system, &vfs_path)?;
+
         assert_eq!(volume_system.get_number_of_partitions(), 2);
 
         Ok(())
@@ -390,19 +356,6 @@ mod tests {
 
         let result = volume_system.open_file_entry(&test_vfs_path);
         assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_with_resolver() -> io::Result<()> {
-        let mut volume_system = ApmVolumeSystem::new();
-
-        let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/", Some(os_vfs_path));
-        volume_system.open_with_resolver(&vfs_path)?;
-
-        assert_eq!(volume_system.get_number_of_partitions(), 2);
 
         Ok(())
     }

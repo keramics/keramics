@@ -16,11 +16,14 @@ use std::io::{Read, Seek, SeekFrom};
 
 use super::enums::VfsFileType;
 use super::path::VfsPath;
-use super::types::{VfsDataStreamReference, VfsFileEntryReference};
+use super::types::{VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference};
 
 /// Virtual File System (VFS) data stream trait.
 pub trait VfsDataStream: Read + Seek {
     // TODO: add get_extents()
+
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64>;
 
     #[inline(always)]
     fn read_at_position(&mut self, data: &mut [u8], position: SeekFrom) -> io::Result<usize> {
@@ -72,6 +75,13 @@ pub trait VfsFileSystem {
         }
     }
 
+    /// Opens a file system.
+    fn open(
+        &mut self,
+        parent_file_system: VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()>;
+
     #[inline(always)]
     /// Opens a data stream with the specified path and name.
     fn open_data_stream(
@@ -85,7 +95,4 @@ pub trait VfsFileSystem {
 
     /// Opens a file entry with the specified path.
     fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference>;
-
-    /// Opens a file system.
-    fn open_with_resolver(&mut self, path: &VfsPath) -> io::Result<()>;
 }

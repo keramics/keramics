@@ -101,4 +101,9 @@ impl Seek for QcowLayer {
     }
 }
 
-impl VfsDataStream for QcowLayer {}
+impl VfsDataStream for QcowLayer {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+}

@@ -417,26 +417,45 @@ impl Seek for VhdFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsFileSystemReference, VfsPathType, VfsResolver, VfsResolverReference};
+    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPathType};
+
+    fn get_file() -> io::Result<VhdFile> {
+        let mut vfs_context: VfsContext = VfsContext::new();
+
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
+
+        let mut file: VhdFile = VhdFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
+        match parent_file_system.with_write_lock() {
+            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        Ok(file)
+    }
 
     #[test]
     fn test_get_parent_filename() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut file = VhdFile::new();
+        let mut file: VhdFile = VhdFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
             "./test_data/vhd/ntfs-differential.vhd",
             None,
         );
-        match vfs_file_system.with_write_lock() {
+        match parent_file_system.with_write_lock() {
             Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
+
         let parent_filename: Option<Ucs2String> = file.get_parent_filename();
         assert_eq!(parent_filename.unwrap().to_string(), "ntfs-parent.vhd");
 
@@ -445,10 +464,11 @@ mod tests {
 
     #[test]
     fn test_open() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut file = VhdFile::new();
 
@@ -457,7 +477,7 @@ mod tests {
             "./test_data/vhd/ntfs-differential.vhd",
             None,
         );
-        match vfs_file_system.with_write_lock() {
+        match parent_file_system.with_write_lock() {
             Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
@@ -479,18 +499,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: VhdFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = VhdFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset: u64 = file.seek(io::SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
@@ -499,18 +509,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: VhdFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = VhdFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset: u64 = file.seek(io::SeekFrom::End(-512))?;
         assert_eq!(offset, file.media_size - 512);
 
@@ -519,18 +519,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: VhdFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = VhdFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset = file.seek(io::SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
@@ -542,18 +532,8 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_media_size() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: VhdFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = VhdFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset: u64 = file.seek(io::SeekFrom::End(512))?;
         assert_eq!(offset, file.media_size + 512);
 
@@ -562,18 +542,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = VhdFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        let mut file: VhdFile = get_file()?;
         file.seek(io::SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -626,18 +595,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = VhdFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        let mut file: VhdFile = get_file()?;
         file.seek(io::SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];

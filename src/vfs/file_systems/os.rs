@@ -18,7 +18,7 @@ use crate::vfs::enums::VfsPathType;
 use crate::vfs::file_entries::OsVfsFileEntry;
 use crate::vfs::path::VfsPath;
 use crate::vfs::traits::{VfsFileEntry, VfsFileSystem};
-use crate::vfs::types::{VfsFileEntryReference, VfsPathReference};
+use crate::vfs::types::{VfsFileEntryReference, VfsFileSystemReference};
 
 /// Operating system file system.
 pub struct OsVfsFileSystem {}
@@ -57,6 +57,27 @@ impl VfsFileSystem for OsVfsFileSystem {
         }
     }
 
+    /// Opens a file system.
+    fn open(
+        &mut self,
+        parent_file_system: VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()> {
+        if parent_file_system.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unsupported parent file system",
+            ));
+        }
+        if path.path_type != VfsPathType::Os {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unsupported path type",
+            ));
+        }
+        Ok(())
+    }
+
     /// Opens a file entry with the specified path.
     fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference> {
         if path.path_type != VfsPathType::Os {
@@ -71,44 +92,22 @@ impl VfsFileSystem for OsVfsFileSystem {
 
         Ok(Box::new(file_entry))
     }
-
-    /// Opens a file system.
-    fn open_with_resolver(&mut self, path: &VfsPath) -> io::Result<()> {
-        if path.path_type != VfsPathType::Os {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        let parent_path: Option<VfsPathReference> = path.get_parent();
-
-        if parent_path.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Parent set in path",
-            ));
-        }
-        if path.location != "/" {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Location in path is not /",
-            ));
-        }
-        Ok(())
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use crate::types::SharedValue;
     use crate::vfs::enums::VfsFileType;
 
     fn get_file_system() -> io::Result<OsVfsFileSystem> {
+        let parent_file_system: VfsFileSystemReference = SharedValue::none();
+
         let mut vfs_file_system: OsVfsFileSystem = OsVfsFileSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        vfs_file_system.open_with_resolver(&vfs_path)?;
+        vfs_file_system.open(parent_file_system, &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -137,6 +136,18 @@ mod tests {
     }
 
     #[test]
+    fn test_open() -> io::Result<()> {
+        let parent_file_system: VfsFileSystemReference = SharedValue::none();
+
+        let mut vfs_file_system: OsVfsFileSystem = OsVfsFileSystem::new();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        vfs_file_system.open(parent_file_system, &vfs_path)?;
+
+        Ok(())
+    }
+
+    #[test]
     fn test_open_file_entry() -> io::Result<()> {
         let vfs_file_system: OsVfsFileSystem = get_file_system()?;
 
@@ -155,16 +166,6 @@ mod tests {
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::NotSet, "/", None);
         let result = vfs_file_system.open_file_entry(&test_vfs_path);
         assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_with_resolver() -> io::Result<()> {
-        let mut vfs_file_system: OsVfsFileSystem = OsVfsFileSystem::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        vfs_file_system.open_with_resolver(&vfs_path)?;
 
         Ok(())
     }

@@ -100,4 +100,9 @@ impl Seek for ApmPartition {
     }
 }
 
-impl VfsDataStream for ApmPartition {}
+impl VfsDataStream for ApmPartition {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+}

@@ -114,4 +114,9 @@ impl Seek for GptPartition {
     }
 }
 
-impl VfsDataStream for GptPartition {}
+impl VfsDataStream for GptPartition {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+}

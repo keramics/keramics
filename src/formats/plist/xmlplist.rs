@@ -30,7 +30,7 @@ struct XmlPlistParser {}
 /// XML property list (plist).
 pub struct XmlPlist {
     /// The root object.
-    root_object: PlistObject,
+    pub root_object: PlistObject,
 }
 
 impl XmlPlist {
@@ -120,7 +120,7 @@ impl XmlPlist {
                 ));
             }
         };
-        let mut array_values: Vec<PlistObject> =
+        let array_values: Vec<PlistObject> =
             self.parse_plist_array_content(token_pair.into_inner())?;
 
         inner_pairs.next();
@@ -177,7 +177,7 @@ impl XmlPlist {
                 ));
             }
         };
-        let mut dict_values: HashMap<String, PlistObject> =
+        let dict_values: HashMap<String, PlistObject> =
             self.parse_plist_dict_content(token_pair.into_inner())?;
 
         inner_pairs.next();
@@ -531,12 +531,13 @@ mod tests {
         let hashmap: &HashMap<String, PlistObject> = plist.root_object.as_hashmap().unwrap();
         assert_eq!(hashmap.len(), 5);
 
-        let string_object: &PlistObject = hashmap.get("CFBundleInfoDictionaryVersion").unwrap();
-        let string: &String = string_object.as_string().unwrap();
+        let string: &String = plist
+            .root_object
+            .get_string_by_key("CFBundleInfoDictionaryVersion")
+            .unwrap();
         assert_eq!(string, "6.0");
 
-        let integer_object: &PlistObject = hashmap.get("band-size").unwrap();
-        let integer: &i64 = integer_object.as_integer().unwrap();
+        let integer: &i64 = plist.root_object.get_integer_by_key("band-size").unwrap();
         assert_eq!(*integer, 8388608);
 
         Ok(())

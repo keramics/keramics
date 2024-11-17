@@ -13,11 +13,16 @@
 
 use std::convert::AsRef;
 use std::io;
-use std::io::Cursor;
+use std::io::{Cursor, Seek};
 
 use crate::vfs::traits::VfsDataStream;
 
-impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {}
+impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        self.seek(io::SeekFrom::End(0))
+    }
+}
 
 // TODO: consider moving this to a separate file.
 use crate::types::SharedValue;
