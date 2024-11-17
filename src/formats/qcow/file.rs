@@ -46,9 +46,6 @@ pub struct QcowFile {
     /// Level 1 index bit shift.
     level1_index_bit_shift: u8,
 
-    /// Level 1 table offset.
-    level1_table_offset: u64,
-
     /// Level 1 cluster table.
     level1_cluster_table: QcowClusterTable,
 
@@ -111,7 +108,6 @@ impl QcowFile {
             file_header_size: 0,
             offset_bit_mask: 0,
             level1_index_bit_shift: 0,
-            level1_table_offset: 0,
             level1_cluster_table: QcowClusterTable::new(),
             level2_index_bit_mask: 0,
             level2_table_number_of_references: 0,

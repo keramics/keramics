@@ -14,18 +14,14 @@
 /// Mac OS sparse image (.sparseimage) block range.
 #[derive(Debug)]
 pub struct SparseImageBlockRange {
-    /// Media offset.
-    pub media_offset: u64,
-
     /// Data offset.
     pub data_offset: u64,
 }
 
 impl SparseImageBlockRange {
     /// Creates a new block range.
-    pub fn new(media_offset: u64, data_offset: u64) -> Self {
+    pub fn new(data_offset: u64) -> Self {
         Self {
-            media_offset: media_offset,
             data_offset: data_offset,
         }
     }

@@ -166,8 +166,6 @@ mod tests {
 
     #[test]
     fn test_read_entry() -> io::Result<()> {
-        Mediator { debug_output: true }.make_current();
-
         let test_data = get_test_data();
         let data_stream: VfsDataStreamReference = new_fake_data_stream(test_data)?;
 

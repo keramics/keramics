@@ -13,7 +13,7 @@
 
 /// Bitstream trait.
 pub trait Bitstream {
-    /// Retrieves a bit values.
+    /// Retrieves a bit value.
     fn get_value(&mut self, number_of_bits: usize) -> u32;
 
     /// Skips a number of bits.
