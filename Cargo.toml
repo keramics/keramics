@@ -17,3 +17,5 @@ path = "tools/hashtool.rs"
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 layout_map = { path = "./layout_map" }
+pest = { version = "2.7.14" }
+pest_derive = { version = "2.7.14" }
