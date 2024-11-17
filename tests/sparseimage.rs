@@ -78,13 +78,11 @@ fn read_media() -> io::Result<()> {
         "./test_data/sparseimage/hfsplus.sparseimage",
         None,
     );
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash, "bf967298a3d7168e781a0e31200ed243".to_string());
+    assert_eq!(md5_hash, "4f499e0eb71cf0100a9b08e93a62ea49".to_string());
 
     Ok(())
 }

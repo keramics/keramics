@@ -104,4 +104,9 @@ impl Seek for MbrPartition {
     }
 }
 
-impl VfsDataStream for MbrPartition {}
+impl VfsDataStream for MbrPartition {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+}

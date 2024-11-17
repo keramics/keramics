@@ -106,9 +106,10 @@ mod tests {
     use super::*;
 
     use crate::formats::apm::{ApmPartition, ApmVolumeSystem};
+    use crate::vfs::context::VfsContext;
     use crate::vfs::enums::VfsPathType;
-    use crate::vfs::resolver::VfsResolver;
-    use crate::vfs::types::{VfsFileSystemReference, VfsResolverReference};
+    use crate::vfs::traits::VfsFileSystem;
+    use crate::vfs::types::VfsFileSystemReference;
 
     #[test]
     fn test_open() -> io::Result<()> {
@@ -125,18 +126,17 @@ mod tests {
 
     #[test]
     fn test_open_data_stream() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => volume_system.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        volume_system.open(parent_file_system, &vfs_path)?;
+
         let partition: ApmPartition = volume_system.get_partition_by_index(0)?;
 
         let mut vfs_file_entry: WrapperVfsFileEntry =

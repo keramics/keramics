@@ -53,7 +53,11 @@ impl VfsContext {
         match self.file_systems.get(lookup_key) {
             Some(value) => return Ok(value.clone()),
             None => {}
-        }
+        };
+        let parent_file_system: VfsFileSystemReference = match &parent_path {
+            Some(parent_path) => self.open_file_system(parent_path)?,
+            None => SharedValue::none(),
+        };
         let mut file_system: Box<dyn VfsFileSystem> = match path.path_type {
             VfsPathType::Apm => Box::new(ApmVolumeSystem::new()),
             VfsPathType::Gpt => Box::new(GptVolumeSystem::new()),
@@ -69,7 +73,7 @@ impl VfsContext {
                 ));
             }
         };
-        file_system.open_with_resolver(path)?;
+        file_system.open(parent_file_system, path)?;
 
         self.file_systems
             .insert(lookup_key.to_string(), SharedValue::new(file_system));

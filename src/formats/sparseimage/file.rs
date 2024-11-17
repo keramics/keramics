@@ -16,7 +16,7 @@ use std::io::{Read, Seek};
 
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsFileSystemReference, VfsPath};
 
 use super::block_range::SparseImageBlockRange;
 use super::file_header::SparseImageFileHeader;
@@ -59,15 +59,21 @@ impl SparseImageFile {
         }
     }
 
-    /// Opens a file.
-    pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
-        self.data_stream = file_system.open_data_stream(path, None)?;
-
-        self.read_file()
+    /// Opens a file system.
+    pub fn open(
+        &mut self,
+        parent_file_system: VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()> {
+        self.data_stream = match parent_file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, None)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        self.read_header_block()
     }
 
-    /// Reads the file header and bands array.
-    fn read_file(&mut self) -> io::Result<()> {
+    /// Reads the header block containing the file header and bands array.
+    fn read_header_block(&mut self) -> io::Result<()> {
         let mut data: [u8; 4096] = [0; 4096];
 
         match self.data_stream.with_write_lock() {
@@ -267,14 +273,14 @@ impl Seek for SparseImageFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsFileSystemReference, VfsPathType, VfsResolver, VfsResolverReference};
+    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPathType};
 
-    #[test]
-    fn test_open() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+    fn get_file() -> io::Result<SparseImageFile> {
+        let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut file = SparseImageFile::new();
 
@@ -283,10 +289,28 @@ mod tests {
             "./test_data/sparseimage/hfsplus.sparseimage",
             None,
         );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        file.open(parent_file_system, &vfs_path)?;
+
+        Ok(file)
+    }
+
+    #[test]
+    fn test_open() -> io::Result<()> {
+        let mut vfs_context: VfsContext = VfsContext::new();
+
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
+
+        let mut file = SparseImageFile::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/sparseimage/hfsplus.sparseimage",
+            None,
+        );
+        file.open(parent_file_system, &vfs_path)?;
+
         assert_eq!(file.bytes_per_sector, 512);
         assert_eq!(file.block_size, 1048576);
         assert_eq!(file.media_size, 4194304);
@@ -296,22 +320,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: SparseImageFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = SparseImageFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/sparseimage/hfsplus.sparseimage",
-            None,
-        );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset: u64 = file.seek(io::SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
@@ -320,22 +330,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: SparseImageFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = SparseImageFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/sparseimage/hfsplus.sparseimage",
-            None,
-        );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset: u64 = file.seek(io::SeekFrom::End(-512))?;
         assert_eq!(offset, file.media_size - 512);
 
@@ -344,22 +340,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: SparseImageFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = SparseImageFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/sparseimage/hfsplus.sparseimage",
-            None,
-        );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset = file.seek(io::SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
@@ -371,22 +353,8 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_media_size() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let mut file: SparseImageFile = get_file()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = SparseImageFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/sparseimage/hfsplus.sparseimage",
-            None,
-        );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
         let offset: u64 = file.seek(io::SeekFrom::End(512))?;
         assert_eq!(offset, file.media_size + 512);
 
@@ -395,22 +363,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = SparseImageFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/sparseimage/hfsplus.sparseimage",
-            None,
-        );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        let mut file: SparseImageFile = get_file()?;
         file.seek(io::SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -419,8 +372,8 @@ mod tests {
 
         let expected_data: Vec<u8> = vec![
             0x00, 0x53, 0x46, 0x48, 0x00, 0x00, 0xaa, 0x11, 0xaa, 0x11, 0x00, 0x30, 0x65, 0x43,
-            0xec, 0xac, 0xe6, 0x77, 0xe9, 0x5a, 0xc7, 0xc3, 0x9b, 0x42, 0xbd, 0x1e, 0xf7, 0x4e,
-            0x9d, 0xd7, 0xa2, 0x9e, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
+            0xec, 0xac, 0xec, 0xe6, 0xeb, 0x2b, 0x58, 0x70, 0x1e, 0x40, 0x85, 0x95, 0x24, 0x8f,
+            0xa4, 0x8a, 0xd3, 0xff, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x64, 0x00, 0x69, 0x00, 0x73, 0x00, 0x6b, 0x00, 0x20, 0x00, 0x69, 0x00, 0x6d, 0x00,
             0x61, 0x00, 0x67, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -463,22 +416,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
-
-        let mut file = SparseImageFile::new();
-
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/sparseimage/hfsplus.sparseimage",
-            None,
-        );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        let mut file: SparseImageFile = get_file()?;
         file.seek(io::SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];

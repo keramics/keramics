@@ -102,4 +102,30 @@ impl PlistObject {
             _ => None,
         }
     }
+
+    /// Retrieves an integer value for a specific key.
+    pub fn get_integer_by_key(&self, key: &str) -> Option<&i64> {
+        let hashmap: &HashMap<String, PlistObject> = match self.as_hashmap() {
+            Some(hashmap) => hashmap,
+            None => return None,
+        };
+        let integer_object: &PlistObject = match hashmap.get(key) {
+            Some(plist_object) => plist_object,
+            None => return None,
+        };
+        integer_object.as_integer()
+    }
+
+    /// Retrieves a string value for a specific key.
+    pub fn get_string_by_key(&self, key: &str) -> Option<&String> {
+        let hashmap: &HashMap<String, PlistObject> = match self.as_hashmap() {
+            Some(hashmap) => hashmap,
+            None => return None,
+        };
+        let string_object: &PlistObject = match hashmap.get(key) {
+            Some(plist_object) => plist_object,
+            None => return None,
+        };
+        string_object.as_string()
+    }
 }

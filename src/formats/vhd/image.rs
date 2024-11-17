@@ -12,12 +12,11 @@
  */
 
 use std::io;
-use std::rc::Rc;
 
 use crate::types::{SharedValue, Ucs2String};
 use crate::vfs::{
     VfsFileEntry, VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference, VfsPath,
-    VfsPathType, VfsResolver, VfsResolverReference, WrapperVfsFileEntry,
+    VfsPathType, WrapperVfsFileEntry,
 };
 
 use super::file::VhdFile;
@@ -100,8 +99,8 @@ impl VhdImage {
         Ok(Some(layer))
     }
 
-    /// Opens a storage media image.
-    pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
+    /// Opens the files.
+    fn open_files(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
         let directory_name: &str = file_system.get_directory_name(&path.location);
 
         let mut files: Vec<VhdFile> = Vec::new();
@@ -170,6 +169,18 @@ impl VfsFileSystem for VhdImage {
         }
     }
 
+    /// Opens a file system.
+    fn open(
+        &mut self,
+        parent_file_system: VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()> {
+        match parent_file_system.with_write_lock() {
+            Ok(file_system) => self.open_files(file_system.as_ref(), path),
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        }
+    }
+
     /// Opens a file entry with the specified path.
     fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference> {
         if path.path_type != VfsPathType::Vhd {
@@ -185,42 +196,6 @@ impl VfsFileSystem for VhdImage {
 
         Ok(Box::new(file_entry))
     }
-
-    /// Opens a file system.
-    fn open_with_resolver(&mut self, path: &VfsPath) -> io::Result<()> {
-        if path.path_type != VfsPathType::Vhd {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        if path.location != "/" {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Location in path is not /",
-            ));
-        }
-        let parent_path: Rc<VfsPath> = match path.get_parent() {
-            Some(value) => value,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing parent path",
-                ));
-            }
-        };
-        let parent_file_system_path: VfsPath = VfsPath::new_from_path(&parent_path, "/");
-
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-        let parent_file_system: VfsFileSystemReference =
-            vfs_resolver.open_file_system(&parent_file_system_path)?;
-
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => self.open(file_system.as_ref(), parent_path.as_ref())?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -232,8 +207,9 @@ mod tests {
     fn get_image() -> io::Result<VhdImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut image = VhdImage::new();
 
@@ -242,16 +218,14 @@ mod tests {
             "./test_data/vhd/ntfs-differential.vhd",
             None,
         );
-        match vfs_file_system.with_write_lock() {
-            Ok(file_system) => image.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        image.open(parent_file_system, &vfs_path)?;
+
         Ok(image)
     }
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/vhd1", None);
         assert_eq!(image.file_entry_exists(&vfs_path)?, true);
@@ -264,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_get_directory_name() -> io::Result<()> {
-        let image = VhdImage::new();
+        let image: VhdImage = VhdImage::new();
 
         let directory_name: &str = image.get_directory_name("/vhd1");
         assert_eq!(directory_name, "/");
@@ -274,7 +248,7 @@ mod tests {
 
     #[test]
     fn test_get_layer_by_index() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let layer: VhdLayer = image.get_layer_by_index(0)?;
 
@@ -288,7 +262,7 @@ mod tests {
 
     #[test]
     fn get_layer_index_by_path() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let layer_index: usize = image.get_layer_index_by_path("/vhd1")?;
         assert_eq!(layer_index, 0);
@@ -304,7 +278,7 @@ mod tests {
 
     #[test]
     fn test_get_layer_by_path() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let result: Option<VhdLayer> = image.get_layer_by_path("/")?;
         assert!(result.is_none());
@@ -326,6 +300,26 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
+
+        let mut image = VhdImage::new();
+
+        let vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/vhd/ntfs-differential.vhd",
+            None,
+        );
+        image.open(parent_file_system, &vfs_path)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_files() -> io::Result<()> {
+        let mut vfs_context: VfsContext = VfsContext::new();
+
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
 
@@ -337,7 +331,7 @@ mod tests {
             None,
         );
         match vfs_file_system.with_write_lock() {
-            Ok(file_system) => image.open(file_system.as_ref(), &vfs_path)?,
+            Ok(file_system) => image.open_files(file_system.as_ref(), &vfs_path)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
         assert_eq!(image.get_number_of_layers(), 2);
@@ -347,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_of_root() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
@@ -364,7 +358,7 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_of_file() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
@@ -381,27 +375,12 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_with_unsupported_path_type() -> io::Result<()> {
-        let image = get_image()?;
+        let image: VhdImage = get_image()?;
 
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::NotSet, "/", None);
 
         let result = image.open_file_entry(&test_vfs_path);
         assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_with_resolver() -> io::Result<()> {
-        let mut image = VhdImage::new();
-
-        let os_vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        );
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/", Some(os_vfs_path));
-        image.open_with_resolver(&vfs_path)?;
 
         Ok(())
     }

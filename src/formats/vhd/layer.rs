@@ -106,4 +106,9 @@ impl Seek for VhdLayer {
     }
 }
 
-impl VfsDataStream for VhdLayer {}
+impl VfsDataStream for VhdLayer {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+}

@@ -14,4 +14,5 @@
 mod object;
 mod xmlplist;
 
+pub use object::PlistObject;
 pub use xmlplist::XmlPlist;
