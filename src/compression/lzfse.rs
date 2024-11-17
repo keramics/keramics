@@ -129,7 +129,7 @@ impl<'a> LzfseBitstream<'a> {
 }
 
 impl<'a> Bitstream for LzfseBitstream<'a> {
-    /// Retrieves a bit values.
+    /// Retrieves a bit value.
     fn get_value(&mut self, number_of_bits: usize) -> u32 {
         let mut bit_offset: usize = 0;
         let mut value_32bit: u32 = 0;

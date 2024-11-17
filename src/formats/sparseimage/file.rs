@@ -150,8 +150,7 @@ impl SparseImageFile {
             let block_media_offset: u64 = ((band_number - 1) as u64) * (self.block_size as u64);
             let band_data_offset: u64 = 4096 + ((array_index as u64) * (self.block_size as u64));
 
-            let block_range: SparseImageBlockRange =
-                SparseImageBlockRange::new(block_media_offset, band_data_offset);
+            let block_range: SparseImageBlockRange = SparseImageBlockRange::new(band_data_offset);
             match self.block_tree.insert_value(
                 block_media_offset,
                 self.block_size as u64,
@@ -272,8 +271,6 @@ mod tests {
 
     #[test]
     fn test_open() -> io::Result<()> {
-        Mediator { debug_output: true }.make_current();
-
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
