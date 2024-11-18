@@ -36,6 +36,8 @@ formats. Version 3 is considered as an extended version of QCOW2.
 
 > Note it is currently assumed that character strings are stored in UTF-8
 
+The number of bytes per sector is 512.
+
 ### Encryption
 
 The QCOW image format can encrypted the media data stored in the image format.

@@ -55,7 +55,7 @@ fn read_media() -> io::Result<()> {
     };
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash, "196066add11fb71c4c49cf1bb50d6d24".to_string());
+    assert_eq!(md5_hash.as_str(), "196066add11fb71c4c49cf1bb50d6d24");
 
     Ok(())
 }

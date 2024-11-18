@@ -103,29 +103,48 @@ impl PlistObject {
         }
     }
 
-    /// Retrieves an integer value for a specific key.
-    pub fn get_integer_by_key(&self, key: &str) -> Option<&i64> {
-        let hashmap: &HashMap<String, PlistObject> = match self.as_hashmap() {
-            Some(hashmap) => hashmap,
+    /// Retrieves a bytes value for a specific key.
+    pub fn get_bytes_by_key(&self, key: &str) -> Option<&[u8]> {
+        let data_object: &PlistObject = match self.get_object_by_key(key) {
+            Some(plist_object) => plist_object,
             None => return None,
         };
-        let integer_object: &PlistObject = match hashmap.get(key) {
+        data_object.as_bytes()
+    }
+
+    /// Retrieves an integer value for a specific key.
+    pub fn get_integer_by_key(&self, key: &str) -> Option<&i64> {
+        let integer_object: &PlistObject = match self.get_object_by_key(key) {
             Some(plist_object) => plist_object,
             None => return None,
         };
         integer_object.as_integer()
     }
 
-    /// Retrieves a string value for a specific key.
-    pub fn get_string_by_key(&self, key: &str) -> Option<&String> {
+    /// Retrieves an object value for a specific key.
+    pub fn get_object_by_key(&self, key: &str) -> Option<&PlistObject> {
         let hashmap: &HashMap<String, PlistObject> = match self.as_hashmap() {
             Some(hashmap) => hashmap,
             None => return None,
         };
-        let string_object: &PlistObject = match hashmap.get(key) {
+        hashmap.get(key)
+    }
+
+    /// Retrieves a string value for a specific key.
+    pub fn get_string_by_key(&self, key: &str) -> Option<&String> {
+        let string_object: &PlistObject = match self.get_object_by_key(key) {
             Some(plist_object) => plist_object,
             None => return None,
         };
         string_object.as_string()
+    }
+
+    /// Retrieves a vector value for a specific key.
+    pub fn get_vector_by_key(&self, key: &str) -> Option<&Vec<PlistObject>> {
+        let array_object: &PlistObject = match self.get_object_by_key(key) {
+            Some(plist_object) => plist_object,
+            None => return None,
+        };
+        array_object.as_vector()
     }
 }

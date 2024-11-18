@@ -123,30 +123,7 @@ create_file_entries()
 		${AFSCTOOL} -c -T LZVN ${MOUNT_POINT}/testdir1/compressed4
 	fi
 
-	# Create a block device file
-	# Need to run mknod with sudo otherwise it errors with: Operation not permitted
-	sudo mknod ${MOUNT_POINT}/testdir1/blockdev1 b 24 57
-
-	# Create a character device file
-	# Need to run mknod with sudo otherwise it errors with: Operation not permitted
-	sudo mknod -F native ${MOUNT_POINT}/testdir1/chardev1 c 13 68
-
-	sudo mknod -F 386bsd ${MOUNT_POINT}/testdir1/chardev1-386bsd c 1 2
-	sudo mknod -F 4bsd ${MOUNT_POINT}/testdir1/chardev1-4bsd c 1 2
-	sudo mknod -F bsdos ${MOUNT_POINT}/testdir1/chardev1-bsdos c 1 2
-	sudo mknod -F bsdos ${MOUNT_POINT}/testdir1/chardev2-bsdos c 3 4 5
-	sudo mknod -F freebsd ${MOUNT_POINT}/testdir1/chardev1-freebsd c 1 2
-	sudo mknod -F hpux ${MOUNT_POINT}/testdir1/chardev1-hpux c 1 2
-	sudo mknod -F isc ${MOUNT_POINT}/testdir1/chardev1-isc c 1 2
-	sudo mknod -F linux ${MOUNT_POINT}/testdir1/chardev1-linux c 1 2
-	sudo mknod -F netbsd ${MOUNT_POINT}/testdir1/chardev1-netbsd c 1 2
-	sudo mknod -F osf1 ${MOUNT_POINT}/testdir1/chardev1-osf1 c 1 2
-	sudo mknod -F sco ${MOUNT_POINT}/testdir1/chardev1-sco c 1 2
-	sudo mknod -F solaris ${MOUNT_POINT}/testdir1/chardev1-solaris c 1 2
-	sudo mknod -F sunos ${MOUNT_POINT}/testdir1/chardev1-sunos c 1 2
-	sudo mknod -F svr3 ${MOUNT_POINT}/testdir1/chardev1-svr3 c 1 2
-	sudo mknod -F svr4 ${MOUNT_POINT}/testdir1/chardev1-svr4 c 1 2
-	sudo mknod -F ultrix ${MOUNT_POINT}/testdir1/chardev1-ultrix c 1 2
+	# Note that compressed UDIF images don't allow for block or character device files.
 
 	# Create a pipe (FIFO) file
 	mkfifo ${MOUNT_POINT}/testdir1/pipe1
@@ -187,8 +164,8 @@ VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
 IMAGE_FILE="test_data/sparseimage/hfsplus"
 IMAGE_SIZE="4M"
 
-rm -f ${IMAGE_FILE}.sparseimage
 mkdir -p test_data/sparseimage
+rm -f ${IMAGE_FILE}.sparseimage
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSE -volname hfsplus_test ${IMAGE_FILE}
 
@@ -204,14 +181,71 @@ VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
 IMAGE_FILE="test_data/sparsebundle/hfsplus"
 IMAGE_SIZE="4M"
 
-rm -rf ${IMAGE_FILE}.sparsebundle
 mkdir -p test_data/sparsebundle
+rm -rf ${IMAGE_FILE}.sparsebundle
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplus_test ${IMAGE_FILE}
 
 hdiutil attach ${IMAGE_FILE}.sparsebundle
 
 create_file_entries "/Volumes/hfsplus_test"
+
+hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+
+# Create a raw image with a HFS+ file system
+VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
+
+IMAGE_FILE="test_data/hfs/hfsplus"
+IMAGE_SIZE="4M"
+
+mkdir -p test_data/hfs
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
+
+hdiutil attach ${IMAGE_FILE}.dmg
+
+create_file_entries "/Volumes/hfsplus_test"
+
+# Create an ADC compressed UDIF image.
+IMAGE_FILE="test_data/udif/hfsplus_adc"
+
+mkdir -p test_data/udif
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -format UDCO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
+
+# Create a bzip2 compressed UDIF image.
+IMAGE_FILE="test_data/udif/hfsplus_bzip2"
+
+mkdir -p test_data/udif
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -format UDBZ -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
+
+# Create a lzfse compressed UDIF image.
+IMAGE_FILE="test_data/udif/hfsplus_lzfse"
+
+mkdir -p test_data/udif
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -format ULFO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
+
+# Create a lzma compressed UDIF image.
+IMAGE_FILE="test_data/udif/hfsplus_lzma"
+
+mkdir -p test_data/udif
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -format ULMO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
+
+# Create a zlib compressed UDIF image.
+IMAGE_FILE="test_data/udif/hfsplus_zlib"
+
+mkdir -p test_data/udif
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 

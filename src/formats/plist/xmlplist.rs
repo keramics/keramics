@@ -228,13 +228,16 @@ impl XmlPlist {
                 ));
             }
         };
-        let mut base64_stream: Base64Stream =
-            Base64Stream::new(token_pair.as_str().as_bytes(), 0, true);
+        let encoded_data: &[u8] = token_pair.as_str().as_bytes();
+
+        let mut base64_stream: Base64Stream = Base64Stream::new(encoded_data, 0, true);
 
         let mut data: Vec<u8> = Vec::new();
         while let Some(byte_value) = base64_stream.get_value()? {
             data.push(byte_value);
         }
+        // TODO: check base64 padding
+
         inner_pairs.next();
 
         match inner_pairs.next() {

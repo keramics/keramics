@@ -16,7 +16,7 @@ use std::io::{Read, Seek};
 
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsFileSystemReference, VfsPath};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPath};
 
 use super::block_range::SparseImageBlockRange;
 use super::file_header::SparseImageFileHeader;
@@ -181,8 +181,8 @@ impl SparseImageFile {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.media_offset;
-        let mut block_number: u64 = media_offset / (self.block_size as u64);
-        let mut block_offset: u64 = block_number * (self.block_size as u64);
+        let block_number: u64 = media_offset / (self.block_size as u64);
+        let block_offset: u64 = block_number * (self.block_size as u64);
         let mut range_relative_offset: u64 = media_offset - block_offset;
         let mut range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
 
@@ -220,8 +220,6 @@ impl SparseImageFile {
             data_offset += range_read_count;
             media_offset += range_read_count as u64;
 
-            block_number += 1;
-            block_offset += self.block_size as u64;
             range_relative_offset = 0;
             range_remainder_size = self.block_size as u64;
         }
@@ -273,7 +271,7 @@ impl Seek for SparseImageFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPathType};
 
     fn get_file() -> io::Result<SparseImageFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
@@ -372,8 +370,8 @@ mod tests {
 
         let expected_data: Vec<u8> = vec![
             0x00, 0x53, 0x46, 0x48, 0x00, 0x00, 0xaa, 0x11, 0xaa, 0x11, 0x00, 0x30, 0x65, 0x43,
-            0xec, 0xac, 0xec, 0xe6, 0xeb, 0x2b, 0x58, 0x70, 0x1e, 0x40, 0x85, 0x95, 0x24, 0x8f,
-            0xa4, 0x8a, 0xd3, 0xff, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
+            0xec, 0xac, 0x48, 0x6f, 0x33, 0x32, 0x41, 0x86, 0x9c, 0x40, 0x86, 0x15, 0x80, 0x36,
+            0xc8, 0xec, 0x25, 0x7b, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x64, 0x00, 0x69, 0x00, 0x73, 0x00, 0x6b, 0x00, 0x20, 0x00, 0x69, 0x00, 0x6d, 0x00,
             0x61, 0x00, 0x67, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

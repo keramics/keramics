@@ -112,11 +112,11 @@ impl VhdFile {
     pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
         self.data_stream = file_system.open_data_stream(path, None)?;
 
-        self.read_file()
+        self.read_metadata()
     }
 
     /// Reads the file footer and dynamic block header.
-    fn read_file(&mut self) -> io::Result<()> {
+    fn read_metadata(&mut self) -> io::Result<()> {
         let mut file_footer: VhdFileFooter = VhdFileFooter::new();
 
         file_footer.read_at_position(&self.data_stream, io::SeekFrom::End(-512))?;
