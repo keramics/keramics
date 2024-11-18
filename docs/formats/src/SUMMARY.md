@@ -6,6 +6,7 @@
     - [Mac OS sparse bundle](sparsebundle.md)
     - [Mac OS sparse image](sparseimage.md)
     - [QEMU Copy-On-Write (QCOW)](qcow.md)
+    - [Universal Disk Image Format (UDIF)](udif.md)
     - [Virtual Hard Disk (VHD)](vhd.md)
     - [Virtual Hard Disk version 2 (VHDX)](vhdx.md)
 - [Volume system formats](volume_system.md)

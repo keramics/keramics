@@ -11,18 +11,13 @@
  * under the License.
  */
 
-// Data formats used in other formats.
-mod plist;
+mod block_range;
+mod block_table;
+mod block_table_entry;
+mod block_table_header;
+mod constants;
+mod enums;
+mod file;
+mod file_footer;
 
-// Storage media image formats
-pub mod qcow;
-pub mod sparsebundle;
-pub mod sparseimage;
-pub mod udif;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
+pub use file::UdifFile;

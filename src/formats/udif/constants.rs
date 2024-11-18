@@ -11,18 +11,8 @@
  * under the License.
  */
 
-// Data formats used in other formats.
-mod plist;
+/// UDIF file footer signature: "koly".
+pub(super) const UDIF_FILE_FOOTER_SIGNATURE: [u8; 4] = [0x6b, 0x6f, 0x6c, 0x79];
 
-// Storage media image formats
-pub mod qcow;
-pub mod sparsebundle;
-pub mod sparseimage;
-pub mod udif;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
+/// UDIF block table header signature: "mish".
+pub(super) const UDIF_BLOCK_TABLE_HEADER_SIGNATURE: [u8; 4] = [0x6d, 0x69, 0x73, 0x68];
