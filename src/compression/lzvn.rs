@@ -328,6 +328,9 @@ impl LzvnContext {
         if self.mediator.debug_output {
             self.mediator.debug_print(format!("LzvnContext {{\n",));
         }
+        // Note that distance can be reused by subsequent oppcodes.
+        let mut distance: u16 = 0;
+
         while compressed_data_offset < compressed_data_size {
             if uncompressed_data_offset >= uncompressed_data_size {
                 break;
@@ -343,11 +346,10 @@ impl LzvnContext {
 
             if self.mediator.debug_output {
                 self.mediator
-                    .debug_print(format!("    oppcode: {}\n", oppcode));
+                    .debug_print(format!("    oppcode: 0x{:02x}\n", oppcode));
             }
             let mut literal_size: u16 = 0;
             let mut match_size: u16 = 0;
-            let mut distance: u16 = 0;
 
             match &LZVN_OPPCODE_TYPES[oppcode as usize] {
                 LzvnOppcodeType::DistanceLarge => {
@@ -438,7 +440,7 @@ impl LzvnContext {
                 LzvnOppcodeType::Invalid => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("Invalid oppcode: {}", oppcode),
+                        format!("Invalid oppcode: 0x{:02x}", oppcode),
                     ));
                 }
             };
@@ -484,7 +486,7 @@ impl LzvnContext {
                 uncompressed_data_offset = uncompressed_data_end_offset;
             }
             if match_size > 0 {
-                if distance as usize >= uncompressed_data_offset {
+                if distance as usize > uncompressed_data_offset {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Invalid distance value exceeds uncompressed data offset",

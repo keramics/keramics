@@ -430,7 +430,7 @@ impl UdifFile {
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                block_range.size, block_range.data_offset, block_range.data_offset,
+                block_range.compressed_data_size, block_range.data_offset, block_range.data_offset,
             ));
             self.mediator.debug_print_data(&compressed_data, true);
         }
