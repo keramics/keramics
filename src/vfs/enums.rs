@@ -29,6 +29,7 @@ pub enum VfsFileType {
 #[derive(Clone, Default, PartialEq)]
 pub enum VfsPathType {
     Apm,
+    Fake,
     Gpt,
     Mbr,
     #[default]

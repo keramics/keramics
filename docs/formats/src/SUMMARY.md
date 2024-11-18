@@ -3,6 +3,7 @@
 [Introduction](introduction.md)
 
 - [Storage media image formats](storage_media_image.md)
+    - [Mac OS sparse bundle](sparsebundle.md)
     - [Mac OS sparse image](sparseimage.md)
     - [QEMU Copy-On-Write (QCOW)](qcow.md)
     - [Virtual Hard Disk (VHD)](vhd.md)
