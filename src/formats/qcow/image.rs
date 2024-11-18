@@ -296,13 +296,14 @@ mod tests {
     fn test_open_files() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let parent_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&parent_file_system_path)?;
 
         let mut image = QcowImage::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        match vfs_file_system.with_write_lock() {
+        match parent_file_system.with_write_lock() {
             Ok(file_system) => image.open_files(file_system.as_ref(), &vfs_path)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };

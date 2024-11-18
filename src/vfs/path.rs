@@ -18,12 +18,18 @@ use super::types::VfsPathReference;
 
 /// Virtual File System (VFS) path.
 pub struct VfsPath {
+    /// Path type.
     pub path_type: VfsPathType,
+
+    /// Location.
     pub location: String,
+
+    /// Parent.
     parent: Option<VfsPathReference>,
 }
 
 impl VfsPath {
+    /// Creates a new path.
     pub fn new(path_type: VfsPathType, location: &str, parent: Option<VfsPath>) -> Self {
         let parent_reference: Option<VfsPathReference> = match parent {
             Some(value) => Some(Rc::new(value)),
@@ -36,6 +42,7 @@ impl VfsPath {
         }
     }
 
+    /// Creates a new path from another path.
     pub fn new_from_path(path: &VfsPath, location: &str) -> Self {
         Self {
             path_type: path.path_type.clone(),
@@ -44,6 +51,7 @@ impl VfsPath {
         }
     }
 
+    /// Retrieves the parent path.
     pub fn get_parent(&self) -> Option<VfsPathReference> {
         match &self.parent {
             Some(value) => Some(value.clone()),

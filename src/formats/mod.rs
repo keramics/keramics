@@ -16,6 +16,7 @@ mod plist;
 
 // Storage media image formats
 pub mod qcow;
+pub mod sparsebundle;
 pub mod sparseimage;
 pub mod vhd;
 pub mod vhdx;

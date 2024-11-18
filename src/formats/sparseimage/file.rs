@@ -282,7 +282,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut file = SparseImageFile::new();
+        let mut file: SparseImageFile = SparseImageFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
@@ -302,7 +302,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut file = SparseImageFile::new();
+        let mut file: SparseImageFile = SparseImageFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
