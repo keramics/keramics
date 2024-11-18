@@ -57,7 +57,7 @@ fn read_media_fixed() -> io::Result<()> {
     };
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash, "75537374a81c40e51e6a4b812b36ce89".to_string());
+    assert_eq!(md5_hash.as_str(), "75537374a81c40e51e6a4b812b36ce89");
 
     Ok(())
 }
@@ -79,7 +79,7 @@ fn read_media_dynamic() -> io::Result<()> {
     };
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash, "20158534070142d63ee02c9ad1a9d87e".to_string());
+    assert_eq!(md5_hash.as_str(), "20158534070142d63ee02c9ad1a9d87e");
 
     Ok(())
 }
@@ -100,7 +100,7 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
     };
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash, "196066add11fb71c4c49cf1bb50d6d24".to_string());
+    assert_eq!(md5_hash.as_str(), "196066add11fb71c4c49cf1bb50d6d24");
 
     Ok(())
 }
@@ -137,7 +137,7 @@ fn read_media_differential() -> io::Result<()> {
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash, "a25df0058eecd8aa1975a68eeaa0e178".to_string());
+    assert_eq!(md5_hash.as_str(), "a25df0058eecd8aa1975a68eeaa0e178");
 
     Ok(())
 }

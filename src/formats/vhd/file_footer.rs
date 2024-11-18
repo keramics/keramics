@@ -49,9 +49,16 @@ use super::constants::*;
 )]
 /// Virtual Hard Disk (VHD) file footer.
 pub struct VhdFileFooter {
+    /// Next metadata offset.
     pub next_offset: u64,
+
+    /// Data size.
     pub data_size: u64,
+
+    /// Disk type.
     pub disk_type: u32,
+
+    /// Identifier.
     pub identifier: Uuid,
 }
 

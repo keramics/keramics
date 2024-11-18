@@ -58,44 +58,10 @@ impl<'a> Base64Stream<'a> {
 
     /// Retrieves a byte value.
     pub fn get_value(&mut self) -> io::Result<Option<u8>> {
-        let mut bit_offset: usize = 0;
-        let mut value_32bit: u32 = 0;
-
-        // Note that this does not check if number_of_bits <= 32
-        while bit_offset < 8 {
-            let mut read_size: usize = 8 - bit_offset;
-
-            if self.data_offset < self.data_size && !self.found_padding {
-                self.read_data(read_size)?;
-            } else if self.number_of_bits == 0 {
-                return Ok(None);
+        while self.number_of_bits < 8 {
+            if self.data_offset >= self.data_size || self.found_padding {
+                break;
             }
-            if read_size > self.number_of_bits {
-                read_size = self.number_of_bits;
-            }
-            let mut read_value: u32 = self.bits;
-
-            self.number_of_bits -= read_size;
-            read_value >>= self.number_of_bits;
-
-            if self.number_of_bits == 0 {
-                self.bits = 0;
-            } else {
-                self.bits &= 0xffffffff >> (32 - self.number_of_bits);
-            }
-            if bit_offset > 0 {
-                value_32bit <<= read_size;
-            }
-            value_32bit |= read_value;
-            bit_offset += read_size;
-        }
-        Ok(Some(value_32bit as u8))
-    }
-
-    /// Reads encoded data into the bits buffer.
-    #[inline(always)]
-    fn read_data(&mut self, number_of_bits: usize) -> io::Result<()> {
-        while number_of_bits > self.number_of_bits && self.number_of_bits <= 24 {
             let byte_value: u8 = self.data[self.data_offset];
             let sixtet: u8 = match byte_value {
                 0x41..0x5b => byte_value - 0x41,        // A-Z
@@ -130,7 +96,19 @@ impl<'a> Base64Stream<'a> {
 
             self.data_offset += 1;
         }
-        Ok(())
+        if self.number_of_bits < 8 {
+            return Ok(None);
+        }
+        self.number_of_bits -= 8;
+
+        let value_32bit: u32 = self.bits >> self.number_of_bits;
+
+        if self.number_of_bits == 0 {
+            self.bits = 0;
+        } else {
+            self.bits &= 0xffffffff >> (32 - self.number_of_bits);
+        }
+        Ok(Some(value_32bit as u8))
     }
 }
 

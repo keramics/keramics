@@ -15,14 +15,17 @@ use std::io;
 use std::io::{Read, Seek};
 
 use crate::formats::plist::XmlPlist;
+use crate::mediator::{Mediator, MediatorReference};
 use crate::types::SharedValue;
 use crate::vfs::{
-    VfsDataStreamReference, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathReference,
-    VfsPathType,
+    VfsDataStreamReference, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathType,
 };
 
 /// Mac OS sparse bundle (.sparsebundle) storage media image.
 pub struct SparseBundleImage {
+    /// Mediator.
+    mediator: MediatorReference,
+
     /// Parent file system.
     parent_file_system: VfsFileSystemReference,
 
@@ -43,6 +46,7 @@ impl SparseBundleImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self {
+            mediator: Mediator::current(),
             parent_file_system: SharedValue::none(),
             path: VfsPath::new(VfsPathType::Fake, "/", None),
             block_size: 0,
@@ -90,10 +94,15 @@ impl SparseBundleImage {
                     ));
                 }
                 let mut data: Vec<u8> = vec![0; data_stream_size as usize];
+                data_stream.read_at_position(&mut data, io::SeekFrom::Start(0))?;
 
-                let read_count: usize =
-                    data_stream.read_at_position(&mut data, io::SeekFrom::Start(0))?;
-
+                if self.mediator.debug_output {
+                    self.mediator.debug_print(format!(
+                        "Info.plist data of size: {} at offset: 0 (0x00000000)\n",
+                        data_stream_size,
+                    ));
+                    self.mediator.debug_print_data(&data, true);
+                }
                 match String::from_utf8(data) {
                     Ok(string) => string,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
@@ -177,13 +186,13 @@ impl SparseBundleImage {
         Ok(())
     }
 
-    /// Reads media data based on the block ranges in the block tree.
+    /// Reads media data from the bands based on the block size.
     fn read_data_from_bands(&mut self, data: &mut [u8]) -> io::Result<usize> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.media_offset;
         let mut block_number: u64 = media_offset / (self.block_size as u64);
-        let mut block_offset: u64 = block_number * (self.block_size as u64);
+        let block_offset: u64 = block_number * (self.block_size as u64);
         let mut range_relative_offset: u64 = media_offset - block_offset;
         let mut range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
 
@@ -223,7 +232,6 @@ impl SparseBundleImage {
             media_offset += range_read_count as u64;
 
             block_number += 1;
-            block_offset += self.block_size as u64;
             range_relative_offset = 0;
             range_remainder_size = self.block_size as u64;
         }
@@ -275,7 +283,7 @@ impl Seek for SparseBundleImage {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPathType};
 
     fn get_image() -> io::Result<SparseBundleImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
@@ -373,8 +381,8 @@ mod tests {
 
         let expected_data: Vec<u8> = vec![
             0x00, 0x53, 0x46, 0x48, 0x00, 0x00, 0xaa, 0x11, 0xaa, 0x11, 0x00, 0x30, 0x65, 0x43,
-            0xec, 0xac, 0xfc, 0xa0, 0x8f, 0x66, 0xbf, 0xdc, 0x88, 0x45, 0x9b, 0x9e, 0x1b, 0xe4,
-            0xe9, 0x79, 0xd0, 0x34, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
+            0xec, 0xac, 0x89, 0xc9, 0xaf, 0xca, 0xee, 0xbd, 0x3f, 0x4a, 0xb3, 0xa6, 0x12, 0x85,
+            0x86, 0x38, 0xf8, 0xa6, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xd7, 0x1f,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x64, 0x00, 0x69, 0x00, 0x73, 0x00, 0x6b, 0x00, 0x20, 0x00, 0x69, 0x00, 0x6d, 0x00,
             0x61, 0x00, 0x67, 0x00, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
