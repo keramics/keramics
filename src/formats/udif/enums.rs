@@ -11,18 +11,13 @@
  * under the License.
  */
 
-// Data formats used in other formats.
-mod plist;
-
-// Storage media image formats
-pub mod qcow;
-pub mod sparsebundle;
-pub mod sparseimage;
-pub mod udif;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
+pub enum UdifCompressionMethod {
+    Adc,
+    Bzip2,
+    Lzfse,
+    Lzma,
+    #[default]
+    None,
+    Zlib,
+}
