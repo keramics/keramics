@@ -185,7 +185,7 @@ impl VfsFileSystem for ApmVolumeSystem {
     /// Opens a file system.
     fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
         self.data_stream = match parent_file_system.with_write_lock() {
@@ -229,7 +229,7 @@ mod tests {
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        volume_system.open(parent_file_system, &vfs_path)?;
+        volume_system.open(&parent_file_system, &vfs_path)?;
 
         Ok(volume_system)
     }
@@ -313,7 +313,7 @@ mod tests {
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        volume_system.open(parent_file_system, &vfs_path)?;
+        volume_system.open(&parent_file_system, &vfs_path)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
 

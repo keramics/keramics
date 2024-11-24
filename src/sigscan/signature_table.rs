@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::{max, min};
+use std::cmp::min;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -283,7 +283,6 @@ impl SignatureTable {
             .get(&self.similarity_weights.largest_weight)
         {
             Some(offset_group) => {
-                let mut byte_value_weight: isize = 0;
                 let mut largest_byte_value_weight: isize = 0;
                 let mut largest_occurrence_weight: isize = 0;
                 let mut pattern_offset: usize = 0;

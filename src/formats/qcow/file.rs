@@ -16,7 +16,7 @@ use std::io::{Read, Seek};
 
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, ByteString, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPath};
 
 use super::block_range::{QcowBlockRange, QcowBlockRangeType};
 use super::cluster_table::{QcowClusterTable, QcowClusterTableEntry};
@@ -129,9 +129,15 @@ impl QcowFile {
     }
 
     /// Opens a file.
-    pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
-        self.data_stream = file_system.open_data_stream(path, None)?;
-
+    pub fn open(
+        &mut self,
+        parent_file_system: &VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()> {
+        self.data_stream = match parent_file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, None)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
         self.read_file_header()
     }
 
@@ -582,7 +588,7 @@ impl Seek for QcowFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPathType};
 
     fn get_file() -> io::Result<QcowFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
@@ -594,10 +600,8 @@ mod tests {
         let mut file: QcowFile = QcowFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        file.open(&parent_file_system, &vfs_path)?;
+
         Ok(file)
     }
 
@@ -612,10 +616,8 @@ mod tests {
         let mut file: QcowFile = QcowFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        file.open(&parent_file_system, &vfs_path)?;
+
         assert_eq!(file.media_size, 4194304);
 
         Ok(())

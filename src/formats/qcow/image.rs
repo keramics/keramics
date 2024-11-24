@@ -94,51 +94,6 @@ impl QcowImage {
 
         Ok(Some(layer))
     }
-
-    /// Opens a storage media image.
-    fn open_files(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
-        let directory_name: &str = file_system.get_directory_name(&path.location);
-
-        let mut files: Vec<QcowFile> = Vec::new();
-
-        let mut file: QcowFile = QcowFile::new();
-        file.open(file_system, path)?;
-
-        while file.backing_file_name.is_some() {
-            let backing_file_name: &ByteString = file.backing_file_name.as_ref().unwrap();
-
-            // TODO: add file_system.join function
-            let backing_file_location: String =
-                format!("{}/{}", directory_name, backing_file_name.to_string());
-            let backing_file_path: VfsPath =
-                VfsPath::new_from_path(&path, backing_file_location.as_str());
-
-            if !file_system.file_entry_exists(&backing_file_path)? {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Missing backing file: {}", backing_file_name.to_string()),
-                ));
-            }
-            let mut backing_file: QcowFile = QcowFile::new();
-            backing_file.open(file_system, &backing_file_path)?;
-
-            files.push(file);
-
-            file = backing_file;
-        }
-        files.push(file);
-
-        let mut file_index: usize = 0;
-        while let Some(mut file) = files.pop() {
-            if file_index > 0 {
-                file.set_backing_file(&mut self.files[file_index - 1])?;
-            }
-            self.files.push(SharedValue::new(file));
-
-            file_index += 1;
-        }
-        Ok(())
-    }
 }
 
 impl VfsFileSystem for QcowImage {
@@ -159,16 +114,59 @@ impl VfsFileSystem for QcowImage {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a storage media image.
     fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => self.open_files(file_system.as_ref(), path),
+        let directory_name: &str = match parent_file_system.with_read_lock() {
+            Ok(file_system) => file_system.get_directory_name(&path.location),
             Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        let mut files: Vec<QcowFile> = Vec::new();
+
+        let mut file: QcowFile = QcowFile::new();
+        file.open(parent_file_system, path)?;
+
+        while file.backing_file_name.is_some() {
+            let backing_file_name: &ByteString = file.backing_file_name.as_ref().unwrap();
+
+            // TODO: add file_system.join function
+            let backing_file_location: String =
+                format!("{}/{}", directory_name, backing_file_name.to_string());
+            let backing_file_path: VfsPath =
+                VfsPath::new_from_path(&path, backing_file_location.as_str());
+
+            let file_exists: bool = match parent_file_system.with_read_lock() {
+                Ok(file_system) => file_system.file_entry_exists(&backing_file_path)?,
+                Err(error) => return Err(crate::error_to_io_error!(error)),
+            };
+            if !file_exists {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Missing backing file: {}", backing_file_name.to_string()),
+                ));
+            }
+            let mut backing_file: QcowFile = QcowFile::new();
+            backing_file.open(parent_file_system, &backing_file_path)?;
+
+            files.push(file);
+
+            file = backing_file;
         }
+        files.push(file);
+
+        let mut file_index: usize = 0;
+        while let Some(mut file) = files.pop() {
+            if file_index > 0 {
+                file.set_backing_file(&mut self.files[file_index - 1])?;
+            }
+            self.files.push(SharedValue::new(file));
+
+            file_index += 1;
+        }
+        Ok(())
     }
 
     /// Opens a file entry with the specified path.
@@ -204,7 +202,7 @@ mod tests {
         let mut image = QcowImage::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        image.open(parent_file_system, &vfs_path)?;
+        image.open(&parent_file_system, &vfs_path)?;
 
         Ok(image)
     }
@@ -287,27 +285,7 @@ mod tests {
         let mut image = QcowImage::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        image.open(parent_file_system, &vfs_path)?;
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_files() -> io::Result<()> {
-        let mut vfs_context: VfsContext = VfsContext::new();
-
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
-
-        let mut image = QcowImage::new();
-
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => image.open_files(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        assert_eq!(image.get_number_of_layers(), 1);
+        image.open(&parent_file_system, &vfs_path)?;
 
         Ok(())
     }

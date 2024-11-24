@@ -78,7 +78,7 @@ pub trait VfsFileSystem {
     /// Opens a file system.
     fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()>;
 

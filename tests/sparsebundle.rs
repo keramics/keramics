@@ -53,7 +53,7 @@ fn read_media() -> io::Result<()> {
         "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
         None,
     );
-    image.open(vfs_file_system, &vfs_path)?;
+    image.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
     assert_eq!(media_offset, image.media_size);

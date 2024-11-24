@@ -85,7 +85,7 @@ impl<'a> ScanContext<'a> {
         let mut scan_tree_node: &ScanTreeNode = &scan_tree.root_node;
 
         while buffer_offset < buffer_size {
-            let mut scan_result: ScanResult = scan_tree_node.scan_buffer(
+            let scan_result: ScanResult = scan_tree_node.scan_buffer(
                 self.data_offset,
                 self.data_size,
                 buffer,
@@ -147,14 +147,10 @@ impl<'a> ScanContext<'a> {
         let next_data_offset: u64 = self.data_offset + buffer_size as u64;
 
         if self.data_offset < self.header_end_offset {
-            let mut remaining_data_size: usize =
-                (self.header_end_offset - self.data_offset) as usize;
-
             self.scan_buffer_with_scan_tree(&self.scanner.header_scan_tree, buffer, 0, buffer_size);
         }
         if next_data_offset >= self.footer_start_offset {
-            let mut remaining_data_size: usize =
-                (next_data_offset - self.footer_start_offset) as usize;
+            let remaining_data_size: usize = (next_data_offset - self.footer_start_offset) as usize;
 
             let buffer_start_offset: usize = if remaining_data_size < buffer_size {
                 buffer_size - remaining_data_size

@@ -50,10 +50,8 @@ fn read_media_fixed() -> io::Result<()> {
     let mut file = VhdFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-parent.vhd", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "acb42a740c63c1f72e299463375751c8");
@@ -71,10 +69,8 @@ fn read_media_dynamic() -> io::Result<()> {
     let mut file = VhdFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-dynamic.vhd", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "4ce30a0c21dd037023a5692d85ade033");
@@ -92,10 +88,8 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
     let mut file = VhdFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "3f0e360a1211f80b3f5633a68dbe98ba");
@@ -113,10 +107,8 @@ fn read_media_differential() -> io::Result<()> {
     let mut parent_file = VhdFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-parent.vhd", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => parent_file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    parent_file.open(&vfs_file_system, &vfs_path)?;
+
     let mut file = VhdFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(
@@ -124,10 +116,8 @@ fn read_media_differential() -> io::Result<()> {
         "./test_data/vhd/ntfs-differential.vhd",
         None,
     );
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let shared_parent_file: SharedValue<VhdFile> = SharedValue::new(parent_file);
 
     file.set_parent(&shared_parent_file)?;

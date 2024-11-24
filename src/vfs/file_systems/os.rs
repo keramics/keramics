@@ -60,7 +60,7 @@ impl VfsFileSystem for OsVfsFileSystem {
     /// Opens a file system.
     fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
         if parent_file_system.is_some() {
@@ -107,7 +107,7 @@ mod tests {
         let mut vfs_file_system: OsVfsFileSystem = OsVfsFileSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        vfs_file_system.open(parent_file_system, &vfs_path)?;
+        vfs_file_system.open(&parent_file_system, &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -142,7 +142,7 @@ mod tests {
         let mut vfs_file_system: OsVfsFileSystem = OsVfsFileSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        vfs_file_system.open(parent_file_system, &vfs_path)?;
+        vfs_file_system.open(&parent_file_system, &vfs_path)?;
 
         Ok(())
     }
