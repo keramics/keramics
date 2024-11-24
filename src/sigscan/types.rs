@@ -11,14 +11,8 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod encoding;
-pub mod formats;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod sigscan;
-pub mod types;
-pub mod vfs;
+use std::rc::Rc;
+
+use super::signature::Signature;
+
+pub type SignatureReference = Rc<Signature>;

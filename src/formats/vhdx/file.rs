@@ -812,8 +812,6 @@ mod tests {
 
     #[test]
     fn test_open() -> io::Result<()> {
-        Mediator { debug_output: true }.make_current();
-
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);

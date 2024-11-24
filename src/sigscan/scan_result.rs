@@ -11,14 +11,22 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod encoding;
-pub mod formats;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod sigscan;
-pub mod types;
-pub mod vfs;
+use super::scan_tree::ScanTreeNode;
+use super::types::SignatureReference;
+
+/// Scan object.
+#[derive(Debug)]
+pub enum ScanResult<'a> {
+    None,
+    ScanTreeNode(&'a ScanTreeNode),
+    Signature(SignatureReference),
+}
+
+impl<'a> ScanResult<'a> {
+    pub fn is_some(&self) -> bool {
+        match self {
+            ScanResult::None => false,
+            _ => true,
+        }
+    }
+}

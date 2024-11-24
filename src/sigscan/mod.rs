@@ -11,19 +11,15 @@
  * under the License.
  */
 
-// Data formats used by other formats below.
-mod xmlplist;
-
-// Storage media image formats
-pub mod qcow;
-pub mod sparseimage;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
-
-// File system formats
-pub mod ext;
+mod constants;
+mod enums;
+mod groups;
+mod pattern_weights;
+mod scan_context;
+mod scan_result;
+mod scan_tree;
+mod scanner;
+mod signature;
+mod signature_table;
+mod skip_table;
+mod types;
