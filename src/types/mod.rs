@@ -14,6 +14,7 @@
 mod block_tree;
 mod byte_string;
 mod errors;
+mod lru_cache;
 mod shared_value;
 mod ucs2_string;
 mod utf16_string;
@@ -22,6 +23,7 @@ mod uuid;
 pub use block_tree::BlockTree;
 pub use byte_string::ByteString;
 pub use errors::{InsertError, ParseError};
+pub use lru_cache::LruCache;
 pub use shared_value::{SharedValue, SharedValueLockError, SharedValueLockResult};
 pub use ucs2_string::Ucs2String;
 pub use utf16_string::Utf16String;
