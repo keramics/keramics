@@ -58,7 +58,7 @@ impl SparseBundleImage {
     /// Opens a file system.
     pub fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
         match parent_file_system.with_write_lock() {
@@ -299,7 +299,7 @@ mod tests {
             "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
             None,
         );
-        image.open(parent_file_system, &vfs_path)?;
+        image.open(&parent_file_system, &vfs_path)?;
 
         Ok(image)
     }
@@ -319,7 +319,7 @@ mod tests {
             "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
             None,
         );
-        image.open(parent_file_system, &vfs_path)?;
+        image.open(&parent_file_system, &vfs_path)?;
 
         assert_eq!(image.block_size, 8388608);
         assert_eq!(image.media_size, 4194304);

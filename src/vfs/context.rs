@@ -73,7 +73,7 @@ impl VfsContext {
                 ));
             }
         };
-        file_system.open(parent_file_system, path)?;
+        file_system.open(&parent_file_system, path)?;
 
         self.file_systems
             .insert(lookup_key.to_string(), SharedValue::new(file_system));

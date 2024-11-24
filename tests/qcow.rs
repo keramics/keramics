@@ -49,10 +49,8 @@ fn read_media() -> io::Result<()> {
     let mut file = QcowFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "196066add11fb71c4c49cf1bb50d6d24");

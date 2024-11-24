@@ -103,20 +103,13 @@ fn create_signature_scanner() -> Result<Scanner, BuildError> {
 }
 
 /// Prints information about a QCOW file.
-fn print_qcow_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+fn print_qcow_file(parent_file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut qcow_file: QcowFile = QcowFile::new();
 
-    // TODO: change QcowFile open() function to match UdifFile
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => match qcow_file.open(file_system.as_ref(), vfs_path) {
-            Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open QCOW file with error: {}", error);
-                return ExitCode::FAILURE;
-            }
-        },
+    match qcow_file.open(parent_file_system, vfs_path) {
+        Ok(_) => {}
         Err(error) => {
-            println!("{}", error);
+            println!("Unable to open QCOW file with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
@@ -165,10 +158,13 @@ fn print_qcow_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) 
 }
 
 /// Prints information about a sparse image file.
-fn print_sparseimage_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+fn print_sparseimage_file(
+    parent_file_system: &VfsFileSystemReference,
+    vfs_path: &VfsPath,
+) -> ExitCode {
     let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
-    match sparseimage_file.open(vfs_file_system, vfs_path) {
+    match sparseimage_file.open(parent_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open sparse image file with error: {}", error);
@@ -199,10 +195,10 @@ fn print_sparseimage_file(vfs_file_system: VfsFileSystemReference, vfs_path: &Vf
 }
 
 /// Prints information about an UDIF file.
-fn print_udif_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+fn print_udif_file(parent_file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut udif_file: UdifFile = UdifFile::new();
 
-    match udif_file.open(vfs_file_system, vfs_path) {
+    match udif_file.open(parent_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open UDIF file with error: {}", error);
@@ -241,20 +237,13 @@ fn print_udif_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) 
 }
 
 /// Prints information about a VHD file.
-fn print_vhd_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+fn print_vhd_file(parent_file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut vhd_file: VhdFile = VhdFile::new();
 
-    // TODO: change VhdFile open() function to match UdifFile
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => match vhd_file.open(file_system.as_ref(), vfs_path) {
-            Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open VHD file with error: {}", error);
-                return ExitCode::FAILURE;
-            }
-        },
+    match vhd_file.open(parent_file_system, vfs_path) {
+        Ok(_) => {}
         Err(error) => {
-            println!("{}", error);
+            println!("Unable to open VHD file with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
@@ -298,20 +287,13 @@ fn print_vhd_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) -
 }
 
 /// Prints information about a VHDX file.
-fn print_vhdx_file(vfs_file_system: VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+fn print_vhdx_file(parent_file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
-    // TODO: change VhdxFile open() function to match UdifFile
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => match vhdx_file.open(file_system.as_ref(), vfs_path) {
-            Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open VHDX file with error: {}", error);
-                return ExitCode::FAILURE;
-            }
-        },
+    match vhdx_file.open(parent_file_system, vfs_path) {
+        Ok(_) => {}
         Err(error) => {
-            println!("{}", error);
+            println!("Unable to open VHDX file with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
@@ -397,7 +379,7 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    // TODO: provide information about supported format
+    // TODO: add option to list supported formats
 
     let source: &str = match arguments.source.to_str() {
         Some(value) => value,
@@ -472,11 +454,11 @@ fn main() -> ExitCode {
     }
     if let Some(signature) = scan_context.results.values().next() {
         match signature.identifier.as_str() {
-            "qcow1" | "qcow2" | "qcow3" => return print_qcow_file(vfs_file_system, &vfs_path),
-            "sparseimage1" => return print_sparseimage_file(vfs_file_system, &vfs_path),
-            "udif1" => return print_udif_file(vfs_file_system, &vfs_path),
-            "vhd1" => return print_vhd_file(vfs_file_system, &vfs_path),
-            "vhdx1" => return print_vhdx_file(vfs_file_system, &vfs_path),
+            "qcow1" | "qcow2" | "qcow3" => return print_qcow_file(&vfs_file_system, &vfs_path),
+            "sparseimage1" => return print_sparseimage_file(&vfs_file_system, &vfs_path),
+            "udif1" => return print_udif_file(&vfs_file_system, &vfs_path),
+            "vhd1" => return print_vhd_file(&vfs_file_system, &vfs_path),
+            "vhdx1" => return print_vhdx_file(&vfs_file_system, &vfs_path),
             _ => {
                 println!("Unsupported format: {}", signature.identifier);
                 return ExitCode::FAILURE;

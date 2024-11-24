@@ -51,10 +51,8 @@ fn read_media_fixed() -> io::Result<()> {
 
     let vfs_path: VfsPath =
         VfsPath::new(VfsPathType::Os, "./test_data/vhdx/ntfs-parent.vhdx", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "75537374a81c40e51e6a4b812b36ce89");
@@ -73,10 +71,8 @@ fn read_media_dynamic() -> io::Result<()> {
 
     let vfs_path: VfsPath =
         VfsPath::new(VfsPathType::Os, "./test_data/vhdx/ntfs-dynamic.vhdx", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "20158534070142d63ee02c9ad1a9d87e");
@@ -94,10 +90,8 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
     let mut file = VhdxFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhdx/ext2.vhdx", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "196066add11fb71c4c49cf1bb50d6d24");
@@ -116,10 +110,8 @@ fn read_media_differential() -> io::Result<()> {
 
     let vfs_path: VfsPath =
         VfsPath::new(VfsPathType::Os, "./test_data/vhdx/ntfs-parent.vhdx", None);
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => parent_file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    parent_file.open(&vfs_file_system, &vfs_path)?;
+
     let mut file = VhdxFile::new();
 
     let vfs_path: VfsPath = VfsPath::new(
@@ -127,10 +119,8 @@ fn read_media_differential() -> io::Result<()> {
         "./test_data/vhdx/ntfs-differential.vhdx",
         None,
     );
-    match vfs_file_system.with_write_lock() {
-        Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
-    };
+    file.open(&vfs_file_system, &vfs_path)?;
+
     let shared_parent_file: SharedValue<VhdxFile> = SharedValue::new(parent_file);
 
     file.set_parent(&shared_parent_file)?;

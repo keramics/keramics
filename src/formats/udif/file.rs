@@ -73,10 +73,10 @@ impl UdifFile {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a file.
     pub fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
         self.data_stream = match parent_file_system.with_write_lock() {
@@ -536,7 +536,7 @@ mod tests {
 
         let vfs_path: VfsPath =
             VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_zlib.dmg", None);
-        file.open(parent_file_system, &vfs_path)?;
+        file.open(&parent_file_system, &vfs_path)?;
 
         Ok(file)
     }
@@ -553,7 +553,7 @@ mod tests {
 
         let vfs_path: VfsPath =
             VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_zlib.dmg", None);
-        file.open(parent_file_system, &vfs_path)?;
+        file.open(&parent_file_system, &vfs_path)?;
 
         assert_eq!(file.bytes_per_sector, 512);
         assert_eq!(file.media_size, 1964032);

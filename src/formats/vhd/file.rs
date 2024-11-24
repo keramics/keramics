@@ -15,7 +15,7 @@ use std::io;
 use std::io::{Read, Seek};
 
 use crate::types::{BlockTree, SharedValue, Ucs2String, Uuid};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPath};
 
 use super::block_allocation_table::{VhdBlockAllocationTable, VhdBlockAllocationTableEntry};
 use super::block_range::{VhdBlockRange, VhdBlockRangeType};
@@ -109,9 +109,15 @@ impl VhdFile {
     }
 
     /// Opens a file.
-    pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
-        self.data_stream = file_system.open_data_stream(path, None)?;
-
+    pub fn open(
+        &mut self,
+        parent_file_system: &VfsFileSystemReference,
+        path: &VfsPath,
+    ) -> io::Result<()> {
+        self.data_stream = match parent_file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, None)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
         self.read_metadata()
     }
 
@@ -417,7 +423,7 @@ impl Seek for VhdFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPathType};
 
     fn get_file() -> io::Result<VhdFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
@@ -429,10 +435,8 @@ mod tests {
         let mut file: VhdFile = VhdFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        file.open(&parent_file_system, &vfs_path)?;
+
         Ok(file)
     }
 
@@ -451,10 +455,7 @@ mod tests {
             "./test_data/vhd/ntfs-differential.vhd",
             None,
         );
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        file.open(&parent_file_system, &vfs_path)?;
 
         let parent_filename: Option<Ucs2String> = file.get_parent_filename();
         assert_eq!(parent_filename.unwrap().to_string(), "ntfs-parent.vhd");
@@ -477,10 +478,8 @@ mod tests {
             "./test_data/vhd/ntfs-differential.vhd",
             None,
         );
-        match parent_file_system.with_write_lock() {
-            Ok(file_system) => file.open(file_system.as_ref(), &vfs_path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        file.open(&parent_file_system, &vfs_path)?;
+
         assert_eq!(file.media_size, 4194304);
         assert_eq!(
             file.identifier.to_string(),

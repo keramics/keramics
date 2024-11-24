@@ -135,7 +135,7 @@ mod tests {
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        volume_system.open(parent_file_system, &vfs_path)?;
+        volume_system.open(&parent_file_system, &vfs_path)?;
 
         let partition: ApmPartition = volume_system.get_partition_by_index(0)?;
 

@@ -59,10 +59,10 @@ impl SparseImageFile {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a file.
     pub fn open(
         &mut self,
-        parent_file_system: VfsFileSystemReference,
+        parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
         self.data_stream = match parent_file_system.with_write_lock() {
@@ -287,7 +287,7 @@ mod tests {
             "./test_data/sparseimage/hfsplus.sparseimage",
             None,
         );
-        file.open(parent_file_system, &vfs_path)?;
+        file.open(&parent_file_system, &vfs_path)?;
 
         Ok(file)
     }
@@ -307,7 +307,7 @@ mod tests {
             "./test_data/sparseimage/hfsplus.sparseimage",
             None,
         );
-        file.open(parent_file_system, &vfs_path)?;
+        file.open(&parent_file_system, &vfs_path)?;
 
         assert_eq!(file.bytes_per_sector, 512);
         assert_eq!(file.block_size, 1048576);
