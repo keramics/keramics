@@ -15,6 +15,7 @@ use std::rc::Rc;
 
 use super::errors::InsertError;
 
+/// Block tree node type.
 #[derive(Clone, Default, PartialEq)]
 enum BlockTreeNodeType {
     Branch,
@@ -22,15 +23,26 @@ enum BlockTreeNodeType {
     Leaf,
 }
 
+/// Block tree node.
 struct BlockTreeNode<T> {
+    /// Node type.
     pub node_type: BlockTreeNodeType,
+
+    /// Offset of the block.
     pub offset: u64,
+
+    /// Size of the block represented by a sub node or (leaf) value.
     pub element_size: u64,
+
+    /// Sub nodes.
     pub sub_nodes: Vec<Option<BlockTreeNode<T>>>,
+
+    /// Values.
     pub values: Vec<Option<Rc<T>>>,
 }
 
 impl<T> BlockTreeNode<T> {
+    /// Creates a new block tree node.
     fn new(node_type: &BlockTreeNodeType, offset: u64, element_size: u64) -> Self {
         BlockTreeNode {
             node_type: node_type.clone(),
@@ -41,6 +53,7 @@ impl<T> BlockTreeNode<T> {
         }
     }
 
+    /// Inserts a (leaf) value.
     fn insert_value(
         &mut self,
         elements_per_node: u64,
@@ -111,14 +124,23 @@ impl<T> BlockTreeNode<T> {
     }
 }
 
+/// Block tree.
 pub struct BlockTree<T> {
+    /// Size of the data represented by the tree.
     data_size: u64,
+
+    /// Number of elements per nodes.
     elements_per_node: u64,
+
+    /// Size of a leaf value.
     leaf_value_size: u64,
+
+    /// Root node.
     root_node: Option<BlockTreeNode<T>>,
 }
 
 impl<T> BlockTree<T> {
+    /// Creates a new block tree.
     pub fn new(data_size: u64, elements_per_node: u64, leaf_value_size: u64) -> Self {
         Self {
             data_size: data_size,
@@ -128,6 +150,7 @@ impl<T> BlockTree<T> {
         }
     }
 
+    /// Creates the root node.
     fn create_root_node(&mut self, size: u64) {
         let mut element_size: u64 = self.leaf_value_size;
 
@@ -154,6 +177,7 @@ impl<T> BlockTree<T> {
         self.root_node = Some(root_node);
     }
 
+    /// Retrieves a (leaf) value.
     pub fn get_value(&self, offset: u64) -> Option<&T> {
         if self.root_node.is_none() {
             return None;
@@ -176,6 +200,7 @@ impl<T> BlockTree<T> {
         Some(node.values[value_index as usize].as_ref().unwrap())
     }
 
+    /// Inserts a (leaf) value.
     pub fn insert_value(&mut self, offset: u64, size: u64, value: T) -> Result<(), InsertError> {
         if offset + size > self.data_size {
             return Err(InsertError::new(format!(
