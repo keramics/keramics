@@ -17,7 +17,7 @@ use std::io::{Read, Seek};
 use crate::compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
 use crate::formats::plist::{PlistObject, XmlPlist};
 use crate::mediator::{Mediator, MediatorReference};
-use crate::types::{BlockTree, SharedValue};
+use crate::types::{BlockTree, LruCache, SharedValue};
 use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPath};
 
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
@@ -44,6 +44,9 @@ pub struct UdifFile {
     /// Block tree.
     block_tree: BlockTree<UdifBlockRange>,
 
+    /// Decompressed block cache.
+    block_cache: LruCache<u64, Vec<u8>>,
+
     /// Bytes per sector.
     pub bytes_per_sector: u16,
 
@@ -66,6 +69,7 @@ impl UdifFile {
             data_fork_offset: 0,
             has_block_ranges: false,
             block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
+            block_cache: LruCache::new(64),
             bytes_per_sector: 0,
             compression_method: UdifCompressionMethod::None,
             media_size: 0,
@@ -379,14 +383,26 @@ impl UdifFile {
                 UdifBlockRangeType::Compressed => {
                     let range_data_offset: usize = range_relative_offset as usize;
                     let range_data_end_offset: usize = range_data_offset + range_read_size;
-                    let mut range_data: Vec<u8> = vec![0; block_range.size as usize];
 
-                    self.read_compressed_block(block_range, &mut range_data)?;
+                    if !self.block_cache.contains(&block_range.data_offset) {
+                        let mut data: Vec<u8> = vec![0; block_range.size as usize];
 
+                        self.read_compressed_block(block_range, &mut data)?;
+
+                        self.block_cache.insert(block_range.data_offset, data);
+                    }
+                    let range_data: &Vec<u8> = match self.block_cache.get(&block_range.data_offset)
+                    {
+                        Some(data) => data,
+                        None => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("Unable to retrieve data from cache."),
+                            ));
+                        }
+                    };
                     data[data_offset..data_end_offset]
                         .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
-
-                    // TODO: cache decompressed ranges
 
                     range_read_size
                 }
