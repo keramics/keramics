@@ -16,6 +16,7 @@ mod block_range;
 mod constants;
 mod enums;
 mod file;
+mod file_header;
 mod image;
 mod image_header;
 mod layer;

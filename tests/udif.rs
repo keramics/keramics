@@ -17,7 +17,6 @@ use std::io::Read;
 use keramics::formats::udif::UdifFile;
 use keramics::formatters::format_as_string;
 use keramics::hashes::{DigestHashContext, Md5Context};
-use keramics::types::SharedValue;
 use keramics::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathType};
 
 fn read_media_from_file(file: &mut UdifFile) -> io::Result<(u64, String)> {

@@ -134,6 +134,9 @@ impl SignatureTable {
             result = Some(self.smallest_pattern_offset);
         }
         if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "SignatureTable::get_most_significant_pattern_offset {{\n"
+            ));
             if result.is_none() {
                 self.mediator
                     .debug_print(format!("    most significant pattern offset: N/A\n"));
@@ -143,6 +146,7 @@ impl SignatureTable {
                     result.unwrap(),
                 ));
             }
+            self.mediator.debug_print(format!("}}\n\n"));
         }
         result
     }
@@ -150,6 +154,9 @@ impl SignatureTable {
     /// Retrieves the pattern offsets for specific byte value weights.
     fn get_pattern_offset_by_byte_value_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "SignatureTable::get_pattern_offset_by_byte_value_weights {{\n"
+            ));
             if self.byte_value_weights.largest_weight == 0 {
                 self.mediator
                     .debug_print(format!("    largest byte value weight: N/A\n"));
@@ -159,7 +166,7 @@ impl SignatureTable {
                     self.byte_value_weights.largest_weight
                 ));
             }
-            let number_of_offset_groups: usize = match self
+            let number_of_offsets: usize = match self
                 .byte_value_weights
                 .offset_groups
                 .get(&self.byte_value_weights.largest_weight)
@@ -167,10 +174,9 @@ impl SignatureTable {
                 Some(offset_group) => offset_group.offsets.len(),
                 None => 0,
             };
-            self.mediator.debug_print(format!(
-                "    number of offset groups: {}\n",
-                number_of_offset_groups,
-            ));
+            self.mediator
+                .debug_print(format!("    number of offsets: {}\n", number_of_offsets,));
+            self.mediator.debug_print(format!("}}\n\n"));
         }
         match self
             .byte_value_weights
@@ -178,19 +184,16 @@ impl SignatureTable {
             .get(&self.byte_value_weights.largest_weight)
         {
             Some(offset_group) => Some(offset_group.offsets[0]),
-            None => {
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    no byte value offsets found\n"));
-                }
-                None
-            }
+            None => None,
         }
     }
 
     /// Retrieves the pattern offsets for specific occurrence weights.
     fn get_pattern_offset_by_occurrence_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "SignatureTable::get_pattern_offset_by_occurrence_weights {{\n"
+            ));
             if self.occurrence_weights.largest_weight == 0 {
                 self.mediator
                     .debug_print(format!("    largest occurrence weight: N/A\n"));
@@ -200,7 +203,7 @@ impl SignatureTable {
                     self.occurrence_weights.largest_weight
                 ));
             }
-            let number_of_offset_groups: usize = match self
+            let number_of_offsets: usize = match self
                 .occurrence_weights
                 .offset_groups
                 .get(&self.occurrence_weights.largest_weight)
@@ -208,10 +211,8 @@ impl SignatureTable {
                 Some(offset_group) => offset_group.offsets.len(),
                 None => 0,
             };
-            self.mediator.debug_print(format!(
-                "    number of offset groups: {}\n",
-                number_of_offset_groups
-            ));
+            self.mediator
+                .debug_print(format!("    number of offsets: {}\n", number_of_offsets));
         }
         match self
             .occurrence_weights
@@ -221,36 +222,41 @@ impl SignatureTable {
             Some(offset_group) => {
                 let mut largest_byte_value_weight: isize = 0;
                 let mut pattern_offset: usize = 0;
-                for occurrence_offset in offset_group.offsets.iter() {
-                    match self
-                        .byte_value_weights
-                        .weight_groups
-                        .get(&occurrence_offset)
-                    {
-                        Some(weight_group) => {
-                            largest_byte_value_weight =
-                                max(weight_group.weight, largest_byte_value_weight);
-                            pattern_offset = *occurrence_offset;
+                for (offset_index, occurrence_offset) in offset_group.offsets.iter().enumerate() {
+                    let byte_value_weight: isize =
+                        self.byte_value_weights.get_weight(occurrence_offset);
 
-                            if self.mediator.debug_output {
-                                self.mediator.debug_print(format!(
-                                    "    occurrence offset: {} byte value weight: {} (largest byte value weight: {})\n",
-                                    pattern_offset, weight_group.weight, largest_byte_value_weight,
-                                ));
-                            }
-                        }
-                        None => {}
-                    };
+                    if offset_index == 0 || byte_value_weight > largest_byte_value_weight {
+                        largest_byte_value_weight = byte_value_weight;
+                        pattern_offset = *occurrence_offset;
+                    }
+                    if self.mediator.debug_output {
+                        self.mediator.debug_print(format!(
+                            "    occurrence offset: {} byte value weight: {} (largest byte value weight: {})\n",
+                            pattern_offset, byte_value_weight, largest_byte_value_weight,
+                        ));
+                    }
+                }
+                if self.mediator.debug_output {
+                    self.mediator.debug_print(format!("}}\n\n"));
                 }
                 Some(pattern_offset)
             }
-            None => self.get_pattern_offset_by_byte_value_weights(),
+            None => {
+                if self.mediator.debug_output {
+                    self.mediator.debug_print(format!("}}\n\n"));
+                }
+                self.get_pattern_offset_by_byte_value_weights()
+            }
         }
     }
 
     /// Retrieves the pattern offsets for specific similarity weights.
     fn get_pattern_offset_by_similarity_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "SignatureTable::get_pattern_offset_by_similarity_weights {{\n"
+            ));
             if self.similarity_weights.largest_weight == 0 {
                 self.mediator
                     .debug_print(format!("    largest similarity weight: N/A\n"));
@@ -260,7 +266,7 @@ impl SignatureTable {
                     self.similarity_weights.largest_weight
                 ));
             }
-            let number_of_offset_groups: usize = match self
+            let number_of_offsets: usize = match self
                 .similarity_weights
                 .offset_groups
                 .get(&self.similarity_weights.largest_weight)
@@ -268,10 +274,8 @@ impl SignatureTable {
                 Some(offset_group) => offset_group.offsets.len(),
                 None => 0,
             };
-            self.mediator.debug_print(format!(
-                "    number of offset groups: {}\n",
-                number_of_offset_groups
-            ));
+            self.mediator
+                .debug_print(format!("    number of offsets: {}\n", number_of_offsets));
         }
         match self
             .similarity_weights
@@ -285,47 +289,41 @@ impl SignatureTable {
                 let mut pattern_offset: usize = 0;
 
                 for (offset_index, similarity_offset) in offset_group.offsets.iter().enumerate() {
-                    match self
-                        .occurrence_weights
-                        .weight_groups
-                        .get(&similarity_offset)
+                    let occurrence_weight: isize =
+                        self.occurrence_weights.get_weight(similarity_offset);
+                    let byte_value_weight: isize =
+                        self.byte_value_weights.get_weight(similarity_offset);
+
+                    if largest_occurrence_weight > 0
+                        && occurrence_weight == largest_occurrence_weight
                     {
-                        Some(occurrence_weight_group) => {
-                            let byte_value_weight: isize = match self
-                                .byte_value_weights
-                                .weight_groups
-                                .get(&similarity_offset)
-                            {
-                                Some(byte_value_weight_group) => byte_value_weight_group.weight,
-                                None => 0,
-                            };
-                            if largest_occurrence_weight > 0
-                                && occurrence_weight_group.weight == largest_occurrence_weight
-                            {
-                                if byte_value_weight > largest_byte_value_weight {
-                                    largest_occurrence_weight = 0;
-                                }
-                            }
-                            if offset_index == 0
-                                || occurrence_weight_group.weight > largest_occurrence_weight
-                            {
-                                largest_byte_value_weight = byte_value_weight;
-                                largest_occurrence_weight = occurrence_weight_group.weight;
-                                pattern_offset = *similarity_offset;
-                            }
-                            if self.mediator.debug_output {
-                                self.mediator.debug_print(format!(
-                                    "    similarity offset: {} occurrence weight: {} byte value weight: {} (largest occurrence weight: {} largest byte value weight: {})\n",
-                                    pattern_offset, occurrence_weight_group.weight, largest_occurrence_weight, byte_value_weight, largest_byte_value_weight
-                                ));
-                            }
+                        if byte_value_weight > largest_byte_value_weight {
+                            largest_occurrence_weight = 0;
                         }
-                        None => {}
-                    };
+                    }
+                    if offset_index == 0 || occurrence_weight > largest_occurrence_weight {
+                        largest_byte_value_weight = byte_value_weight;
+                        largest_occurrence_weight = occurrence_weight;
+                        pattern_offset = *similarity_offset;
+                    }
+                    if self.mediator.debug_output {
+                        self.mediator.debug_print(format!(
+                            "    similarity offset: {} occurrence weight: {} byte value weight: {} (largest occurrence weight: {} largest byte value weight: {})\n",
+                            pattern_offset, occurrence_weight, largest_occurrence_weight, byte_value_weight, largest_byte_value_weight
+                        ));
+                    }
+                }
+                if self.mediator.debug_output {
+                    self.mediator.debug_print(format!("}}\n\n"));
                 }
                 Some(pattern_offset)
             }
-            None => self.get_pattern_offset_by_occurrence_weights(),
+            None => {
+                if self.mediator.debug_output {
+                    self.mediator.debug_print(format!("}}\n\n"));
+                }
+                self.get_pattern_offset_by_occurrence_weights()
+            }
         }
     }
 

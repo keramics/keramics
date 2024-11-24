@@ -14,14 +14,14 @@
 use std::cmp::max;
 use std::collections::HashMap;
 
-use super::groups::{OffsetGroup, WeightGroup};
+use super::groups::OffsetGroup;
 
 pub struct PatternWeights {
     /// Offset (per weight) groups.
     pub offset_groups: HashMap<isize, OffsetGroup>,
 
     /// Weight (per offset) groups.
-    pub weight_groups: HashMap<usize, WeightGroup>,
+    pub weights: HashMap<usize, isize>,
 
     /// Largest weight.
     pub largest_weight: isize,
@@ -32,7 +32,7 @@ impl PatternWeights {
     pub fn new() -> Self {
         Self {
             offset_groups: HashMap::new(),
-            weight_groups: HashMap::new(),
+            weights: HashMap::new(),
             largest_weight: 0,
         }
     }
@@ -42,22 +42,23 @@ impl PatternWeights {
         match self.offset_groups.get_mut(&weight) {
             Some(offset_group) => offset_group.append_offset(pattern_offset),
             None => {
-                let mut offset_group: OffsetGroup = OffsetGroup::new(weight);
+                let mut offset_group: OffsetGroup = OffsetGroup::new();
                 offset_group.append_offset(pattern_offset);
 
                 self.offset_groups.insert(weight, offset_group);
             }
         };
-        match self.weight_groups.get_mut(&pattern_offset) {
-            Some(weight_group) => weight_group.weight = weight,
-            None => {
-                let mut weight_group: WeightGroup = WeightGroup::new(pattern_offset);
-                weight_group.weight = weight;
+        self.weights.insert(pattern_offset, weight);
 
-                self.weight_groups.insert(pattern_offset, weight_group);
-            }
-        };
         self.largest_weight = max(weight, self.largest_weight);
+    }
+
+    /// Retrieves a weight for a specific offset.
+    pub fn get_weight(&self, pattern_offset: &usize) -> isize {
+        match self.weights.get(pattern_offset) {
+            Some(weight) => *weight,
+            None => 0,
+        }
     }
 }
 
@@ -70,15 +71,15 @@ mod tests {
         let mut pattern_weights: PatternWeights = PatternWeights::new();
 
         assert_eq!(pattern_weights.offset_groups.len(), 0);
-        assert_eq!(pattern_weights.weight_groups.len(), 0);
+        assert_eq!(pattern_weights.weights.len(), 0);
         assert_eq!(pattern_weights.largest_weight, 0);
 
         pattern_weights.append_weight(3, 5);
 
         assert_eq!(pattern_weights.offset_groups.len(), 1);
         // TODO: test if offset_groups contains an offset group for weight 5
-        assert_eq!(pattern_weights.weight_groups.len(), 1);
-        // TODO: test if weight_groups contains a weight group for pattern offset 3
+        assert_eq!(pattern_weights.weights.len(), 1);
+        // TODO: test if weights contains a weight for pattern offset 3
         assert_eq!(pattern_weights.largest_weight, 5);
     }
 }

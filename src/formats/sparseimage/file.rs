@@ -171,7 +171,7 @@ impl SparseImageFile {
                 self.mediator.debug_print(format!("\n"));
             }
             self.mediator.debug_print(format!("    ],\n"));
-            self.mediator.debug_print(format!("}}\n"));
+            self.mediator.debug_print(format!("}}\n\n"));
         }
         Ok(())
     }

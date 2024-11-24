@@ -13,6 +13,10 @@
 
 use crate::types::Uuid;
 
+/// VHDX file header signature: "vhdxfile".
+pub(super) const VHDX_FILE_HEADER_SIGNATURE: [u8; 8] =
+    [0x76, 0x68, 0x64, 0x78, 0x66, 0x69, 0x6c, 0x65];
+
 /// VHDX image header signature: "head".
 pub(super) const VHDX_IMAGE_HEADER_SIGNATURE: [u8; 4] = [0x68, 0x65, 0x61, 0x64];
 

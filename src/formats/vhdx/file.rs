@@ -22,6 +22,7 @@ use super::block_allocation_table::{VhdxBlockAllocationTable, VhdxBlockAllocatio
 use super::block_range::{VhdxBlockRange, VhdxBlockRangeType};
 use super::constants::*;
 use super::enums::VhdxDiskType;
+use super::file_header::VhdxFileHeader;
 use super::image_header::VhdxImageHeader;
 use super::metadata_table::VhdxMetadataTable;
 use super::parent_locator::VhdxParentLocator;
@@ -128,11 +129,14 @@ impl VhdxFile {
     pub fn open(&mut self, file_system: &dyn VfsFileSystem, path: &VfsPath) -> io::Result<()> {
         self.data_stream = file_system.open_data_stream(path, None)?;
 
-        self.read_file()
+        self.read_metadata()
     }
 
-    /// Reads the image headers and region tables.
-    fn read_file(&mut self) -> io::Result<()> {
+    /// Reads the file header, image headers and region tables.
+    fn read_metadata(&mut self) -> io::Result<()> {
+        let mut file_header: VhdxFileHeader = VhdxFileHeader::new();
+        file_header.read_at_position(&self.data_stream, io::SeekFrom::Start(0))?;
+
         let mut primary_image_header: VhdxImageHeader = VhdxImageHeader::new();
 
         primary_image_header.read_at_position(&self.data_stream, io::SeekFrom::Start(65536))?;
