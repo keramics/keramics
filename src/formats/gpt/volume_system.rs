@@ -15,7 +15,7 @@ use std::io;
 
 use crate::checksums::ReversedCrc32Context;
 use crate::mediator::{Mediator, MediatorReference};
-use crate::types::SharedValue;
+use crate::types::{SharedValue, Uuid};
 use crate::vfs::{
     VfsDataStreamReference, VfsFileEntry, VfsFileEntryReference, VfsFileSystem,
     VfsFileSystemReference, VfsPath, VfsPathType, WrapperVfsFileEntry,
@@ -35,6 +35,9 @@ pub struct GptVolumeSystem {
     /// Data stream.
     data_stream: VfsDataStreamReference,
 
+    /// Disk identifier.
+    pub disk_identifier: Uuid,
+
     /// Bytes per sector.
     pub bytes_per_sector: u16,
 
@@ -50,6 +53,7 @@ impl GptVolumeSystem {
         Self {
             mediator: Mediator::current(),
             data_stream: SharedValue::none(),
+            disk_identifier: Uuid::new(),
             bytes_per_sector: 0,
             partition_entries: Vec::new(),
         }
@@ -75,8 +79,8 @@ impl GptVolumeSystem {
                     partition_entry.index,
                     partition_offset,
                     partition_size,
-                    partition_entry.type_identifier.clone(),
-                    partition_entry.identifier.clone(),
+                    &partition_entry.type_identifier,
+                    &partition_entry.identifier,
                 );
                 partition.open(&self.data_stream)?;
 
@@ -188,6 +192,9 @@ impl GptVolumeSystem {
         }
         // TODO: compare primary with backup partition table header.
 
+        if !partition_table_header.disk_identifier.is_nil() {
+            self.disk_identifier = partition_table_header.disk_identifier;
+        }
         if partition_table_header.entry_data_size < 128 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

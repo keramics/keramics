@@ -96,7 +96,7 @@ impl<'a> ScanContext<'a> {
                 ScanResult::ScanTreeNode(next_node) => {
                     scan_tree_node = next_node;
 
-                    skip_value = 0;
+                    continue;
                 }
                 ScanResult::Signature(signature) => {
                     self.results.insert(buffer_offset, Rc::clone(&signature));

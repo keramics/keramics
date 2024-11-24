@@ -186,6 +186,7 @@ impl ScanTreeNode {
             scan_object = self.scan_objects.get(&scan_object_key);
         }
         if mediator.debug_output {
+            mediator.debug_print(format!("ScanTreeNode::scan_buffer {{\n"));
             let pattern_offset: u64 = data_offset + scan_offset as u64;
             mediator.debug_print(format!(
                 "    scanning at offset: {} (0x{:08x}) for scan object: ",
@@ -201,6 +202,7 @@ impl ScanTreeNode {
                 }
                 None => mediator.debug_print(format!("N/A\n")),
             };
+            mediator.debug_print(format!("}}\n\n"));
         }
         if let Some(ScanObject::Signature(signature)) = scan_object {
             if signature.scan_buffer(data_offset, data_size, buffer, buffer_offset, buffer_size) {

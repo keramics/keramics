@@ -12,7 +12,7 @@
  */
 
 use std::cmp::min;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::mediator::{Mediator, MediatorReference};
@@ -32,7 +32,7 @@ pub(super) struct SignatureTable {
     pub pattern_type: PatternType,
 
     /// Byte value groups.
-    pub byte_value_groups: HashMap<usize, ByteValueGroup>,
+    pub byte_value_groups: BTreeMap<usize, ByteValueGroup>,
 
     /// Smallest pattern offset.
     pub smallest_pattern_offset: usize,
@@ -56,7 +56,7 @@ impl SignatureTable {
         Self {
             mediator: Mediator::current(),
             pattern_type: pattern_type.clone(),
-            byte_value_groups: HashMap::new(),
+            byte_value_groups: BTreeMap::new(),
             smallest_pattern_offset: 0,
             signatures: Vec::new(),
             byte_value_weights: PatternWeights::new(),
@@ -151,7 +151,7 @@ impl SignatureTable {
         result
     }
 
-    /// Retrieves the pattern offsets for specific byte value weights.
+    /// Retrieves the pattern offset for specific byte value weights.
     fn get_pattern_offset_by_byte_value_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
@@ -188,7 +188,7 @@ impl SignatureTable {
         }
     }
 
-    /// Retrieves the pattern offsets for specific occurrence weights.
+    /// Retrieves the pattern offset for specific occurrence weights.
     fn get_pattern_offset_by_occurrence_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
@@ -231,13 +231,22 @@ impl SignatureTable {
                         pattern_offset = *occurrence_offset;
                     }
                     if self.mediator.debug_output {
+                        self.mediator
+                            .debug_print(format!("    offset: {} {{\n", *occurrence_offset));
                         self.mediator.debug_print(format!(
-                            "    occurrence offset: {} byte value weight: {} (largest byte value weight: {})\n",
-                            pattern_offset, byte_value_weight, largest_byte_value_weight,
+                            "        byte value weight: {},\n",
+                            byte_value_weight
                         ));
+                        self.mediator.debug_print(format!("    }},\n"));
                     }
                 }
                 if self.mediator.debug_output {
+                    self.mediator
+                        .debug_print(format!("    pattern offset: {},\n", pattern_offset));
+                    self.mediator.debug_print(format!(
+                        "    largest byte value weight: {},\n",
+                        largest_byte_value_weight
+                    ));
                     self.mediator.debug_print(format!("}}\n\n"));
                 }
                 Some(pattern_offset)
@@ -251,7 +260,7 @@ impl SignatureTable {
         }
     }
 
-    /// Retrieves the pattern offsets for specific similarity weights.
+    /// Retrieves the pattern offset for specific similarity weights.
     fn get_pattern_offset_by_similarity_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
@@ -306,13 +315,30 @@ impl SignatureTable {
                         pattern_offset = *similarity_offset;
                     }
                     if self.mediator.debug_output {
+                        self.mediator
+                            .debug_print(format!("    offset: {} {{\n", *similarity_offset));
                         self.mediator.debug_print(format!(
-                            "    similarity offset: {} occurrence weight: {} byte value weight: {} (largest occurrence weight: {} largest byte value weight: {})\n",
-                            pattern_offset, occurrence_weight, largest_occurrence_weight, byte_value_weight, largest_byte_value_weight
+                            "        occurrence weight: {},\n",
+                            occurrence_weight
                         ));
+                        self.mediator.debug_print(format!(
+                            "        byte value weight: {},\n",
+                            byte_value_weight
+                        ));
+                        self.mediator.debug_print(format!("    }},\n"));
                     }
                 }
                 if self.mediator.debug_output {
+                    self.mediator
+                        .debug_print(format!("    pattern offset: {},\n", pattern_offset));
+                    self.mediator.debug_print(format!(
+                        "    largest occurrence weight: {},\n",
+                        largest_occurrence_weight
+                    ));
+                    self.mediator.debug_print(format!(
+                        "    largest byte value weight: {},\n",
+                        largest_byte_value_weight
+                    ));
                     self.mediator.debug_print(format!("}}\n\n"));
                 }
                 Some(pattern_offset)

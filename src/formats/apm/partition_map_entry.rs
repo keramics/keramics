@@ -28,8 +28,8 @@ use super::constants::*;
         field(name = "number_of_entries", data_type = "u32"),
         field(name = "start_sector", data_type = "u32"),
         field(name = "number_of_sectors", data_type = "u32"),
-        field(name = "partition_name", data_type = "ByteString<32>"),
-        field(name = "partition_type", data_type = "ByteString<32>"),
+        field(name = "name", data_type = "ByteString<32>"),
+        field(name = "type_identifier", data_type = "ByteString<32>"),
         field(name = "data_area_start_sector", data_type = "u32"),
         field(name = "data_area_number_of_sectors", data_type = "u32"),
         field(name = "status_flags", data_type = "u32", format = "hex"),
@@ -51,8 +51,8 @@ pub struct ApmPartitionMapEntry {
     pub number_of_entries: u32,
     pub start_sector: u32,
     pub number_of_sectors: u32,
-    pub partition_name: ByteString,
-    pub partition_type: ByteString,
+    pub name: ByteString,
+    pub type_identifier: ByteString,
     pub status_flags: u32,
 }
 
@@ -63,8 +63,8 @@ impl ApmPartitionMapEntry {
             number_of_entries: 0,
             start_sector: 0,
             number_of_sectors: 0,
-            partition_name: ByteString::new(),
-            partition_type: ByteString::new(),
+            name: ByteString::new(),
+            type_identifier: ByteString::new(),
             status_flags: 0,
         }
     }
@@ -86,8 +86,8 @@ impl ApmPartitionMapEntry {
         self.number_of_entries = crate::bytes_to_u32_be!(data, 4);
         self.start_sector = crate::bytes_to_u32_be!(data, 8);
         self.number_of_sectors = crate::bytes_to_u32_be!(data, 12);
-        self.partition_name = ByteString::from_bytes(&data[16..48]);
-        self.partition_type = ByteString::from_bytes(&data[48..80]);
+        self.name = ByteString::from_bytes(&data[16..48]);
+        self.type_identifier = ByteString::from_bytes(&data[48..80]);
         self.status_flags = crate::bytes_to_u32_be!(data, 88);
 
         Ok(())
