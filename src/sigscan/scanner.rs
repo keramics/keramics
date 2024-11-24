@@ -63,14 +63,30 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scanner() -> Result<(), BuildError> {
+    fn test_add_signature() {
+        let mut scanner: Scanner = Scanner::new();
+
+        assert_eq!(scanner.signatures.len(), 0);
+
+        scanner.add_signature(Signature::new(
+            "vdh",
+            PatternType::BoundToStart,
+            0,
+            "conectix".as_bytes(),
+        ));
+
+        assert_eq!(scanner.signatures.len(), 1);
+    }
+
+    #[test]
+    fn test_build() -> Result<(), BuildError> {
         let mut scanner: Scanner = Scanner::new();
 
         scanner.add_signature(Signature::new(
-            "test1",
-            PatternType::Unbound,
+            "vdh",
+            PatternType::BoundToStart,
             0,
-            "example of unbounded pattern".as_bytes(),
+            "conectix".as_bytes(),
         ));
         scanner.build()
     }

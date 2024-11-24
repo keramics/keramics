@@ -14,7 +14,7 @@
 use std::io;
 use std::io::{Read, Seek};
 
-use crate::types::SharedValue;
+use crate::types::{ByteString, SharedValue};
 use crate::vfs::{VfsDataStream, VfsDataStreamReference};
 
 /// Apple Partition Map (APM) partition.
@@ -31,18 +31,32 @@ pub struct ApmPartition {
     /// The size of the partition.
     pub size: u64,
 
+    /// The partition type identifier.
+    pub type_identifier: ByteString,
+
+    /// The name.
+    pub name: ByteString,
+
     /// The status flags.
     pub status_flags: u32,
 }
 
 impl ApmPartition {
     /// Creates a new partition.
-    pub(super) fn new(offset: u64, size: u64, status_flags: u32) -> Self {
+    pub(super) fn new(
+        offset: u64,
+        size: u64,
+        type_identifier: &ByteString,
+        name: &ByteString,
+        status_flags: u32,
+    ) -> Self {
         Self {
             data_stream: SharedValue::none(),
             current_offset: 0,
             offset: offset,
             size: size,
+            type_identifier: type_identifier.clone(),
+            name: name.clone(),
             status_flags: status_flags,
         }
     }

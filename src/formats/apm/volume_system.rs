@@ -42,7 +42,7 @@ impl ApmVolumeSystem {
     pub fn new() -> Self {
         Self {
             data_stream: SharedValue::none(),
-            bytes_per_sector: 512,
+            bytes_per_sector: 0,
             partition_map_entries: Vec::new(),
         }
     }
@@ -64,6 +64,8 @@ impl ApmVolumeSystem {
                 let mut partition: ApmPartition = ApmPartition::new(
                     partition_offset,
                     partition_size,
+                    &partition_entry.type_identifier,
+                    &partition_entry.name,
                     partition_entry.status_flags,
                 );
                 partition.open(&self.data_stream)?;
@@ -123,6 +125,8 @@ impl ApmVolumeSystem {
         let mut partition_map_entry_index: u32 = 0;
         let mut partition_map_entry_offset: u64 = 512;
 
+        self.bytes_per_sector = 512;
+
         loop {
             let mut partition_map_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
 
@@ -132,7 +136,7 @@ impl ApmVolumeSystem {
             )?;
 
             if partition_map_entry_index == 0 {
-                if partition_map_entry.partition_type.string != APM_PARTITION_MAP_TYPE {
+                if partition_map_entry.type_identifier.string != APM_PARTITION_MAP_TYPE {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(

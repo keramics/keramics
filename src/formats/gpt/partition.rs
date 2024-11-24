@@ -47,8 +47,8 @@ impl GptPartition {
         entry_index: usize,
         offset: u64,
         size: u64,
-        type_identifier: Uuid,
-        identifier: Uuid,
+        type_identifier: &Uuid,
+        identifier: &Uuid,
     ) -> Self {
         Self {
             data_stream: SharedValue::none(),
@@ -56,8 +56,8 @@ impl GptPartition {
             entry_index: entry_index,
             offset: offset,
             size: size,
-            type_identifier: type_identifier,
-            identifier: identifier,
+            type_identifier: type_identifier.clone(),
+            identifier: identifier.clone(),
         }
     }
 
