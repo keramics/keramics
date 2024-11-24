@@ -21,12 +21,3 @@ pub enum ScanResult<'a> {
     ScanTreeNode(&'a ScanTreeNode),
     Signature(SignatureReference),
 }
-
-impl<'a> ScanResult<'a> {
-    pub fn is_some(&self) -> bool {
-        match self {
-            ScanResult::None => false,
-            _ => true,
-        }
-    }
-}

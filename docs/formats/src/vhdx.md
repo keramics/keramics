@@ -8,7 +8,7 @@ and snapshots.
 
 A VHDX image file consist of: 
 
-* file (type) identifier
+* file header
 * 2x image headers
 * 2x region tables
 * log or metadata journal
@@ -30,9 +30,10 @@ The elements are stored in 64 KiB (65536 bytes) aligned blocks
 
 The number of bytes per sector is 512 or 4096 depending on the logical sector size.
 
-## File (type) identifier
+## File hader
 
-The file (type) identifier is 64 KiB (65536 bytes) in size and consists of:
+The file header of (file type identifier) is 64 KiB (65536 bytes) in size and
+consists of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---

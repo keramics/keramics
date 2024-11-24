@@ -13,14 +13,12 @@
 
 use std::cmp::min;
 use std::collections::HashMap;
-use std::io;
 use std::rc::Rc;
 
 use super::enums::PatternType;
 use super::scan_result::ScanResult;
 use super::scan_tree::{ScanTree, ScanTreeNode};
 use super::scanner::Scanner;
-use super::skip_table::SkipTable;
 use super::types::SignatureReference;
 
 /// Scan context.
@@ -29,22 +27,19 @@ pub struct ScanContext<'a> {
     scanner: &'a Scanner,
 
     /// Data offset.
-    data_offset: usize,
+    pub data_offset: u64,
 
     /// Data size.
-    data_size: usize,
+    data_size: u64,
 
     /// Header (range) end offset.
-    header_end_offset: usize,
+    header_end_offset: u64,
 
     /// Footer (range) start offset.
-    footer_start_offset: usize,
+    footer_start_offset: u64,
 
     /// Unbound range size.
     unbound_range_size: usize,
-
-    /// Active unbound scan tree node.
-    active_unbound_scan_tree_node: &'a ScanTreeNode,
 
     /// Results.
     pub results: HashMap<usize, SignatureReference>,
@@ -52,7 +47,7 @@ pub struct ScanContext<'a> {
 
 impl<'a> ScanContext<'a> {
     /// Creates a new scan context.
-    pub fn new(scanner: &'a Scanner, data_size: usize) -> Self {
+    pub fn new(scanner: &'a Scanner, data_size: u64) -> Self {
         // The header range starts at 0 since the header scan tree is relative to the start of the
         // data.
         let (_, header_end_offset): (usize, usize) = scanner.header_scan_tree.get_spanning_range();
@@ -60,7 +55,7 @@ impl<'a> ScanContext<'a> {
         // The footer range ends at data_size since the footer scan tree is relative to offset end
         // of the data.
         let (_, range_end_offset): (usize, usize) = scanner.footer_scan_tree.get_spanning_range();
-        let footer_start_offset: usize = data_size - range_end_offset;
+        let footer_start_offset: u64 = data_size - range_end_offset as u64;
 
         let (range_start_offset, range_end_offset): (usize, usize) =
             scanner.unbound_scan_tree.get_spanning_range();
@@ -70,37 +65,39 @@ impl<'a> ScanContext<'a> {
             scanner: scanner,
             data_offset: 0,
             data_size: data_size,
-            header_end_offset: header_end_offset,
+            header_end_offset: header_end_offset as u64,
             footer_start_offset: footer_start_offset,
             unbound_range_size: unbound_range_size,
-            active_unbound_scan_tree_node: &scanner.unbound_scan_tree.root_node,
             results: HashMap::new(),
         }
     }
 
-    /// Finalizes the scan.
-    pub fn finalize(&mut self) {}
-
-    /// Scans a buffer for a matching scan object.
-    fn scan_buffer(
+    /// Scans a buffer with a specific scan tree.
+    fn scan_buffer_with_scan_tree(
         &mut self,
         scan_tree: &'a ScanTree,
-        mut active_scan_tree_node: &'a ScanTreeNode,
         buffer: &[u8],
         mut buffer_offset: usize,
         buffer_size: usize,
     ) {
         let buffer_end_offset: usize = buffer_size - 1;
         let mut skip_value: usize;
+        let mut scan_tree_node: &ScanTreeNode = &scan_tree.root_node;
 
         while buffer_offset < buffer_size {
-            match active_scan_tree_node.scan_buffer(
+            let mut scan_result: ScanResult = scan_tree_node.scan_buffer(
                 self.data_offset,
                 self.data_size,
                 buffer,
                 buffer_offset,
                 buffer_size,
-            ) {
+            );
+            match scan_result {
+                ScanResult::ScanTreeNode(next_node) => {
+                    scan_tree_node = next_node;
+
+                    skip_value = 0;
+                }
                 ScanResult::Signature(signature) => {
                     self.results.insert(buffer_offset, Rc::clone(&signature));
 
@@ -132,62 +129,64 @@ impl<'a> ScanContext<'a> {
             if scan_tree.pattern_type != PatternType::Unbound {
                 break;
             }
-            self.active_unbound_scan_tree_node = &scan_tree.root_node;
-
             buffer_offset += skip_value;
         }
     }
 
     /// Scans the buffer for signatures.
-    pub fn update(&mut self, buffer: &[u8]) {
+    pub fn scan_buffer(&mut self, buffer: &[u8]) {
         if self.data_offset >= self.data_size {
             return;
         }
-        let remaining_data_size: usize = self.data_size - self.data_offset;
+        let remaining_data_size: usize = (self.data_size - self.data_offset) as usize;
 
         let mut buffer_size: usize = buffer.len();
         if buffer_size > remaining_data_size {
             buffer_size = remaining_data_size;
         }
-        let next_data_offset: usize = self.data_offset + buffer_size;
+        let next_data_offset: u64 = self.data_offset + buffer_size as u64;
 
         if self.data_offset < self.header_end_offset {
-            let mut remaining_data_size: usize = self.header_end_offset - self.data_offset;
+            let mut remaining_data_size: usize =
+                (self.header_end_offset - self.data_offset) as usize;
 
-            self.scan_buffer(
-                &self.scanner.header_scan_tree,
-                &self.scanner.header_scan_tree.root_node,
-                buffer,
-                0,
-                buffer_size,
-            );
+            self.scan_buffer_with_scan_tree(&self.scanner.header_scan_tree, buffer, 0, buffer_size);
         }
         if next_data_offset >= self.footer_start_offset {
-            let mut remaining_data_size: usize = next_data_offset - self.footer_start_offset;
+            let mut remaining_data_size: usize =
+                (next_data_offset - self.footer_start_offset) as usize;
 
             let buffer_start_offset: usize = if remaining_data_size < buffer_size {
                 buffer_size - remaining_data_size
             } else {
                 0
             };
-            self.scan_buffer(
+            self.scan_buffer_with_scan_tree(
                 &self.scanner.footer_scan_tree,
-                &self.scanner.footer_scan_tree.root_node,
                 buffer,
                 buffer_start_offset,
                 buffer_size,
             );
         }
         if self.unbound_range_size > 0 {
-            self.scan_buffer(
+            self.scan_buffer_with_scan_tree(
                 &self.scanner.unbound_scan_tree,
-                self.active_unbound_scan_tree_node,
                 buffer,
                 0,
                 buffer_size,
             );
         }
         self.data_offset = next_data_offset;
+    }
+
+    /// Retrieves the footer range.
+    pub fn get_footer_range(&self) -> (u64, u64) {
+        (self.footer_start_offset, self.data_size)
+    }
+
+    /// Retrieves the header range.
+    pub fn get_header_range(&self) -> (u64, u64) {
+        (0, self.header_end_offset)
     }
 }
 
@@ -199,7 +198,7 @@ mod tests {
     use crate::sigscan::signature::Signature;
 
     #[test]
-    fn test_update_and_finalize_with_bound_to_start_signature() {
+    fn test_scan_buffer_with_bound_to_start_signature() {
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new(
             "msiecf1",
@@ -207,7 +206,7 @@ mod tests {
             0,
             "Client UrlCache MMF Ver ".as_bytes(),
         ));
-        scanner.build();
+        scanner.build().unwrap();
 
         let data: [u8; 128] = [
             0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x20, 0x55, 0x72, 0x6c, 0x43, 0x61, 0x63, 0x68,
@@ -223,14 +222,13 @@ mod tests {
         ];
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
-        scan_context.update(&data);
-        scan_context.finalize();
+        scan_context.scan_buffer(&data);
 
         assert_eq!(scan_context.results.len(), 1);
     }
 
     #[test]
-    fn test_update_and_finalize_with_bound_to_end_signature() {
+    fn test_scan_buffer_with_bound_to_end_signature() {
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new(
             "vhd1",
@@ -238,7 +236,7 @@ mod tests {
             72,
             "conectix".as_bytes(),
         ));
-        scanner.build();
+        scanner.build().unwrap();
 
         let data: [u8; 128] = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -254,14 +252,13 @@ mod tests {
         ];
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
-        scan_context.update(&data);
-        scan_context.finalize();
+        scan_context.scan_buffer(&data);
 
         assert_eq!(scan_context.results.len(), 1);
     }
 
     #[test]
-    fn test_update_and_finalize_with_unbound_signature() {
+    fn test_scan_buffer_with_unbound_signature() {
         let mut scanner: Scanner = Scanner::new();
         scanner.add_signature(Signature::new(
             "test1",
@@ -269,7 +266,7 @@ mod tests {
             0,
             "example of unbounded pattern".as_bytes(),
         ));
-        scanner.build();
+        scanner.build().unwrap();
 
         let data: [u8; 128] = [
             0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -285,8 +282,7 @@ mod tests {
         ];
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
-        scan_context.update(&data);
-        scan_context.finalize();
+        scan_context.scan_buffer(&data);
 
         assert_eq!(scan_context.results.len(), 1);
     }

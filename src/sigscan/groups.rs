@@ -52,18 +52,14 @@ impl ByteValueGroup {
 /// Offset group.
 #[derive(Debug)]
 pub(super) struct OffsetGroup {
-    /// Weight.
-    pub weight: isize,
-
     /// Offsets.
     pub offsets: Vec<usize>,
 }
 
 impl OffsetGroup {
     /// Creates a new offset group.
-    pub fn new(weight: isize) -> Self {
+    pub fn new() -> Self {
         Self {
-            weight: weight,
             offsets: Vec::new(),
         }
     }
@@ -99,26 +95,6 @@ impl SignatureGroup {
     }
 }
 
-/// Weight group.
-#[derive(Debug)]
-pub(super) struct WeightGroup {
-    /// Pattern offset.
-    pub pattern_offset: usize,
-
-    /// Weight.
-    pub weight: isize,
-}
-
-impl WeightGroup {
-    /// Creates a new weight group.
-    pub fn new(pattern_offset: usize) -> Self {
-        Self {
-            pattern_offset: pattern_offset,
-            weight: 0,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,7 +124,7 @@ mod tests {
 
     #[test]
     fn test_offset_group_append_offset() {
-        let mut offset_group: OffsetGroup = OffsetGroup::new(3);
+        let mut offset_group: OffsetGroup = OffsetGroup::new();
 
         assert_eq!(offset_group.offsets.len(), 0);
 

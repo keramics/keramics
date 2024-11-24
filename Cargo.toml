@@ -11,6 +11,10 @@ name = "keramics"
 path = "src/lib.rs"
 
 [[bin]]
+name = "keramicsinfo"
+path = "tools/infotool.rs"
+
+[[bin]]
 name = "keramicshash"
 path = "tools/hashtool.rs"
 

@@ -11,14 +11,32 @@
  * under the License.
  */
 
-mod block_range;
-mod block_table;
-mod block_table_entry;
-mod block_table_header;
-mod constants;
-mod enums;
-mod file;
-mod file_footer;
+use std::error::Error;
+use std::fmt;
 
-pub use enums::UdifCompressionMethod;
-pub use file::UdifFile;
+/// The error returned for issues while building a scan tree.
+#[derive(Debug)]
+pub struct BuildError {
+    message: String,
+}
+
+impl BuildError {
+    /// Creates a new error.
+    pub fn new(message_string: String) -> Self {
+        Self {
+            message: message_string,
+        }
+    }
+}
+
+impl Error for BuildError {
+    fn description(&self) -> &str {
+        &self.message
+    }
+}
+
+impl fmt::Display for BuildError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{}", self.message)
+    }
+}

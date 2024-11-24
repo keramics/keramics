@@ -57,15 +57,15 @@ impl Signature {
     /// Scans a buffer for a matching signature.
     pub(super) fn scan_buffer(
         &self,
-        data_offset: usize,
-        data_size: usize,
+        data_offset: u64,
+        data_size: u64,
         buffer: &[u8],
         buffer_offset: usize,
         buffer_size: usize,
     ) -> bool {
-        let pattern_offset: usize = match self.pattern_type {
-            PatternType::BoundToEnd => data_size - self.pattern_offset,
-            PatternType::BoundToStart => self.pattern_offset,
+        let pattern_offset: u64 = match self.pattern_type {
+            PatternType::BoundToEnd => data_size - self.pattern_offset as u64,
+            PatternType::BoundToStart => self.pattern_offset as u64,
             PatternType::Unbound => data_offset,
         };
         let mediator: MediatorReference = Mediator::current();
@@ -80,7 +80,7 @@ impl Signature {
         }
         let scan_offset: usize = match self.pattern_type {
             PatternType::Unbound => buffer_offset,
-            _ => pattern_offset - data_offset,
+            _ => (pattern_offset - data_offset) as usize,
         };
         let scan_end_offset: usize = scan_offset + self.pattern_size;
 
@@ -92,7 +92,7 @@ impl Signature {
         }
         match self.pattern_type {
             PatternType::Unbound => true,
-            _ => (data_offset + scan_offset) == pattern_offset,
+            _ => (data_offset + scan_offset as u64) == pattern_offset,
         }
     }
 }

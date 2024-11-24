@@ -14,6 +14,7 @@
 use std::rc::Rc;
 
 use super::enums::PatternType;
+use super::errors::BuildError;
 use super::scan_tree::ScanTree;
 use super::signature::Signature;
 use super::types::SignatureReference;
@@ -50,10 +51,10 @@ impl Scanner {
     }
 
     /// Builds the scan trees.
-    pub fn build(&mut self) {
-        self.header_scan_tree.build(&self.signatures);
-        self.footer_scan_tree.build(&self.signatures);
-        self.unbound_scan_tree.build(&self.signatures);
+    pub fn build(&mut self) -> Result<(), BuildError> {
+        self.header_scan_tree.build(&self.signatures)?;
+        self.footer_scan_tree.build(&self.signatures)?;
+        self.unbound_scan_tree.build(&self.signatures)
     }
 }
 
@@ -62,7 +63,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_scanner() {
+    fn test_scanner() -> Result<(), BuildError> {
         let mut scanner: Scanner = Scanner::new();
 
         scanner.add_signature(Signature::new(
@@ -71,6 +72,6 @@ mod tests {
             0,
             "example of unbounded pattern".as_bytes(),
         ));
-        scanner.build();
+        scanner.build()
     }
 }

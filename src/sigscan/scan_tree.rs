@@ -18,6 +18,7 @@ use std::rc::Rc;
 use crate::mediator::{Mediator, MediatorReference};
 
 use super::enums::PatternType;
+use super::errors::BuildError;
 use super::scan_result::ScanResult;
 use super::signature_table::SignatureTable;
 use super::skip_table::SkipTable;
@@ -57,20 +58,18 @@ impl ScanTreeNode {
         signature_table: &SignatureTable,
         offsets_to_ignore: &Vec<usize>,
         largest_pattern_offset: usize,
-    ) {
-        let result: Option<usize> = signature_table.get_most_significant_pattern_offset();
-
-        // TODO: ensure pattern offset is set
-        match result {
-            Some(pattern_offset) => self.pattern_offset = pattern_offset,
-            None => {}
-        };
-        let signatures_in_node: Vec<SignatureReference> = match result {
-            Some(pattern_offset) => {
-                signature_table.get_signatures_by_pattern_offset(pattern_offset)
+    ) -> Result<(), BuildError> {
+        self.pattern_offset = match signature_table.get_most_significant_pattern_offset() {
+            Some(pattern_offset) => pattern_offset,
+            None => {
+                return Err(BuildError::new(format!(
+                    "Unable to determine most significant pattern offset"
+                )))
             }
-            None => Vec::new(),
         };
+        let signatures_in_node: Vec<SignatureReference> =
+            signature_table.get_signatures_by_pattern_offset(self.pattern_offset);
+
         let mut remaining_signatures: Vec<SignatureReference> = Vec::new();
         for signature in signature_table.signatures.iter() {
             if !signatures_in_node.contains(signature) {
@@ -78,60 +77,51 @@ impl ScanTreeNode {
             }
         }
         let mut sub_offsets_to_ignore: Vec<usize> = offsets_to_ignore.clone();
-        match result {
-            Some(pattern_offset) => sub_offsets_to_ignore.push(pattern_offset),
-            None => {}
-        };
-        match result {
-            Some(pattern_offset) => {
-                match signature_table.byte_value_groups.get(&pattern_offset) {
-                    Some(byte_value_group) => {
-                        for (group_index, (_, signature_group)) in
-                            byte_value_group.signature_groups.iter().enumerate()
-                        {
-                            let number_of_signatures: usize = signature_group.signatures.len();
+        sub_offsets_to_ignore.push(self.pattern_offset);
 
-                            if number_of_signatures == 0 {
-                                // TODO: return an error instead of panic
-                                panic!("Invalid byte value group for pattern offset: {} invalid signature group: {} missing signatures", pattern_offset, group_index);
-                            }
-                            if number_of_signatures == 1 {
-                                self.scan_objects.insert(
-                                    signature_group.byte_value as i16,
-                                    ScanObject::Signature(Rc::clone(
-                                        &signature_group.signatures[0],
-                                    )),
-                                );
-                            } else {
-                                let mut sub_signature_table: SignatureTable =
-                                    SignatureTable::new(&signature_table.pattern_type);
-                                sub_signature_table.fill(
-                                    &signature_group.signatures,
-                                    &sub_offsets_to_ignore,
-                                    largest_pattern_offset,
-                                );
-                                sub_signature_table.fill(
-                                    &remaining_signatures,
-                                    &sub_offsets_to_ignore,
-                                    largest_pattern_offset,
-                                );
-                                sub_signature_table.calculate_pattern_weights();
+        match signature_table.byte_value_groups.get(&self.pattern_offset) {
+            Some(byte_value_group) => {
+                for (group_index, (_, signature_group)) in
+                    byte_value_group.signature_groups.iter().enumerate()
+                {
+                    let number_of_signatures: usize = signature_group.signatures.len();
 
-                                let mut sub_node: ScanTreeNode = ScanTreeNode::new();
-
-                                sub_node.build(
-                                    &sub_signature_table,
-                                    &sub_offsets_to_ignore,
-                                    largest_pattern_offset,
-                                );
-                                self.scan_objects.insert(
-                                    signature_group.byte_value as i16,
-                                    ScanObject::ScanTreeNode(sub_node),
-                                );
-                            }
-                        }
+                    if number_of_signatures == 0 {
+                        return Err(BuildError::new(format!(
+                                "Invalid byte value group for pattern offset: {} invalid signature group: {} missing signatures", self.pattern_offset, group_index)));
                     }
-                    None => {}
+                    if number_of_signatures == 1 {
+                        self.scan_objects.insert(
+                            signature_group.byte_value as i16,
+                            ScanObject::Signature(Rc::clone(&signature_group.signatures[0])),
+                        );
+                    } else {
+                        let mut sub_signature_table: SignatureTable =
+                            SignatureTable::new(&signature_table.pattern_type);
+                        sub_signature_table.fill(
+                            &signature_group.signatures,
+                            &sub_offsets_to_ignore,
+                            largest_pattern_offset,
+                        );
+                        sub_signature_table.fill(
+                            &remaining_signatures,
+                            &sub_offsets_to_ignore,
+                            largest_pattern_offset,
+                        );
+                        sub_signature_table.calculate_pattern_weights();
+
+                        let mut sub_node: ScanTreeNode = ScanTreeNode::new();
+
+                        sub_node.build(
+                            &sub_signature_table,
+                            &sub_offsets_to_ignore,
+                            largest_pattern_offset,
+                        )?;
+                        self.scan_objects.insert(
+                            signature_group.byte_value as i16,
+                            ScanObject::ScanTreeNode(sub_node),
+                        );
+                    }
                 }
             }
             None => {}
@@ -159,17 +149,18 @@ impl ScanTreeNode {
                 &sub_signature_table,
                 &sub_offsets_to_ignore,
                 largest_pattern_offset,
-            );
+            )?;
             self.scan_objects
                 .insert(DEFAULT_SCAN_OBJECT, ScanObject::ScanTreeNode(sub_node));
         }
+        Ok(())
     }
 
     /// Scans a buffer for a matching scan object.
-    pub fn scan_buffer(
+    pub(super) fn scan_buffer(
         &self,
-        data_offset: usize,
-        data_size: usize,
+        data_offset: u64,
+        data_size: u64,
         buffer: &[u8],
         buffer_offset: usize,
         buffer_size: usize,
@@ -186,7 +177,7 @@ impl ScanTreeNode {
         // Note that if the pattern offset exceeds the (total) data size the scan continues with the default scan object.
         let mut scan_object: Option<&ScanObject> = None;
 
-        if scan_offset < buffer_size && scan_offset < data_size - data_offset {
+        if scan_offset < buffer_size && (scan_offset as u64) < data_size - data_offset {
             scan_object_key = buffer[scan_offset] as i16;
             scan_object = self.scan_objects.get(&scan_object_key);
         }
@@ -195,9 +186,10 @@ impl ScanTreeNode {
             scan_object = self.scan_objects.get(&scan_object_key);
         }
         if mediator.debug_output {
+            let pattern_offset: u64 = data_offset + scan_offset as u64;
             mediator.debug_print(format!(
                 "    scanning at offset: {} (0x{:08x}) for scan object: ",
-                scan_offset, scan_offset
+                pattern_offset, pattern_offset
             ));
             match scan_object {
                 Some(_) => {
@@ -220,13 +212,9 @@ impl ScanTreeNode {
         }
         match scan_object {
             Some(scan_object) => match scan_object {
-                ScanObject::ScanTreeNode(scan_tree_node) => scan_tree_node.scan_buffer(
-                    data_offset,
-                    data_size,
-                    buffer,
-                    buffer_offset,
-                    buffer_size,
-                ),
+                ScanObject::ScanTreeNode(scan_tree_node) => {
+                    ScanResult::ScanTreeNode(&scan_tree_node)
+                }
                 ScanObject::Signature(signature) => {
                     if signature.scan_buffer(
                         data_offset,
@@ -278,7 +266,7 @@ impl ScanTree {
     }
 
     /// Builds the scan tree.
-    pub fn build(&mut self, signatures: &Vec<SignatureReference>) {
+    pub fn build(&mut self, signatures: &Vec<SignatureReference>) -> Result<(), BuildError> {
         let mut number_of_signatures: usize = 0;
         for signature in signatures.iter() {
             if signature.pattern_type != self.pattern_type {
@@ -297,9 +285,10 @@ impl ScanTree {
             signature_table.calculate_pattern_weights();
 
             self.root_node
-                .build(&signature_table, &offsets_to_ignore, self.range_end_offset);
+                .build(&signature_table, &offsets_to_ignore, self.range_end_offset)?;
             self.skip_table.fill(&signatures);
         }
+        Ok(())
     }
 
     /// Retrieves the spanning range.
@@ -317,7 +306,7 @@ mod tests {
     use crate::sigscan::signature::Signature;
 
     #[test]
-    fn test_scan_tree_node_build() {
+    fn test_scan_tree_node_build() -> Result<(), BuildError> {
         let mut scan_tree_node: ScanTreeNode = ScanTreeNode::new();
 
         assert_eq!(scan_tree_node.scan_objects.len(), 0);
@@ -334,13 +323,15 @@ mod tests {
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
         signature_table.calculate_pattern_weights();
 
-        scan_tree_node.build(&signature_table, &offsets_to_ignore, 8);
+        scan_tree_node.build(&signature_table, &offsets_to_ignore, 8)?;
 
         assert_eq!(scan_tree_node.scan_objects.len(), 1);
+
+        Ok(())
     }
 
     #[test]
-    fn test_scan_tree_build() {
+    fn test_scan_tree_build() -> Result<(), BuildError> {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
 
         assert_eq!(scan_tree.root_node.scan_objects.len(), 0);
@@ -352,15 +343,17 @@ mod tests {
             0,
             "conectix".as_bytes(),
         )));
-        scan_tree.build(&signatures);
+        scan_tree.build(&signatures)?;
 
         assert_eq!(scan_tree.root_node.scan_objects.len(), 1);
+
+        Ok(())
     }
 
     // TODO: add tests for scan_tree get_spanning_range
 
     #[test]
-    fn test_scan_tree_node_scan_buffer_with_bound_to_start_signature() {
+    fn test_scan_tree_node_scan_buffer_with_bound_to_start_signature() -> Result<(), BuildError> {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
@@ -370,7 +363,7 @@ mod tests {
             0,
             "Client UrlCache MMF Ver ".as_bytes(),
         )));
-        scan_tree.build(&signatures);
+        scan_tree.build(&signatures)?;
 
         let data: [u8; 128] = [
             0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x20, 0x55, 0x72, 0x6c, 0x43, 0x61, 0x63, 0x68,
@@ -385,11 +378,17 @@ mod tests {
             0x00, 0x00,
         ];
         let scan_result: ScanResult = scan_tree.root_node.scan_buffer(0, 128, &data, 0, 128);
-        assert!(scan_result.is_some());
+        match scan_result {
+            ScanResult::Signature(signature) => {
+                assert_eq!(signature.identifier.as_str(), "msiecf1")
+            }
+            _ => panic!("Incorrect scan result type"),
+        }
+        Ok(())
     }
 
     #[test]
-    fn test_scan_tree_node_scan_buffer_with_bound_to_end_signature() {
+    fn test_scan_tree_node_scan_buffer_with_bound_to_end_signature() -> Result<(), BuildError> {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToEnd);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
@@ -399,7 +398,7 @@ mod tests {
             72,
             "conectix".as_bytes(),
         )));
-        scan_tree.build(&signatures);
+        scan_tree.build(&signatures)?;
 
         let data: [u8; 128] = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -414,11 +413,15 @@ mod tests {
             0x00, 0x00,
         ];
         let scan_result: ScanResult = scan_tree.root_node.scan_buffer(0, 128, &data, 48, 128);
-        assert!(scan_result.is_some());
+        match scan_result {
+            ScanResult::Signature(signature) => assert_eq!(signature.identifier.as_str(), "vhd1"),
+            _ => panic!("Incorrect scan result type"),
+        }
+        Ok(())
     }
 
     #[test]
-    fn test_scan_tree_node_scan_buffer_with_unbound_signature() {
+    fn test_scan_tree_node_scan_buffer_with_unbound_signature() -> Result<(), BuildError> {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::Unbound);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
@@ -428,7 +431,7 @@ mod tests {
             0,
             "example of unbounded pattern".as_bytes(),
         )));
-        scan_tree.build(&signatures);
+        scan_tree.build(&signatures)?;
 
         let data: [u8; 128] = [
             0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
@@ -443,6 +446,10 @@ mod tests {
             0x20, 0x20,
         ];
         let scan_result: ScanResult = scan_tree.root_node.scan_buffer(0, 128, &data, 15, 128);
-        assert!(scan_result.is_some());
+        match scan_result {
+            ScanResult::Signature(signature) => assert_eq!(signature.identifier.as_str(), "test1"),
+            _ => panic!("Incorrect scan result type"),
+        }
+        Ok(())
     }
 }
