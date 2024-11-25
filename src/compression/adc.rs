@@ -187,11 +187,13 @@ mod tests {
         let test_data: [u8; 10] = [0x83, 0xfe, 0xed, 0xfa, 0xce, 0x00, 0x00, 0x40, 0x00, 0x06];
         let mut test_context: AdcContext = AdcContext::new();
 
+        let mut uncompressed_data: Vec<u8> = vec![0; 11];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 11);
+
         let expected_data: [u8; 11] = [
             0xfe, 0xed, 0xfa, 0xce, 0xce, 0xce, 0xce, 0xfe, 0xed, 0xfa, 0xce,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0; 11];
-        test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(uncompressed_data, expected_data);
 
         Ok(())

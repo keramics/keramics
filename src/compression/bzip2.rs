@@ -1073,6 +1073,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let mut uncompressed_data: Vec<u8> = vec![0; 512];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 108);
 
         let expected_uncompressed_data: [u8; 108] = [
             0x49, 0x66, 0x20, 0x50, 0x65, 0x74, 0x65, 0x72, 0x20, 0x50, 0x69, 0x70, 0x65, 0x72,
@@ -1108,6 +1109,7 @@ mod tests {
         ];
         let mut uncompressed_data: Vec<u8> = vec![0; 512];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 512);
 
         let expected_uncompressed_data: [u8; 512] = [
             0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54, 0x00, 0x00, 0x01, 0x00, 0x5c, 0x00,

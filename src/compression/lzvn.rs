@@ -539,12 +539,14 @@ mod tests {
         ];
         let mut test_context: LzvnContext = LzvnContext::new();
 
+        let mut uncompressed_data: Vec<u8> = vec![0; 19];
+        test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 19);
+
         let expected_data: [u8; 19] = [
             0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x65, 0x64, 0x20,
             0x66, 0x69, 0x6c, 0x65, 0x0a,
         ];
-        let mut uncompressed_data: Vec<u8> = vec![0; 19];
-        test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(uncompressed_data, expected_data);
 
         Ok(())

@@ -58,6 +58,7 @@ impl StructureLayoutField {
 
     pub fn get_byte_size(&self) -> Option<usize> {
         match &self.data_type {
+            DataType::BitField16 => Some(2),
             DataType::BitField32 => Some(4),
             DataType::BitField64 => Some(8),
             DataType::ByteString => Some(1),
@@ -83,6 +84,11 @@ impl StructureLayoutField {
         data_offset: TokenStream,
     ) -> TokenStream {
         match &self.data_type {
+            DataType::BitField16 => match byte_order {
+                &ByteOrder::BigEndian => quote!(crate::bytes_to_u16_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u16_le!(data, #data_offset)),
+                _ => todo!(),
+            },
             DataType::BitField32 => match byte_order {
                 &ByteOrder::BigEndian => quote!(crate::bytes_to_u32_be!(data, #data_offset)),
                 &ByteOrder::LittleEndian => quote!(crate::bytes_to_u32_le!(data, #data_offset)),
@@ -141,6 +147,7 @@ impl StructureLayoutField {
 
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
+            DataType::BitField16 => quote!(u16),
             DataType::BitField32 => quote!(u32),
             DataType::BitField64 => quote!(u64),
             DataType::ByteString => quote!(crate::types::ByteString),
@@ -211,7 +218,8 @@ impl StructureLayout {
             let end_offset_literal: Literal = Literal::usize_unsuffixed(
                 data_offset + (structure_layout_field.number_of_elements * value_data_size),
             );
-            if structure_layout_field.data_type == DataType::BitField32
+            if structure_layout_field.data_type == DataType::BitField16
+                ||  structure_layout_field.data_type == DataType::BitField32
                 || structure_layout_field.data_type == DataType::BitField64
             {
                 let bit_field_data_type: DataType = structure_layout_field.data_type.clone();

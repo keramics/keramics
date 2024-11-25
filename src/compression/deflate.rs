@@ -989,6 +989,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let mut uncompressed_data: Vec<u8> = vec![0; 11358];
         test_context.decompress(&test_data, &mut uncompressed_data)?;
+        assert_eq!(test_context.uncompressed_data_size, 11358);
 
         let expected_data: String = fs::read_to_string("./LICENSE")?;
         assert_eq!(uncompressed_data, expected_data.as_bytes());
