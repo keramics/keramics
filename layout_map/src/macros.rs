@@ -73,7 +73,11 @@ impl FieldOptions {
             "u64" | "uint64" | "UnsignedInteger64Bit" => DataType::UnsignedInteger64Bit,
             "uuid" | "Uuid" => DataType::Uuid,
             _ => {
-                if data_type_str.starts_with("BitField32<") && data_type_str.ends_with(">") {
+                if data_type_str.starts_with("BitField16<") && data_type_str.ends_with(">") {
+                    data_type_str = data_type_str.strip_prefix("BitField16<").unwrap();
+                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
+                    DataType::BitField16
+                } else if data_type_str.starts_with("BitField32<") && data_type_str.ends_with(">") {
                     data_type_str = data_type_str.strip_prefix("BitField32<").unwrap();
                     number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
                     DataType::BitField32

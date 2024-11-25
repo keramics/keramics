@@ -281,27 +281,27 @@ impl LzfseBlockV2Header {
                 format!("Unsupported data size"),
             ));
         }
-        let packed_fields1: u64 = bytes_to_u64_le!(data, 0);
-        let packed_fields2: u64 = bytes_to_u64_le!(data, 8);
-        let packed_fields3: u64 = bytes_to_u64_le!(data, 16);
+        let bit_fields1: u64 = bytes_to_u64_le!(data, 0);
+        let bit_fields2: u64 = bytes_to_u64_le!(data, 8);
+        let bit_fields3: u64 = bytes_to_u64_le!(data, 16);
 
-        self.header_size = (packed_fields3 & 0xffffffff) as u32;
+        self.header_size = (bit_fields3 & 0xffffffff) as u32;
 
-        decoder.number_of_literals = (packed_fields1 & 0x000fffff) as u32;
-        decoder.literals_data_size = ((packed_fields1 >> 20) & 0x000fffff) as u32;
-        decoder.number_of_lmd_values = ((packed_fields1 >> 40) & 0x000fffff) as u32;
-        decoder.literal_bits = (((packed_fields1 >> 60) & 0x00000007) as i32) - 7;
+        decoder.number_of_literals = (bit_fields1 & 0x000fffff) as u32;
+        decoder.literals_data_size = ((bit_fields1 >> 20) & 0x000fffff) as u32;
+        decoder.number_of_lmd_values = ((bit_fields1 >> 40) & 0x000fffff) as u32;
+        decoder.literal_bits = (((bit_fields1 >> 60) & 0x00000007) as i32) - 7;
 
-        decoder.literal_states[0] = (packed_fields2 & 0x000003ff) as u16;
-        decoder.literal_states[1] = ((packed_fields2 >> 10) & 0x000003ff) as u16;
-        decoder.literal_states[2] = ((packed_fields2 >> 20) & 0x000003ff) as u16;
-        decoder.literal_states[3] = ((packed_fields2 >> 30) & 0x000003ff) as u16;
-        decoder.lmd_values_data_size = ((packed_fields2 >> 40) & 0x000fffff) as u32;
-        decoder.lmd_values_bits = (((packed_fields2 >> 60) & 0x00000007) as i32) - 7;
+        decoder.literal_states[0] = (bit_fields2 & 0x000003ff) as u16;
+        decoder.literal_states[1] = ((bit_fields2 >> 10) & 0x000003ff) as u16;
+        decoder.literal_states[2] = ((bit_fields2 >> 20) & 0x000003ff) as u16;
+        decoder.literal_states[3] = ((bit_fields2 >> 30) & 0x000003ff) as u16;
+        decoder.lmd_values_data_size = ((bit_fields2 >> 40) & 0x000fffff) as u32;
+        decoder.lmd_values_bits = (((bit_fields2 >> 60) & 0x00000007) as i32) - 7;
 
-        decoder.l_value_state = ((packed_fields3 >> 32) & 0x000003ff) as u16;
-        decoder.m_value_state = ((packed_fields3 >> 42) & 0x000003ff) as u16;
-        decoder.d_value_state = ((packed_fields3 >> 52) & 0x000003ff) as u16;
+        decoder.l_value_state = ((bit_fields3 >> 32) & 0x000003ff) as u16;
+        decoder.m_value_state = ((bit_fields3 >> 42) & 0x000003ff) as u16;
+        decoder.d_value_state = ((bit_fields3 >> 52) & 0x000003ff) as u16;
 
         if self.header_size < 32 || self.header_size > 720 {
             return Err(io::Error::new(
