@@ -108,7 +108,7 @@ impl Lznt1Context {
             if safe_compressed_data_offset >= compressed_data_size {
                 break;
             }
-            let mut compression_flag_byte: u8 = compressed_data[safe_compressed_data_offset];
+            let mut compression_flags: u8 = compressed_data[safe_compressed_data_offset];
 
             if self.mediator.debug_output {
                 self.mediator.debug_print(format!(
@@ -116,14 +116,14 @@ impl Lznt1Context {
                     safe_compressed_data_offset, safe_compressed_data_offset
                 ));
                 self.mediator.debug_print(format!(
-                    "    compression_flag_byte: 0x{:02x},\n",
-                    compression_flag_byte
+                    "    compression_flags: 0x{:02x},\n",
+                    compression_flags
                 ));
             }
             safe_compressed_data_offset += 1;
 
             for _ in 0..8 {
-                if compression_flag_byte & 0x01 != 0 {
+                if compression_flags & 0x01 != 0 {
                     if 2 > compressed_data_size - safe_compressed_data_offset {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
@@ -139,6 +139,10 @@ impl Lznt1Context {
                         (compression_tuple & compression_tuple_match_size_mask) + 3;
 
                     if self.mediator.debug_output {
+                        self.mediator.debug_print(format!(
+                            "    compressed_data_offset: {} (0x{:08x}),\n",
+                            safe_compressed_data_offset, safe_compressed_data_offset
+                        ));
                         self.mediator.debug_print(format!(
                             "    compression_tuple: 0x{:04x} (shift: {}, mask: 0x{:04x}),\n",
                             compression_tuple,
@@ -198,19 +202,13 @@ impl Lznt1Context {
                             "Invalid uncompressed data value too small",
                         ));
                     }
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    uncompressed_data_offset: {},\n",
-                            uncompressed_data_offset
-                        ));
-                    }
                     uncompressed_data[uncompressed_data_offset] =
                         compressed_data[safe_compressed_data_offset];
 
                     safe_compressed_data_offset += 1;
                     uncompressed_data_offset += 1;
                 }
-                compression_flag_byte >>= 1;
+                compression_flags >>= 1;
 
                 if safe_compressed_data_offset >= compressed_data_end_offset {
                     break;
@@ -284,12 +282,6 @@ impl Lznt1Context {
             compressed_data_offset = compressed_data_end_offset;
 
             if chunk_header.is_compressed {
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    uncompressed_data_offset: {},\n",
-                        uncompressed_data_offset
-                    ));
-                }
                 let write_count: usize = self.decompress_chunk(
                     chunk_header.chunk_size as usize,
                     compressed_data,

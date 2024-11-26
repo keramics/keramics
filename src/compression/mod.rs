@@ -18,6 +18,7 @@ mod huffman;
 mod lzfse;
 mod lznt1;
 mod lzvn;
+mod lzxpress;
 mod traits;
 mod zlib;
 
@@ -27,4 +28,5 @@ pub use deflate::DeflateContext;
 pub use lzfse::LzfseContext;
 pub use lznt1::Lznt1Context;
 pub use lzvn::LzvnContext;
+pub use lzxpress::LzxpressContext;
 pub use zlib::ZlibContext;
