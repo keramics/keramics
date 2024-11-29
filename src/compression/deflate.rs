@@ -129,11 +129,13 @@ impl<'a> DeflateBitstream<'a> {
     /// Reads input data forwards into the bits buffer in little-endian byte order.
     #[inline(always)]
     fn read_data(&mut self, number_of_bits: usize) {
-        while number_of_bits > self.number_of_bits && self.number_of_bits <= 24 {
-            self.bits |= (self.data[self.data_offset] as u32) << self.number_of_bits;
+        while self.number_of_bits < number_of_bits {
+            // If the bit stream overflows fill the bit buffer with 0 byte values.
+            if self.data_offset < self.data_size {
+                self.bits |= (self.data[self.data_offset] as u32) << self.number_of_bits;
+                self.data_offset += 1;
+            }
             self.number_of_bits += 8;
-
-            self.data_offset += 1;
         }
     }
 
@@ -152,53 +154,58 @@ impl<'a> DeflateBitstream<'a> {
 impl<'a> Bitstream for DeflateBitstream<'a> {
     /// Retrieves a bit value.
     fn get_value(&mut self, number_of_bits: usize) -> u32 {
-        let mut bit_offset: usize = 0;
-        let mut value_32bit: u32 = 0;
-
         // Note that this does not check if number_of_bits <= 32
+        let mut bit_value: u32 = 0;
+
+        let mut bit_offset: usize = 0;
         while bit_offset < number_of_bits {
             let mut read_size: usize = number_of_bits - bit_offset;
-
-            self.read_data(read_size);
-
-            if read_size > self.number_of_bits {
-                read_size = self.number_of_bits;
+            if read_size > 24 {
+                read_size = 24;
             }
-            let mut read_value: u32 = self.bits;
+            if self.number_of_bits < read_size {
+                self.read_data(read_size);
+            }
+            let mut value_32bit: u32 = self.bits;
 
-            if read_size < 32 {
-                read_value &= !(0xffffffff << read_size);
+            if read_size == 32 {
+                self.bits = 0;
+            } else {
+                value_32bit &= !(0xffffffff << read_size);
 
                 self.bits >>= read_size;
             }
             self.number_of_bits -= read_size;
 
             if bit_offset > 0 {
-                read_value <<= bit_offset;
+                value_32bit <<= bit_offset;
             }
-            value_32bit |= read_value;
+            bit_value |= value_32bit;
             bit_offset += read_size;
         }
-        value_32bit
+        bit_value
     }
 
     /// Skips a number of bits.
-    fn skip_bits(&mut self, mut number_of_bits: usize) {
+    fn skip_bits(&mut self, number_of_bits: usize) {
         // Note that this does not check if number_of_bits <= 32
-        while number_of_bits > 0 {
-            self.read_data(number_of_bits);
-
-            let mut read_size: usize = number_of_bits;
-
-            if read_size > self.number_of_bits {
-                read_size = self.number_of_bits;
+        let mut bit_offset: usize = 0;
+        while bit_offset < number_of_bits {
+            let mut read_size: usize = number_of_bits - bit_offset;
+            if read_size > 24 {
+                read_size = 24;
             }
-            if read_size < 32 {
+            if self.number_of_bits < read_size {
+                self.read_data(read_size);
+            }
+            if read_size == 32 {
+                self.bits = 0;
+            } else {
                 self.bits >>= read_size;
             }
             self.number_of_bits -= read_size;
 
-            number_of_bits -= read_size;
+            bit_offset += read_size;
         }
     }
 }

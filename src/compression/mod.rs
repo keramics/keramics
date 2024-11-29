@@ -28,5 +28,5 @@ pub use deflate::DeflateContext;
 pub use lzfse::LzfseContext;
 pub use lznt1::Lznt1Context;
 pub use lzvn::LzvnContext;
-pub use lzxpress::LzxpressContext;
+pub use lzxpress::{LzxpressContext, LzxpressHuffmanContext};
 pub use zlib::ZlibContext;
