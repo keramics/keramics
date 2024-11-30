@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::{bytes_to_u32_be, bytes_to_u64_be};
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -66,11 +68,11 @@ impl UdifBlockTableEntry {
                 format!("Unsupported data size"),
             ));
         }
-        self.entry_type = crate::bytes_to_u32_be!(data, 0);
-        self.start_sector = crate::bytes_to_u64_be!(data, 8);
-        self.number_of_sectors = crate::bytes_to_u64_be!(data, 16);
-        self.data_offset = crate::bytes_to_u64_be!(data, 24);
-        self.data_size = crate::bytes_to_u64_be!(data, 32);
+        self.entry_type = bytes_to_u32_be!(data, 0);
+        self.start_sector = bytes_to_u64_be!(data, 8);
+        self.number_of_sectors = bytes_to_u64_be!(data, 16);
+        self.data_offset = bytes_to_u64_be!(data, 24);
+        self.data_size = bytes_to_u64_be!(data, 32);
 
         Ok(())
     }

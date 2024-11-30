@@ -15,6 +15,7 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u64_be;
 use crate::mediator::Mediator;
 use crate::vfs::VfsDataStreamReference;
 
@@ -45,7 +46,7 @@ impl QcowClusterTableEntry {
                 format!("Unsupported data size"),
             ));
         }
-        self.reference = crate::bytes_to_u64_be!(data, 0);
+        self.reference = bytes_to_u64_be!(data, 0);
 
         Ok(())
     }

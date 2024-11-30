@@ -15,6 +15,8 @@
 //!
 //! Provides support for calculating a SHA1 hash (RFC 1321, FIPS 180-1).
 
+use crate::bytes_to_u32_be;
+
 use super::traits::DigestHashContext;
 
 /// SHA1 block size.
@@ -54,7 +56,7 @@ impl Sha1Context {
 
         // Break the block of data into 16 x 32-bit big-endian values
         for value_index in 0..16 {
-            values_32bit[value_index] = crate::bytes_to_u32_be!(data, data_offset);
+            values_32bit[value_index] = bytes_to_u32_be!(data, data_offset);
 
             data_offset += 4;
         }

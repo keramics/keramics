@@ -17,6 +17,7 @@ use layout_map::LayoutMap;
 
 use crate::checksums::ReversedCrc32Context;
 use crate::types::Uuid;
+use crate::{bytes_to_u32_le, bytes_to_u64_le};
 
 use super::constants::*;
 
@@ -84,7 +85,7 @@ impl GptPartitionTableHeader {
                 format!("Unsupported signature"),
             ));
         }
-        let format_version: u32 = crate::bytes_to_u32_le!(data, 8);
+        let format_version: u32 = bytes_to_u32_le!(data, 8);
 
         if format_version != 0x00010000 {
             return Err(io::Error::new(
@@ -92,7 +93,7 @@ impl GptPartitionTableHeader {
                 format!("Unsupported format version: 0x{:08x}", format_version),
             ));
         }
-        let header_data_size: u32 = crate::bytes_to_u32_le!(data, 12);
+        let header_data_size: u32 = bytes_to_u32_le!(data, 12);
 
         if header_data_size != 92 {
             return Err(io::Error::new(
@@ -100,7 +101,7 @@ impl GptPartitionTableHeader {
                 format!("Unsupported header data size: {}", header_data_size),
             ));
         }
-        let stored_checksum: u32 = crate::bytes_to_u32_le!(data, 16);
+        let stored_checksum: u32 = bytes_to_u32_le!(data, 16);
 
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
         crc32_context.update(&data[0..16]);
@@ -121,14 +122,14 @@ impl GptPartitionTableHeader {
                 ),
             ));
         }
-        self.backup_header_block_number = crate::bytes_to_u64_le!(data, 32);
-        self.area_start_block_number = crate::bytes_to_u64_le!(data, 40);
-        self.area_end_block_number = crate::bytes_to_u64_le!(data, 48);
+        self.backup_header_block_number = bytes_to_u64_le!(data, 32);
+        self.area_start_block_number = bytes_to_u64_le!(data, 40);
+        self.area_end_block_number = bytes_to_u64_le!(data, 48);
         self.disk_identifier = Uuid::from_le_bytes(&data[56..72]);
-        self.entries_start_block_number = crate::bytes_to_u64_le!(data, 72);
-        self.number_of_entries = crate::bytes_to_u32_le!(data, 80);
-        self.entry_data_size = crate::bytes_to_u32_le!(data, 84);
-        self.entries_data_checksum = crate::bytes_to_u32_le!(data, 88);
+        self.entries_start_block_number = bytes_to_u64_le!(data, 72);
+        self.number_of_entries = bytes_to_u32_le!(data, 80);
+        self.entry_data_size = bytes_to_u32_le!(data, 84);
+        self.entries_data_checksum = bytes_to_u32_le!(data, 88);
 
         Ok(())
     }

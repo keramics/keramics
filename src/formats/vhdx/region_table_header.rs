@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_le;
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -60,8 +62,8 @@ impl VhdxRegionTableHeader {
                 format!("Unsupported signature"),
             ));
         }
-        self.checksum = crate::bytes_to_u32_le!(data, 4);
-        self.number_of_entries = crate::bytes_to_u32_le!(data, 8);
+        self.checksum = bytes_to_u32_le!(data, 4);
+        self.number_of_entries = bytes_to_u32_le!(data, 8);
 
         Ok(())
     }

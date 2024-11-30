@@ -15,6 +15,7 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u64_le;
 use crate::types::{Utf16String, Uuid};
 
 #[derive(LayoutMap)]
@@ -65,9 +66,9 @@ impl GptPartitionEntry {
         }
         self.type_identifier = Uuid::from_le_bytes(&data[0..16]);
         self.identifier = Uuid::from_le_bytes(&data[16..32]);
-        self.start_block_number = crate::bytes_to_u64_le!(data, 32);
-        self.end_block_number = crate::bytes_to_u64_le!(data, 40);
-        self.attribute_flags = crate::bytes_to_u64_le!(data, 48);
+        self.start_block_number = bytes_to_u64_le!(data, 32);
+        self.end_block_number = bytes_to_u64_le!(data, 40);
+        self.attribute_flags = bytes_to_u64_le!(data, 48);
         self.name = Utf16String::from_le_bytes(&data[56..128]);
 
         Ok(())

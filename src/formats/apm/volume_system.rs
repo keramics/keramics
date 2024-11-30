@@ -150,7 +150,7 @@ impl ApmVolumeSystem {
                 return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(
-                            "Unsupported partition map entry: {} number of entries value: {} out of bounds",
+                            "Unsupported partition map entry: {} number of entries: {} value out of bounds",
                             partition_map_entry_index, partition_map_entry.number_of_entries,
                         ),
                     ));
@@ -186,7 +186,7 @@ impl VfsFileSystem for ApmVolumeSystem {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a volume system.
     fn open(
         &mut self,
         parent_file_system: &VfsFileSystemReference,

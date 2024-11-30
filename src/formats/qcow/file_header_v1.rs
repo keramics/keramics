@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::{bytes_to_u32_be, bytes_to_u64_be};
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -74,7 +76,7 @@ impl QcowFileHeaderV1 {
                 format!("Unsupported signature"),
             ));
         }
-        let format_version: u32 = crate::bytes_to_u32_be!(data, 4);
+        let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 1 {
             return Err(io::Error::new(
@@ -82,13 +84,13 @@ impl QcowFileHeaderV1 {
                 format!("Unsupported format version: {}", format_version),
             ));
         }
-        self.backing_file_name_offset = crate::bytes_to_u64_be!(data, 8);
-        self.backing_file_name_size = crate::bytes_to_u32_be!(data, 16);
-        self.media_size = crate::bytes_to_u64_be!(data, 24);
+        self.backing_file_name_offset = bytes_to_u64_be!(data, 8);
+        self.backing_file_name_size = bytes_to_u32_be!(data, 16);
+        self.media_size = bytes_to_u64_be!(data, 24);
         self.number_of_cluster_block_bits = data[32];
         self.number_of_level2_table_bits = data[33];
-        self.encryption_method = crate::bytes_to_u32_be!(data, 36);
-        self.level1_table_offset = crate::bytes_to_u64_be!(data, 40);
+        self.encryption_method = bytes_to_u32_be!(data, 36);
+        self.level1_table_offset = bytes_to_u64_be!(data, 40);
 
         if self.number_of_cluster_block_bits > 63 {
             return Err(io::Error::new(

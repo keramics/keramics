@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u16_le;
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -56,7 +58,7 @@ impl VhdxMetadataTableHeader {
                 format!("Unsupported signature"),
             ));
         }
-        self.number_of_entries = crate::bytes_to_u16_le!(data, 10);
+        self.number_of_entries = bytes_to_u16_le!(data, 10);
 
         Ok(())
     }

@@ -15,6 +15,7 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_be;
 use crate::mediator::Mediator;
 use crate::vfs::VfsDataStreamReference;
 
@@ -43,7 +44,7 @@ impl VhdBlockAllocationTableEntry {
                 format!("Unsupported data size"),
             ));
         }
-        self.sector_number = crate::bytes_to_u32_be!(data, 0);
+        self.sector_number = bytes_to_u32_be!(data, 0);
 
         Ok(())
     }

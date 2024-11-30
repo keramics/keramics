@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use crate::{bytes_to_u16_be, bytes_to_u16_le};
+
 /// 16-bit Universal Coded Character Set (UCS-2) string.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Ucs2String {
@@ -29,7 +31,7 @@ impl Ucs2String {
         let mut string: Vec<u16> = Vec::new();
 
         for string_index in 0..data_size {
-            let value_16bit = crate::bytes_to_u16_be!(data, string_index * 2);
+            let value_16bit = bytes_to_u16_be!(data, string_index * 2);
             if value_16bit == 0 {
                 break;
             }
@@ -44,7 +46,7 @@ impl Ucs2String {
         let mut string: Vec<u16> = Vec::new();
 
         for string_index in 0..data_size {
-            let value_16bit = crate::bytes_to_u16_le!(data, string_index * 2);
+            let value_16bit = bytes_to_u16_le!(data, string_index * 2);
             if value_16bit == 0 {
                 break;
             }

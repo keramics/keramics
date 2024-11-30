@@ -54,7 +54,7 @@ mod tests {
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
         ];
 
-        let ucs2_string: ByteString = ByteString::from_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), "ASCII string".to_string(),);
+        let byte_string: ByteString = ByteString::from_bytes(&test_data);
+        assert_eq!(byte_string.to_string(), "ASCII string".to_string(),);
     }
 }

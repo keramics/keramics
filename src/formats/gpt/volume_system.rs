@@ -314,7 +314,7 @@ impl VfsFileSystem for GptVolumeSystem {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a volume system.
     fn open(
         &mut self,
         parent_file_system: &VfsFileSystemReference,

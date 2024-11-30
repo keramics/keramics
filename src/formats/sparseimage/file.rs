@@ -14,6 +14,7 @@
 use std::io;
 use std::io::{Read, Seek};
 
+use crate::bytes_to_u32_be;
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, SharedValue};
 use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPath};
@@ -137,7 +138,7 @@ impl SparseImageFile {
             self.mediator.debug_print(format!("    band_numbers: [\n"));
         }
         for array_index in 0..number_of_bands {
-            let band_number: u32 = crate::bytes_to_u32_be!(data, data_offset);
+            let band_number: u32 = bytes_to_u32_be!(data, data_offset);
             data_offset += 4;
 
             if self.mediator.debug_output {

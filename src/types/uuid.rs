@@ -13,6 +13,8 @@
 
 use std::fmt;
 
+use crate::{bytes_to_u16_be, bytes_to_u16_le, bytes_to_u32_be, bytes_to_u32_le};
+
 use super::errors::ParseError;
 
 /// Universally unique identifier (UUID).
@@ -33,26 +35,26 @@ impl Uuid {
 
     /// Reads a big-endian UUID from a byte sequence.
     pub fn from_be_bytes(data: &[u8]) -> Self {
-        let part5_upper: u16 = crate::bytes_to_u16_be!(data, 10);
-        let part5_lower: u32 = crate::bytes_to_u32_be!(data, 12);
+        let part5_upper: u16 = bytes_to_u16_be!(data, 10);
+        let part5_lower: u32 = bytes_to_u32_be!(data, 12);
         Self {
-            part1: crate::bytes_to_u32_be!(data, 0),
-            part2: crate::bytes_to_u16_be!(data, 4),
-            part3: crate::bytes_to_u16_be!(data, 6),
-            part4: crate::bytes_to_u16_be!(data, 8),
+            part1: bytes_to_u32_be!(data, 0),
+            part2: bytes_to_u16_be!(data, 4),
+            part3: bytes_to_u16_be!(data, 6),
+            part4: bytes_to_u16_be!(data, 8),
             part5: ((part5_upper as u64) << 32) | (part5_lower as u64),
         }
     }
 
     /// Reads a little-endian UUID from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
-        let part5_upper: u16 = crate::bytes_to_u16_be!(data, 10);
-        let part5_lower: u32 = crate::bytes_to_u32_be!(data, 12);
+        let part5_upper: u16 = bytes_to_u16_be!(data, 10);
+        let part5_lower: u32 = bytes_to_u32_be!(data, 12);
         Self {
-            part1: crate::bytes_to_u32_le!(data, 0),
-            part2: crate::bytes_to_u16_le!(data, 4),
-            part3: crate::bytes_to_u16_le!(data, 6),
-            part4: crate::bytes_to_u16_be!(data, 8),
+            part1: bytes_to_u32_le!(data, 0),
+            part2: bytes_to_u16_le!(data, 4),
+            part3: bytes_to_u16_le!(data, 6),
+            part4: bytes_to_u16_be!(data, 8),
             part5: ((part5_upper as u64) << 32) | (part5_lower as u64),
         }
     }

@@ -55,7 +55,7 @@ impl SparseBundleImage {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a storage media image.
     pub fn open(
         &mut self,
         parent_file_system: &VfsFileSystemReference,

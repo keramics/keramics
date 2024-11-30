@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_be;
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -51,7 +53,7 @@ impl QcowFileHeaderCommon {
                 format!("Unsupported signature"),
             ));
         }
-        self.format_version = crate::bytes_to_u32_be!(data, 4);
+        self.format_version = bytes_to_u32_be!(data, 4);
 
         Ok(())
     }
