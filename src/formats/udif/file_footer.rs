@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::{bytes_to_u32_be, bytes_to_u64_be};
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -89,7 +91,7 @@ impl UdifFileFooter {
                 format!("Unsupported signature"),
             ));
         }
-        let format_version: u32 = crate::bytes_to_u32_be!(data, 4);
+        let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 4 {
             return Err(io::Error::new(
@@ -97,10 +99,10 @@ impl UdifFileFooter {
                 format!("Unsupported format version: {}", format_version),
             ));
         }
-        self.data_fork_offset = crate::bytes_to_u64_be!(data, 24);
-        self.data_fork_size = crate::bytes_to_u64_be!(data, 32);
-        self.plist_offset = crate::bytes_to_u64_be!(data, 216);
-        self.plist_size = crate::bytes_to_u64_be!(data, 224);
+        self.data_fork_offset = bytes_to_u64_be!(data, 24);
+        self.data_fork_size = bytes_to_u64_be!(data, 32);
+        self.plist_offset = bytes_to_u64_be!(data, 216);
+        self.plist_size = bytes_to_u64_be!(data, 224);
 
         Ok(())
     }

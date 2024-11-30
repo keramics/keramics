@@ -56,7 +56,7 @@ impl ZlibDataHeader {
         string_parts.push(format!("    flags: {},\n", flags));
 
         if flags & 0x20 != 0 {
-            let preset_dictionary_identifier: u32 = crate::bytes_to_u32_be!(data, 0);
+            let preset_dictionary_identifier: u32 = bytes_to_u32_be!(data, 0);
             string_parts.push(format!(
                 "    preset_dictionary_identifier: {},\n",
                 preset_dictionary_identifier

@@ -118,7 +118,7 @@ impl VfsFileSystem for VhdxImage {
         }
     }
 
-    /// Opens a file system.
+    /// Opens a storage media image.
     fn open(
         &mut self,
         parent_file_system: &VfsFileSystemReference,

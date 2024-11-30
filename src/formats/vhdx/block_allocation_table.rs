@@ -15,6 +15,7 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u64_le;
 use crate::mediator::Mediator;
 use crate::vfs::VfsDataStreamReference;
 
@@ -54,7 +55,7 @@ impl VhdxBlockAllocationTableEntry {
                 format!("Unsupported data size"),
             ));
         }
-        let entry: u64 = crate::bytes_to_u64_le!(data, 0);
+        let entry: u64 = bytes_to_u64_le!(data, 0);
 
         self.block_state = (entry & 0x0000000000000007) as u8;
         self.block_offset = entry & 0xfffffffffff00000;

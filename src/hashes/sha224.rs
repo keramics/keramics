@@ -15,6 +15,8 @@
 //!
 //! Provides support for calculating a SHA-224 hash (RFC 3874, RFC 6234, FIPS 180-2).
 
+use crate::bytes_to_u32_be;
+
 use super::traits::DigestHashContext;
 
 /// SHA-224 block size.
@@ -68,7 +70,7 @@ impl Sha224Context {
 
         // Break the block of data into 16 x 32-bit big-endian values
         for value_index in 0..16 {
-            values_32bit[value_index] = crate::bytes_to_u32_be!(data, data_offset);
+            values_32bit[value_index] = bytes_to_u32_be!(data, data_offset);
 
             data_offset += 4;
         }

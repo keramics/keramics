@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::{bytes_to_u32_be, bytes_to_u64_be};
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -69,7 +71,7 @@ impl UdifBlockTableHeader {
                 format!("Unsupported signature"),
             ));
         }
-        let format_version: u32 = crate::bytes_to_u32_be!(data, 4);
+        let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 1 {
             return Err(io::Error::new(
@@ -77,9 +79,9 @@ impl UdifBlockTableHeader {
                 format!("Unsupported format version: {}", format_version),
             ));
         }
-        self.start_sector = crate::bytes_to_u64_be!(data, 8);
-        self.number_of_sectors = crate::bytes_to_u64_be!(data, 16);
-        self.number_of_entries = crate::bytes_to_u32_be!(data, 200);
+        self.start_sector = bytes_to_u64_be!(data, 8);
+        self.number_of_sectors = bytes_to_u64_be!(data, 16);
+        self.number_of_entries = bytes_to_u32_be!(data, 200);
 
         Ok(())
     }

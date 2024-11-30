@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::{bytes_to_u16_le, bytes_to_u32_le};
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -60,10 +62,10 @@ impl VhdxParentLocatorEntry {
                 format!("Unsupported data size"),
             ));
         }
-        self.key_data_offset = crate::bytes_to_u32_le!(data, 0);
-        self.value_data_offset = crate::bytes_to_u32_le!(data, 4);
-        self.key_data_size = crate::bytes_to_u16_le!(data, 8);
-        self.value_data_size = crate::bytes_to_u16_le!(data, 10);
+        self.key_data_offset = bytes_to_u32_le!(data, 0);
+        self.value_data_offset = bytes_to_u32_le!(data, 4);
+        self.key_data_size = bytes_to_u16_le!(data, 8);
+        self.value_data_size = bytes_to_u16_le!(data, 10);
 
         Ok(())
     }

@@ -15,6 +15,7 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_le;
 use crate::types::Uuid;
 
 #[derive(LayoutMap)]
@@ -59,8 +60,8 @@ impl VhdxMetadataTableEntry {
             ));
         }
         self.item_identifier = Uuid::from_le_bytes(&data[0..16]);
-        self.item_offset = crate::bytes_to_u32_le!(data, 16);
-        self.item_size = crate::bytes_to_u32_le!(data, 20);
+        self.item_offset = bytes_to_u32_le!(data, 16);
+        self.item_size = bytes_to_u32_le!(data, 20);
 
         if self.item_offset < 65536 {
             return Err(io::Error::new(

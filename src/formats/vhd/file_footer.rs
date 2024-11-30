@@ -16,6 +16,7 @@ use std::io;
 use layout_map::LayoutMap;
 
 use crate::types::Uuid;
+use crate::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
 
@@ -87,7 +88,7 @@ impl VhdFileFooter {
                 format!("Unsupported signature"),
             ));
         }
-        let format_version: u32 = crate::bytes_to_u32_be!(data, 12);
+        let format_version: u32 = bytes_to_u32_be!(data, 12);
 
         if format_version != 0x00010000 {
             return Err(io::Error::new(
@@ -95,9 +96,9 @@ impl VhdFileFooter {
                 format!("Unsupported format version: 0x{:08x}", format_version),
             ));
         }
-        self.next_offset = crate::bytes_to_u64_be!(data, 16);
-        self.data_size = crate::bytes_to_u64_be!(data, 40);
-        self.disk_type = crate::bytes_to_u32_be!(data, 60);
+        self.next_offset = bytes_to_u64_be!(data, 16);
+        self.data_size = bytes_to_u64_be!(data, 40);
+        self.disk_type = bytes_to_u32_be!(data, 60);
         self.identifier = Uuid::from_be_bytes(&data[68..84]);
 
         // TODO: calculate and compare checksum.

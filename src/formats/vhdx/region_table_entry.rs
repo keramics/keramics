@@ -16,6 +16,7 @@ use std::io;
 use layout_map::LayoutMap;
 
 use crate::types::Uuid;
+use crate::{bytes_to_u32_le, bytes_to_u64_le};
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -62,11 +63,11 @@ impl VhdxRegionTableEntry {
                 format!("Unsupported data size"),
             ));
         }
-        let is_required_flag: u32 = crate::bytes_to_u32_le!(data, 28);
+        let is_required_flag: u32 = bytes_to_u32_le!(data, 28);
 
         self.type_identifier = Uuid::from_le_bytes(&data[0..16]);
-        self.data_offset = crate::bytes_to_u64_le!(data, 16);
-        self.data_size = crate::bytes_to_u32_le!(data, 24);
+        self.data_offset = bytes_to_u64_le!(data, 16);
+        self.data_size = bytes_to_u32_le!(data, 24);
         self.is_required = if is_required_flag & 0x00000001 == 0 {
             false
         } else {

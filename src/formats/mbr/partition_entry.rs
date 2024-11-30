@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_le;
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -68,8 +70,8 @@ impl MbrPartitionEntry {
         }
         self.flags = data[0];
         self.partition_type = data[4];
-        self.start_address_lba = crate::bytes_to_u32_le!(data, 8);
-        self.number_of_sectors = crate::bytes_to_u32_le!(data, 12);
+        self.start_address_lba = bytes_to_u32_le!(data, 8);
+        self.number_of_sectors = bytes_to_u32_le!(data, 12);
 
         Ok(())
     }

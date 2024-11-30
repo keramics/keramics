@@ -34,7 +34,7 @@ formats. Version 3 is considered as an extended version of QCOW2.
 | Date and time values | Number of seconds since Jan 1, 1970 00:00:00 UTC (POSIX epoch)
 | Character strings | UTF-8
 
-> Note it is currently assumed that character strings are stored in UTF-8
+> Note that this docuement assumes that character strings are stored in UTF-8
 
 The number of bytes per sector is 512.
 
@@ -192,9 +192,9 @@ The file header - version 3 is 104 or 112 bytes in size and consist of:
 | 56 | 4 | | Reference count table clusters
 | 60 | 4 | | Number of snapshots
 | 64 | 8 | | Snapshots offset
-| 72 | 8 | | Incompatible feature flags
-| 80 | 8 | | Compatible feature flags
-| 88 | 8 | | Auto-clear feature flags
+| 72 | 8 | | Incompatible features flags
+| 80 | 8 | | Compatible features flags
+| 88 | 8 | | Auto-clear features flags
 | 96 | 4 | | Reference count order
 | 100 | 4 | 104 or 112 | File header size, which contains the size of the file header, this value does not include the size of the file header extensions
 | <td colspan="4"> *If file header size equals 112*
@@ -236,7 +236,7 @@ after the file header.
 | 1 | QCOW_CRYPT_AES | AES-CBC 128-bits encryption
 | 2 | QCOW_CRYPT_LUKS | Linux Unified Key Setup (LUKS) encryption
 
-### Incompatible feature flags
+### Incompatible features flags
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -246,13 +246,13 @@ after the file header.
 | 0x00000008 | QCOW2_INCOMPAT_COMPRESSION |
 | 0x00000010 | QCOW2_INCOMPAT_EXTL2 |
 
-### Compatible feature flags
+### Compatible features flags
 
 | Value | Identifier | Description
 | --- | --- | ---
 | 0x00000001 | QCOW2_COMPAT_LAZY_REFCOUNTS |
 
-### Auto-clear feature flags
+### Auto-clear features flags
 
 | Value | Identifier | Description
 | --- | --- | ---

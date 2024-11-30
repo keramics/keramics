@@ -16,6 +16,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_le;
+
 use super::constants::*;
 use super::partition_entry::MbrPartitionEntry;
 
@@ -64,7 +66,7 @@ impl MbrMasterBootRecord {
                 format!("Unsupported signature"),
             ));
         }
-        self.disk_identity = crate::bytes_to_u32_le!(data, 440);
+        self.disk_identity = bytes_to_u32_le!(data, 440);
 
         for data_offset in (446..510).step_by(16) {
             let mut partition_entry: MbrPartitionEntry = MbrPartitionEntry::new();

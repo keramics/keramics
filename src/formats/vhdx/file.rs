@@ -17,6 +17,7 @@ use std::io::{Read, Seek};
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, SharedValue, Ucs2String, Uuid};
 use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPath};
+use crate::{bytes_to_u32_le, bytes_to_u64_le};
 
 use super::block_allocation_table::{VhdxBlockAllocationTable, VhdxBlockAllocationTableEntry};
 use super::block_range::{VhdxBlockRange, VhdxBlockRangeType};
@@ -272,9 +273,9 @@ impl VhdxFile {
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
                 };
-                let file_parameters_flags: u32 = crate::bytes_to_u32_le!(data, 4);
+                let file_parameters_flags: u32 = bytes_to_u32_le!(data, 4);
 
-                self.block_size = crate::bytes_to_u32_le!(data, 0);
+                self.block_size = bytes_to_u32_le!(data, 0);
                 self.disk_type = match file_parameters_flags & 0x00000003 {
                     0 => VhdxDiskType::Fixed,
                     1 => VhdxDiskType::Dynamic,
@@ -331,7 +332,7 @@ impl VhdxFile {
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
                 };
-                self.media_size = crate::bytes_to_u64_le!(data, 0);
+                self.media_size = bytes_to_u64_le!(data, 0);
 
                 if self.mediator.debug_output {
                     self.mediator
@@ -368,7 +369,7 @@ impl VhdxFile {
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
                 };
-                let logical_sector_size: u32 = crate::bytes_to_u32_le!(data, 0);
+                let logical_sector_size: u32 = bytes_to_u32_le!(data, 0);
 
                 if self.mediator.debug_output {
                     self.mediator.debug_print(format!(
@@ -417,7 +418,7 @@ impl VhdxFile {
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
                 };
-                let physical_sector_size: u32 = crate::bytes_to_u32_le!(data, 0);
+                let physical_sector_size: u32 = bytes_to_u32_le!(data, 0);
 
                 if self.mediator.debug_output {
                     self.mediator.debug_print(format!(

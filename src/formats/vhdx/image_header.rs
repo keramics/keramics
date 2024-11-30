@@ -17,6 +17,7 @@ use layout_map::LayoutMap;
 
 use crate::checksums::ReversedCrc32Context;
 use crate::types::Uuid;
+use crate::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
 use super::constants::*;
 
@@ -75,11 +76,11 @@ impl VhdxImageHeader {
                 format!("Unsupported signature"),
             ));
         }
-        let stored_checksum: u32 = crate::bytes_to_u32_le!(data, 4);
+        let stored_checksum: u32 = bytes_to_u32_le!(data, 4);
 
-        self.sequence_number = crate::bytes_to_u64_le!(data, 8);
+        self.sequence_number = bytes_to_u64_le!(data, 8);
         self.data_write_identifier = Uuid::from_le_bytes(&data[32..48]);
-        self.format_version = crate::bytes_to_u16_le!(data, 66);
+        self.format_version = bytes_to_u16_le!(data, 66);
 
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
 

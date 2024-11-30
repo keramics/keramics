@@ -15,6 +15,8 @@
 //!
 //! Provides support for calculating a MD5 hash (RFC 1321).
 
+use crate::bytes_to_u32_le;
+
 use super::traits::DigestHashContext;
 
 /// MD5 block size.
@@ -84,7 +86,7 @@ impl Md5Context {
 
         // Break the block of data into 16 x 32-bit little-endian values
         for value_index in 0..16 {
-            values_32bit[value_index] = crate::bytes_to_u32_le!(data, data_offset);
+            values_32bit[value_index] = bytes_to_u32_le!(data, data_offset);
 
             data_offset += 4;
         }

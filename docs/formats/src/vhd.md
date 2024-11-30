@@ -48,7 +48,7 @@ A differential (or differencing) VHD image consists of:
 | --- | ---
 | Byte order | big-endian
 | Date and time values | Number of seconds since January 1, 2000 00:00:00 UTC
-| Character strings | UCS-2 big-endian, which allows for unpaired Unicode surrogates, such as "U+d800" and "U+dc00"
+| Character strings | UCS-2 big-endian, which allows for unpaired Unicode surrogates such as "U+d800" and "U+dc00"
 
 The number of bytes per sector is 512.
 

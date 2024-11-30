@@ -16,6 +16,7 @@ use std::io;
 use layout_map::LayoutMap;
 
 use crate::types::{Ucs2String, Uuid};
+use crate::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
 
@@ -75,7 +76,7 @@ impl VhdDynamicDiskHeader {
                 format!("Unsupported signature"),
             ));
         }
-        let format_version: u32 = crate::bytes_to_u32_be!(data, 24);
+        let format_version: u32 = bytes_to_u32_be!(data, 24);
 
         if format_version != 0x00010000 {
             return Err(io::Error::new(
@@ -83,7 +84,7 @@ impl VhdDynamicDiskHeader {
                 format!("Unsupported format version: 0x{:08x}", format_version),
             ));
         }
-        let next_offset: u64 = crate::bytes_to_u64_be!(data, 8);
+        let next_offset: u64 = bytes_to_u64_be!(data, 8);
 
         if next_offset != 0xffffffffffffffff {
             return Err(io::Error::new(
@@ -91,9 +92,9 @@ impl VhdDynamicDiskHeader {
                 format!("Unsupported next offset: 0x{:08x}", next_offset),
             ));
         }
-        self.block_table_offset = crate::bytes_to_u64_be!(data, 16);
-        self.number_of_blocks = crate::bytes_to_u32_be!(data, 28);
-        self.block_size = crate::bytes_to_u32_be!(data, 32);
+        self.block_table_offset = bytes_to_u64_be!(data, 16);
+        self.number_of_blocks = bytes_to_u32_be!(data, 28);
+        self.block_size = bytes_to_u32_be!(data, 32);
         self.parent_identifier = Uuid::from_be_bytes(&data[40..56]);
         self.parent_name = Ucs2String::from_be_bytes(&data[64..576]);
 

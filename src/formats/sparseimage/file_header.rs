@@ -15,6 +15,8 @@ use std::io;
 
 use layout_map::LayoutMap;
 
+use crate::bytes_to_u32_be;
+
 use super::constants::*;
 
 #[derive(LayoutMap)]
@@ -64,8 +66,8 @@ impl SparseImageFileHeader {
                 format!("Unsupported signature"),
             ));
         }
-        self.sectors_per_band = crate::bytes_to_u32_be!(data, 8);
-        self.number_of_sectors = crate::bytes_to_u32_be!(data, 16);
+        self.sectors_per_band = bytes_to_u32_be!(data, 8);
+        self.number_of_sectors = bytes_to_u32_be!(data, 16);
 
         if self.sectors_per_band == 0 {
             return Err(io::Error::new(

@@ -26,7 +26,7 @@ The elements are stored in 64 KiB (65536 bytes) aligned blocks
 | --- | ---
 | Byte order | little-endian
 | Date and time values | N/A
-| Character strings | UCS-2 little-endian, which allows for unpaired Unicode surrogates, such as "U+d800" and "U+dc00"
+| Character strings | UCS-2 little-endian, which allows for unpaired Unicode surrogates such as "U+d800" and "U+dc00"
 
 The number of bytes per sector is 512 or 4096 depending on the logical sector size.
 
