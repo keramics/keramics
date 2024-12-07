@@ -96,14 +96,14 @@ impl VhdFile {
         let mut string_index: usize = 0;
 
         // Look for the last backslash character.
-        for (index, character) in parent_name.string.iter().enumerate().rev() {
+        for (index, character) in parent_name.elements.iter().enumerate().rev() {
             if *character == 0x5c {
                 string_index = index + 1;
                 break;
             }
         }
         let mut parent_filename: Ucs2String = Ucs2String::new();
-        parent_filename.string = parent_name.string[string_index..].to_vec();
+        parent_filename.elements = parent_name.elements[string_index..].to_vec();
 
         Some(parent_filename)
     }

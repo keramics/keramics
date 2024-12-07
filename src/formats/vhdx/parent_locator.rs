@@ -46,7 +46,7 @@ impl VhdxParentLocator {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(parent_locator_header.debug_read_data(&data[0..20]));
+                .debug_print(VhdxParentLocatorHeader::debug_read_data(&data[0..20]));
         }
         parent_locator_header.read_data(&data[0..20])?;
 
@@ -58,9 +58,10 @@ impl VhdxParentLocator {
             let mut parent_locator_entry: VhdxParentLocatorEntry = VhdxParentLocatorEntry::new();
 
             if self.mediator.debug_output {
-                self.mediator.debug_print(
-                    parent_locator_entry.debug_read_data(&data[data_offset..data_end_offset]),
-                );
+                self.mediator
+                    .debug_print(VhdxParentLocatorEntry::debug_read_data(
+                        &data[data_offset..data_end_offset],
+                    ));
             }
             parent_locator_entry.read_data(&data[data_offset..data_end_offset])?;
             data_offset = data_end_offset;

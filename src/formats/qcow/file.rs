@@ -178,7 +178,7 @@ impl QcowFile {
 
             if self.mediator.debug_output {
                 self.mediator
-                    .debug_print(file_header_v1.debug_read_data(&data));
+                    .debug_print(QcowFileHeaderV1::debug_read_data(&data));
             }
             self.media_size = file_header_v1.media_size;
             self.number_of_cluster_block_bits = file_header_v1.number_of_cluster_block_bits;
@@ -200,7 +200,7 @@ impl QcowFile {
 
             if self.mediator.debug_output {
                 self.mediator
-                    .debug_print(file_header_v2.debug_read_data(&data));
+                    .debug_print(QcowFileHeaderV2::debug_read_data(&data));
             }
             self.media_size = file_header_v2.media_size;
             self.number_of_cluster_block_bits = file_header_v2.number_of_cluster_block_bits as u8;
@@ -224,7 +224,7 @@ impl QcowFile {
 
             if self.mediator.debug_output {
                 self.mediator
-                    .debug_print(file_header_v3.debug_read_data(&data));
+                    .debug_print(QcowFileHeaderV3::debug_read_data(&data));
             }
             self.media_size = file_header_v3.media_size;
             self.number_of_cluster_block_bits = file_header_v3.number_of_cluster_block_bits as u8;

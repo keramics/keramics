@@ -26,28 +26,31 @@ use crate::mediator::{Mediator, MediatorReference};
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "chunk_size", data_type = "BitField16<12>"),
+        field(name = "block_size", data_type = "BitField16<12>", modifier = "+ 1"),
         field(name = "signature", data_type = "BitField16<3>"),
         field(name = "is_compressed_flag", data_type = "BitField16<1>"),
     ),
     method(name = "debug_read_data")
 )]
-/// LZNT1 chunk header.
-struct Lznt1ChunkHeader {
-    chunk_size: u16,
+/// LZNT1 block header.
+struct Lznt1BlockHeader {
+    /// Block size.
+    block_size: u16,
+
+    /// Value to indicate the block is compressed.
     is_compressed: bool,
 }
 
-impl Lznt1ChunkHeader {
-    /// Creates a new chunk header.
+impl Lznt1BlockHeader {
+    /// Creates a new block header.
     pub fn new() -> Self {
         Self {
-            chunk_size: 0,
+            block_size: 0,
             is_compressed: false,
         }
     }
 
-    /// Reads the chunk header from a buffer.
+    /// Reads the block header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         if data.len() < 2 {
             return Err(io::Error::new(
@@ -57,7 +60,7 @@ impl Lznt1ChunkHeader {
         }
         let bit_fields1: u16 = bytes_to_u16_le!(data, 0);
 
-        self.chunk_size = (bit_fields1 & 0x0fff) + 1;
+        self.block_size = (bit_fields1 & 0x0fff) + 1;
         self.is_compressed = bit_fields1 & 0x8000 != 0;
 
         Ok(())
@@ -82,10 +85,10 @@ impl Lznt1Context {
         }
     }
 
-    /// Decompress a chunk.
-    fn decompress_chunk(
+    /// Decompress a block.
+    fn decompress_block(
         &self,
-        chunk_size: usize,
+        block_size: usize,
         compressed_data: &[u8],
         compressed_data_offset: &mut usize,
         compressed_data_size: usize,
@@ -97,9 +100,9 @@ impl Lznt1Context {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(format!("Lznt1Context::decompress_chunk {{\n",));
+                .debug_print(format!("Lznt1Context::decompress_block {{\n",));
         }
-        let compressed_data_end_offset: usize = safe_compressed_data_offset + chunk_size;
+        let compressed_data_end_offset: usize = safe_compressed_data_offset + block_size;
         let mut compression_tuple_threshold: usize = 16;
         let mut compression_tuple_distance_shift: u16 = 12;
         let mut compression_tuple_match_size_mask: u16 = 0x0fff;
@@ -262,28 +265,28 @@ impl Lznt1Context {
             if compressed_data[compressed_data_offset..compressed_data_end_offset] == [0; 2] {
                 break;
             }
-            let mut chunk_header: Lznt1ChunkHeader = Lznt1ChunkHeader::new();
+            let mut block_header: Lznt1BlockHeader = Lznt1BlockHeader::new();
 
             if self.mediator.debug_output {
                 self.mediator.debug_print(format!(
-                    "Lznt1ChunkHeader data of size: 2 at offset: {} (0x{:08x})\n",
+                    "Lznt1BlockHeader data of size: 2 at offset: {} (0x{:08x})\n",
                     compressed_data_offset, compressed_data_offset
                 ));
                 self.mediator.debug_print_data(
                     &compressed_data[compressed_data_offset..compressed_data_end_offset],
                     true,
                 );
-                self.mediator.debug_print(chunk_header.debug_read_data(
+                self.mediator.debug_print(Lznt1BlockHeader::debug_read_data(
                     &compressed_data[compressed_data_offset..compressed_data_end_offset],
                 ));
             }
-            chunk_header
+            block_header
                 .read_data(&compressed_data[compressed_data_offset..compressed_data_end_offset])?;
             compressed_data_offset = compressed_data_end_offset;
 
-            if chunk_header.is_compressed {
-                let write_count: usize = self.decompress_chunk(
-                    chunk_header.chunk_size as usize,
+            if block_header.is_compressed {
+                let write_count: usize = self.decompress_block(
+                    block_header.block_size as usize,
                     compressed_data,
                     &mut compressed_data_offset,
                     compressed_data_size,
@@ -293,9 +296,9 @@ impl Lznt1Context {
                 uncompressed_data_offset += write_count;
             } else {
                 let compressed_data_end_offset: usize =
-                    compressed_data_offset + chunk_header.chunk_size as usize;
+                    compressed_data_offset + block_header.block_size as usize;
                 let uncompressed_data_end_offset: usize =
-                    uncompressed_data_offset + chunk_header.chunk_size as usize;
+                    uncompressed_data_offset + block_header.block_size as usize;
 
                 if self.mediator.debug_output {
                     self.mediator

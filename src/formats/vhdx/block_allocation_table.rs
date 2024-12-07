@@ -118,7 +118,7 @@ impl VhdxBlockAllocationTable {
                 entry_offset
             ));
             mediator.debug_print_data(&data, true);
-            mediator.debug_print(entry.debug_read_data(&data));
+            mediator.debug_print(VhdxBlockAllocationTableEntry::debug_read_data(&data));
         }
         entry.read_data(&data)?;
 

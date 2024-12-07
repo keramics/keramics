@@ -25,9 +25,19 @@ use crate::structure::{StructureLayout, StructureLayoutField};
 #[derive(Default, FromMeta)]
 #[darling(default)]
 struct FieldOptions {
+    /// Byte order.
     byte_order: String,
+
+    /// Data type.
     data_type: String,
+
+    /// Format.
     format: String,
+
+    /// Modifier.
+    modifier: String,
+
+    /// Name.
     name: String,
 }
 
@@ -149,11 +159,15 @@ impl FieldOptions {
 #[derive(Default, FromMeta)]
 #[darling(default)]
 struct BitmapOptions {
+    /// Bit order.
     bit_order: String,
+
+    /// Data type.
     data_type: String,
 }
 
 impl BitmapOptions {
+    /// Determines if the options are empty.
     pub fn is_empty(&self) -> bool {
         return self.bit_order.is_empty() && self.data_type.is_empty();
     }
@@ -198,12 +212,16 @@ impl BitmapOptions {
 #[derive(Default, FromMeta)]
 #[darling(default)]
 struct StructureOptions {
+    /// Byte order.
     byte_order: String,
+
+    /// Fields.
     #[darling(default, multiple, rename = "field")]
     fields: Vec<FieldOptions>,
 }
 
 impl StructureOptions {
+    /// Determines if the options are empty.
     pub fn is_empty(&self) -> bool {
         return self.byte_order.is_empty() && self.fields.len() == 0;
     }
@@ -227,18 +245,22 @@ impl StructureOptions {
 #[derive(Default, FromMeta)]
 #[darling(default)]
 struct MethodOptions {
+    /// Name.
     name: String,
 }
 
 #[derive(FromDeriveInput)]
 #[darling(attributes(layout_map), supports(struct_named))]
 struct LayoutMapOptions {
+    /// Bitmap option.
     #[darling(default)]
     pub bitmap: BitmapOptions,
 
+    /// Structure option.
     #[darling(default)]
     pub structure: StructureOptions,
 
+    /// Method option.
     #[darling(default, multiple, rename = "method")]
     methods: Vec<MethodOptions>,
 }
@@ -272,8 +294,9 @@ fn parse_bitmap_layout(
     let bitmap_layout: BitmapLayout = BitmapLayout::new(data_type, bit_order);
 
     // TODO: add option for value size and byte order
+    todo!();
 
-    Ok(bitmap_layout)
+    // Ok(bitmap_layout)
 }
 
 /// Parses a structure layout.
@@ -334,6 +357,7 @@ fn parse_structure_layout(
             data_type,
             byte_order,
             number_of_elements,
+            &field_options.modifier,
             format,
         ));
     }

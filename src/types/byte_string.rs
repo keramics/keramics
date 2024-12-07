@@ -14,36 +14,40 @@
 /// String of 8-bit values.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct ByteString {
-    pub string: Vec<u8>,
+    /// Elements.
+    pub elements: Vec<u8>,
 }
 
 impl ByteString {
     /// Creates a new byte string.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            elements: Vec::new(),
+        }
     }
 
     /// Reads a byte string from a byte sequence.
     pub fn from_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len();
-        let mut string: Vec<u8> = Vec::new();
+        let mut elements: Vec<u8> = Vec::new();
 
-        for string_index in 0..data_size {
-            let value_8bit = data[string_index];
+        for data_offset in 0..data_size {
+            let value_8bit = data[data_offset];
             if value_8bit == 0 {
                 break;
             }
-            string.push(value_8bit);
+            elements.push(value_8bit);
         }
-        Self { string: string }
+        Self { elements: elements }
     }
 
     /// Retrieves the string representation of a byte string.
     pub fn to_string(&self) -> String {
         // TODO: add code page support
-        String::from_utf8(self.string.to_vec()).unwrap()
+        String::from_utf8(self.elements.to_vec()).unwrap()
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
