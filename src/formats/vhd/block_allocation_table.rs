@@ -104,7 +104,7 @@ impl VhdBlockAllocationTable {
                 entry_offset
             ));
             mediator.debug_print_data(&data, true);
-            mediator.debug_print(entry.debug_read_data(&data));
+            mediator.debug_print(VhdBlockAllocationTableEntry::debug_read_data(&data));
         }
         entry.read_data(&data)?;
 

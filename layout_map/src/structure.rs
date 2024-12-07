@@ -12,6 +12,7 @@
  */
 
 use std::slice::Iter;
+use std::str::FromStr;
 
 use proc_macro2::{Ident, Literal, TokenStream};
 
@@ -19,20 +20,35 @@ use quote::{format_ident, quote};
 
 use crate::enums::{ByteOrder, DataType, Format};
 
+/// Structure layout field.
 pub(crate) struct StructureLayoutField {
+    /// Name.
     pub name: String,
+
+    /// Data type.
     pub data_type: DataType,
+
+    /// Byte order.
     pub byte_order: ByteOrder,
+
+    /// Number of elements.
     pub number_of_elements: usize,
+
+    /// Modifier.
+    pub modifier: String,
+
+    /// Format.
     pub format: Format,
 }
 
 impl StructureLayoutField {
+    /// Creates a new field.
     pub fn new(
         name: &String,
         data_type: DataType,
         byte_order: ByteOrder,
         number_of_elements: usize,
+        modifier: &String,
         format: Format,
     ) -> Self {
         Self {
@@ -40,10 +56,12 @@ impl StructureLayoutField {
             data_type: data_type,
             byte_order: byte_order,
             number_of_elements: number_of_elements,
+            modifier: modifier.clone(),
             format: format,
         }
     }
 
+    /// Retrieves the byte order.
     pub fn get_byte_order(&self, parent_byte_order: &ByteOrder) -> ByteOrder {
         if self.byte_order != ByteOrder::NotSet {
             return self.byte_order.clone();
@@ -56,6 +74,7 @@ impl StructureLayoutField {
         parent_byte_order.clone()
     }
 
+    /// Retrieves the byte size.
     pub fn get_byte_size(&self) -> Option<usize> {
         match &self.data_type {
             DataType::BitField16 => Some(2),
@@ -78,6 +97,7 @@ impl StructureLayoutField {
         }
     }
 
+    /// Retrieves a token stream to convert the field from bytes.
     pub fn get_from_bytes_token_stream(
         &self,
         byte_order: &ByteOrder,
@@ -145,6 +165,15 @@ impl StructureLayoutField {
         }
     }
 
+    /// Retrieves a token stream of the modifier.
+    pub fn get_modifier_token_stream(&self) -> TokenStream {
+        match TokenStream::from_str(&self.modifier) {
+            Ok(token_stream) => token_stream,
+            Err(error) => panic!("Unable to parse modifier: \"{}\" with error: {}", self.modifier, error),
+        }
+    }
+
+    /// Retrieves a token stream of the type.
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
             DataType::BitField16 => quote!(u16),
@@ -170,6 +199,7 @@ impl StructureLayoutField {
         }
     }
 
+    /// Determines if field requires a byte order.
     pub fn requires_byte_order(&self) -> bool {
         match self.data_type {
             DataType::SignedInteger8Bit | DataType::UnsignedInteger8Bit => false,
@@ -178,13 +208,20 @@ impl StructureLayoutField {
     }
 }
 
+/// Structure layout.
 pub(crate) struct StructureLayout {
+    /// Name.
     pub name: String,
+
+    /// Byte order.
     pub byte_order: ByteOrder,
+
+    /// Fields.
     pub fields: Vec<StructureLayoutField>,
 }
 
 impl StructureLayout {
+    /// Creates a new layout.
     pub fn new(name: &String, byte_order: ByteOrder) -> Self {
         Self {
             name: name.clone(),
@@ -193,6 +230,7 @@ impl StructureLayout {
         }
     }
 
+    /// Generates the debug_read_data method.
     pub fn generate_debug_read_data(&self) -> TokenStream {
         let mut data_offset: usize = 0;
         let mut debug_read_fields = quote!();
@@ -229,9 +267,10 @@ impl StructureLayout {
                 let quote_data_offset = quote!(#data_offset_literal);
                 let quote_from_bytes: TokenStream = structure_layout_field
                     .get_from_bytes_token_stream(&self.byte_order, quote_data_offset);
+                let quote_modifier: TokenStream = structure_layout_field.get_modifier_token_stream();
 
                 debug_read_fields.extend(quote! {
-                    let #packed_field_name: #field_type = #quote_from_bytes;
+                    let #packed_field_name: #field_type = #quote_from_bytes #quote_modifier;
 
                 });
                 let mut bit_offset: usize = 0;
@@ -291,6 +330,9 @@ impl StructureLayout {
                 || structure_layout_field.data_type == DataType::Ucs2String
                 || structure_layout_field.data_type == DataType::Utf16String
             {
+                if !structure_layout_field.modifier.is_empty() {
+                    panic!("Unsupported modifier for data type")
+                }
                 let format_string: String = format!(
                     "    {}: \"{}\",\n",
                     structure_layout_field.name, field_format_string
@@ -323,9 +365,8 @@ impl StructureLayout {
                             format!("    {}: ", structure_layout_field.name);
 
                         debug_read_fields.extend(quote! {
-                            let #field_name: #field_type = #field_type::new();
                             string_parts.push(format!(#format_string));
-                            for line in #field_name.debug_read_data(&data[#data_offset_literal..#end_offset_literal]).lines() {
+                            for line in #field_type::debug_read_data(&data[#data_offset_literal..#end_offset_literal]).lines() {
                                 string_parts.push(format!("    {}\n", line));
                             }
 
@@ -335,6 +376,7 @@ impl StructureLayout {
                         let quote_data_offset = quote!(#data_offset_literal);
                         let quote_from_bytes: TokenStream = structure_layout_field
                             .get_from_bytes_token_stream(&byte_order, quote_data_offset);
+                        let quote_modifier: TokenStream = structure_layout_field.get_modifier_token_stream();
 
                         let format_string: String = format!(
                             "    {}: {},\n",
@@ -347,13 +389,16 @@ impl StructureLayout {
                             _ => quote!(format!(#format_string, #field_name)),
                         };
                         debug_read_fields.extend(quote! {
-                            let #field_name: #field_type = #quote_from_bytes;
+                            let #field_name: #field_type = #quote_from_bytes #quote_modifier;
                             string_parts.push(#quote_format);
 
                         });
                     }
                 };
             } else {
+                if !structure_layout_field.modifier.is_empty() {
+                    panic!("Unsupported modifier for data type")
+                }
                 // if structure_layout_field.format == Format::NotSet
                 // TODO: add support to format vector of character into string.
 
@@ -365,10 +410,9 @@ impl StructureLayout {
                         let format_string: String =
                             format!("    {}: [\n", structure_layout_field.name);
                         quote!(
-                            let #field_name: #field_type = #field_type::new();
                             string_parts.push(format!(#format_string));
                             for data_offset in (#data_offset_literal..#end_offset_literal).step_by(#value_data_size_literal) {
-                                for line in #field_name.debug_read_data(&data[data_offset..data_offset + #value_data_size_literal]).lines() {
+                                for line in #field_type::debug_read_data(&data[data_offset..data_offset + #value_data_size_literal]).lines() {
                                     string_parts.push(format!("        {}\n", line));
                                 }
                             }
@@ -406,7 +450,7 @@ impl StructureLayout {
         let name_format_string: String = format!("{} {{{{\n", self.name);
 
         quote! {
-            pub fn debug_read_data(&self, data: &[u8]) -> String {
+            pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!(#name_format_string));
 
@@ -418,9 +462,11 @@ impl StructureLayout {
         }
     }
 
+    /// Generates the read_data_at_position method.
     pub fn generate_read_at_position(&self) -> TokenStream {
         let mut data_size: usize = 0;
 
+        let struct_name: Ident = format_ident!("{}", self.name);
         for structure_layout_field in self.fields.iter() {
             let value_data_size = match structure_layout_field.get_byte_size() {
                 None => panic!(
@@ -457,7 +503,7 @@ impl StructureLayout {
                         offset,
                         offset));
                     mediator.debug_print_data(&data, true);
-                    mediator.debug_print(self.debug_read_data(&data));
+                    mediator.debug_print(#struct_name::debug_read_data(&data));
                 }
                 self.read_data(&data)
             }
@@ -479,6 +525,7 @@ mod tests {
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
             1,
+            &"".to_string(),
             Format::NotSet,
         ));
         structure_layout.fields.push(StructureLayoutField::new(
@@ -486,17 +533,18 @@ mod tests {
             DataType::UnsignedInteger16Bit,
             ByteOrder::BigEndian,
             1,
+            &"- 7".to_string(),
             Format::NotSet,
         ));
         let expected_token_stream = quote! {
-            pub fn debug_read_data(&self, data: &[u8]) -> String {
+            pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
                 let field1: u8 = data[0];
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: u16 = crate::bytes_to_u16_be!(data, 1);
+                let field2: u16 = crate::bytes_to_u16_be!(data, 1) - 7;
                 string_parts.push(format!("    field2: {},\n", field2));
 
                 string_parts.push(format!("}}\n\n"));
@@ -521,6 +569,7 @@ mod tests {
             DataType::UnsignedInteger64Bit,
             ByteOrder::BigEndian,
             1,
+            &"".to_string(),
             Format::NotSet,
         ));
         structure_layout.fields.push(StructureLayoutField::new(
@@ -528,10 +577,11 @@ mod tests {
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
             64,
+            &"".to_string(),
             Format::NotSet,
         ));
         let expected_token_stream = quote! {
-            pub fn debug_read_data(&self, data: &[u8]) -> String {
+            pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
@@ -567,6 +617,7 @@ mod tests {
             DataType::BitField32,
             ByteOrder::NotSet,
             9,
+            &"".to_string(),
             Format::NotSet,
         ));
         structure_layout.fields.push(StructureLayoutField::new(
@@ -574,10 +625,11 @@ mod tests {
             DataType::BitField32,
             ByteOrder::NotSet,
             23,
+            &"".to_string(),
             Format::NotSet,
         ));
         let expected_token_stream = quote! {
-            pub fn debug_read_data(&self, data: &[u8]) -> String {
+            pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
@@ -619,6 +671,7 @@ mod tests {
             DataType::UnsignedInteger32Bit,
             ByteOrder::LittleEndian,
             1,
+            &"".to_string(),
             Format::NotSet,
         ));
         structure_layout.fields.push(StructureLayoutField::new(
@@ -629,19 +682,19 @@ mod tests {
             },
             ByteOrder::NotSet,
             1,
+            &"".to_string(),
             Format::NotSet,
         ));
         let expected_token_stream = quote! {
-            pub fn debug_read_data(&self, data: &[u8]) -> String {
+            pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
                 let field1: u32 = crate::bytes_to_u32_le!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: MyStruct = MyStruct::new();
                 string_parts.push(format!("    field2: "));
-                for line in field2.debug_read_data(&data[4..11]).lines() {
+                for line in MyStruct::debug_read_data(&data[4..11]).lines() {
                     string_parts.push(format!("    {}\n", line));
                 }
                 string_parts.push(format!("}}\n\n"));
@@ -666,6 +719,7 @@ mod tests {
             DataType::SignedInteger32Bit,
             ByteOrder::LittleEndian,
             1,
+            &"".to_string(),
             Format::NotSet,
         ));
         structure_layout.fields.push(StructureLayoutField::new(
@@ -676,20 +730,20 @@ mod tests {
             },
             ByteOrder::NotSet,
             10,
+            &"".to_string(),
             Format::NotSet,
         ));
         let expected_token_stream = quote! {
-            pub fn debug_read_data(&self, data: &[u8]) -> String {
+            pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
                 let field1: i32 = crate::bytes_to_i32_le!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: MyStruct = MyStruct::new();
                 string_parts.push(format!("    field2: [\n"));
                 for data_offset in (4..54).step_by(5) {
-                    for line in field2.debug_read_data(&data[data_offset..data_offset + 5]).lines() {
+                    for line in MyStruct::debug_read_data(&data[data_offset..data_offset + 5]).lines() {
                         string_parts.push(format!("        {}\n", line));
                     }
                 }
@@ -718,6 +772,7 @@ mod tests {
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
             16,
+            &"".to_string(),
             Format::NotSet,
         ));
         let expected_token_stream = quote! {
@@ -740,7 +795,7 @@ mod tests {
                         offset,
                         offset));
                     mediator.debug_print_data(&data, true);
-                    mediator.debug_print(self.debug_read_data(&data));
+                    mediator.debug_print(TestStruct::debug_read_data(&data));
                 }
                 self.read_data(&data)
             }

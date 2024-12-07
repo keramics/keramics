@@ -45,7 +45,7 @@ impl VhdxMetadataTable {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(metadata_table_header.debug_read_data(&data[0..32]));
+                .debug_print(VhdxMetadataTableHeader::debug_read_data(&data[0..32]));
         }
         metadata_table_header.read_data(&data[0..32])?;
 
@@ -57,9 +57,10 @@ impl VhdxMetadataTable {
             let mut metadata_table_entry: VhdxMetadataTableEntry = VhdxMetadataTableEntry::new();
 
             if self.mediator.debug_output {
-                self.mediator.debug_print(
-                    metadata_table_entry.debug_read_data(&data[data_offset..data_end_offset]),
-                );
+                self.mediator
+                    .debug_print(VhdxMetadataTableEntry::debug_read_data(
+                        &data[data_offset..data_end_offset],
+                    ));
             }
             metadata_table_entry.read_data(&data[data_offset..data_end_offset])?;
             data_offset = data_end_offset;

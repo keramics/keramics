@@ -46,7 +46,7 @@ impl VhdxRegionTable {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(region_table_header.debug_read_data(&data[0..16]));
+                .debug_print(VhdxRegionTableHeader::debug_read_data(&data[0..16]));
         }
         region_table_header.read_data(&data[0..16])?;
 
@@ -79,9 +79,10 @@ impl VhdxRegionTable {
             let mut region_table_entry: VhdxRegionTableEntry = VhdxRegionTableEntry::new();
 
             if self.mediator.debug_output {
-                self.mediator.debug_print(
-                    region_table_entry.debug_read_data(&data[data_offset..data_end_offset]),
-                );
+                self.mediator
+                    .debug_print(VhdxRegionTableEntry::debug_read_data(
+                        &data[data_offset..data_end_offset],
+                    ));
             }
             region_table_entry.read_data(&data[data_offset..data_end_offset])?;
             data_offset = data_end_offset;

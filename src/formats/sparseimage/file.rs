@@ -91,7 +91,7 @@ impl SparseImageFile {
             ));
             self.mediator.debug_print_data(&data[0..64], true);
             self.mediator
-                .debug_print(file_header.debug_read_data(&data[0..64]));
+                .debug_print(SparseImageFileHeader::debug_read_data(&data[0..64]));
         }
         file_header.read_data(&data[0..64])?;
 

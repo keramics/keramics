@@ -136,7 +136,7 @@ impl ApmVolumeSystem {
             )?;
 
             if partition_map_entry_index == 0 {
-                if partition_map_entry.type_identifier.string != APM_PARTITION_MAP_TYPE {
+                if partition_map_entry.type_identifier.elements != APM_PARTITION_MAP_TYPE {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(

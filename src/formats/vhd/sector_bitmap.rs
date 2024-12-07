@@ -13,8 +13,6 @@
 
 use std::io;
 
-use layout_map::LayoutMap;
-
 use crate::mediator::Mediator;
 use crate::vfs::VfsDataStreamReference;
 
@@ -37,8 +35,6 @@ impl VhdSectorBitmapRange {
     }
 }
 
-#[derive(LayoutMap)]
-#[layout_map(bitmap(data_type = "u8", bit_order = "msb"))]
 /// Virtual Hard Disk (VHD) sector bitmap.
 pub struct VhdSectorBitmap {
     /// Size.

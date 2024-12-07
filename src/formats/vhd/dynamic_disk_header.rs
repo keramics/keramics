@@ -203,7 +203,7 @@ mod tests {
             test_struct.parent_identifier.to_string(),
             "e7ea9200-8493-954e-a816-9572339be931"
         );
-        let string: String = String::from_utf16(&test_struct.parent_name.string).unwrap();
+        let string: String = String::from_utf16(&test_struct.parent_name.elements).unwrap();
         assert_eq!(string, "C:\\Projects\\dfvfs\\test_data\\ntfs-parent.vhd",);
 
         Ok(())
@@ -253,7 +253,7 @@ mod tests {
             test_struct.parent_identifier.to_string(),
             "e7ea9200-8493-954e-a816-9572339be931"
         );
-        let string: String = String::from_utf16(&test_struct.parent_name.string).unwrap();
+        let string: String = String::from_utf16(&test_struct.parent_name.elements).unwrap();
         assert_eq!(string, "C:\\Projects\\dfvfs\\test_data\\ntfs-parent.vhd",);
 
         Ok(())

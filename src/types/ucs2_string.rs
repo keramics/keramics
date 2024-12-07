@@ -16,51 +16,55 @@ use crate::{bytes_to_u16_be, bytes_to_u16_le};
 /// 16-bit Universal Coded Character Set (UCS-2) string.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
 pub struct Ucs2String {
-    pub string: Vec<u16>,
+    /// Elements.
+    pub elements: Vec<u16>,
 }
 
 impl Ucs2String {
     /// Creates a new UCS-2 string.
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            elements: Vec::new(),
+        }
     }
 
     /// Reads a big-endian UCS-2 string from a byte sequence.
     pub fn from_be_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len() / 2;
-        let mut string: Vec<u16> = Vec::new();
+        let mut elements: Vec<u16> = Vec::new();
 
-        for string_index in 0..data_size {
-            let value_16bit = bytes_to_u16_be!(data, string_index * 2);
+        for data_offset in 0..data_size {
+            let value_16bit = bytes_to_u16_be!(data, data_offset * 2);
             if value_16bit == 0 {
                 break;
             }
-            string.push(value_16bit);
+            elements.push(value_16bit);
         }
-        Self { string: string }
+        Self { elements: elements }
     }
 
     /// Reads a little-endian UCS-2 string from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len() / 2;
-        let mut string: Vec<u16> = Vec::new();
+        let mut elements: Vec<u16> = Vec::new();
 
-        for string_index in 0..data_size {
-            let value_16bit = bytes_to_u16_le!(data, string_index * 2);
+        for data_offset in 0..data_size {
+            let value_16bit = bytes_to_u16_le!(data, data_offset * 2);
             if value_16bit == 0 {
                 break;
             }
-            string.push(value_16bit);
+            elements.push(value_16bit);
         }
-        Self { string: string }
+        Self { elements: elements }
     }
 
     /// Retrieves the string representation of an UCS-2 string.
     pub fn to_string(&self) -> String {
         // TODO: add support for non-Unicode characters.
-        String::from_utf16(&self.string).unwrap()
+        String::from_utf16(&self.elements).unwrap()
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

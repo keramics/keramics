@@ -18,6 +18,8 @@
 use std::cmp;
 use std::io;
 
+use layout_map::LayoutMap;
+
 use crate::checksums::Crc32Context;
 use crate::mediator::{Mediator, MediatorReference};
 
@@ -136,6 +138,16 @@ impl<'a> Bitstream for Bzip2Bitstream<'a> {
     }
 }
 
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        field(name = "signature", data_type = "[u8; 2]", format = "char"),
+        field(name = "format_version", data_type = "u8"),
+        field(name = "compression_level", data_type = "u8", format = "char"),
+    ),
+    method(name = "debug_read_data")
+)]
 /// Stream header used by bzip2 compressed data.
 struct Bzip2StreamHeader {}
 
@@ -143,25 +155,6 @@ impl Bzip2StreamHeader {
     /// Creates a new stream header.
     pub fn new() -> Self {
         Self {}
-    }
-
-    /// Reads the stream header for debugging.
-    pub fn debug_read_data(&self, data: &[u8]) -> String {
-        let mut string_parts: Vec<String> = Vec::new();
-        string_parts.push(format!("Bzip2StreamHeader {{\n"));
-
-        string_parts.push(format!(
-            "    signature: \"{}{}\",\n",
-            data[0] as char, data[1] as char
-        ));
-
-        string_parts.push(format!("    format_version: {},\n", data[2]));
-
-        string_parts.push(format!("    compression_level: {},\n", data[3] as char));
-
-        string_parts.push(format!("}}\n\n"));
-
-        string_parts.join("")
     }
 
     /// Reads the stream header.
@@ -301,7 +294,7 @@ impl Bzip2Context {
             ));
             self.mediator.debug_print_data(compressed_data, true);
             self.mediator
-                .debug_print(data_header.debug_read_data(compressed_data));
+                .debug_print(Bzip2StreamHeader::debug_read_data(compressed_data));
         }
         data_header.read_data(compressed_data)?;
 

@@ -245,14 +245,18 @@ impl LzfseBlockV1Header {
         field(name = "number_of_literals", data_type = "BitField64<20>"),
         field(name = "literals_data_size", data_type = "BitField64<20>"),
         field(name = "number_of_lmd_values", data_type = "BitField64<20>"),
-        field(name = "literal_bits", data_type = "BitField64<3>"),
+        field(name = "literal_bits", data_type = "BitField64<3>", modifier = "- 7"),
         field(name = "unknown1", data_type = "BitField64<1>"),
         field(name = "literal_state1", data_type = "BitField64<10>"),
         field(name = "literal_state2", data_type = "BitField64<10>"),
         field(name = "literal_state3", data_type = "BitField64<10>"),
         field(name = "literal_state4", data_type = "BitField64<10>"),
         field(name = "lmd_values_data_size", data_type = "BitField64<20>"),
-        field(name = "lmd_values_bits", data_type = "BitField64<3>"),
+        field(
+            name = "lmd_values_bits",
+            data_type = "BitField64<3>",
+            modifier = "- 7"
+        ),
         field(name = "unknown2", data_type = "BitField64<1>"),
         field(name = "header_size", data_type = "BitField64<32>"),
         field(name = "l_value_state", data_type = "BitField64<10>"),
@@ -914,9 +918,10 @@ impl LzfseContext {
             ));
             self.mediator
                 .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-            self.mediator.debug_print(
-                block_header.debug_read_data(&compressed_data[data_offset..data_end_offset]),
-            );
+            self.mediator
+                .debug_print(LzfseBlockV1Header::debug_read_data(
+                    &compressed_data[data_offset..data_end_offset],
+                ));
         }
         block_header.read_data(&compressed_data[data_offset..data_end_offset], decoder)?;
         data_offset = data_end_offset;
@@ -982,9 +987,10 @@ impl LzfseContext {
             ));
             self.mediator
                 .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-            self.mediator.debug_print(
-                block_header.debug_read_data(&compressed_data[data_offset..data_end_offset]),
-            );
+            self.mediator
+                .debug_print(LzfseBlockV2Header::debug_read_data(
+                    &compressed_data[data_offset..data_end_offset],
+                ));
         }
         block_header.read_data(&compressed_data[data_offset..data_end_offset], decoder)?;
         if block_header.header_size as usize > compressed_data_size - data_offset {

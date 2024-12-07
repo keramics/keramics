@@ -46,7 +46,7 @@ impl UdifBlockTable {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(block_table_header.debug_read_data(&data[0..204]));
+                .debug_print(UdifBlockTableHeader::debug_read_data(&data[0..204]));
         }
         block_table_header.read_data(&data[0..204])?;
 
@@ -60,9 +60,10 @@ impl UdifBlockTable {
             let mut block_table_entry: UdifBlockTableEntry = UdifBlockTableEntry::new();
 
             if self.mediator.debug_output {
-                self.mediator.debug_print(
-                    block_table_entry.debug_read_data(&data[data_offset..data_end_offset]),
-                );
+                self.mediator
+                    .debug_print(UdifBlockTableEntry::debug_read_data(
+                        &data[data_offset..data_end_offset],
+                    ));
             }
             block_table_entry.read_data(&data[data_offset..data_end_offset])?;
             data_offset = data_end_offset;

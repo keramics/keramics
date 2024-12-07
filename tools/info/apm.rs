@@ -61,7 +61,7 @@ pub fn print_apm_volume_system(
             "    Type identifier\t\t: {}",
             apm_partition.type_identifier.to_string()
         );
-        if apm_partition.name.string.len() > 0 {
+        if apm_partition.name.elements.len() > 0 {
             println!("    Name\t\t\t: {}", apm_partition.name.to_string());
         }
         println!(
