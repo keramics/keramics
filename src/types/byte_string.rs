@@ -12,7 +12,7 @@
  */
 
 /// String of 8-bit values.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ByteString {
     /// Elements.
     pub elements: Vec<u8>,
@@ -41,7 +41,7 @@ impl ByteString {
         Self { elements: elements }
     }
 
-    /// Retrieves the string representation of a byte string.
+    /// Retrieves the string representation of the byte string.
     pub fn to_string(&self) -> String {
         // TODO: add code page support
         String::from_utf8(self.elements.to_vec()).unwrap()

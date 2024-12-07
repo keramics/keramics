@@ -11,15 +11,11 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod datetime;
-pub mod encoding;
-pub mod formats;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod sigscan;
-pub mod types;
-pub mod vfs;
+#[derive(Clone, Default)]
+pub enum DateTime {
+    #[default]
+    NotSet,
+    PosixTime32(i32),
+    PosixTime64(i64),
+    PosixTime64Nanoseconds(i64),
+}
