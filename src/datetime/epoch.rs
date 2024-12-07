@@ -11,15 +11,24 @@
  * under the License.
  */
 
-pub mod checksums;
-pub mod compression;
-pub mod datetime;
-pub mod encoding;
-pub mod formats;
-pub mod formatters;
-pub mod hashes;
-pub mod macros;
-pub mod mediator;
-pub mod sigscan;
-pub mod types;
-pub mod vfs;
+/// A fixed date and time used as a reference (epoch).
+pub struct Epoch {
+    /// The year.
+    pub year: i16,
+
+    /// The month.
+    pub month: u8,
+
+    /// The day of month.
+    pub day_of_month: u8,
+}
+
+impl Epoch {
+    pub fn new(year: i16, month: u8, day_of_month: u8) -> Self {
+        Self {
+            year: year,
+            month: month,
+            day_of_month: day_of_month,
+        }
+    }
+}

@@ -14,7 +14,7 @@
 use crate::{bytes_to_u16_be, bytes_to_u16_le};
 
 /// 16-bit Unicode Transformation Format (UTF-16) string.
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Utf16String {
     /// Elements.
     pub elements: Vec<u16>,
