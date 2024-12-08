@@ -34,11 +34,11 @@ pub fn print_apm_volume_system(
     };
     println!("Apple Partition Map (APM) information:");
     println!(
-        "    Bytes per sector\t\t: {} bytes",
+        "    Bytes per sector\t\t\t: {} bytes",
         apm_volume_system.bytes_per_sector
     );
     let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
-    println!("    Number of partitions\t: {}", number_of_partitions);
+    println!("    Number of partitions\t\t: {}", number_of_partitions);
 
     for partition_index in 0..number_of_partitions {
         println!("");
@@ -58,21 +58,24 @@ pub fn print_apm_volume_system(
 
         println!("Partition: {}", partition_index + 1);
         println!(
-            "    Type identifier\t\t: {}",
+            "    Type identifier\t\t\t: {}",
             apm_partition.type_identifier.to_string()
         );
         if apm_partition.name.elements.len() > 0 {
             println!("    Name\t\t\t: {}", apm_partition.name.to_string());
         }
         println!(
-            "    Offset\t\t\t: {} (0x{:08x})",
+            "    Offset\t\t\t\t: {} (0x{:08x})",
             apm_partition.offset, apm_partition.offset
         );
         println!(
-            "    Size\t\t\t: {} ({} bytes)",
+            "    Size\t\t\t\t: {} ({} bytes)",
             size_string, apm_partition.size
         );
-        println!("    Status flags\t\t: 0x{:08x}", apm_partition.status_flags);
+        println!(
+            "    Status flags\t\t\t: 0x{:08x}",
+            apm_partition.status_flags
+        );
         if apm_partition.status_flags & 0x00000001 != 0 {
             println!("        Is valid");
         }

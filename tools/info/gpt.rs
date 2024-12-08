@@ -34,15 +34,15 @@ pub fn print_gpt_volume_system(
     };
     println!("GUID Partition Table (GPT) information:");
     println!(
-        "    Disk identifier\t\t: {}",
+        "    Disk identifier\t\t\t: {}",
         gpt_volume_system.disk_identifier.to_string()
     );
     println!(
-        "    Bytes per sector\t\t: {} bytes",
+        "    Bytes per sector\t\t\t: {} bytes",
         gpt_volume_system.bytes_per_sector
     );
     let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
-    println!("    Number of partitions\t: {}", number_of_partitions);
+    println!("    Number of partitions\t\t: {}", number_of_partitions);
 
     for partition_index in 0..number_of_partitions {
         println!("");
@@ -62,19 +62,19 @@ pub fn print_gpt_volume_system(
 
         println!("Partition: {}", partition_index + 1);
         println!(
-            "    Identifier\t\t\t: {}",
+            "    Identifier\t\t\t\t: {}",
             gpt_partition.identifier.to_string()
         );
         println!(
-            "    Type identifier\t\t: {}",
+            "    Type identifier\t\t\t: {}",
             gpt_partition.type_identifier.to_string()
         );
         println!(
-            "    Offset\t\t\t: {} (0x{:08x})",
+            "    Offset\t\t\t\t: {} (0x{:08x})",
             gpt_partition.offset, gpt_partition.offset
         );
         println!(
-            "    Size\t\t\t: {} ({} bytes)",
+            "    Size\t\t\t\t: {} ({} bytes)",
             size_string, gpt_partition.size
         );
     }

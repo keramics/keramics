@@ -43,17 +43,10 @@ impl OsVfsFileEntry {
             file_type: VfsFileType::NotSet,
         }
     }
-}
 
-impl VfsFileEntry for OsVfsFileEntry {
-    /// Retrieves the file type.
-    fn get_file_type(&self) -> VfsFileType {
-        self.file_type.clone()
-    }
-
-    /// Opens a file entry.
+    /// Initializes the file entry.
     #[cfg(unix)]
-    fn open(&mut self, path: &VfsPath) -> io::Result<()> {
+    pub(crate) fn initialize(&mut self, path: &VfsPath) -> io::Result<()> {
         let parent_path: Option<VfsPathReference> = path.get_parent();
         if parent_path.is_some() {
             return Err(io::Error::new(
@@ -86,10 +79,18 @@ impl VfsFileEntry for OsVfsFileEntry {
         Ok(())
     }
 
-    /// Opens a file entry.
+    /// Initializes the file entry.
     #[cfg(windows)]
-    fn open(&mut self, path: &VfsPath) -> io::Result<()> {
+    pub(crate) fn initialize(&mut self, path: &VfsPath) -> io::Result<()> {
+        // TODO: add Windows support.
         todo!();
+    }
+}
+
+impl VfsFileEntry for OsVfsFileEntry {
+    /// Retrieves the file type.
+    fn get_vfs_file_type(&self) -> VfsFileType {
+        self.file_type.clone()
     }
 
     /// Opens a data stream with the specified name.
@@ -123,11 +124,11 @@ mod tests {
     use crate::vfs::enums::VfsPathType;
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_initialize() -> io::Result<()> {
         let mut vfs_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        vfs_file_entry.open(&vfs_path)?;
+        vfs_file_entry.initialize(&vfs_path)?;
 
         assert!(vfs_file_entry.file_type == VfsFileType::File);
 
@@ -139,7 +140,7 @@ mod tests {
         let mut vfs_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        vfs_file_entry.open(&vfs_path)?;
+        vfs_file_entry.initialize(&vfs_path)?;
 
         let expected_data: String = [
             "A ceramic is any of the various hard, brittle, heat-resistant, and ",

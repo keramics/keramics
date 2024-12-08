@@ -15,8 +15,8 @@ use std::io;
 
 use crate::types::{SharedValue, Ucs2String};
 use crate::vfs::{
-    VfsFileEntry, VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference, VfsPath,
-    VfsPathType, WrapperVfsFileEntry,
+    VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathType,
+    WrapperVfsFileEntry,
 };
 
 use super::file::VhdxFile;
@@ -180,19 +180,21 @@ impl VfsFileSystem for VhdxImage {
     }
 
     /// Opens a file entry with the specified path.
-    fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference> {
+    fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
         if path.path_type != VfsPathType::Vhdx {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "Unsupported path type",
             ));
         }
-        let layer: Option<VhdxLayer> = self.get_layer_by_path(&path.location)?;
-
+        let layer: Option<VhdxLayer> = match self.get_layer_by_path(&path.location) {
+            Ok(layer) => layer,
+            Err(_) => return Ok(None),
+        };
         let mut file_entry: WrapperVfsFileEntry = WrapperVfsFileEntry::new::<VhdxLayer>(layer);
-        file_entry.open(path)?;
+        file_entry.initialize(path)?;
 
-        Ok(Box::new(file_entry))
+        Ok(Some(Box::new(file_entry)))
     }
 }
 
@@ -324,9 +326,9 @@ mod tests {
             None,
         );
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/", Some(os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?;
+        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -341,9 +343,27 @@ mod tests {
             None,
         );
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/vhdx1", Some(os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?;
+        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_file_entry_non_existing() -> io::Result<()> {
+        let image: VhdxImage = get_image()?;
+
+        let os_vfs_path: VfsPath = VfsPath::new(
+            VfsPathType::Os,
+            "./test_data/vhdx/ntfs-differential.vhdx",
+            None,
+        );
+        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/bogus1", Some(os_vfs_path));
+        let vfs_file_entry: Option<VfsFileEntryReference> =
+            image.open_file_entry(&test_vfs_path)?;
+
+        assert!(vfs_file_entry.is_none());
 
         Ok(())
     }

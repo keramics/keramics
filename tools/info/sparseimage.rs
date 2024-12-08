@@ -39,15 +39,15 @@ pub fn print_sparseimage_file(
 
     println!("Sparse image (.sparseimage) information:");
     println!(
-        "    Media size\t\t\t: {} ({} bytes)",
+        "    Media size\t\t\t\t: {} ({} bytes)",
         media_size_string, sparseimage_file.media_size
     );
     println!(
-        "    Bytes per sector\t\t: {} bytes",
+        "    Bytes per sector\t\t\t: {} bytes",
         sparseimage_file.bytes_per_sector
     );
     println!(
-        "    Band size\t\t\t: {} ({} bytes)",
+        "    Band size\t\t\t\t: {} ({} bytes)",
         band_size_string, sparseimage_file.block_size,
     );
     println!("");
