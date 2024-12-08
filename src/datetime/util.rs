@@ -101,12 +101,12 @@ fn get_days_in_century(year: i16) -> i32 {
 }
 
 /// Retrieves date values.
-pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) {
+pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) {
     let before_epoch: bool = number_of_days < 0;
 
     let mut year: i16 = epoch.year;
     let mut month: u8 = epoch.month;
-    number_of_days += epoch.day_of_month as i32;
+    number_of_days += epoch.day_of_month as i64;
 
     if before_epoch {
         month -= 1;
@@ -119,7 +119,7 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
     }
     // Align with the start of the year.
     while month > 1 {
-        let days_in_month: i32 = get_days_in_month(year, month) as i32;
+        let days_in_month: i64 = get_days_in_month(year, month) as i64;
         if number_of_days < days_in_month {
             break;
         }
@@ -137,7 +137,7 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
     // Align with the start of the next century.
     let remaining_years: usize = (year as usize) % 100;
     for _ in remaining_years..100 {
-        let days_in_year: i32 = get_days_in_year(year) as i32;
+        let days_in_year: i64 = get_days_in_year(year) as i64;
         if number_of_days < days_in_year {
             break;
         }
@@ -148,7 +148,7 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
         }
         number_of_days -= days_in_year;
     }
-    let mut days_in_century: i32 = get_days_in_century(year);
+    let mut days_in_century: i64 = get_days_in_century(year) as i64;
     while number_of_days > days_in_century {
         if before_epoch {
             year -= 100;
@@ -157,9 +157,9 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
         }
         number_of_days -= days_in_century;
 
-        days_in_century = get_days_in_century(year) as i32;
+        days_in_century = get_days_in_century(year) as i64;
     }
-    let mut days_in_year: i32 = get_days_in_year(year) as i32;
+    let mut days_in_year: i64 = get_days_in_year(year) as i64;
     while number_of_days > days_in_year {
         if before_epoch {
             year -= 1;
@@ -168,9 +168,9 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
         }
         number_of_days -= days_in_year;
 
-        days_in_year = get_days_in_year(year) as i32;
+        days_in_year = get_days_in_year(year) as i64;
     }
-    let mut days_in_month: i32 = get_days_in_month(year, month) as i32;
+    let mut days_in_month: i64 = get_days_in_month(year, month) as i64;
     while number_of_days > days_in_month {
         if before_epoch {
             month -= 1;
@@ -186,10 +186,10 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
         }
         number_of_days -= days_in_month;
 
-        days_in_month = get_days_in_month(year, month) as i32;
+        days_in_month = get_days_in_month(year, month) as i64;
     }
     if before_epoch {
-        let days_in_month: i32 = get_days_in_month(year, month) as i32;
+        let days_in_month: i64 = get_days_in_month(year, month) as i64;
         number_of_days = days_in_month - number_of_days;
     } else if number_of_days == 0 {
         number_of_days = 31;
@@ -200,7 +200,7 @@ pub fn get_date_values(mut number_of_days: i32, epoch: &Epoch) -> (i16, u8, u8) 
 }
 
 /// Retrieves time values.
-pub fn get_time_values(mut number_of_seconds: i32) -> (i32, u8, u8, u8) {
+pub fn get_time_values(mut number_of_seconds: i64) -> (i64, u8, u8, u8) {
     let seconds: u8 = number_of_seconds.rem_euclid(60) as u8;
     number_of_seconds = number_of_seconds.div_euclid(60);
 
