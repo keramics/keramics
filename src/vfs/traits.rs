@@ -44,14 +44,7 @@ pub trait VfsFileEntry {
     // TODO: add get_attributes()
 
     /// Retrieves the file type.
-    fn get_file_type(&self) -> VfsFileType;
-
-    // TODO: add get_directory()
-
-    // TODO: add get_file_system()
-
-    /// Opens a file entry.
-    fn open(&mut self, path: &VfsPath) -> io::Result<()>;
+    fn get_vfs_file_type(&self) -> VfsFileType;
 
     /// Opens a data stream with the specified name.
     fn open_data_stream(&self, name: Option<&str>) -> io::Result<VfsDataStreamReference>;
@@ -82,17 +75,25 @@ pub trait VfsFileSystem {
         path: &VfsPath,
     ) -> io::Result<()>;
 
-    #[inline(always)]
     /// Opens a data stream with the specified path and name.
+    #[inline(always)]
     fn open_data_stream(
         &self,
         path: &VfsPath,
         name: Option<&str>,
     ) -> io::Result<VfsDataStreamReference> {
-        let file_entry: VfsFileEntryReference = self.open_file_entry(path)?;
+        let file_entry: VfsFileEntryReference = match self.open_file_entry(path)? {
+            Some(file_entry) => file_entry,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing file entry",
+                ));
+            }
+        };
         file_entry.open_data_stream(name)
     }
 
     /// Opens a file entry with the specified path.
-    fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference>;
+    fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>>;
 }

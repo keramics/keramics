@@ -41,22 +41,25 @@ pub fn print_vhd_file(parent_file_system: &VfsFileSystemReference, vfs_path: &Vf
     let media_size_string: String = formatters::format_as_bytesize(vhd_file.media_size, 1024);
 
     println!("Virtual Hard Disk (VHD) information:");
-    println!("    Format version\t\t: 1.0");
-    println!("    Disk type\t\t\t: {}", disk_type_string);
+    println!("    Format version\t\t\t: 1.0");
+    println!("    Disk type\t\t\t\t: {}", disk_type_string);
     println!(
-        "    Media size\t\t\t: {} ({} bytes)",
+        "    Media size\t\t\t\t: {} ({} bytes)",
         media_size_string, vhd_file.media_size
     );
     println!(
-        "    Bytes per sector\t\t: {} bytes",
+        "    Bytes per sector\t\t\t: {} bytes",
         vhd_file.bytes_per_sector
     );
-    println!("    Identifier\t\t\t: {}", vhd_file.identifier.to_string());
+    println!(
+        "    Identifier\t\t\t\t: {}",
+        vhd_file.identifier.to_string()
+    );
 
     match &vhd_file.parent_identifier {
         Some(parent_identifier) => {
             println!(
-                "    Parent identifier\t\t: {}",
+                "    Parent identifier\t\t\t: {}",
                 parent_identifier.to_string()
             );
         }
@@ -64,7 +67,7 @@ pub fn print_vhd_file(parent_file_system: &VfsFileSystemReference, vfs_path: &Vf
     }
     match &vhd_file.parent_name {
         Some(parent_name) => {
-            println!("    Parent name\t\t\t: {}", parent_name.to_string());
+            println!("    Parent name\t\t\t\t: {}", parent_name.to_string());
         }
         None => {}
     }

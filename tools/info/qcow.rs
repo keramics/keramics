@@ -56,18 +56,21 @@ pub fn print_qcow_file(
     let media_size_string: String = formatters::format_as_bytesize(qcow_file.media_size, 1024);
 
     println!("QEMU Copy-On-Write (QCOW) information:");
-    println!("    Format version\t\t: {}", qcow_file.format_version);
+    println!("    Format version\t\t\t: {}", qcow_file.format_version);
     println!(
-        "    Media size\t\t\t: {} ({} bytes)",
+        "    Media size\t\t\t\t: {} ({} bytes)",
         media_size_string, qcow_file.media_size
     );
-    println!("    Compression method\t\t: {}", compression_method_string);
-    println!("    Encryption method\t\t: {}", encryption_method_string);
+    println!(
+        "    Compression method\t\t\t: {}",
+        compression_method_string
+    );
+    println!("    Encryption method\t\t\t: {}", encryption_method_string);
 
     match &qcow_file.backing_file_name {
         Some(backing_file_name) => {
             println!(
-                "    Backing file name\t\t: {}",
+                "    Backing file name\t\t\t: {}",
                 backing_file_name.to_string()
             );
         }

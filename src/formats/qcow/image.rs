@@ -15,8 +15,8 @@ use std::io;
 
 use crate::types::{ByteString, SharedValue};
 use crate::vfs::{
-    VfsFileEntry, VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference, VfsPath,
-    VfsPathType, WrapperVfsFileEntry,
+    VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathType,
+    WrapperVfsFileEntry,
 };
 
 use super::file::QcowFile;
@@ -170,19 +170,21 @@ impl VfsFileSystem for QcowImage {
     }
 
     /// Opens a file entry with the specified path.
-    fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference> {
+    fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
         if path.path_type != VfsPathType::Qcow {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "Unsupported path type",
             ));
         }
-        let layer: Option<QcowLayer> = self.get_layer_by_path(&path.location)?;
-
+        let layer: Option<QcowLayer> = match self.get_layer_by_path(&path.location) {
+            Ok(layer) => layer,
+            Err(_) => return Ok(None),
+        };
         let mut file_entry: WrapperVfsFileEntry = WrapperVfsFileEntry::new::<QcowLayer>(layer);
-        file_entry.open(path)?;
+        file_entry.initialize(path)?;
 
-        Ok(Box::new(file_entry))
+        Ok(Some(Box::new(file_entry)))
     }
 }
 
@@ -297,9 +299,9 @@ mod tests {
         let os_vfs_path: VfsPath =
             VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/", Some(os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?;
+        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -311,9 +313,24 @@ mod tests {
         let os_vfs_path: VfsPath =
             VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/qcow1", Some(os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?;
+        let vfs_file_entry: VfsFileEntryReference = image.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_file_entry_non_existing() -> io::Result<()> {
+        let image: QcowImage = get_image()?;
+
+        let os_vfs_path: VfsPath =
+            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/bogus1", Some(os_vfs_path));
+        let vfs_file_entry: Option<VfsFileEntryReference> =
+            image.open_file_entry(&test_vfs_path)?;
+
+        assert!(vfs_file_entry.is_none());
 
         Ok(())
     }

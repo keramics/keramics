@@ -44,16 +44,9 @@ impl WrapperVfsFileEntry {
             file_type: VfsFileType::NotSet,
         }
     }
-}
 
-impl VfsFileEntry for WrapperVfsFileEntry {
-    /// Retrieves the file type.
-    fn get_file_type(&self) -> VfsFileType {
-        self.file_type.clone()
-    }
-
-    /// Opens a file entry.
-    fn open(&mut self, path: &VfsPath) -> io::Result<()> {
+    /// Initializes the file entry.
+    pub(crate) fn initialize(&mut self, path: &VfsPath) -> io::Result<()> {
         let parent_path: Option<VfsPathReference> = path.get_parent();
         if parent_path.is_none() {
             return Err(io::Error::new(
@@ -72,6 +65,13 @@ impl VfsFileEntry for WrapperVfsFileEntry {
         self.location = path.location.clone();
 
         Ok(())
+    }
+}
+
+impl VfsFileEntry for WrapperVfsFileEntry {
+    /// Retrieves the file type.
+    fn get_vfs_file_type(&self) -> VfsFileType {
+        self.file_type.clone()
     }
 
     /// Opens a data stream with the specified name.
@@ -112,13 +112,13 @@ mod tests {
     use crate::vfs::types::VfsFileSystemReference;
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_initialize() -> io::Result<()> {
         let mut vfs_file_entry: WrapperVfsFileEntry =
             WrapperVfsFileEntry::new::<ApmPartition>(None);
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", Some(os_vfs_path));
-        vfs_file_entry.open(&vfs_path)?;
+        vfs_file_entry.initialize(&vfs_path)?;
         assert!(vfs_file_entry.file_type == VfsFileType::Directory);
 
         Ok(())
@@ -144,7 +144,7 @@ mod tests {
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/apm1", Some(os_vfs_path));
-        vfs_file_entry.open(&vfs_path)?;
+        vfs_file_entry.initialize(&vfs_path)?;
 
         let vfs_data_stream: VfsDataStreamReference = vfs_file_entry.open_data_stream(None)?;
 

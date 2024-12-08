@@ -23,6 +23,7 @@ pub enum VfsFileType {
     NotSet,
     Socket,
     SymbolicLink,
+    Unknown,
     Whiteout,
 }
 

@@ -17,7 +17,7 @@ use std::path::{Path, MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use crate::vfs::enums::VfsPathType;
 use crate::vfs::file_entries::OsVfsFileEntry;
 use crate::vfs::path::VfsPath;
-use crate::vfs::traits::{VfsFileEntry, VfsFileSystem};
+use crate::vfs::traits::VfsFileSystem;
 use crate::vfs::types::{VfsFileEntryReference, VfsFileSystemReference};
 
 /// Operating system file system.
@@ -79,7 +79,7 @@ impl VfsFileSystem for OsVfsFileSystem {
     }
 
     /// Opens a file entry with the specified path.
-    fn open_file_entry(&self, path: &VfsPath) -> io::Result<VfsFileEntryReference> {
+    fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
         if path.path_type != VfsPathType::Os {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -87,10 +87,9 @@ impl VfsFileSystem for OsVfsFileSystem {
             ));
         }
         let mut file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
+        file_entry.initialize(path)?;
 
-        file_entry.open(path)?;
-
-        Ok(Box::new(file_entry))
+        Ok(Some(Box::new(file_entry)))
     }
 }
 
@@ -153,8 +152,8 @@ mod tests {
 
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         let vfs_file_entry: VfsFileEntryReference =
-            vfs_file_system.open_file_entry(&test_vfs_path)?;
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+            vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
+        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
 
         Ok(())
     }

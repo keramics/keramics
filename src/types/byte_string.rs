@@ -41,6 +41,16 @@ impl ByteString {
         Self { elements: elements }
     }
 
+    /// Determines if the byte string is empty.
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
+    /// Retrieves the length (or size) of the byte string.
+    pub fn len(&self) -> usize {
+        self.elements.len()
+    }
+
     /// Retrieves the string representation of the byte string.
     pub fn to_string(&self) -> String {
         // TODO: add code page support

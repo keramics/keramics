@@ -51,14 +51,17 @@ pub fn print_udif_file(
 
     println!("Universal Disk Image Format (UDIF) information:");
     println!(
-        "    Media size\t\t\t: {} ({} bytes)",
+        "    Media size\t\t\t\t: {} ({} bytes)",
         media_size_string, udif_file.media_size
     );
     println!(
-        "    Bytes per sector\t\t: {} bytes",
+        "    Bytes per sector\t\t\t: {} bytes",
         udif_file.bytes_per_sector
     );
-    println!("    Compression method\t\t: {}", compression_method_string);
+    println!(
+        "    Compression method\t\t\t: {}",
+        compression_method_string
+    );
 
     println!("");
 
