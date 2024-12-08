@@ -14,3 +14,5 @@
 mod epoch;
 mod posix;
 mod util;
+
+pub use posix::PosixTime32;

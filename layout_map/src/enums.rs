@@ -35,6 +35,7 @@ pub enum DataType {
     ByteString,
     #[default]
     NotSet,
+    PosixTime32,
     SignedInteger8Bit,
     SignedInteger16Bit,
     SignedInteger32Bit,
@@ -60,6 +61,7 @@ impl Clone for DataType {
             DataType::BitField64 => DataType::BitField64,
             DataType::ByteString => DataType::ByteString,
             DataType::NotSet => DataType::NotSet,
+            DataType::PosixTime32 => DataType::PosixTime32,
             DataType::SignedInteger8Bit => DataType::SignedInteger8Bit,
             DataType::SignedInteger16Bit => DataType::SignedInteger16Bit,
             DataType::SignedInteger32Bit => DataType::SignedInteger32Bit,
@@ -68,7 +70,6 @@ impl Clone for DataType {
                 name: name.to_string(),
                 size: *size,
             },
-
             DataType::Ucs2String => DataType::Ucs2String,
             DataType::Utf16String => DataType::Utf16String,
             DataType::UnsignedInteger8Bit => DataType::UnsignedInteger8Bit,
