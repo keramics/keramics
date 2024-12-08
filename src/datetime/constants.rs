@@ -11,13 +11,5 @@
  * under the License.
  */
 
-use super::posix::{PosixTime32, PosixTime64Ns};
-
-#[derive(Clone, Default)]
-pub enum DateTime {
-    Filetime,
-    #[default]
-    NotSet,
-    PosixTime32(PosixTime32),
-    PosixTime64Ns(PosixTime64Ns),
-}
+/// Number of nanoseconds per second.
+pub const NANOSECONDS_PER_SECOND: i64 = 1000000000;

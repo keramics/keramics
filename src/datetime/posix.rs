@@ -15,6 +15,7 @@ use std::fmt;
 
 use crate::{bytes_to_i32_be, bytes_to_i32_le};
 
+use super::constants::*;
 use super::epoch::Epoch;
 use super::util::{get_date_values, get_time_values};
 
@@ -58,11 +59,46 @@ impl PosixTime32 {
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
     pub fn to_iso8601_string(&self) -> String {
-        let (days, hours, minutes, seconds): (i32, u8, u8, u8) = get_time_values(self.timestamp);
+        let (days, hours, minutes, seconds): (i64, u8, u8, u8) =
+            get_time_values(self.timestamp as i64);
         let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &POSIX_EPOCH);
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
             year, month, day_of_month, hours, minutes, seconds
+        )
+    }
+}
+
+/// 64-bit POSIX timestamp in nanoseconds.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PosixTime64Ns {
+    /// Number of nanoseconds since January 1, 1970 (UTC) (POSIX epoch).
+    /// Negative values represent date and times predating the epoch.
+    pub timestamp: i64,
+}
+
+impl PosixTime64Ns {
+    /// Creates a new timestamp.
+    pub fn new(timestamp: i64) -> Self {
+        Self {
+            timestamp: timestamp,
+        }
+    }
+
+    /// Retrieves an ISO 8601 string representation of the timestamp.
+    pub fn to_iso8601_string(&self) -> String {
+        let mut number_of_seconds: i64 = self.timestamp / NANOSECONDS_PER_SECOND;
+        let mut nanoseconds: i64 = self.timestamp % NANOSECONDS_PER_SECOND;
+
+        if nanoseconds < 0 {
+            number_of_seconds -= 1;
+            nanoseconds += NANOSECONDS_PER_SECOND;
+        }
+        let (days, hours, minutes, seconds): (i64, u8, u8, u8) = get_time_values(number_of_seconds);
+        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &POSIX_EPOCH);
+        format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
+            year, month, day_of_month, hours, minutes, seconds, nanoseconds
         )
     }
 }
@@ -83,7 +119,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_from_be_bytes() {
+    fn test_posix_time32_from_be_bytes() {
         let test_data: [u8; 4] = [0x67, 0x54, 0x0d, 0xd9];
 
         let posix_time: PosixTime32 = PosixTime32::from_be_bytes(&test_data);
@@ -91,7 +127,7 @@ mod tests {
     }
 
     #[test]
-    fn test_from_le_bytes() {
+    fn test_posix_time32_from_le_bytes() {
         let test_data: [u8; 4] = [0xd9, 0x0d, 0x54, 0x67];
 
         let posix_time: PosixTime32 = PosixTime32::from_le_bytes(&test_data);
@@ -99,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn test_to_iso8601_string() {
+    fn test_posix_time32_to_iso8601_string() {
         let test_struct: PosixTime32 = PosixTime32::new(1281643591);
 
         let string: String = test_struct.to_iso8601_string();
@@ -109,5 +145,18 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1929-05-22T03:53:29");
+    }
+
+    #[test]
+    fn test_posix_time64ns_to_iso8601_string() {
+        let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591987654321);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "2010-08-12T20:06:31.987654321");
+
+        let test_struct: PosixTime64Ns = PosixTime64Ns::new(-1281643591987654321);
+
+        let string: String = test_struct.to_iso8601_string();
+        assert_eq!(string.as_str(), "1929-05-22T03:53:28.012345679");
     }
 }
