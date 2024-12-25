@@ -64,19 +64,20 @@ The GPT partition table header is 92 bytes in size and consists of:
 | 88 | 4 | | Partition entries data checksum
 | 92 | ... | 0 | Unknown (Reserved)
 
-The [CRC-32 algorithm](https://www.ietf.org/rfc/rfc1952.txt) with polynominal
-0x04c11db7 and initial value of 0 is used to calculate the checksums.
-
-The header data is calculated over the 92 bytes of data of the GPT partition
-table header, where the header data checkum value is considered to be 0 during
-calculation.
-
 > Note that the partition entries start block number (LBA) of the backup
 > partition table header will point to the backup partition entries.
 
 > Note that the number of partition entries value contains the number of
 > available partition entries not the number of used partition entries. Empty
 > partition entries have a unused entry partition type identifier.
+
+### Checksum calculation
+
+The [CRC-32 algorithm](https://www.ietf.org/rfc/rfc1952.txt) with polynominal
+0x04c11db7 and initial value of 0 is used to calculate the checksums.
+
+The checksum is calculated over the 92 bytes of the table header data, where the
+header data checkum value is considered to be 0 during calculation.
 
 ## GPT partition entries
 

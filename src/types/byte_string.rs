@@ -26,18 +26,11 @@ impl ByteString {
         }
     }
 
-    /// Reads a byte string from a byte sequence.
+    /// Creates a new byte string from a byte sequence.
     pub fn from_bytes(data: &[u8]) -> Self {
-        let data_size: usize = data.len();
         let mut elements: Vec<u8> = Vec::new();
+        ByteString::read_elements(&mut elements, data);
 
-        for data_offset in 0..data_size {
-            let value_8bit = data[data_offset];
-            if value_8bit == 0 {
-                break;
-            }
-            elements.push(value_8bit);
-        }
         Self { elements: elements }
     }
 
@@ -49,6 +42,19 @@ impl ByteString {
     /// Retrieves the length (or size) of the byte string.
     pub fn len(&self) -> usize {
         self.elements.len()
+    }
+
+    /// Reads byte string elements from a byte sequence.
+    pub fn read_elements(elements: &mut Vec<u8>, data: &[u8]) {
+        let data_size: usize = data.len();
+
+        for data_offset in 0..data_size {
+            let value_8bit = data[data_offset];
+            if value_8bit == 0 {
+                break;
+            }
+            elements.push(value_8bit);
+        }
     }
 
     /// Retrieves the string representation of the byte string.

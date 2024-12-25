@@ -14,6 +14,7 @@
 use std::fs::{metadata, File, Metadata};
 use std::io;
 use std::path::Path;
+use std::time::UNIX_EPOCH;
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
@@ -21,6 +22,8 @@ use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 
+use crate::datetime::constants::*;
+use crate::datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
 use crate::vfs::path::VfsPath;
@@ -33,6 +36,18 @@ pub struct OsVfsFileEntry {
 
     /// File type.
     file_type: VfsFileType,
+
+    /// Access time.
+    access_time: Option<DateTime>,
+
+    /// Change time.
+    change_time: Option<DateTime>,
+
+    /// Creation time.
+    creation_time: Option<DateTime>,
+
+    /// Modification time.
+    modification_time: Option<DateTime>,
 }
 
 impl OsVfsFileEntry {
@@ -41,6 +56,10 @@ impl OsVfsFileEntry {
         Self {
             location: String::new(),
             file_type: VfsFileType::NotSet,
+            access_time: None,
+            change_time: None,
+            creation_time: None,
+            modification_time: None,
         }
     }
 
@@ -74,6 +93,56 @@ impl OsVfsFileEntry {
                 ))
             }
         };
+        // Determine access time.
+        let timestamp: i64 = file_metadata.atime();
+        let fraction: i64 = file_metadata.atime_nsec();
+        self.access_time = if timestamp != 0 && fraction == 0 {
+            Some(DateTime::PosixTime32(PosixTime32::new(timestamp as i32)))
+        } else if timestamp == 0 {
+            Some(DateTime::NotSet)
+        } else {
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                timestamp,
+                fraction as u32,
+            )))
+        };
+        // Determine change time.
+        let timestamp: i64 = file_metadata.ctime();
+        let fraction: i64 = file_metadata.ctime_nsec();
+        self.change_time = if timestamp != 0 && fraction == 0 {
+            Some(DateTime::PosixTime32(PosixTime32::new(timestamp as i32)))
+        } else if timestamp == 0 {
+            Some(DateTime::NotSet)
+        } else {
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                timestamp,
+                fraction as u32,
+            )))
+        };
+        // Determine creation time.
+        self.creation_time = match file_metadata.created() {
+            Ok(system_time) => match system_time.duration_since(UNIX_EPOCH) {
+                Ok(duration) => Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                    duration.as_secs() as i64,
+                    duration.subsec_nanos(),
+                ))),
+                Err(error) => return Err(crate::error_to_io_error!(error)),
+            },
+            Err(_) => None,
+        };
+        // Determine modification time.
+        let timestamp: i64 = file_metadata.mtime();
+        let fraction: i64 = file_metadata.mtime_nsec();
+        self.modification_time = if timestamp != 0 && fraction == 0 {
+            Some(DateTime::PosixTime32(PosixTime32::new(timestamp as i32)))
+        } else if timestamp == 0 {
+            Some(DateTime::NotSet)
+        } else {
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                timestamp,
+                fraction as u32,
+            )))
+        };
         self.location = path.location.clone();
 
         Ok(())
@@ -88,6 +157,26 @@ impl OsVfsFileEntry {
 }
 
 impl VfsFileEntry for OsVfsFileEntry {
+    /// Retrieves the access time.
+    fn get_access_time(&self) -> Option<&DateTime> {
+        self.access_time.as_ref()
+    }
+
+    /// Retrieves the change time.
+    fn get_change_time(&self) -> Option<&DateTime> {
+        self.change_time.as_ref()
+    }
+
+    /// Retrieves the creation time.
+    fn get_creation_time(&self) -> Option<&DateTime> {
+        self.creation_time.as_ref()
+    }
+
+    /// Retrieves the modification time.
+    fn get_modification_time(&self) -> Option<&DateTime> {
+        self.modification_time.as_ref()
+    }
+
     /// Retrieves the file type.
     fn get_vfs_file_type(&self) -> VfsFileType {
         self.file_type.clone()

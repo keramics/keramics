@@ -12,6 +12,7 @@
  */
 
 mod apm;
+mod ext;
 mod gpt;
 mod qcow;
 mod sparseimage;
@@ -20,6 +21,10 @@ mod vhd;
 mod vhdx;
 
 pub use apm::print_apm_volume_system;
+pub use ext::{
+    print_entry_ext_file_system, print_ext_file_system, print_hierarcy_ext_file_system,
+    print_path_ext_file_system,
+};
 pub use gpt::print_gpt_volume_system;
 pub use qcow::print_qcow_file;
 pub use sparseimage::print_sparseimage_file;

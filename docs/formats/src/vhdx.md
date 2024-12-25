@@ -59,6 +59,8 @@ The image header is 4 KiB (4096 bytes) in size and consists of:
 | 72 | 8 | | Log offset, which according to MS-VHDX this value must be a multitude of 1 MiB and greater than or equal to 1 MiB
 | 80 | 4016 | 0 | Unknown (reserved), which according to MS-VHDX this value must be set to 0
 
+### Checksum calculation
+
 The CRC32-C algorithm with the Castagnoli polynomial (0x1edc6f41) and initial
 value of 0 is used to calculate the checksum.
 
