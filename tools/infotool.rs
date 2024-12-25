@@ -15,7 +15,7 @@ use std::io;
 use std::io::SeekFrom;
 use std::process::ExitCode;
 
-use clap::Parser;
+use clap::{Args, Parser, Subcommand};
 
 use keramics::mediator::Mediator;
 use keramics::sigscan::{BuildError, PatternType, ScanContext, Scanner, Signature};
@@ -36,6 +36,40 @@ struct CommandLineArguments {
 
     /// Path of the source file
     source: std::path::PathBuf,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Shows the information about a specific entry
+    Entry(EntryCommandArguments),
+
+    /// Shows the in-format hierarchy
+    Hierarchy(HierarchyCommandArguments),
+
+    /// Shows the information about a specific path
+    Path(PathCommandArguments),
+}
+
+#[derive(Args, Debug)]
+struct EntryCommandArguments {
+    /// Format specific entry identifier
+    entry: u64,
+}
+
+#[derive(Args, Debug)]
+struct HierarchyCommandArguments {
+    #[arg(long, default_value_t = false)]
+    /// Output as a bodyfile
+    bodyfile: bool,
+}
+
+#[derive(Args, Debug)]
+struct PathCommandArguments {
+    /// Format specific path
+    path: String,
 }
 
 /// Create a signature scanner.
@@ -53,6 +87,13 @@ fn create_signature_scanner() -> Result<Scanner, BuildError> {
             0x6e, 0x5f, 0x6d, 0x61, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00,
         ],
+    ));
+    // EXT file system signature.
+    signature_scanner.add_signature(Signature::new(
+        "ext1",
+        PatternType::BoundToStart,
+        1080,
+        &[0x53, 0xef],
     ));
     // GPT signature for 512 bytes per sector.
     signature_scanner.add_signature(Signature::new(
@@ -178,11 +219,6 @@ fn scan_data_stream(
 fn main() -> ExitCode {
     let arguments = CommandLineArguments::parse();
 
-    Mediator {
-        debug_output: arguments.debug,
-    }
-    .make_current();
-
     // TODO: add option to list supported formats
 
     let source: &str = match arguments.source.to_str() {
@@ -256,23 +292,70 @@ fn main() -> ExitCode {
         println!("Unsupported format found more than 1 signature");
         return ExitCode::FAILURE;
     }
+    Mediator {
+        debug_output: arguments.debug,
+    }
+    .make_current();
+
     if let Some(signature) = scan_context.results.values().next() {
-        match signature.identifier.as_str() {
-            "apm1" => return info::print_apm_volume_system(&vfs_file_system, &vfs_path),
-            "gpt1" | "gpt2" | "gpt3" | "gpt4" => {
-                return info::print_gpt_volume_system(&vfs_file_system, &vfs_path)
-            }
-            "qcow1" | "qcow2" | "qcow3" => {
-                return info::print_qcow_file(&vfs_file_system, &vfs_path)
-            }
-            "sparseimage1" => return info::print_sparseimage_file(&vfs_file_system, &vfs_path),
-            "udif1" => return info::print_udif_file(&vfs_file_system, &vfs_path),
-            "vhd1" => return info::print_vhd_file(&vfs_file_system, &vfs_path),
-            "vhdx1" => return info::print_vhdx_file(&vfs_file_system, &vfs_path),
-            _ => {
-                println!("Unsupported format: {}", signature.identifier);
-                return ExitCode::FAILURE;
-            }
+        match arguments.command {
+            Some(Commands::Entry(command_arguments)) => match signature.identifier.as_str() {
+                "ext1" => {
+                    return info::print_entry_ext_file_system(
+                        &vfs_file_system,
+                        &vfs_path,
+                        command_arguments.entry,
+                    )
+                }
+                _ => {
+                    println!("Unsupported format: {}", signature.identifier);
+                    return ExitCode::FAILURE;
+                }
+            },
+            Some(Commands::Hierarchy(command_arguments)) => match signature.identifier.as_str() {
+                "ext1" => {
+                    return info::print_hierarcy_ext_file_system(
+                        &vfs_file_system,
+                        &vfs_path,
+                        command_arguments.bodyfile,
+                    )
+                }
+                _ => {
+                    println!("Unsupported format: {}", signature.identifier);
+                    return ExitCode::FAILURE;
+                }
+            },
+            Some(Commands::Path(command_arguments)) => match signature.identifier.as_str() {
+                "ext1" => {
+                    return info::print_path_ext_file_system(
+                        &vfs_file_system,
+                        &vfs_path,
+                        &command_arguments.path,
+                    )
+                }
+                _ => {
+                    println!("Unsupported format: {}", signature.identifier);
+                    return ExitCode::FAILURE;
+                }
+            },
+            None => match signature.identifier.as_str() {
+                "apm1" => return info::print_apm_volume_system(&vfs_file_system, &vfs_path),
+                "ext1" => return info::print_ext_file_system(&vfs_file_system, &vfs_path),
+                "gpt1" | "gpt2" | "gpt3" | "gpt4" => {
+                    return info::print_gpt_volume_system(&vfs_file_system, &vfs_path)
+                }
+                "qcow1" | "qcow2" | "qcow3" => {
+                    return info::print_qcow_file(&vfs_file_system, &vfs_path)
+                }
+                "sparseimage1" => return info::print_sparseimage_file(&vfs_file_system, &vfs_path),
+                "udif1" => return info::print_udif_file(&vfs_file_system, &vfs_path),
+                "vhd1" => return info::print_vhd_file(&vfs_file_system, &vfs_path),
+                "vhdx1" => return info::print_vhdx_file(&vfs_file_system, &vfs_path),
+                _ => {
+                    println!("Unsupported format: {}", signature.identifier);
+                    return ExitCode::FAILURE;
+                }
+            },
         }
     }
     ExitCode::SUCCESS

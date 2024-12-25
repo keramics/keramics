@@ -17,10 +17,19 @@
 
 /// Context for calculating a CRC-32 checksum.
 pub struct Crc32Context {
+    /// Polynomial.
     polynomial: u32,
+
+    /// The initial checksum value.
     initial_value: u32,
+
+    /// The checksum value.
     checksum: u32,
+
+    /// Lookup table.
     table: [u32; 256],
+
+    /// Value to indicate the lookup table has been initialized.
     table_initilized: bool,
 }
 
@@ -81,10 +90,19 @@ impl Crc32Context {
 
 /// Context for calculating a reversed CRC-32 checksum.
 pub struct ReversedCrc32Context {
+    /// Polynomial.
     polynomial: u32,
+
+    /// The initial checksum value.
     initial_value: u32,
+
+    /// The checksum value.
     checksum: u32,
+
+    /// Lookup table.
     table: [u32; 256],
+
+    /// Value to indicate the lookup table has been initialized.
     table_initilized: bool,
 }
 

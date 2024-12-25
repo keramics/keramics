@@ -26,3 +26,6 @@ pub mod vhdx;
 pub mod apm;
 pub mod gpt;
 pub mod mbr;
+
+// File system formats
+pub mod ext;

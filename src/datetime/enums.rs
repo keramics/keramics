@@ -13,7 +13,7 @@
 
 use super::posix::{PosixTime32, PosixTime64Ns};
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum DateTime {
     Filetime,
     #[default]

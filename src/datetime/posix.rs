@@ -15,7 +15,6 @@ use std::fmt;
 
 use crate::{bytes_to_i32_be, bytes_to_i32_le};
 
-use super::constants::*;
 use super::epoch::Epoch;
 use super::util::{get_date_values, get_time_values};
 
@@ -69,40 +68,6 @@ impl PosixTime32 {
     }
 }
 
-/// 64-bit POSIX timestamp in nanoseconds.
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct PosixTime64Ns {
-    /// Number of nanoseconds since January 1, 1970 (UTC) (POSIX epoch).
-    /// Negative values represent date and times predating the epoch.
-    pub timestamp: i64,
-}
-
-impl PosixTime64Ns {
-    /// Creates a new timestamp.
-    pub fn new(timestamp: i64) -> Self {
-        Self {
-            timestamp: timestamp,
-        }
-    }
-
-    /// Retrieves an ISO 8601 string representation of the timestamp.
-    pub fn to_iso8601_string(&self) -> String {
-        let mut number_of_seconds: i64 = self.timestamp / NANOSECONDS_PER_SECOND;
-        let mut nanoseconds: i64 = self.timestamp % NANOSECONDS_PER_SECOND;
-
-        if nanoseconds < 0 {
-            number_of_seconds -= 1;
-            nanoseconds += NANOSECONDS_PER_SECOND;
-        }
-        let (days, hours, minutes, seconds): (i64, u8, u8, u8) = get_time_values(number_of_seconds);
-        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &POSIX_EPOCH);
-        format!(
-            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
-            year, month, day_of_month, hours, minutes, seconds, nanoseconds
-        )
-    }
-}
-
 impl fmt::Display for PosixTime32 {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
@@ -110,6 +75,49 @@ impl fmt::Display for PosixTime32 {
             "{} ({})",
             self.to_iso8601_string(),
             self.timestamp
+        )
+    }
+}
+
+/// 64-bit POSIX timestamp in nanoseconds.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PosixTime64Ns {
+    /// Number of seconds since January 1, 1970 (UTC) (POSIX epoch).
+    /// Negative values represent date and times predating the epoch.
+    pub timestamp: i64,
+
+    /// Fraction of second in nanoseconds.
+    pub fraction: u32,
+}
+
+impl PosixTime64Ns {
+    /// Creates a new timestamp.
+    pub fn new(timestamp: i64, fraction: u32) -> Self {
+        Self {
+            timestamp: timestamp,
+            fraction: fraction,
+        }
+    }
+
+    /// Retrieves an ISO 8601 string representation of the timestamp.
+    pub fn to_iso8601_string(&self) -> String {
+        let (days, hours, minutes, seconds): (i64, u8, u8, u8) = get_time_values(self.timestamp);
+        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &POSIX_EPOCH);
+        format!(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
+            year, month, day_of_month, hours, minutes, seconds, self.fraction
+        )
+    }
+}
+
+impl fmt::Display for PosixTime64Ns {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            formatter,
+            "{} ({}.{})",
+            self.to_iso8601_string(),
+            self.timestamp,
+            self.fraction
         )
     }
 }
@@ -149,12 +157,12 @@ mod tests {
 
     #[test]
     fn test_posix_time64ns_to_iso8601_string() {
-        let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591987654321);
+        let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591, 987654321);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2010-08-12T20:06:31.987654321");
 
-        let test_struct: PosixTime64Ns = PosixTime64Ns::new(-1281643591987654321);
+        let test_struct: PosixTime64Ns = PosixTime64Ns::new(-1281643592, 12345679);
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1929-05-22T03:53:28.012345679");

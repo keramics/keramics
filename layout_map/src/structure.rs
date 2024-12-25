@@ -478,7 +478,8 @@ impl StructureLayoutGroup {
     pub fn new(condition: &String) -> Self {
         Self {
             condition: condition.clone(),
-            fields: Vec::new() }
+            fields: Vec::new(),
+        }
     }
 
     /// Retrieves a token stream of the condition.
@@ -1052,8 +1053,8 @@ mod tests {
             .members
             .push(StructureLayoutMember::Field(field));
 
-        let mut group: StructureLayoutGroup = StructureLayoutGroup::new(
-            &"data.len() > 8".to_string());
+        let mut group: StructureLayoutGroup =
+            StructureLayoutGroup::new(&"data.len() > 8".to_string());
 
         let field: StructureLayoutField = StructureLayoutField::new(
             &"field2".to_string(),

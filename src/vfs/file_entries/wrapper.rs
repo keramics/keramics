@@ -13,6 +13,7 @@
 
 use std::io;
 
+use crate::datetime::DateTime;
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
 use crate::vfs::path::VfsPath;
@@ -69,6 +70,26 @@ impl WrapperVfsFileEntry {
 }
 
 impl VfsFileEntry for WrapperVfsFileEntry {
+    /// Retrieves the access time.
+    fn get_access_time(&self) -> Option<&DateTime> {
+        None
+    }
+
+    /// Retrieves the change time.
+    fn get_change_time(&self) -> Option<&DateTime> {
+        None
+    }
+
+    /// Retrieves the creation time.
+    fn get_creation_time(&self) -> Option<&DateTime> {
+        None
+    }
+
+    /// Retrieves the modification time.
+    fn get_modification_time(&self) -> Option<&DateTime> {
+        None
+    }
+
     /// Retrieves the file type.
     fn get_vfs_file_type(&self) -> VfsFileType {
         self.file_type.clone()

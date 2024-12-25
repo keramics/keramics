@@ -13,5 +13,7 @@
     - [Apple Partition Map (APM)](apm.md)
     - [GUID Partition Table (GPT)](gpt.md)
     - [Master Boot Record (MBR)](mbr.md)
+- [File system formats](file_system.md)
+    - [Extended File System (ext)](ext.md)
 - [Assorted formats](assorted.md)
     - [Property list (plist)](plist.md)

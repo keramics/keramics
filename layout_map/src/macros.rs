@@ -545,8 +545,7 @@ fn parse_structure_layout_group(
             name
         )));
     };
-    let mut group: StructureLayoutGroup = StructureLayoutGroup::new(
-        &condition);
+    let mut group: StructureLayoutGroup = StructureLayoutGroup::new(&condition);
 
     for field_options in group_options.fields.iter() {
         let field: StructureLayoutField = parse_structure_layout_field(&name, field_options)?;
