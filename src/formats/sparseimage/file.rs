@@ -119,6 +119,15 @@ impl SparseImageFile {
             self.mediator
                 .debug_print_data(&data[64..data_end_offset], true);
         }
+        if file_header.sectors_per_band > u32::MAX / 512 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid sectors per band: {} value out of bounds",
+                    file_header.sectors_per_band
+                ),
+            ));
+        }
         self.bytes_per_sector = 512;
         self.block_size = file_header.sectors_per_band * (self.bytes_per_sector as u32);
         self.media_size = (file_header.number_of_sectors as u64) * (self.bytes_per_sector as u64);

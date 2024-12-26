@@ -78,7 +78,7 @@ impl Signature {
             mediator.debug_print(format!("}}\n\n"));
         }
         if pattern_offset < data_offset {
-            false;
+            return false;
         }
         let scan_offset: usize = match self.pattern_type {
             PatternType::Unbound => buffer_offset,
@@ -87,7 +87,7 @@ impl Signature {
         let scan_end_offset: usize = scan_offset + self.pattern_size;
 
         if scan_end_offset >= buffer_size {
-            false;
+            return false;
         }
         if buffer[scan_offset..scan_end_offset] != self.pattern {
             return false;

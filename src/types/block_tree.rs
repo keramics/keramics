@@ -154,8 +154,10 @@ impl<T> BlockTree<T> {
     fn create_root_node(&mut self, size: u64) {
         let mut element_size: u64 = self.leaf_value_size;
 
-        while self.data_size / element_size > self.elements_per_node {
-            element_size *= self.elements_per_node;
+        if self.elements_per_node * element_size > self.leaf_value_size {
+            while self.data_size / element_size > self.elements_per_node {
+                element_size *= self.elements_per_node;
+            }
         }
         let elements_per_node: u64 = self.data_size.div_ceil(element_size);
 

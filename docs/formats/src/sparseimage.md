@@ -36,7 +36,7 @@ The file header is 64 bytes in size and consist of:
 | --- | --- | --- | ---
 | 0 | 4 | "sprs" | Signature
 | 4 | 4 | | Unknown (format version?), seen 3
-| 8 | 4 | | Number of sectors in band
+| 8 | 4 | | Number of sectors per band
 | 12 | 4 | | Unknown, seen 1
 | 16 | 4 | | The media data size in sectors
 | 20 | 12 | 0 | Unknown (0-byte values)

@@ -15,7 +15,9 @@ use std::convert::AsRef;
 use std::io;
 use std::io::{Cursor, Seek};
 
+use crate::types::SharedValue;
 use crate::vfs::traits::VfsDataStream;
+use crate::vfs::types::VfsDataStreamReference;
 
 impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {
     /// Retrieves the size of the data stream.
@@ -24,10 +26,7 @@ impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {
     }
 }
 
-// TODO: consider moving this to a separate file.
-use crate::types::SharedValue;
-use crate::vfs::types::VfsDataStreamReference;
-
-pub fn new_fake_data_stream(data: Vec<u8>) -> io::Result<VfsDataStreamReference> {
-    Ok(SharedValue::new(Box::new(Cursor::new(data))))
+/// Creates a new fake data stream.
+pub fn new_fake_data_stream(data: Vec<u8>) -> VfsDataStreamReference {
+    SharedValue::new(Box::new(Cursor::new(data)))
 }
