@@ -23,7 +23,7 @@ use super::constants::*;
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "signature", data_type = "[u8; 4]"),
+        field(name = "signature", data_type = "ByteString<4>"),
         field(name = "unknown1", data_type = "[u8; 4]"),
         field(name = "sectors_per_band", data_type = "u32"),
         field(name = "unknown2", data_type = "[u8; 4]"),

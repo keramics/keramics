@@ -12,15 +12,15 @@
  */
 
 use std::io;
-use std::io::Cursor;
 use std::rc::Rc;
 
 use crate::datetime::DateTime;
 use crate::types::SharedValue;
+use crate::vfs::data_streams::new_fake_data_stream;
 use crate::vfs::enums::VfsFileType;
 use crate::vfs::path::VfsPath;
 use crate::vfs::traits::VfsFileEntry;
-use crate::vfs::types::{VfsDataStreamReference, VfsPathReference};
+use crate::vfs::types::VfsDataStreamReference;
 
 /// Fake (or virtual) file entry.
 pub struct FakeVfsFileEntry {
@@ -66,7 +66,7 @@ impl FakeVfsFileEntry {
         // TODO: test timestamps with current time
         Self {
             location: String::new(),
-            data_stream: SharedValue::new(Box::new(Cursor::new(data.to_vec()))),
+            data_stream: new_fake_data_stream(data.to_vec()),
             file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
@@ -79,22 +79,22 @@ impl FakeVfsFileEntry {
 impl VfsFileEntry for FakeVfsFileEntry {
     /// Retrieves the access time.
     fn get_access_time(&self) -> Option<&DateTime> {
-        None
+        self.access_time.as_ref()
     }
 
     /// Retrieves the change time.
     fn get_change_time(&self) -> Option<&DateTime> {
-        None
+        self.change_time.as_ref()
     }
 
     /// Retrieves the creation time.
     fn get_creation_time(&self) -> Option<&DateTime> {
-        None
+        self.creation_time.as_ref()
     }
 
     /// Retrieves the modification time.
     fn get_modification_time(&self) -> Option<&DateTime> {
-        None
+        self.modification_time.as_ref()
     }
 
     /// Retrieves the file type.
@@ -182,7 +182,7 @@ mod tests {
     #[test]
     fn test_open_data_stream() -> io::Result<()> {
         let test_data: Vec<u8> = get_test_data();
-        let mut vfs_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&test_data);
+        let vfs_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&test_data);
 
         let expected_data: String = [
             "A ceramic is any of the various hard, brittle, heat-resistant, and ",

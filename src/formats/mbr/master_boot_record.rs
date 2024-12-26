@@ -163,7 +163,7 @@ mod tests {
     #[test]
     fn test_read_at_position() -> io::Result<()> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: VfsDataStreamReference = new_fake_data_stream(test_data)?;
+        let data_stream: VfsDataStreamReference = new_fake_data_stream(test_data);
 
         let mut test_struct = MbrMasterBootRecord::new();
         test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
