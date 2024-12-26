@@ -216,7 +216,7 @@ mod tests {
     fn test_read_data_ext2() -> io::Result<()> {
         let mut test_struct = ExtGroupDescriptor::new();
 
-        let test_data = get_test_data_ext2();
+        let test_data: Vec<u8> = get_test_data_ext2();
         test_struct.read_data(2, &test_data)?;
 
         assert_eq!(test_struct.inode_table_block_number, 20);
@@ -228,7 +228,7 @@ mod tests {
     fn test_read_data_ext2_with_unsupported_data_size() {
         let mut test_struct = ExtGroupDescriptor::new();
 
-        let test_data = get_test_data_ext2();
+        let test_data: Vec<u8> = get_test_data_ext2();
         let result = test_struct.read_data(2, &test_data[0..31]);
         assert!(result.is_err());
     }
@@ -237,7 +237,7 @@ mod tests {
     fn test_read_data_ext4_32bit() -> io::Result<()> {
         let mut test_struct = ExtGroupDescriptor::new();
 
-        let test_data = get_test_data_ext4_32bit();
+        let test_data: Vec<u8> = get_test_data_ext4_32bit();
         test_struct.read_data(4, &test_data)?;
 
         assert_eq!(test_struct.inode_table_block_number, 66);
@@ -249,7 +249,7 @@ mod tests {
     fn test_read_data_ext4_32bit_with_unsupported_data_size() {
         let mut test_struct = ExtGroupDescriptor::new();
 
-        let test_data = get_test_data_ext4_32bit();
+        let test_data: Vec<u8> = get_test_data_ext4_32bit();
         let result = test_struct.read_data(4, &test_data[0..31]);
         assert!(result.is_err());
     }
@@ -258,7 +258,7 @@ mod tests {
     fn test_read_data_ext4_64bit() -> io::Result<()> {
         let mut test_struct = ExtGroupDescriptor::new();
 
-        let test_data = get_test_data_ext4_64bit();
+        let test_data: Vec<u8> = get_test_data_ext4_64bit();
         test_struct.read_data(4, &test_data)?;
 
         assert_eq!(test_struct.inode_table_block_number, 66);
@@ -270,7 +270,7 @@ mod tests {
     fn test_read_data_ext4_64bit_with_unsupported_data_size() {
         let mut test_struct = ExtGroupDescriptor::new();
 
-        let test_data = get_test_data_ext4_64bit();
+        let test_data: Vec<u8> = get_test_data_ext4_64bit();
         let result = test_struct.read_data(4, &test_data[0..63]);
         assert!(result.is_err());
     }

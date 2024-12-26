@@ -719,7 +719,7 @@ mod tests {
     fn test_read_data_ext2() -> io::Result<()> {
         let mut test_struct = ExtInode::new();
 
-        let test_data = get_test_data_ext2();
+        let test_data: Vec<u8> = get_test_data_ext2();
         test_struct.read_data(2, &test_data)?;
 
         assert_eq!(test_struct.file_mode, 0o40755);
@@ -731,7 +731,7 @@ mod tests {
     fn test_read_data_ext2_with_unsupported_data_size() {
         let mut test_struct = ExtInode::new();
 
-        let test_data = get_test_data_ext2();
+        let test_data: Vec<u8> = get_test_data_ext2();
         let result = test_struct.read_data(2, &test_data[0..127]);
         assert!(result.is_err());
     }
@@ -740,7 +740,7 @@ mod tests {
     fn test_read_data_ext3() -> io::Result<()> {
         let mut test_struct = ExtInode::new();
 
-        let test_data = get_test_data_ext3();
+        let test_data: Vec<u8> = get_test_data_ext3();
         test_struct.read_data(3, &test_data)?;
 
         assert_eq!(test_struct.file_mode, 0o40755);
@@ -752,7 +752,7 @@ mod tests {
     fn test_read_data_ext3_with_unsupported_data_size() {
         let mut test_struct = ExtInode::new();
 
-        let test_data = get_test_data_ext3();
+        let test_data: Vec<u8> = get_test_data_ext3();
         let result = test_struct.read_data(3, &test_data[0..127]);
         assert!(result.is_err());
     }
@@ -763,7 +763,7 @@ mod tests {
     fn test_read_data_ext4() -> io::Result<()> {
         let mut test_struct = ExtInode::new();
 
-        let test_data = get_test_data_ext4();
+        let test_data: Vec<u8> = get_test_data_ext4();
         test_struct.read_data(4, &test_data)?;
 
         assert_eq!(test_struct.file_mode, 0o40755);
@@ -775,7 +775,7 @@ mod tests {
     fn test_read_data_ext4_with_unsupported_data_size() {
         let mut test_struct = ExtInode::new();
 
-        let test_data = get_test_data_ext4();
+        let test_data: Vec<u8> = get_test_data_ext4();
         let result = test_struct.read_data(4, &test_data[0..127]);
         assert!(result.is_err());
     }

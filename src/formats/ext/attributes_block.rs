@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_read_data() -> io::Result<()> {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
 
         let test_struct = ExtAttributesBlock::new();
 

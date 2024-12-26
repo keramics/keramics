@@ -14,6 +14,7 @@
 use std::fmt;
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
+/// Lock error for value that can be shared across threads.
 pub enum SharedValueLockError<T> {
     Poisoned(PoisonError<T>),
     ValueIsNone,
@@ -34,21 +35,25 @@ impl<T> fmt::Display for SharedValueLockError<T> {
 
 pub type SharedValueLockResult<Guard> = Result<Guard, SharedValueLockError<Guard>>;
 
+/// Value that can be shared across threads.
 pub struct SharedValue<T: ?Sized> {
     value: Option<Arc<RwLock<T>>>,
 }
 
 impl<T> SharedValue<T> {
+    /// Creates a new value.
     pub fn new(value: T) -> Self {
         Self {
             value: Some(Arc::new(RwLock::new(value))),
         }
     }
 
+    /// Creates a new empty value.
     pub fn none() -> Self {
         Self { value: None }
     }
 
+    /// Clones the value.
     pub fn clone(&self) -> Self {
         let value: Option<Arc<RwLock<T>>> = match &self.value {
             None => None,
@@ -57,14 +62,17 @@ impl<T> SharedValue<T> {
         Self { value: value }
     }
 
+    /// Determines if the value is empty.
     pub fn is_none(&self) -> bool {
         self.value.is_none()
     }
 
+    /// Determines if the value is not empty.
     pub fn is_some(&self) -> bool {
         self.value.is_some()
     }
 
+    /// Access the value with a read lock.
     pub fn with_read_lock(&self) -> SharedValueLockResult<RwLockReadGuard<'_, T>> {
         match &self.value {
             None => SharedValueLockResult::Err(SharedValueLockError::ValueIsNone),
@@ -75,6 +83,7 @@ impl<T> SharedValue<T> {
         }
     }
 
+    /// Access the value with a write lock.
     pub fn with_write_lock(&self) -> SharedValueLockResult<RwLockWriteGuard<'_, T>> {
         match &self.value {
             None => SharedValueLockResult::Err(SharedValueLockError::ValueIsNone),
@@ -85,3 +94,5 @@ impl<T> SharedValue<T> {
         }
     }
 }
+
+// TODO: add tests.

@@ -92,7 +92,7 @@ mod tests {
 
     #[test]
     fn test_read_data() -> io::Result<()> {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = UdifBlockTableEntry::new();
         test_struct.read_data(&test_data)?;
@@ -110,7 +110,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let mut test_struct = UdifBlockTableEntry::new();
 
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..39]);
         assert!(result.is_err());
     }

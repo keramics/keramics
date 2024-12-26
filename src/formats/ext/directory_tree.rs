@@ -262,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_read_node_data() -> io::Result<()> {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtDirectoryTree::new(1024);
 
@@ -276,7 +276,7 @@ mod tests {
 
     #[test]
     fn test_read_at_position() -> io::Result<()> {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         let data_stream: VfsDataStreamReference = new_fake_data_stream(test_data)?;
 
         let mut test_struct = ExtDirectoryTree::new(1024);
