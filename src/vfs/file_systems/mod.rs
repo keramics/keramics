@@ -11,6 +11,8 @@
  * under the License.
  */
 
+mod fake;
 mod os;
 
+pub use fake::FakeVfsFileSystem;
 pub use os::OsVfsFileSystem;

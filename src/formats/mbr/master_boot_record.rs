@@ -132,7 +132,7 @@ mod tests {
     fn test_read_data() -> io::Result<()> {
         let mut test_struct = MbrMasterBootRecord::new();
 
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.disk_identity, 0x695b431a);
@@ -143,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = MbrMasterBootRecord::new();
         let result = test_struct.read_data(&test_data[0..511]);
@@ -162,7 +162,7 @@ mod tests {
 
     #[test]
     fn test_read_at_position() -> io::Result<()> {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
         let data_stream: VfsDataStreamReference = new_fake_data_stream(test_data)?;
 
         let mut test_struct = MbrMasterBootRecord::new();

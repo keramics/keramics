@@ -22,7 +22,6 @@ use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 
-use crate::datetime::constants::*;
 use crate::datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
@@ -30,8 +29,20 @@ use crate::vfs::path::VfsPath;
 use crate::vfs::traits::VfsFileEntry;
 use crate::vfs::types::{VfsDataStreamReference, VfsPathReference};
 
+/// Determines the POSIX date and time value.
+fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
+    if fraction != 0 {
+        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction as u32))
+    } else if timestamp != 0 {
+        DateTime::PosixTime32(PosixTime32::new(timestamp as i32))
+    } else {
+        DateTime::NotSet
+    }
+}
+
 /// Operating system file entry.
 pub struct OsVfsFileEntry {
+    /// Location.
     location: String,
 
     /// File type.
@@ -93,32 +104,21 @@ impl OsVfsFileEntry {
                 ))
             }
         };
-        // Determine access time.
-        let timestamp: i64 = file_metadata.atime();
-        let fraction: i64 = file_metadata.atime_nsec();
-        self.access_time = if timestamp != 0 && fraction == 0 {
-            Some(DateTime::PosixTime32(PosixTime32::new(timestamp as i32)))
-        } else if timestamp == 0 {
-            Some(DateTime::NotSet)
-        } else {
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                timestamp,
-                fraction as u32,
-            )))
-        };
-        // Determine change time.
-        let timestamp: i64 = file_metadata.ctime();
-        let fraction: i64 = file_metadata.ctime_nsec();
-        self.change_time = if timestamp != 0 && fraction == 0 {
-            Some(DateTime::PosixTime32(PosixTime32::new(timestamp as i32)))
-        } else if timestamp == 0 {
-            Some(DateTime::NotSet)
-        } else {
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                timestamp,
-                fraction as u32,
-            )))
-        };
+        self.modification_time = Some(get_posix_datetime_value(
+            file_metadata.mtime(),
+            file_metadata.mtime_nsec(),
+        ));
+
+        self.access_time = Some(get_posix_datetime_value(
+            file_metadata.atime(),
+            file_metadata.atime_nsec(),
+        ));
+
+        self.change_time = Some(get_posix_datetime_value(
+            file_metadata.ctime(),
+            file_metadata.ctime_nsec(),
+        ));
+
         // Determine creation time.
         self.creation_time = match file_metadata.created() {
             Ok(system_time) => match system_time.duration_since(UNIX_EPOCH) {
@@ -129,19 +129,6 @@ impl OsVfsFileEntry {
                 Err(error) => return Err(crate::error_to_io_error!(error)),
             },
             Err(_) => None,
-        };
-        // Determine modification time.
-        let timestamp: i64 = file_metadata.mtime();
-        let fraction: i64 = file_metadata.mtime_nsec();
-        self.modification_time = if timestamp != 0 && fraction == 0 {
-            Some(DateTime::PosixTime32(PosixTime32::new(timestamp as i32)))
-        } else if timestamp == 0 {
-            Some(DateTime::NotSet)
-        } else {
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                timestamp,
-                fraction as u32,
-            )))
         };
         self.location = path.location.clone();
 

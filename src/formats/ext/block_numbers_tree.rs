@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     fn test_read_data_reference() -> io::Result<()> {
-        let test_data = get_test_data();
+        let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtBlockNumbersTree::new(1024, 2);
         let test_data_stream: VfsDataStreamReference = SharedValue::none();
