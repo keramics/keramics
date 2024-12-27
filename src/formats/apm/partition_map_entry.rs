@@ -75,13 +75,13 @@ impl ApmPartitionMapEntry {
         if data.len() != 512 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported partition map entry data size"),
             ));
         }
         if data[0..2] != APM_PARTITION_MAP_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported partition map entry signature"),
             ));
         }
         self.number_of_entries = bytes_to_u32_be!(data, 4);

@@ -150,7 +150,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = QcowFileHeaderV1::new();
@@ -160,7 +160,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_format_version() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[4] = 0xff;
 
         let mut test_struct = QcowFileHeaderV1::new();
@@ -170,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_number_of_cluster_block_bits() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[32] = 0xff;
 
         let mut test_struct = QcowFileHeaderV1::new();
@@ -180,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_number_of_level2_table_bits() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[33] = 0xff;
 
         let mut test_struct = QcowFileHeaderV1::new();

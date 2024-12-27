@@ -40,7 +40,7 @@ impl VhdxMetadataTable {
     }
 
     /// Reads the metadata table from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         let mut metadata_table_header: VhdxMetadataTableHeader = VhdxMetadataTableHeader::new();
 
         if self.mediator.debug_output {
@@ -4803,7 +4803,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = VhdxMetadataTable::new();

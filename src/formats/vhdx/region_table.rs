@@ -41,7 +41,7 @@ impl VhdxRegionTable {
     }
 
     /// Reads the region table from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         let mut region_table_header: VhdxRegionTableHeader = VhdxRegionTableHeader::new();
 
         if self.mediator.debug_output {
@@ -4825,7 +4825,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = VhdxRegionTable::new();
@@ -4835,7 +4835,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_checksum_mismatch() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[4] = 0xff;
 
         let mut test_struct = VhdxRegionTable::new();

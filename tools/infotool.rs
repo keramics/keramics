@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::collections::HashSet;
 use std::io;
 use std::io::SeekFrom;
 use std::process::ExitCode;
@@ -193,7 +194,9 @@ fn scan_data_stream(
 
     match vfs_data_stream.with_write_lock() {
         Ok(mut data_stream) => {
-            data_stream.read_exact_at_position(&mut data, SeekFrom::Start(range_start_offset))?
+            // TODO: handle read_count < range_size
+            // data_stream.read_exact_at_position(&mut data, SeekFrom::Start(range_start_offset))?
+            data_stream.read_at_position(&mut data, SeekFrom::Start(range_start_offset))?
         }
         Err(error) => return Err(keramics::error_to_io_error!(error)),
     };
@@ -206,7 +209,9 @@ fn scan_data_stream(
 
     match vfs_data_stream.with_write_lock() {
         Ok(mut data_stream) => {
-            data_stream.read_exact_at_position(&mut data, SeekFrom::Start(range_start_offset))?
+            // TODO: handle read_count < range_size
+            // data_stream.read_exact_at_position(&mut data, SeekFrom::Start(range_start_offset))?
+            data_stream.read_at_position(&mut data, SeekFrom::Start(range_start_offset))?
         }
         Err(error) => return Err(keramics::error_to_io_error!(error)),
     };
@@ -288,75 +293,97 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    if scan_context.results.len() > 1 {
-        println!("Unsupported format found more than 1 signature");
+    let mut scan_results: HashSet<&str> = HashSet::new();
+    for signature in scan_context.results.values() {
+        let format_identifier: &str = match signature.identifier.as_str() {
+            "apm1" => "apm",
+            "ext1" => "ext",
+            "gpt1" | "gpt2" | "gpt3" | "gpt4" => "gpt",
+            "qcow1" | "qcow2" | "qcow3" => "qcow",
+            "sparseimage1" => "sparseimage",
+            "udif1" => "udif",
+            "vhd1" => "vhd",
+            "vhdx1" => "vhdx",
+            _ => {
+                println!("Unsupported format: {}", signature.identifier);
+                return ExitCode::FAILURE;
+            }
+        };
+        scan_results.insert(format_identifier);
+    }
+    let number_of_scan_results: usize = scan_results.len();
+    if number_of_scan_results > 1 {
+        println!(
+            "Unsupported format found known signatures for {} different formats",
+            number_of_scan_results
+        );
         return ExitCode::FAILURE;
     }
+    let format_identifier: &str = match scan_results.iter().next() {
+        Some(format_identifier) => format_identifier,
+        None => {
+            println!("Unsupported format no known signatures found");
+            return ExitCode::FAILURE;
+        }
+    };
     Mediator {
         debug_output: arguments.debug,
     }
     .make_current();
 
-    if let Some(signature) = scan_context.results.values().next() {
-        match arguments.command {
-            Some(Commands::Entry(command_arguments)) => match signature.identifier.as_str() {
-                "ext1" => {
-                    return info::print_entry_ext_file_system(
-                        &vfs_file_system,
-                        &vfs_path,
-                        command_arguments.entry,
-                    )
-                }
-                _ => {
-                    println!("Unsupported format: {}", signature.identifier);
-                    return ExitCode::FAILURE;
-                }
-            },
-            Some(Commands::Hierarchy(command_arguments)) => match signature.identifier.as_str() {
-                "ext1" => {
-                    return info::print_hierarcy_ext_file_system(
-                        &vfs_file_system,
-                        &vfs_path,
-                        command_arguments.bodyfile,
-                    )
-                }
-                _ => {
-                    println!("Unsupported format: {}", signature.identifier);
-                    return ExitCode::FAILURE;
-                }
-            },
-            Some(Commands::Path(command_arguments)) => match signature.identifier.as_str() {
-                "ext1" => {
-                    return info::print_path_ext_file_system(
-                        &vfs_file_system,
-                        &vfs_path,
-                        &command_arguments.path,
-                    )
-                }
-                _ => {
-                    println!("Unsupported format: {}", signature.identifier);
-                    return ExitCode::FAILURE;
-                }
-            },
-            None => match signature.identifier.as_str() {
-                "apm1" => return info::print_apm_volume_system(&vfs_file_system, &vfs_path),
-                "ext1" => return info::print_ext_file_system(&vfs_file_system, &vfs_path),
-                "gpt1" | "gpt2" | "gpt3" | "gpt4" => {
-                    return info::print_gpt_volume_system(&vfs_file_system, &vfs_path)
-                }
-                "qcow1" | "qcow2" | "qcow3" => {
-                    return info::print_qcow_file(&vfs_file_system, &vfs_path)
-                }
-                "sparseimage1" => return info::print_sparseimage_file(&vfs_file_system, &vfs_path),
-                "udif1" => return info::print_udif_file(&vfs_file_system, &vfs_path),
-                "vhd1" => return info::print_vhd_file(&vfs_file_system, &vfs_path),
-                "vhdx1" => return info::print_vhdx_file(&vfs_file_system, &vfs_path),
-                _ => {
-                    println!("Unsupported format: {}", signature.identifier);
-                    return ExitCode::FAILURE;
-                }
-            },
-        }
+    match arguments.command {
+        Some(Commands::Entry(command_arguments)) => match format_identifier {
+            "ext" => {
+                return info::print_entry_ext_file_system(
+                    &vfs_file_system,
+                    &vfs_path,
+                    command_arguments.entry,
+                )
+            }
+            _ => {
+                println!("Unsupported format: {}", format_identifier);
+                return ExitCode::FAILURE;
+            }
+        },
+        Some(Commands::Hierarchy(command_arguments)) => match format_identifier {
+            "ext" => {
+                return info::print_hierarcy_ext_file_system(
+                    &vfs_file_system,
+                    &vfs_path,
+                    command_arguments.bodyfile,
+                )
+            }
+            _ => {
+                println!("Unsupported format: {}", format_identifier);
+                return ExitCode::FAILURE;
+            }
+        },
+        Some(Commands::Path(command_arguments)) => match format_identifier {
+            "ext" => {
+                return info::print_path_ext_file_system(
+                    &vfs_file_system,
+                    &vfs_path,
+                    &command_arguments.path,
+                )
+            }
+            _ => {
+                println!("Unsupported format: {}", format_identifier);
+                return ExitCode::FAILURE;
+            }
+        },
+        None => match format_identifier {
+            "apm" => return info::print_apm_volume_system(&vfs_file_system, &vfs_path),
+            "ext" => return info::print_ext_file_system(&vfs_file_system, &vfs_path),
+            "gpt" => return info::print_gpt_volume_system(&vfs_file_system, &vfs_path),
+            "qcow" => return info::print_qcow_file(&vfs_file_system, &vfs_path),
+            "sparseimage" => return info::print_sparseimage_file(&vfs_file_system, &vfs_path),
+            "udif" => return info::print_udif_file(&vfs_file_system, &vfs_path),
+            "vhd" => return info::print_vhd_file(&vfs_file_system, &vfs_path),
+            "vhdx" => return info::print_vhdx_file(&vfs_file_system, &vfs_path),
+            _ => {
+                println!("Unsupported format: {}", format_identifier);
+                return ExitCode::FAILURE;
+            }
+        },
     }
-    ExitCode::SUCCESS
 }

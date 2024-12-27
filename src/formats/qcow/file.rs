@@ -337,7 +337,10 @@ impl QcowFile {
         }
         if self.encryption_method != QcowEncryptionMethod::None {
             // TODO: handle encryption
-            todo!();
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unsupported encryption method",),
+            ));
         }
         Ok(())
     }

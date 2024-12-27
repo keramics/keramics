@@ -42,6 +42,13 @@ impl UdifBlockTable {
 
     /// Reads the block table from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+        let data_size: usize = data.len();
+        if data_size < 204 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Unsupported block table data size"),
+            ));
+        }
         let mut block_table_header: UdifBlockTableHeader = UdifBlockTableHeader::new();
 
         if self.mediator.debug_output {
@@ -56,7 +63,15 @@ impl UdifBlockTable {
 
         for _ in 0..block_table_header.number_of_entries {
             let data_end_offset: usize = data_offset + 40;
-
+            if data_end_offset > data_size {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "Invalid block table number of entries: {} value out of bounds",
+                        block_table_header.number_of_entries
+                    ),
+                ));
+            }
             let mut block_table_entry: UdifBlockTableEntry = UdifBlockTableEntry::new();
 
             if self.mediator.debug_output {
@@ -119,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = UdifBlockTable::new();

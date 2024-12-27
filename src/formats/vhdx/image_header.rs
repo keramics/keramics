@@ -438,7 +438,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = VhdxImageHeader::new();
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_checksum_mismatch() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[4] = 0xff;
 
         let mut test_struct = VhdxImageHeader::new();

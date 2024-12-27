@@ -43,10 +43,19 @@ use super::constants::*;
 )]
 /// Virtual Hard Disk (VHD) dynamic disk header.
 pub struct VhdDynamicDiskHeader {
+    /// Block table offset.
     pub block_table_offset: u64,
+
+    /// Number of blocks.
     pub number_of_blocks: u32,
+
+    /// Block size.
     pub block_size: u32,
+
+    /// Parent identifier.
     pub parent_identifier: Uuid,
+
+    /// Parent name.
     pub parent_name: Ucs2String,
 }
 
@@ -100,6 +109,15 @@ impl VhdDynamicDiskHeader {
 
         // TODO: calculate and compare checksum.
 
+        if self.block_size == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid block size: {} value out of bounds",
+                    self.block_size
+                ),
+            ));
+        }
         Ok(())
     }
 }
@@ -220,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = VhdDynamicDiskHeader::new();
@@ -230,8 +248,18 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_format_version() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[24] = 0xff;
+
+        let mut test_struct = VhdDynamicDiskHeader::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_invalid_block_size() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[33] = 0;
 
         let mut test_struct = VhdDynamicDiskHeader::new();
         let result = test_struct.read_data(&test_data);

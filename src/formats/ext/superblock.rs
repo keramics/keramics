@@ -438,7 +438,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[56] = 0xff;
 
         let mut test_struct = ExtSuperblock::new();
@@ -448,7 +448,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_invalid_block_size() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[24] = 0xff;
 
         let mut test_struct = ExtSuperblock::new();
@@ -458,7 +458,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_revision_format() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[76] = 0xff;
 
         let mut test_struct = ExtSuperblock::new();

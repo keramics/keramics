@@ -18,6 +18,48 @@ use crate::formatters;
 use keramics::formats::apm::{ApmPartition, ApmVolumeSystem};
 use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPath};
 
+/// Prints the partition status flags.
+fn print_apm_partition_status_flags(flags: u32) {
+    if flags & 0x00000001 != 0 {
+        println!("        0x00000001: Is valid");
+    }
+    if flags & 0x00000002 != 0 {
+        println!("        0x00000002: Is allocated");
+    }
+    if flags & 0x00000004 != 0 {
+        println!("        0x00000004: Is in use");
+    }
+    if flags & 0x00000008 != 0 {
+        println!("        0x00000008: Contains boot information");
+    }
+    if flags & 0x00000010 != 0 {
+        println!("        0x00000010: Is readable");
+    }
+    if flags & 0x00000020 != 0 {
+        println!("        0x00000020: Is writeable");
+    }
+    if flags & 0x00000040 != 0 {
+        println!("        0x00000040: Boot code is position independent");
+    }
+
+    if flags & 0x00000100 != 0 {
+        println!("        0x00000100: Contains a chain-compatible driver");
+    }
+    if flags & 0x00000200 != 0 {
+        println!("        0x00000200: Contains a real driver");
+    }
+    if flags & 0x00000400 != 0 {
+        println!("        0x00000400: Contains a chain driver");
+    }
+
+    if flags & 0x40000000 != 0 {
+        println!("        0x40000000: Automatic mount at startup");
+    }
+    if flags & 0x80000000 != 0 {
+        println!("        0x80000000: Is startup partition");
+    }
+}
+
 /// Prints information about an APM volume system.
 pub fn print_apm_volume_system(
     parent_file_system: &VfsFileSystemReference,
@@ -62,7 +104,7 @@ pub fn print_apm_volume_system(
             apm_partition.type_identifier.to_string()
         );
         if apm_partition.name.elements.len() > 0 {
-            println!("    Name\t\t\t: {}", apm_partition.name.to_string());
+            println!("    Name\t\t\t\t: {}", apm_partition.name.to_string());
         }
         println!(
             "    Offset\t\t\t\t: {} (0x{:08x})",
@@ -76,44 +118,7 @@ pub fn print_apm_volume_system(
             "    Status flags\t\t\t: 0x{:08x}",
             apm_partition.status_flags
         );
-        if apm_partition.status_flags & 0x00000001 != 0 {
-            println!("        Is valid");
-        }
-        if apm_partition.status_flags & 0x00000002 != 0 {
-            println!("        Is allocated");
-        }
-        if apm_partition.status_flags & 0x00000004 != 0 {
-            println!("        Is in use");
-        }
-        if apm_partition.status_flags & 0x00000008 != 0 {
-            println!("        Contains boot information");
-        }
-        if apm_partition.status_flags & 0x00000010 != 0 {
-            println!("        Is readable");
-        }
-        if apm_partition.status_flags & 0x00000020 != 0 {
-            println!("        Is writeable");
-        }
-        if apm_partition.status_flags & 0x00000040 != 0 {
-            println!("        Boot code is position independent");
-        }
-
-        if apm_partition.status_flags & 0x00000100 != 0 {
-            println!("        Contains a chain-compatible driver");
-        }
-        if apm_partition.status_flags & 0x00000200 != 0 {
-            println!("        Contains a real driver");
-        }
-        if apm_partition.status_flags & 0x00000400 != 0 {
-            println!("        Contains a chain driver");
-        }
-
-        if apm_partition.status_flags & 0x40000000 != 0 {
-            println!("        Automatic mount at startup");
-        }
-        if apm_partition.status_flags & 0x80000000 != 0 {
-            println!("        Is startup partition");
-        }
+        print_apm_partition_status_flags(apm_partition.status_flags);
     }
     println!("");
 
