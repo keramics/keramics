@@ -82,7 +82,7 @@ impl ExtInodeTable {
             number_of_inodes_per_block_group as u64,
             inode_size as u64,
         );
-        let inode_table_offset: u64 = 0;
+        let mut inode_table_offset: u64 = 0;
         for group_descriptor in group_descriptors.drain(0..) {
             match self
                 .block_tree
@@ -91,6 +91,7 @@ impl ExtInodeTable {
                 Ok(_) => {}
                 Err(error) => return Err(crate::error_to_io_error!(error)),
             };
+            inode_table_offset += group_size;
         }
         Ok(())
     }

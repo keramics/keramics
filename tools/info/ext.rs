@@ -104,150 +104,153 @@ fn get_file_mode_string(file_mode: u16) -> String {
     string_parts.join("")
 }
 
-/// Prints the compatible features flags.
-fn print_ext_compatible_features_flags(flags: u32) {
+/// Prints the compatible feature flags.
+fn print_ext_compatible_feature_flags(flags: u32) {
     if flags & 0x00000001 != 0 {
-        println!("        Pre-allocate directory blocks (EXT2_COMPAT_PREALLOC)");
+        println!("        0x00000001: Pre-allocate directory blocks (EXT2_COMPAT_PREALLOC)");
     }
     if flags & 0x00000002 != 0 {
-        println!("        Has AFS server inodes (EXT2_FEATURE_COMPAT_IMAGIC_INODES)");
+        println!("        0x00000002: Has AFS server inodes (EXT2_FEATURE_COMPAT_IMAGIC_INODES)");
     }
     if flags & 0x00000004 != 0 {
-        println!("        Has journal (EXT3_FEATURE_COMPAT_HAS_JOURNAL)");
+        println!("        0x00000004: Has journal (EXT3_FEATURE_COMPAT_HAS_JOURNAL)");
     }
     if flags & 0x00000008 != 0 {
-        println!("        Have extended inode attributes (EXT2_FEATURE_COMPAT_EXT_ATTR)");
+        println!("        0x00000008: Has extended attributes (EXT2_FEATURE_COMPAT_EXT_ATTR)");
     }
     if flags & 0x00000010 != 0 {
-        println!("        Resizable volume (EXT2_FEATURE_COMPAT_RESIZE_INO)");
+        println!("        0x00000010: Is resizable (EXT2_FEATURE_COMPAT_RESIZE_INO)");
     }
     if flags & 0x00000020 != 0 {
-        println!("        Use directory hash index (EXT2_FEATURE_COMPAT_DIR_INDEX)");
+        println!("        0x00000020: Has indexed directories (EXT2_FEATURE_COMPAT_DIR_INDEX)");
     }
 
     if flags & 0x00000200 != 0 {
-        println!("        (EXT4_FEATURE_COMPAT_SPARSE_SUPER2)");
+        println!("        0x00000200: Has sparse superblock version 2 (EXT4_FEATURE_COMPAT_SPARSE_SUPER2)");
     }
     if flags & 0x00000400 != 0 {
-        println!("        (EXT4_FEATURE_COMPAT_FAST_COMMIT)");
+        println!("        0x00000400: (EXT4_FEATURE_COMPAT_FAST_COMMIT)");
     }
     if flags & 0x00000800 != 0 {
-        println!("        (EXT4_FEATURE_COMPAT_STABLE_INODES)");
+        println!("        0x00000800: (EXT4_FEATURE_COMPAT_STABLE_INODES)");
     }
     if flags & 0x00001000 != 0 {
-        println!("        Has orphan file (EXT4_FEATURE_COMPAT_ORPHAN_FILE)");
+        println!("        0x00001000: Has orphan file (EXT4_FEATURE_COMPAT_ORPHAN_FILE)");
     }
     println!("");
 }
 
-/// Prints the incompatible features flags.
-fn print_ext_incompatible_features_flags(flags: u32) {
+/// Prints the incompatible feature flags.
+fn print_ext_incompatible_feature_flags(flags: u32) {
     if flags & 0x00000001 != 0 {
-        println!("        Has compression (EXT2_FEATURE_INCOMPAT_COMPRESSION)");
+        println!("        0x00000001: Has compression (EXT2_FEATURE_INCOMPAT_COMPRESSION)");
     }
     if flags & 0x00000002 != 0 {
-        println!("        Has directory type (EXT2_FEATURE_INCOMPAT_FILETYPE)");
+        println!("        0x00000002: Has directory type (EXT2_FEATURE_INCOMPAT_FILETYPE)");
     }
     if flags & 0x00000004 != 0 {
-        println!("        Needs recovery (EXT3_FEATURE_INCOMPAT_RECOVER)");
+        println!("        0x00000004: Needs recovery (EXT3_FEATURE_INCOMPAT_RECOVER)");
     }
     if flags & 0x00000008 != 0 {
-        println!("        Has journal device (EXT3_FEATURE_INCOMPAT_JOURNAL_DEV)");
+        println!("        0x00000008: Has journal device (EXT3_FEATURE_INCOMPAT_JOURNAL_DEV)");
     }
     if flags & 0x00000010 != 0 {
-        println!("        Has metadata block groups (EXT2_FEATURE_INCOMPAT_META_BG)");
+        println!("        0x00000010: Has meta block groups (EXT2_FEATURE_INCOMPAT_META_BG)");
     }
 
     if flags & 0x00000040 != 0 {
-        println!("        Has extents (EXT4_FEATURE_INCOMPAT_EXTENTS)");
+        println!("        0x00000040: Has extents (EXT4_FEATURE_INCOMPAT_EXTENTS)");
     }
     if flags & 0x00000080 != 0 {
-        println!("        Has 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT)");
+        println!("        0x00000080: Has 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT)");
     }
     if flags & 0x00000100 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_MMP)");
+        println!("        0x00000100: (EXT4_FEATURE_INCOMPAT_MMP)");
     }
     if flags & 0x00000200 != 0 {
-        println!("        Has flexible block groups (EXT4_FEATURE_INCOMPAT_FLEX_BG)");
+        println!("        0x00000200: Has flexible block groups (EXT4_FEATURE_INCOMPAT_FLEX_BG)");
     }
     if flags & 0x00000400 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_EA_INODE)");
+        println!("        0x00000400: (EXT4_FEATURE_INCOMPAT_EA_INODE)");
     }
 
     if flags & 0x00001000 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_DIRDATA)");
+        println!("        0x00001000: (EXT4_FEATURE_INCOMPAT_DIRDATA)");
     }
     if flags & 0x00002000 != 0 {
-        println!("        Has metadata checksum seed (EXT4_FEATURE_INCOMPAT_CSUM_SEED)");
+        println!(
+            "        0x00002000: Has metadata checksum seed (EXT4_FEATURE_INCOMPAT_CSUM_SEED)"
+        );
     }
     if flags & 0x00004000 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_LARGEDIR)");
+        println!("        0x00004000: (EXT4_FEATURE_INCOMPAT_LARGEDIR)");
     }
     if flags & 0x00008000 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_INLINE_DATA)");
+        println!("        0x00008000: (EXT4_FEATURE_INCOMPAT_INLINE_DATA)");
     }
     if flags & 0x00010000 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_ENCRYPT)");
+        println!("        0x00010000: (EXT4_FEATURE_INCOMPAT_ENCRYPT)");
     }
     if flags & 0x00020000 != 0 {
-        println!("        (EXT4_FEATURE_INCOMPAT_CASEFOLD)");
+        println!("        0x00020000: (EXT4_FEATURE_INCOMPAT_CASEFOLD)");
     }
     println!("");
 }
 
-/// Prints the read-only compatible features flags.
-fn print_ext_read_only_compatible_features_flags(flags: u32) {
+/// Prints the read-only compatible feature flags.
+fn print_ext_read_only_compatible_feature_flags(flags: u32) {
     if flags & 0x00000001 != 0 {
-        println!("        Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)");
+        println!("        0x00000001: Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)");
     }
     if flags & 0x00000002 != 0 {
-        println!("        Contains large files (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)");
+        println!("        0x00000002: Contains large files (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)");
     }
     if flags & 0x00000004 != 0 {
-        println!("        Use directory B-tree (EXT2_FEATURE_RO_COMPAT_BTREE_DIR)");
+        println!("        0x00000004: Has directory B-tree (EXT2_FEATURE_RO_COMPAT_BTREE_DIR)");
     }
     if flags & 0x00000008 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_HUGE_FILE)");
+        println!("        0x00000008: (EXT4_FEATURE_RO_COMPAT_HUGE_FILE)");
     }
     if flags & 0x00000010 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_GDT_CSUM)");
+        println!("        0x00000010: (EXT4_FEATURE_RO_COMPAT_GDT_CSUM)");
     }
     if flags & 0x00000020 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_DIR_NLINK)");
+        println!("        0x00000020: (EXT4_FEATURE_RO_COMPAT_DIR_NLINK)");
     }
     if flags & 0x00000040 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE)");
+        println!("        0x00000040: Has large inodes (EXT4_FEATURE_RO_COMPAT_EXTRA_ISIZE)");
     }
     if flags & 0x00000080 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_HAS_SNAPSHOT)");
+        println!("        0x00000080: (EXT4_FEATURE_RO_COMPAT_HAS_SNAPSHOT)");
     }
     if flags & 0x00000100 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_QUOTA)");
+        println!("        0x00000100: (EXT4_FEATURE_RO_COMPAT_QUOTA)");
     }
     if flags & 0x00000200 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_BIGALLOC)");
+        println!("        0x00000200: (EXT4_FEATURE_RO_COMPAT_BIGALLOC)");
     }
     if flags & 0x00000400 != 0 {
-        println!("        Has metadata checksums (EXT4_FEATURE_RO_COMPAT_METADATA_CSUM)");
+        println!(
+            "        0x00000400: Has metadata checksums (EXT4_FEATURE_RO_COMPAT_METADATA_CSUM)"
+        );
     }
     if flags & 0x00000800 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_REPLICA)");
+        println!("        0x00000800: (EXT4_FEATURE_RO_COMPAT_REPLICA)");
     }
     if flags & 0x00001000 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_READONLY)");
+        println!("        0x00001000: (EXT4_FEATURE_RO_COMPAT_READONLY)");
     }
     if flags & 0x00002000 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_PROJECT)");
+        println!("        0x00002000: (EXT4_FEATURE_RO_COMPAT_PROJECT)");
     }
-
     if flags & 0x00004000 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_SHARED_BLOCKS)");
+        println!("        0x00004000: (EXT4_FEATURE_RO_COMPAT_SHARED_BLOCKS)");
     }
     if flags & 0x00008000 != 0 {
-        println!("        (EXT4_FEATURE_RO_COMPAT_VERITY)");
+        println!("        0x00008000: (EXT4_FEATURE_RO_COMPAT_VERITY)");
     }
     if flags & 0x00010000 != 0 {
-        println!("        Orphan file may be non-empty (EXT4_FEATURE_RO_COMPAT_ORPHAN_PRESENT)");
+        println!("        0x00010000: Orphan file may be non-empty (EXT4_FEATURE_RO_COMPAT_ORPHAN_PRESENT)");
     }
     println!("");
 }
@@ -275,20 +278,20 @@ pub fn print_ext_file_system(
         "    Volume label\t\t\t: {}",
         ext_file_system.volume_label.to_string()
     );
-    let features_flags: u32 = ext_file_system.get_compatible_features_flags();
-    println!("    Compatible features\t\t\t: 0x{:08x}", features_flags);
-    print_ext_compatible_features_flags(features_flags);
+    let feature_flags: u32 = ext_file_system.get_compatible_feature_flags();
+    println!("    Compatible features\t\t\t: 0x{:08x}", feature_flags);
+    print_ext_compatible_feature_flags(feature_flags);
 
-    let features_flags: u32 = ext_file_system.get_incompatible_features_flags();
-    println!("    Incompatible features\t\t: 0x{:08x}", features_flags);
-    print_ext_incompatible_features_flags(features_flags);
+    let feature_flags: u32 = ext_file_system.get_incompatible_feature_flags();
+    println!("    Incompatible features\t\t: 0x{:08x}", feature_flags);
+    print_ext_incompatible_feature_flags(feature_flags);
 
-    let features_flags: u32 = ext_file_system.get_read_only_compatible_features_flags();
+    let feature_flags: u32 = ext_file_system.get_read_only_compatible_feature_flags();
     println!(
         "    Read-only compatible features\t: 0x{:08x}",
-        features_flags
+        feature_flags
     );
-    print_ext_read_only_compatible_features_flags(features_flags);
+    print_ext_read_only_compatible_feature_flags(feature_flags);
 
     println!(
         "    Number of inodes\t\t\t: {}",
@@ -692,9 +695,9 @@ mod tests {
         assert_eq!(string, "-rwxrwxrwx");
     }
 
-    // TODO: add tests for print_ext_compatible_features_flags
-    // TODO: add tests for print_ext_incompatible_features_flags
-    // TODO: add tests for print_ext_read_only_compatible_features_flags
+    // TODO: add tests for print_ext_compatible_feature_flags
+    // TODO: add tests for print_ext_incompatible_feature_flags
+    // TODO: add tests for print_ext_read_only_compatible_feature_flags
     // TODO: add tests for print_ext_file_system
     // TODO: add tests for print_ext_file_entry
     // TODO: add tests for print_ext_file_entry_bodyfile

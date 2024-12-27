@@ -55,10 +55,7 @@ impl VhdxRegionTable {
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
 
         crc32_context.update(&data[0..4]);
-
-        let empty_data: [u8; 4] = [0; 4];
-        crc32_context.update(&empty_data);
-
+        crc32_context.update(&[0; 4]);
         crc32_context.update(&data[8..65536]);
 
         let calculated_checksum: u32 = crc32_context.finalize();

@@ -42,7 +42,7 @@ use super::constants::*;
         field(name = "mount_count", data_type = "u16"),
         field(name = "maximum_mount_count", data_type = "u16"),
         field(name = "signature", data_type = "[u8; 2]"),
-        field(name = "file_system_state_flags", data_type = "u16"),
+        field(name = "file_system_state_flags", data_type = "u16", format = "hex"),
         field(name = "error_handling_status", data_type = "u16"),
         field(name = "minor_format_revision", data_type = "u16"),
         field(name = "last_consistency_check_time", data_type = "PosixTime32"),
@@ -54,9 +54,13 @@ use super::constants::*;
         field(name = "first_non_reserved_inode", data_type = "u32"),
         field(name = "inode_size", data_type = "u16"),
         field(name = "block_group", data_type = "u16"),
-        field(name = "compatible_features_flags", data_type = "u32"),
-        field(name = "incompatible_features_flags", data_type = "u32"),
-        field(name = "read_only_compatible_features_flags", data_type = "u32"),
+        field(name = "compatible_feature_flags", data_type = "u32", format = "hex"),
+        field(name = "incompatible_feature_flags", data_type = "u32", format = "hex"),
+        field(
+            name = "read_only_compatible_feature_flags",
+            data_type = "u32",
+            format = "hex"
+        ),
         field(
             name = "file_system_identifier",
             data_type = "uuid",
@@ -80,7 +84,7 @@ use super::constants::*;
         field(name = "journal_backup_type", data_type = "u8"),
         field(name = "group_descriptor_size", data_type = "u16"),
         field(name = "default_mount_options", data_type = "u32"),
-        field(name = "first_metadata_block_group", data_type = "u32"),
+        field(name = "first_meta_block_group", data_type = "u32"),
         field(name = "file_system_creation_time", data_type = "PosixTime32"),
         field(name = "backup_journal_inodes", data_type = "[u32; 17]"),
         field(name = "number_of_blocks_upper", data_type = "u32"),
@@ -88,7 +92,7 @@ use super::constants::*;
         field(name = "number_of_unallocated_blocks_upper", data_type = "u32"),
         field(name = "minimum_inode_size", data_type = "u16"),
         field(name = "reserved_inode_size", data_type = "u16"),
-        field(name = "flags", data_type = "u32"),
+        field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "read_stride", data_type = "u16"),
         field(name = "multi_mount_protection_update_interval", data_type = "u16"),
         field(name = "multi_mount_protection_block", data_type = "u64"),
@@ -126,7 +130,7 @@ use super::constants::*;
         field(name = "metadata_checksum_seed", data_type = "u32", format = "hex"),
         field(name = "unknown1", data_type = "[u8; 8]"),
         field(name = "encoding", data_type = "u16"),
-        field(name = "encoding_flags", data_type = "u16"),
+        field(name = "encoding_flags", data_type = "u16", format = "hex"),
         field(name = "orphan_file_inode_number", data_type = "u32"),
         field(name = "padding3", data_type = "[u8; 376]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
@@ -136,23 +140,62 @@ use super::constants::*;
 )]
 /// Extended File System (ext) superblock.
 pub struct ExtSuperblock {
+    /// Number of inodes.
     pub number_of_inodes: u32,
+
+    /// Number of blocks.
     pub number_of_blocks: u64,
+
+    /// Block size.
     pub block_size: u32,
+
+    /// Number of blocks per block group.
     pub number_of_blocks_per_block_group: u32,
+
+    /// Number of inodes per block group.
     pub number_of_inodes_per_block_group: u32,
+
+    /// Last mount date and time.
     pub last_mount_time: PosixTime32,
+
+    /// Last written date and time.
     pub last_written_time: PosixTime32,
+
+    /// Format revision.
     pub format_revision: u32,
+
+    /// Inode size.
     pub inode_size: u16,
-    pub compatible_features_flags: u32,
-    pub incompatible_features_flags: u32,
-    pub read_only_compatible_features_flags: u32,
+
+    /// Compatible feature flags.
+    pub compatible_feature_flags: u32,
+
+    /// Incompatible feature flags.
+    pub incompatible_feature_flags: u32,
+
+    /// Read-only compatible feature flags.
+    pub read_only_compatible_feature_flags: u32,
+
+    /// File system identifier.
     pub file_system_identifier: [u8; 16],
+
+    /// Volume label.
     pub volume_label: ByteString,
+
+    /// Last mount path.
     pub last_mount_path: ByteString,
+
+    /// Group descriptor size.
     pub group_descriptor_size: u16,
-    pub first_metadata_block_group: u32,
+
+    /// First meta block group.
+    pub first_meta_block_group: u32,
+
+    /// Number of block groups per flex group.
+    pub number_of_block_groups_per_flex_group: u32,
+
+    /// Metadata checksum seed.
+    pub metadata_checksum_seed: Option<u32>,
 }
 
 impl ExtSuperblock {
@@ -168,14 +211,16 @@ impl ExtSuperblock {
             last_written_time: PosixTime32::new(0),
             format_revision: 0,
             inode_size: 0,
-            compatible_features_flags: 0,
-            incompatible_features_flags: 0,
-            read_only_compatible_features_flags: 0,
+            compatible_feature_flags: 0,
+            incompatible_feature_flags: 0,
+            read_only_compatible_feature_flags: 0,
             file_system_identifier: [0; 16],
             volume_label: ByteString::new(),
             last_mount_path: ByteString::new(),
             group_descriptor_size: 0,
-            first_metadata_block_group: 0,
+            number_of_block_groups_per_flex_group: 0,
+            first_meta_block_group: 0,
+            metadata_checksum_seed: None,
         }
     }
 
@@ -201,47 +246,13 @@ impl ExtSuperblock {
                 format!("Unsupported format revision: {}", self.format_revision),
             ));
         }
-        self.compatible_features_flags = bytes_to_u32_le!(data, 92);
-        self.incompatible_features_flags = bytes_to_u32_le!(data, 96);
-        self.read_only_compatible_features_flags = bytes_to_u32_le!(data, 100);
+        self.compatible_feature_flags = bytes_to_u32_le!(data, 92);
+        self.incompatible_feature_flags = bytes_to_u32_le!(data, 96);
+        self.read_only_compatible_feature_flags = bytes_to_u32_le!(data, 100);
 
-        let supported_flags: u32 =
-            0x00000001 | 0x00000004 | 0x00000008 | 0x00000010 | 0x00000020 | 0x00001000;
-
-        if self.compatible_features_flags & !(supported_flags) != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported compatible features flags: 0x{:08x}",
-                    self.compatible_features_flags
-                ),
-            ));
-        }
-        let supported_flags: u32 = 0x00000002
-            | 0x00000004
-            | 0x00000008
-            | 0x00000010
-            | 0x00000040
-            | 0x00000080
-            | 0x00000200
-            | 0x00000400
-            | 0x00008000
-            | 0x00002000
-            | 0x00010000
-            | 0x00020000;
-
-        if self.incompatible_features_flags & !(supported_flags) != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported incompatible features flags: 0x{:08x}",
-                    self.incompatible_features_flags
-                ),
-            ));
-        }
         self.number_of_inodes = bytes_to_u32_le!(data, 0);
         self.number_of_blocks = bytes_to_u32_le!(data, 4) as u64;
-        if self.incompatible_features_flags & EXT_INCOMPATIBLE_FEATURES_FLAG_64BIT_SUPPORT != 0 {
+        if self.incompatible_feature_flags & EXT_INCOMPATIBLE_FEATURE_FLAG_64BIT_SUPPORT != 0 {
             self.number_of_blocks |= (bytes_to_u32_le!(data, 336) as u64) << 32;
         }
         if self.number_of_blocks == 0 {
@@ -292,14 +303,33 @@ impl ExtSuperblock {
         self.last_written_time = PosixTime32::from_le_bytes(&data[48..52]);
         self.inode_size = bytes_to_u16_le!(data, 88);
         self.group_descriptor_size = bytes_to_u16_le!(data, 254);
-        self.first_metadata_block_group = bytes_to_u32_le!(data, 260);
-
+        self.first_meta_block_group = bytes_to_u32_le!(data, 260);
         self.file_system_identifier.copy_from_slice(&data[104..120]);
         self.volume_label = ByteString::from_bytes(&data[120..136]);
         self.last_mount_path = ByteString::from_bytes(&data[136..200]);
 
-        if self.read_only_compatible_features_flags
-            & EXT_READ_ONLY_COMPATIBLE_FEATURES_FLAG_METADATA_CHECKSUM
+        let number_of_block_groups_per_flex_group: u8 = data[372];
+        if number_of_block_groups_per_flex_group >= 16 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid number of blocks per flex group: {} value out of bounds",
+                    number_of_block_groups_per_flex_group,
+                ),
+            ));
+        }
+        self.number_of_block_groups_per_flex_group =
+            1 << (number_of_block_groups_per_flex_group as u32);
+
+        if self.incompatible_feature_flags
+            & EXT_INCOMPATIBLE_FEATURE_FLAG_HAS_METADATA_CHECKSUM_SEED
+            != 0
+        {
+            let stored_checksum: u32 = bytes_to_u32_le!(data, 624);
+            self.metadata_checksum_seed = Some(0xffffffff - stored_checksum);
+        }
+        if self.read_only_compatible_feature_flags
+            & EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_METADATA_CHECKSUM
             != 0
         {
             let checksum_type: u8 = data[373];
@@ -328,6 +358,17 @@ impl ExtSuperblock {
             }
         }
         Ok(())
+    }
+
+    /// Retrieves the block group size.
+    pub fn get_block_group_size(&self) -> u64 {
+        (self.number_of_blocks_per_block_group as u64) * (self.block_size as u64)
+    }
+
+    /// Retrieves the number of block groups.
+    pub fn get_number_of_block_groups(&self) -> u64 {
+        self.number_of_blocks
+            .div_ceil(self.number_of_blocks_per_block_group as u64)
     }
 }
 

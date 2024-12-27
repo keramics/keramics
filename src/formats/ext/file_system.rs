@@ -91,88 +91,101 @@ impl ExtFileSystem {
         let mut block_group_number: u32 = 0;
         let mut block_group_offset: u64 = 0;
         let mut block_group_size: u64 = 0;
-        let mut exponent3: u32 = 0;
-        let mut exponent5: u32 = 0;
-        let mut exponent7: u32 = 0;
+        let mut exponent3: u32 = 3;
+        let mut exponent5: u32 = 5;
+        let mut exponent7: u32 = 7;
+        let mut meta_group_number: u32 = 0;
         let mut meta_group_start_block_number: u32 = 0;
         let mut number_of_block_groups: u64 = 0;
-        let mut number_of_blocks_per_meta_group: u32 = 0;
+        let mut number_of_block_groups_per_meta_group: u32 = 0;
         let mut number_of_inodes_per_block_group: u32 = 0;
         let mut group_descriptors: Vec<ExtGroupDescriptor> = Vec::new();
 
         loop {
-            if exponent7 < block_group_number {
-                exponent7 *= 7;
+            if exponent3 < block_group_number {
+                exponent3 *= 3;
             }
             if exponent5 < block_group_number {
                 exponent5 *= 5;
             }
-            if exponent3 < block_group_number {
-                exponent3 *= 3;
+            if exponent7 < block_group_number {
+                exponent7 *= 7;
             }
-            let mut block_group_has_superblock: bool = false;
-
-            if block_group_number == 0 || block_group_number == 1 {
-                block_group_has_superblock = true;
-            } else if self.features.has_sparse_superblock()
-                && (block_group_number == exponent3
-                    || block_group_number == exponent5
-                    || block_group_number == exponent7)
+            // The first block group will always contain a superblock.
+            let block_group_has_superblock: bool = if block_group_number == 0 {
+                true
+            // If sparse superblock feature is disabled all block groups contain a superblock.
+            } else if !self.features.has_sparse_superblock() {
+                true
+            // TODO: add support for sparse superblock version 2
+            } else if self.features.has_sparse_superblock2() {
+                false
+            // Only block group numbers that are a power of 3, 5 or 7 contain a superblock.
+            } else if block_group_number == 1
+                || block_group_number == exponent3
+                || block_group_number == exponent5
+                || block_group_number == exponent7
             {
-                block_group_has_superblock = true;
-            }
-            let mut superblock_offset: u64 = block_group_offset;
-
+                true
+            } else {
+                false
+            };
             if block_group_has_superblock {
+                let mut superblock_offset: u64 = block_group_offset;
+
                 if block_group_offset == 0 || self.block_size == 1024 {
                     superblock_offset += 1024;
                 }
+                let mut superblock: ExtSuperblock = ExtSuperblock::new();
+                superblock
+                    .read_at_position(&self.data_stream, io::SeekFrom::Start(superblock_offset))?;
+
+                if block_group_number == 0 {
+                    self.features.initialize(&superblock);
+
+                    number_of_block_groups = superblock.get_number_of_block_groups();
+                    block_group_size = superblock.get_block_group_size();
+
+                    self.number_of_inodes = superblock.number_of_inodes;
+                    self.block_size = superblock.block_size;
+                    self.inode_size = superblock.inode_size;
+
+                    self.volume_label = superblock.volume_label;
+
+                    // TODO: change to ExtPath
+                    self.last_mount_path = superblock.last_mount_path;
+
+                    if superblock.last_mount_time.timestamp != 0 {
+                        self.last_mount_time = DateTime::PosixTime32(superblock.last_mount_time);
+                    }
+                    if superblock.last_written_time.timestamp != 0 {
+                        self.last_written_time =
+                            DateTime::PosixTime32(superblock.last_written_time);
+                    }
+                    number_of_inodes_per_block_group = superblock.number_of_inodes_per_block_group;
+
+                    if self.features.has_meta_block_groups() {
+                        let group_descriptor_size: u32 = self.features.get_group_descriptor_size();
+                        number_of_block_groups_per_meta_group =
+                            superblock.block_size / group_descriptor_size;
+                        meta_group_start_block_number = superblock.first_meta_block_group
+                            * number_of_block_groups_per_meta_group;
+                    }
+                    self.metadata_checksum_seed = match superblock.metadata_checksum_seed {
+                        Some(metadata_checksum_seed) => metadata_checksum_seed,
+                        None => {
+                            let mut crc32_context: ReversedCrc32Context =
+                                ReversedCrc32Context::new(0x82f63b78, 0);
+                            crc32_context.update(&superblock.file_system_identifier);
+                            crc32_context.finalize()
+                        }
+                    };
+                }
+                // TODO: compare superblock
             }
-            let mut superblock: ExtSuperblock = ExtSuperblock::new();
-            superblock
-                .read_at_position(&self.data_stream, io::SeekFrom::Start(superblock_offset))?;
-
-            if block_group_number == 0 {
-                self.features.initialize(&superblock);
-                self.number_of_inodes = superblock.number_of_inodes;
-                self.block_size = superblock.block_size;
-                self.inode_size = superblock.inode_size;
-
-                self.volume_label = superblock.volume_label;
-
-                // TODO: change to ExtPath
-                self.last_mount_path = superblock.last_mount_path;
-
-                if superblock.last_mount_time.timestamp != 0 {
-                    self.last_mount_time = DateTime::PosixTime32(superblock.last_mount_time);
-                }
-                if superblock.last_written_time.timestamp != 0 {
-                    self.last_written_time = DateTime::PosixTime32(superblock.last_written_time);
-                }
-                number_of_block_groups = superblock
-                    .number_of_blocks
-                    .div_ceil(superblock.number_of_blocks_per_block_group as u64);
-                block_group_size = (superblock.number_of_blocks_per_block_group as u64)
-                    * (superblock.block_size as u64);
-                number_of_inodes_per_block_group = superblock.number_of_inodes_per_block_group;
-
-                if self.features.has_meta_block_groups() {
-                    let group_descriptor_size: u32 = self.features.get_group_descriptor_size();
-                    number_of_blocks_per_meta_group = superblock.block_size / group_descriptor_size;
-                    meta_group_start_block_number =
-                        superblock.first_metadata_block_group * number_of_blocks_per_meta_group;
-                }
-                let mut crc32_context: ReversedCrc32Context =
-                    ReversedCrc32Context::new(0x82f63b78, 0);
-                crc32_context.update(&superblock.file_system_identifier);
-                self.metadata_checksum_seed = crc32_context.finalize();
-            }
-            // TODO: compare superblock
-
-            // When the has meta block groups feature is enabled group
-            // descriptors are stored at the beginning of the first, second,
-            // and last block groups in a meta block group, independent of a
-            // superblock. Otherwise group descriptors are stored in the first
+            // When the has meta block groups feature is enabled group descriptors are stored at the
+            // beginning of the first, second, and last block groups in a meta block group,
+            // independent of a superblock. Otherwise group descriptors are stored in the first
             // block after a superblock.
             let mut block_group_has_group_descriptors: bool = false;
             let mut meta_group_block_group_number: u32 = 0;
@@ -183,11 +196,11 @@ impl ExtFileSystem {
                 block_group_has_group_descriptors = block_group_has_superblock;
             } else {
                 meta_group_block_group_number =
-                    block_group_number % number_of_blocks_per_meta_group;
+                    block_group_number % number_of_block_groups_per_meta_group;
 
                 if meta_group_block_group_number == 0
                     || meta_group_block_group_number == 1
-                    || meta_group_block_group_number == number_of_blocks_per_meta_group - 1
+                    || meta_group_block_group_number == number_of_block_groups_per_meta_group - 1
                 {
                     block_group_has_group_descriptors = true;
                 }
@@ -195,23 +208,34 @@ impl ExtFileSystem {
             if block_group_has_group_descriptors {
                 let mut group_descriptor_offset: u64 = block_group_offset;
 
+                if self.block_size == 1024 {
+                    group_descriptor_offset += 1024;
+                }
                 if block_group_has_superblock {
                     group_descriptor_offset += self.block_size as u64;
-
-                    if block_group_number == 0 && self.block_size == 1024 {
-                        group_descriptor_offset += 1024;
-                    }
                 }
+                let first_group_number: u32 = if !self.features.has_meta_block_groups()
+                    || block_group_number < meta_group_start_block_number
+                {
+                    0
+                } else {
+                    meta_group_start_block_number
+                        + (meta_group_number * number_of_block_groups_per_meta_group)
+                };
                 let number_of_group_descriptors: u32 = if !self.features.has_meta_block_groups() {
                     number_of_block_groups as u32
                 } else if block_group_number < meta_group_start_block_number {
-                    superblock.first_metadata_block_group
+                    meta_group_start_block_number
                 } else {
-                    number_of_blocks_per_meta_group
+                    number_of_block_groups_per_meta_group
                 };
                 let mut group_descriptor_table: ExtGroupDescriptorTable =
                     ExtGroupDescriptorTable::new();
-                group_descriptor_table.initialize(&self.features, number_of_group_descriptors);
+                group_descriptor_table.initialize(
+                    &self.features,
+                    first_group_number,
+                    number_of_group_descriptors,
+                );
                 group_descriptor_table.read_at_position(
                     &self.data_stream,
                     io::SeekFrom::Start(group_descriptor_offset),
@@ -228,6 +252,9 @@ impl ExtFileSystem {
                     for group_descriptor in group_descriptor_table.entries.drain(0..) {
                         group_descriptors.push(group_descriptor);
                     }
+                } else if meta_group_block_group_number == number_of_block_groups_per_meta_group - 1
+                {
+                    meta_group_number += 1;
                 };
             }
             // TODO: read block bitmap for debugging purposes
@@ -263,26 +290,32 @@ impl ExtFileSystem {
         self.features.get_format_version()
     }
 
-    /// Retrieves the compatible features flags.
-    pub fn get_compatible_features_flags(&self) -> u32 {
-        self.features.compatible_features_flags
+    /// Retrieves the compatible feature flags.
+    pub fn get_compatible_feature_flags(&self) -> u32 {
+        self.features.compatible_feature_flags
     }
 
-    /// Retrieves the incompatible features flags.
-    pub fn get_incompatible_features_flags(&self) -> u32 {
-        self.features.incompatible_features_flags
+    /// Retrieves the incompatible feature flags.
+    pub fn get_incompatible_feature_flags(&self) -> u32 {
+        self.features.incompatible_feature_flags
     }
 
-    /// Retrieves the read-only compatible features flags.
-    pub fn get_read_only_compatible_features_flags(&self) -> u32 {
-        self.features.read_only_compatible_features_flags
+    /// Retrieves the read-only compatible feature flags.
+    pub fn get_read_only_compatible_feature_flags(&self) -> u32 {
+        self.features.read_only_compatible_feature_flags
     }
 
     /// Retrieves the file entry for a specific inode number.
     pub fn get_file_entry_by_inode_number(&self, inode_number: u32) -> io::Result<ExtFileEntry> {
-        if inode_number == 0 || inode_number > self.number_of_inodes {
+        if self.features.is_unsupported() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
+                format!("Ext file system has unsupported features"),
+            ));
+        }
+        if inode_number == 0 || inode_number > self.number_of_inodes {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
                 format!("Invalid inode number: {} value out of bounds", inode_number),
             ));
         }
@@ -470,14 +503,14 @@ mod tests {
         let format_version: u8 = file_system.get_format_version();
         assert_eq!(format_version, 2);
 
-        let features_flags: u32 = file_system.get_compatible_features_flags();
-        assert_eq!(features_flags, 0x00000038);
+        let feature_flags: u32 = file_system.get_compatible_feature_flags();
+        assert_eq!(feature_flags, 0x00000038);
 
-        let features_flags: u32 = file_system.get_incompatible_features_flags();
-        assert_eq!(features_flags, 0x00000002);
+        let feature_flags: u32 = file_system.get_incompatible_feature_flags();
+        assert_eq!(feature_flags, 0x00000002);
 
-        let features_flags: u32 = file_system.get_read_only_compatible_features_flags();
-        assert_eq!(features_flags, 0x00000003);
+        let feature_flags: u32 = file_system.get_read_only_compatible_feature_flags();
+        assert_eq!(feature_flags, 0x00000003);
 
         assert_eq!(file_system.block_size, 1024);
         assert_eq!(file_system.inode_size, 128);

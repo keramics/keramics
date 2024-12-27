@@ -105,10 +105,7 @@ impl GptPartitionTableHeader {
 
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
         crc32_context.update(&data[0..16]);
-
-        let empty_data: [u8; 4] = [0; 4];
-        crc32_context.update(&empty_data);
-
+        crc32_context.update(&[0; 4]);
         crc32_context.update(&data[20..header_data_size as usize]);
 
         let calculated_checksum: u32 = crc32_context.finalize();
