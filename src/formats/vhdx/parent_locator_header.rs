@@ -97,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_type_indicator() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = VhdxParentLocatorHeader::new();

@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = SparseImageFileHeader::new();
@@ -130,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_invalid_sectors_per_band() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[10] = 0x00;
 
         let mut test_struct = SparseImageFileHeader::new();

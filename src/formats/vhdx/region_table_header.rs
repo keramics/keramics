@@ -65,6 +65,15 @@ impl VhdxRegionTableHeader {
         self.checksum = bytes_to_u32_le!(data, 4);
         self.number_of_entries = bytes_to_u32_le!(data, 8);
 
+        if self.number_of_entries > 2047 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Invalid number of entries: {} value out of bounds",
+                    self.number_of_entries,
+                ),
+            ));
+        }
         Ok(())
     }
 }
@@ -104,8 +113,18 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_signature() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
+
+        let mut test_struct = VhdxRegionTableHeader::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_invalid_number_of_entries() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[11] = 0xff;
 
         let mut test_struct = VhdxRegionTableHeader::new();
         let result = test_struct.read_data(&test_data);

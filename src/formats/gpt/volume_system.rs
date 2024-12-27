@@ -195,7 +195,7 @@ impl GptVolumeSystem {
         if !partition_table_header.disk_identifier.is_nil() {
             self.disk_identifier = partition_table_header.disk_identifier;
         }
-        if partition_table_header.entry_data_size < 128 {
+        if partition_table_header.entry_data_size != 128 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(

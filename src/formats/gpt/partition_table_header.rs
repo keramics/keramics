@@ -183,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_format_version() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[8] = 0xff;
 
         let mut test_struct = GptPartitionTableHeader::new();
@@ -193,7 +193,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_header_size() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[12] = 0xff;
 
         let mut test_struct = GptPartitionTableHeader::new();
@@ -203,7 +203,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_checksum_mismatch() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[16] = 0xff;
 
         let mut test_struct = GptPartitionTableHeader::new();

@@ -40,7 +40,7 @@ impl VhdxParentLocator {
     }
 
     /// Reads the parent locator from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         let data_size: usize = data.len();
         let mut parent_locator_header: VhdxParentLocatorHeader = VhdxParentLocatorHeader::new();
 
@@ -54,7 +54,15 @@ impl VhdxParentLocator {
 
         for parent_locator_entry_index in 0..parent_locator_header.number_of_entries {
             let data_end_offset: usize = data_offset + 12;
-
+            if data_end_offset > data_size {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "Invalid number of entries: {} value out of bounds",
+                        parent_locator_header.number_of_entries
+                    ),
+                ));
+            }
             let mut parent_locator_entry: VhdxParentLocatorEntry = VhdxParentLocatorEntry::new();
 
             if self.mediator.debug_output {
@@ -156,6 +164,12 @@ impl VhdxParentLocator {
         data_size: u32,
         position: io::SeekFrom,
     ) -> io::Result<()> {
+        if data_size < 20 || data_size > 65536 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Unsupported parent locator data size"),
+            ));
+        }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
         let offset: u64 = match data_stream.with_write_lock() {
@@ -245,7 +259,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_type_indicator() {
-        let mut test_data = get_test_data();
+        let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
         let mut test_struct = VhdxParentLocator::new();
