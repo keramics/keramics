@@ -419,16 +419,16 @@ impl Bzip2Context {
         let mut symbol_index: usize = 0;
         let mut tree_index: usize = selectors[0] as usize;
 
-        if tree_index > number_of_trees {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid tree index: {} value out of bounds", tree_index),
-            ));
-        }
         if self.mediator.debug_output {
             self.mediator.debug_print(format!("Bzip2BlockData {{\n",));
         }
         loop {
+            if tree_index >= number_of_trees {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid tree index: {} value out of bounds", tree_index),
+                ));
+            }
             let huffman_tree: &HuffmanTree = &huffman_trees[tree_index];
             let symbol: u16 = huffman_tree.decode_symbol(bitstream)?;
 
@@ -521,13 +521,6 @@ impl Bzip2Context {
                     ));
                 }
                 tree_index = selectors[selector_index] as usize;
-
-                if tree_index > number_of_trees {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid tree index: {} value out of bounds", tree_index),
-                    ));
-                }
             }
         }
         if self.mediator.debug_output {

@@ -85,6 +85,104 @@ impl Lznt1Context {
         }
     }
 
+    /// Decompress data.
+    pub fn decompress(
+        &mut self,
+        compressed_data: &[u8],
+        uncompressed_data: &mut [u8],
+    ) -> io::Result<()> {
+        let mut compressed_data_offset: usize = 0;
+        let compressed_data_size: usize = compressed_data.len();
+
+        let mut uncompressed_data_offset: usize = 0;
+        let uncompressed_data_size: usize = uncompressed_data.len();
+
+        while compressed_data_offset < compressed_data_size {
+            if uncompressed_data_offset >= uncompressed_data_size {
+                break;
+            }
+            if 2 > compressed_data_size - compressed_data_offset {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Invalid compressed data value too small",
+                ));
+            }
+            let compressed_data_end_offset: usize = compressed_data_offset + 2;
+
+            if compressed_data[compressed_data_offset..compressed_data_end_offset] == [0; 2] {
+                break;
+            }
+            let mut block_header: Lznt1BlockHeader = Lznt1BlockHeader::new();
+
+            if self.mediator.debug_output {
+                self.mediator.debug_print(format!(
+                    "Lznt1BlockHeader data of size: 2 at offset: {} (0x{:08x})\n",
+                    compressed_data_offset, compressed_data_offset
+                ));
+                self.mediator.debug_print_data(
+                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                    true,
+                );
+                self.mediator.debug_print(Lznt1BlockHeader::debug_read_data(
+                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                ));
+            }
+            block_header
+                .read_data(&compressed_data[compressed_data_offset..compressed_data_end_offset])?;
+            compressed_data_offset = compressed_data_end_offset;
+
+            if block_header.is_compressed {
+                let write_count: usize = self.decompress_block(
+                    block_header.block_size as usize,
+                    compressed_data,
+                    &mut compressed_data_offset,
+                    compressed_data_size,
+                    &mut uncompressed_data[uncompressed_data_offset..],
+                    uncompressed_data_size - uncompressed_data_offset,
+                )?;
+                uncompressed_data_offset += write_count;
+            } else {
+                let compressed_data_end_offset: usize =
+                    compressed_data_offset + block_header.block_size as usize;
+                let uncompressed_data_end_offset: usize =
+                    uncompressed_data_offset + block_header.block_size as usize;
+
+                if self.mediator.debug_output {
+                    self.mediator
+                        .debug_print(format!("Lznt1Context::decompress {{\n",));
+                    self.mediator.debug_print(format!("    literal data:\n"));
+                    self.mediator.debug_print_data(
+                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                        true,
+                    );
+                    self.mediator.debug_print(format!("}}\n\n"));
+                }
+                if compressed_data_end_offset > compressed_data_size {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Invalid compressed data value too small",
+                    ));
+                }
+                if uncompressed_data_end_offset > uncompressed_data_size {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Invalid uncompressed data value too small",
+                    ));
+                }
+                uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
+                    .copy_from_slice(
+                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                    );
+
+                compressed_data_offset = compressed_data_end_offset;
+                uncompressed_data_offset = uncompressed_data_end_offset;
+            }
+        }
+        self.uncompressed_data_size = uncompressed_data_offset;
+
+        Ok(())
+    }
+
     /// Decompress a block.
     fn decompress_block(
         &self,
@@ -236,92 +334,6 @@ impl Lznt1Context {
         *compressed_data_offset = compressed_data_end_offset;
 
         Ok(uncompressed_data_offset)
-    }
-
-    /// Decompress data.
-    pub fn decompress(
-        &mut self,
-        compressed_data: &[u8],
-        uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
-        let mut compressed_data_offset: usize = 0;
-        let compressed_data_size: usize = compressed_data.len();
-
-        let mut uncompressed_data_offset: usize = 0;
-        let uncompressed_data_size: usize = uncompressed_data.len();
-
-        while compressed_data_offset < compressed_data_size {
-            if uncompressed_data_offset >= uncompressed_data_size {
-                break;
-            }
-            if 2 > compressed_data_size - compressed_data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid compressed data value too small",
-                ));
-            }
-            let compressed_data_end_offset: usize = compressed_data_offset + 2;
-
-            if compressed_data[compressed_data_offset..compressed_data_end_offset] == [0; 2] {
-                break;
-            }
-            let mut block_header: Lznt1BlockHeader = Lznt1BlockHeader::new();
-
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "Lznt1BlockHeader data of size: 2 at offset: {} (0x{:08x})\n",
-                    compressed_data_offset, compressed_data_offset
-                ));
-                self.mediator.debug_print_data(
-                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                    true,
-                );
-                self.mediator.debug_print(Lznt1BlockHeader::debug_read_data(
-                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                ));
-            }
-            block_header
-                .read_data(&compressed_data[compressed_data_offset..compressed_data_end_offset])?;
-            compressed_data_offset = compressed_data_end_offset;
-
-            if block_header.is_compressed {
-                let write_count: usize = self.decompress_block(
-                    block_header.block_size as usize,
-                    compressed_data,
-                    &mut compressed_data_offset,
-                    compressed_data_size,
-                    &mut uncompressed_data[uncompressed_data_offset..],
-                    uncompressed_data_size - uncompressed_data_offset,
-                )?;
-                uncompressed_data_offset += write_count;
-            } else {
-                let compressed_data_end_offset: usize =
-                    compressed_data_offset + block_header.block_size as usize;
-                let uncompressed_data_end_offset: usize =
-                    uncompressed_data_offset + block_header.block_size as usize;
-
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("Lznt1Context::decompress {{\n",));
-                    self.mediator.debug_print(format!("    literal data:\n"));
-                    self.mediator.debug_print_data(
-                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                        true,
-                    );
-                    self.mediator.debug_print(format!("}}\n\n"));
-                }
-                uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
-                    .copy_from_slice(
-                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                    );
-
-                compressed_data_offset = compressed_data_end_offset;
-                uncompressed_data_offset = uncompressed_data_end_offset;
-            }
-        }
-        self.uncompressed_data_size = uncompressed_data_offset;
-
-        Ok(())
     }
 }
 

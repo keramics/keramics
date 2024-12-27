@@ -119,10 +119,14 @@ impl<'a> LzfseBitstream<'a> {
     /// Reads input data backwards into the bits buffer in big-endian byte order.
     #[inline(always)]
     fn read_data(&mut self, number_of_bits: usize) {
-        while number_of_bits > self.number_of_bits && self.number_of_bits <= 24 {
-            self.data_offset -= 1;
+        while number_of_bits > self.number_of_bits {
+            self.bits <<= 8;
 
-            self.bits = (self.bits << 8) | self.data[self.data_offset] as u32;
+            // If the bit stream overflows fill the bit buffer with 0 byte values.
+            if self.data_offset > 0 {
+                self.data_offset -= 1;
+                self.bits |= self.data[self.data_offset] as u32;
+            }
             self.number_of_bits += 8;
         }
     }
@@ -131,54 +135,58 @@ impl<'a> LzfseBitstream<'a> {
 impl<'a> Bitstream for LzfseBitstream<'a> {
     /// Retrieves a bit value.
     fn get_value(&mut self, number_of_bits: usize) -> u32 {
-        let mut bit_offset: usize = 0;
-        let mut value_32bit: u32 = 0;
-
         // Note that this does not check if number_of_bits <= 32
+        let mut bit_value: u32 = 0;
+
+        let mut bit_offset: usize = 0;
         while bit_offset < number_of_bits {
             let mut read_size: usize = number_of_bits - bit_offset;
-
-            self.read_data(read_size);
-
-            if read_size > self.number_of_bits {
-                read_size = self.number_of_bits;
+            if read_size > 24 {
+                read_size = 24;
             }
-            let mut read_value: u32 = self.bits;
+            if self.number_of_bits < read_size {
+                self.read_data(read_size);
+            }
+            let mut value_32bit: u32 = self.bits;
 
             self.number_of_bits -= read_size;
-            read_value >>= self.number_of_bits;
+
+            if self.number_of_bits == 0 {
+                self.bits = 0;
+            } else {
+                self.bits &= 0xffffffff >> (32 - self.number_of_bits);
+
+                value_32bit >>= self.number_of_bits;
+            }
+            if bit_offset > 0 {
+                bit_value <<= read_size;
+            }
+            bit_value |= value_32bit;
+            bit_offset += read_size;
+        }
+        bit_value
+    }
+
+    /// Skips a number of bits.
+    fn skip_bits(&mut self, mut number_of_bits: usize) {
+        // Note that this does not check if number_of_bits <= 32
+        let mut bit_offset: usize = 0;
+        while bit_offset < number_of_bits {
+            let mut read_size: usize = number_of_bits - bit_offset;
+            if read_size > 24 {
+                read_size = 24;
+            }
+            if self.number_of_bits < read_size {
+                self.read_data(read_size);
+            }
+            self.number_of_bits -= read_size;
 
             if self.number_of_bits == 0 {
                 self.bits = 0;
             } else {
                 self.bits &= 0xffffffff >> (32 - self.number_of_bits);
             }
-            if bit_offset > 0 {
-                value_32bit <<= read_size;
-            }
-            value_32bit |= read_value;
             bit_offset += read_size;
-        }
-        value_32bit
-    }
-
-    /// Skips a number of bits.
-    fn skip_bits(&mut self, mut number_of_bits: usize) {
-        // Note that this does not check if number_of_bits <= 32
-        while number_of_bits > 0 {
-            self.read_data(number_of_bits);
-
-            let mut read_size: usize = number_of_bits;
-
-            if read_size > self.number_of_bits {
-                read_size = self.number_of_bits;
-            }
-            self.number_of_bits -= read_size;
-
-            if self.number_of_bits > 0 {
-                self.bits &= 0xffffffff >> (32 - self.number_of_bits);
-            }
-            number_of_bits -= read_size;
         }
     }
 }
@@ -598,9 +606,11 @@ impl LzfseContext {
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
     ) -> io::Result<()> {
-        let mut compressed_data_offset: usize = 0;
-        let compressed_data_size: usize = uncompressed_data.len();
         let mut frequency_table: [u16; 360] = [0; 360];
+
+        let mut compressed_data_offset: usize = 0;
+        let compressed_data_size: usize = compressed_data.len();
+
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
@@ -980,6 +990,12 @@ impl LzfseContext {
         let mut block_header: LzfseBlockV2Header = LzfseBlockV2Header::new();
         let mut data_end_offset: usize = data_offset + 24;
 
+        if data_end_offset > compressed_data_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid compressed data value too small",
+            ));
+        }
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "LzfseBlockV2Header data of size: 24 at offset: {} (0x{:08x})\n",
