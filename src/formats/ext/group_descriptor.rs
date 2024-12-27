@@ -70,7 +70,7 @@ impl Ext2GroupDescriptor {
         member(field(name = "number_of_unallocated_blocks_lower", data_type = "u16")),
         member(field(name = "number_of_unallocated_inodes_lower", data_type = "u16")),
         member(field(name = "number_of_directories_lower", data_type = "u16")),
-        member(field(name = "block_group_flags", data_type = "u16")),
+        member(field(name = "block_group_flags", data_type = "u16", format = "hex")),
         member(field(name = "exclude_bitmap_block_number", data_type = "u32")),
         member(field(
             name = "block_bitmap_checksum_lower",

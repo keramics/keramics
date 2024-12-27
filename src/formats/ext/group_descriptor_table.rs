@@ -34,6 +34,9 @@ pub struct ExtGroupDescriptorTable {
     /// Group descriptor size.
     group_descriptor_size: usize,
 
+    /// First group number.
+    first_group_number: u32,
+
     /// Number of group descriptors.
     number_of_group_descriptors: u32,
 
@@ -49,27 +52,39 @@ impl ExtGroupDescriptorTable {
             format_version: 2,
             metadata_checksum_seed: None,
             group_descriptor_size: 32,
+            first_group_number: 0,
             number_of_group_descriptors: 0,
             entries: Vec::new(),
         }
     }
 
     /// Initializes the group descriptor table.
-    pub fn initialize(&mut self, features: &ExtFeatures, number_of_group_descriptors: u32) {
+    pub fn initialize(
+        &mut self,
+        features: &ExtFeatures,
+        first_group_number: u32,
+        number_of_group_descriptors: u32,
+    ) {
         self.format_version = features.get_format_version();
         self.metadata_checksum_seed = features.get_metadata_checksum_seed();
         self.group_descriptor_size = features.get_group_descriptor_size() as usize;
+        self.first_group_number = first_group_number;
         self.number_of_group_descriptors = number_of_group_descriptors;
     }
 
     /// Reads the group descriptor table from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+        let empty_group_descriptor: Vec<u8> = vec![0; self.group_descriptor_size];
         let mut data_offset: usize = 0;
 
         for group_number in 0..self.number_of_group_descriptors {
             let mut group_descriptor: ExtGroupDescriptor = ExtGroupDescriptor::new();
 
             let data_end_offset: usize = data_offset + self.group_descriptor_size;
+
+            if &data[data_offset..data_end_offset] == &empty_group_descriptor {
+                break;
+            }
             if self.mediator.debug_output {
                 self.mediator.debug_print(
                     group_descriptor
@@ -84,7 +99,8 @@ impl ExtGroupDescriptorTable {
                     let mut crc32_context: ReversedCrc32Context =
                         ReversedCrc32Context::new(0x82f63b78, checksum_seed);
 
-                    let group_number_data: [u8; 4] = group_number.to_le_bytes();
+                    let group_number_data: [u8; 4] =
+                        (self.first_group_number + group_number).to_le_bytes();
                     crc32_context.update(&group_number_data);
                     crc32_context.update(&data[data_offset..data_offset + 30]);
                     crc32_context.update(&[0; 2]);
@@ -159,7 +175,7 @@ mod tests {
 
         let features: ExtFeatures = ExtFeatures::new();
         let mut test_struct: ExtGroupDescriptorTable = ExtGroupDescriptorTable::new();
-        test_struct.initialize(&features, 1);
+        test_struct.initialize(&features, 0, 1);
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.entries.len(), 1);

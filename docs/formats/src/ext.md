@@ -123,9 +123,9 @@ The ext2 superblock is 208 bytes in size and consists of:
 | 84 | 4 | | First non-reserved inode
 | 88 | 2 | | Inode size. Note that the inode size must be a power of 2 larger or equal to 128, the maximum supported by mke2fs is 1024
 | 90 | 2 | | Block group, which contains a block group number
-| 92 | 4 | | [Compatible features flags](#compatible_features_flags)
-| 96 | 4 | | [Incompatible features flags](#incompatible_features_flags)
-| 100 | 4 | | [Read-only compatible features flags](#read_only_compatible_features_flags)
+| 92 | 4 | | [Compatible feature flags](#compatible_feature_flags)
+| 96 | 4 | | [Incompatible feature flags](#incompatible_feature_flags)
+| 100 | 4 | | [Read-only compatible feature flags](#read_only_compatible_feature_flags)
 | 104 | 16 | | File system identifier, which contains a big-endian UUID
 | 120 | 16 | | Volume label, which contains a narrow character string without end-of-string character
 | 136 | 64 | | Last mount path, which contains a narrow character string without end-of-string character
@@ -170,9 +170,9 @@ The ext3 superblock is 336 bytes in size and consists of:
 | 84 | 4 | | First non-reserved inode
 | 88 | 2 | | Inode size. Note that the inode size must be a power of 2 larger or equal to 128, the maximum supported by mke2fs is 1024
 | 90 | 2 | | Block group, which contains a block group number
-| 92 | 4 | | [Compatible features flags](#compatible_features_flags)
-| 96 | 4 | | [Incompatible features flags](#incompatible_features_flags)
-| 100 | 4 | | [Read-only compatible features flags](#read_only_compatible_features_flags)
+| 92 | 4 | | [Compatible feature flags](#compatible_feature_flags)
+| 96 | 4 | | [Incompatible feature flags](#incompatible_feature_flags)
+| 100 | 4 | | [Read-only compatible feature flags](#read_only_compatible_feature_flags)
 | 104 | 16 | | File system identifier, which contains a big-endian UUID
 | 120 | 16 | | Volume label, which contains a narrow character string without end-of-string character
 | 136 | 64 | | Last mount path, which contains a narrow character string without end-of-string character
@@ -191,7 +191,7 @@ The ext3 superblock is 336 bytes in size and consists of:
 | 253 | 1 | | Journal backup type
 | 254 | 2 | | Group descriptor size
 | 256 | 4 | | Default mount options
-| 260 | 4 | | First metadata block group (or metablock)
+| 260 | 4 | | First meta block group (or metablock)
 | 264 | 4 | | File system creation time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 268 | 17 x 4 | | Backup journal inodes
 
@@ -230,9 +230,9 @@ The superblock is 1024 bytes in size and consists of:
 | 84 | 4 | | First non-reserved inode
 | 88 | 2 | | Inode size. Note that the inode size must be a power of 2 larger or equal to 128, the maximum supported by mke2fs is 1024
 | 90 | 2 | | Block group
-| 92 | 4 | | [Compatible features flags](#compatible_features_flags)
-| 96 | 4 | | [Incompatible features flags](#incompatible_features_flags)
-| 100 | 4 | | [Read-only compatible features flags](#read_only_compatible_features_flags)
+| 92 | 4 | | [Compatible feature flags](#compatible_feature_flags)
+| 96 | 4 | | [Incompatible feature flags](#incompatible_feature_flags)
+| 100 | 4 | | [Read-only compatible feature flags](#read_only_compatible_feature_flags)
 | 104 | 16 | | File system identifier, which contains a big-endian UUID
 | 120 | 16 | | Volume label, which contains a narrow character string without end-of-string character
 | 136 | 64 | | Last mount path, which contains a narrow character string without end-of-string character
@@ -251,7 +251,7 @@ The superblock is 1024 bytes in size and consists of:
 | 253 | 1 | | Journal backup type
 | 254 | 2 | | Group descriptor size
 | 256 | 4 | | Default mount options
-| 260 | 4 | | First metadata block group (or metablock)
+| 260 | 4 | | First meta block group (or metablock)
 | 264 | 4 | | File system creation time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 268 | 17 x 4 | | Backup journal inodes
 | <td colspan="4"> *If 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT) is enabled*
@@ -265,7 +265,7 @@ The superblock is 1024 bytes in size and consists of:
 | 358 | 2 | | Multiple mount protection (MMP) update interval in seconds
 | 360 | 8 | | Block for multi-mount protection
 | 368 | 4 | | Unknown (blocks on all data disks (N\*stride))
-| 372 | 1 | | Flex block group size, where the size is stored as: 2 ^ value
+| 372 | 1 | | Number of block groups per flex block group, which is stored as: 2 ^ value
 | 373 | 1 | | [Checksum type](#checksum_type)
 | 374 | 1 | | Unknown (encryption level)
 | 375 | 1 | | Unknown (padding)
@@ -294,7 +294,7 @@ The superblock is 1024 bytes in size and consists of:
 | 600 | 16 | | Unknown (s_encrypt_pw_salt)
 | 616 | 4 | | Unknown (s_lpf_ino)
 | 620 | 4 | | Unknown (s_prj_quota_inum)
-| 624 | 4 | | Unknown (s_checksum_seed)
+| 624 | 4 | | Metadata checksum seed
 | 628 | 1 | | Unknown (s_wtime_hi)
 | 629 | 1 | | Unknown (s_mtime_hi)
 | 630 | 1 | | Unknown (s_mkfs_time_hi)
@@ -323,6 +323,23 @@ polynomial (0x1edc6f41) and initial value of 0 is used to calculate the
 checksum.
 
 The checksum is calculated over the 1020 bytes of data of the suberblock.
+
+### Metadata checksum seed calculation
+
+If checksum type is CRC-32C, the CRC32-C algorithm with the Castagnoli
+polynomial (0x1edc6f41) and initial value of 0 is used to calculate the
+checksum.
+
+The checksum is calculated over:
+
+* the 16 byte file system identifier in the superblock
+
+If EXT4_FEATURE_INCOMPAT_CSUM_SEED is set the metadata checksum seed value
+stored in the superblock should be used instead of calculating it based on the
+file system identifier.
+
+If checksum type is CRC-32C, the metadata checksum seed is stored as
+0xffffffff - CRC-32C.
 
 ### <a name="file_system_state_flags"></a>File system state flags
 
@@ -357,20 +374,20 @@ The checksum is calculated over the 1020 bytes of data of the suberblock.
 | 0 | EXT2_GOOD_OLD_REV | Original version with a fixed inode size of 128 bytes
 | 1 | EXT2_DYNAMIC_REV | Version with dynamic inode size support
 
-### <a name="compatible_features_flags"></a>Compatible features flags
+### <a name="compatible_feature_flags"></a>Compatible feature flags
 
 | Value | Identifier | Description
 | --- | --- | ---
-| 0x00000001 | EXT2_COMPAT_PREALLOC | Pre-allocate directory blocks, which is intended to reduce fragmentation
+| 0x00000001 | EXT2_COMPAT_PREALLOC | Pre-allocate directory blocks, which is intended to reduce fragmentation.
 | 0x00000002 | EXT2_FEATURE_COMPAT_IMAGIC_INODES | Has AFS server inodes.
 | 0x00000004 | EXT3_FEATURE_COMPAT_HAS_JOURNAL | Has a journal.
-| 0x00000008 | EXT2_FEATURE_COMPAT_EXT_ATTR | Has extended inode attributes.
-| 0x00000010 | EXT2_FEATURE_COMPAT_RESIZE_INO, EXT2_FEATURE_COMPAT_RESIZE_INODE | Has reserved GDT blocks for file system expansion, which requires RO_COMPAT_SPARSE_SUPER
-| 0x00000020 | EXT2_FEATURE_COMPAT_DIR_INDEX | Has hash-indexed directories.
+| 0x00000008 | EXT2_FEATURE_COMPAT_EXT_ATTR | Has extended attributes.
+| 0x00000010 | EXT2_FEATURE_COMPAT_RESIZE_INO, EXT2_FEATURE_COMPAT_RESIZE_INODE | Is resizeable, the file system has reserved GDT blocks for expansion, which also requires RO_COMPAT_SPARSE_SUPER
+| 0x00000020 | EXT2_FEATURE_COMPAT_DIR_INDEX | Has indexed directories
 | 0x00000040 | COMPAT_LAZY_BG | Unknown (Lazy block group)
 | 0x00000080 | COMPAT_EXCLUDE_INODE | Unknown (Exclude inode), which is not yet implemented and intended for a future file system snapshot feature
 | 0x00000100 | COMPAT_EXCLUDE_BITMAP | Unknown (Exclude bitmap), which is not yet implemented and intended for a future file system snapshot feature
-| 0x00000200 | EXT4_FEATURE_COMPAT_SPARSE_SUPER2 | Has a version 2 sparse superblock.
+| 0x00000200 | EXT4_FEATURE_COMPAT_SPARSE_SUPER2 | Has sparse superblock version 2
 | 0x00000400 | EXT4_FEATURE_COMPAT_FAST_COMMIT | Unknown (fast commit)
 | 0x00000800 | EXT4_FEATURE_COMPAT_STABLE_INODES | Unknown (stable inodes)
 | 0x00001000 | EXT4_FEATURE_COMPAT_ORPHAN_FILE | Has orphan file.
@@ -378,7 +395,7 @@ The checksum is calculated over the 1020 bytes of data of the suberblock.
 > Note that EXT2_FEATURE_COMPAT_, EXT3_FEATURE_COMPAT_, EXT4_FEATURE_COMPAT_ and
 > COMPAT_ can be used interchangeably.
 
-### <a name="incompatible_features_flags"></a>Incompatible features flags
+### <a name="incompatible_feature_flags"></a>Incompatible feature flags
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -392,7 +409,7 @@ The checksum is calculated over the 1020 bytes of data of the suberblock.
 | 0x00000080 | EXT4_FEATURE_INCOMPAT_64BIT | Has 64-bit support, which supports more than 2^32 blocks
 | 0x00000100 | EXT4_FEATURE_INCOMPAT_MMP | Multiple mount protection
 | 0x00000200 | EXT4_FEATURE_INCOMPAT_FLEX_BG | Has flex (or flexible) block groups
-| 0x00000400 | EXT4_FEATURE_INCOMPAT_EA_INODE | Inodes can be used to store large extended attribute values
+| 0x00000400 | EXT4_FEATURE_INCOMPAT_EA_INODE | Has large inodes, which are larger than 128 bytes.
 | | |
 | 0x00001000 | EXT4_FEATURE_INCOMPAT_DIRDATA | Data in directory entry, which is not yet implemented
 | 0x00002000 | EXT4_FEATURE_INCOMPAT_CSUM_SEED, EXT4_FEATURE_INCOMPAT_BG_USE_META_CSUM | Initial metadata checksum value (or seed) is stored in the superblock
@@ -404,7 +421,7 @@ The checksum is calculated over the 1020 bytes of data of the suberblock.
 > Note that EXT2_FEATURE_INCOMPAT_, EXT3_FEATURE_INCOMPAT_,
 > EXT4_FEATURE_INCOMPAT_ and INCOMPAT_ can be used interchangeably.
 
-### <a name="read_only_compatible_features_flags"></a>Read-only compatible features flags
+### <a name="read_only_compatible_feature_flags"></a>Read-only compatible feature flags
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -430,7 +447,7 @@ The checksum is calculated over the 1020 bytes of data of the suberblock.
 > EXT4_FEATURE_RO_COMPAT_ and RO_COMPAT_ can be used interchangeably.
 
 > Note that in some ext file systems used by ChromeOS it has been observed that
-> the upper 8-bits of the read-only compatible features flags are set as in
+> the upper 8-bits of the read-only compatible feature flags are set as in
 > 0xff000003. debugfs identifies these as FEATURE_R24 - FEATURE_R31.
 
 ### <a name="checksum_types"></a>Checksum types

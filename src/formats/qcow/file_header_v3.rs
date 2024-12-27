@@ -36,9 +36,9 @@ use super::constants::*;
         field(name = "reference_count_table_clusters", data_type = "u32"),
         field(name = "number_of_snapshots", data_type = "u32"),
         field(name = "snapshots_offset", data_type = "u64"),
-        field(name = "incompatible_features_flags", data_type = "u64"),
-        field(name = "compatible_features_flags", data_type = "u64"),
-        field(name = "auto_clear_features_flags", data_type = "u64"),
+        field(name = "incompatible_feature_flags", data_type = "u64"),
+        field(name = "compatible_feature_flags", data_type = "u64"),
+        field(name = "auto_clear_feature_flags", data_type = "u64"),
         field(name = "reference_count_order", data_type = "u32"),
         field(name = "header_size", data_type = "u32"),
         field(name = "compression_method", data_type = "u8"),
@@ -103,25 +103,25 @@ impl QcowFileHeaderV3 {
         }
         let supported_flags: u64 = 1;
 
-        let incompatible_features_flags: u64 = bytes_to_u64_be!(data, 72);
+        let incompatible_feature_flags: u64 = bytes_to_u64_be!(data, 72);
 
-        if incompatible_features_flags & !(supported_flags) != 0 {
+        if incompatible_feature_flags & !(supported_flags) != 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "Unsupported incompatible features flags: 0x{:016x}",
-                    incompatible_features_flags
+                    "Unsupported incompatible feature flags: 0x{:016x}",
+                    incompatible_feature_flags
                 ),
             ));
         }
-        let compatible_features_flags: u64 = bytes_to_u64_be!(data, 80);
+        let compatible_feature_flags: u64 = bytes_to_u64_be!(data, 80);
 
-        if compatible_features_flags & !(supported_flags) != 0 {
+        if compatible_feature_flags & !(supported_flags) != 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "Unsupported compatible features flags: 0x{:016x}",
-                    compatible_features_flags
+                    "Unsupported compatible feature flags: 0x{:016x}",
+                    compatible_feature_flags
                 ),
             ));
         }
@@ -225,7 +225,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_with_unsupported_incompatible_features_flags() {
+    fn test_read_data_with_unsupported_incompatible_feature_flags() {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[72] = 0xff;
 
@@ -235,7 +235,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_with_unsupported_compatible_features_flags() {
+    fn test_read_data_with_unsupported_compatible_feature_flags() {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[80] = 0xff;
 

@@ -192,9 +192,9 @@ The file header - version 3 is 104 or 112 bytes in size and consist of:
 | 56 | 4 | | Reference count table clusters
 | 60 | 4 | | Number of snapshots
 | 64 | 8 | | Snapshots offset
-| 72 | 8 | | Incompatible features flags
-| 80 | 8 | | Compatible features flags
-| 88 | 8 | | Auto-clear features flags
+| 72 | 8 | | Incompatible feature flags
+| 80 | 8 | | Compatible feature flags
+| 88 | 8 | | Auto-clear feature flags
 | 96 | 4 | | Reference count order
 | 100 | 4 | 104 or 112 | File header size, which contains the size of the file header, this value does not include the size of the file header extensions
 | <td colspan="4"> *If file header size equals 112*
@@ -236,7 +236,7 @@ after the file header.
 | 1 | QCOW_CRYPT_AES | AES-CBC 128-bits encryption
 | 2 | QCOW_CRYPT_LUKS | Linux Unified Key Setup (LUKS) encryption
 
-### Incompatible features flags
+### Incompatible feature flags
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -246,13 +246,13 @@ after the file header.
 | 0x00000008 | QCOW2_INCOMPAT_COMPRESSION |
 | 0x00000010 | QCOW2_INCOMPAT_EXTL2 |
 
-### Compatible features flags
+### Compatible feature flags
 
 | Value | Identifier | Description
 | --- | --- | ---
 | 0x00000001 | QCOW2_COMPAT_LAZY_REFCOUNTS |
 
-### Auto-clear features flags
+### Auto-clear feature flags
 
 | Value | Identifier | Description
 | --- | --- | ---

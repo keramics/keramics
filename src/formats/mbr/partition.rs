@@ -115,7 +115,7 @@ impl VfsDataStream for MbrPartition {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsFileType, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathType};
 
     #[test]
     fn test_open() -> io::Result<()> {
