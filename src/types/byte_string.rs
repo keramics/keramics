@@ -77,4 +77,9 @@ mod tests {
         let byte_string: ByteString = ByteString::from_bytes(&test_data);
         assert_eq!(byte_string.to_string(), "ASCII string".to_string(),);
     }
+
+    // TODO: add test for is_empty
+    // TODO: add test for len
+    // TODO: add test for read_elements
+    // TODO: add test for to_string
 }

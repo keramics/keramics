@@ -16,7 +16,7 @@ use std::io::{Read, Seek, SeekFrom};
 
 use crate::datetime::DateTime;
 
-use super::enums::VfsFileType;
+use super::enums::{VfsFileType, VfsPathType};
 use super::path::VfsPath;
 use super::types::{VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference};
 
@@ -27,12 +27,14 @@ pub trait VfsDataStream: Read + Seek {
     /// Retrieves the size of the data stream.
     fn get_size(&mut self) -> io::Result<u64>;
 
+    /// Reads data at a specific position.
     #[inline(always)]
     fn read_at_position(&mut self, data: &mut [u8], position: SeekFrom) -> io::Result<usize> {
         self.seek(position)?;
         self.read(data)
     }
 
+    /// Reads an exact amount of data at a specific position.
     #[inline(always)]
     fn read_exact_at_position(&mut self, data: &mut [u8], position: SeekFrom) -> io::Result<u64> {
         let offset: u64 = self.seek(position)?;
@@ -68,6 +70,9 @@ pub trait VfsFileEntry {
 pub trait VfsFileSystem {
     /// Determines if the file entry with the specified path exists.
     fn file_entry_exists(&self, path: &VfsPath) -> io::Result<bool>;
+
+    /// Retrieves the path type.
+    fn get_vfs_path_type(&self) -> VfsPathType;
 
     /// Retrieves the directory name of the specified location.
     fn get_directory_name<'a>(&self, location: &'a str) -> &'a str {

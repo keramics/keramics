@@ -16,23 +16,33 @@ use std::sync::{Arc, RwLock};
 
 use super::context::VfsContext;
 use super::path::VfsPath;
-use super::types::{VfsFileSystemReference, VfsResolverReference};
+use super::types::{VfsFileEntryReference, VfsFileSystemReference, VfsResolverReference};
 
 /// Virtual File System (VFS) resolver.
 pub struct VfsResolver {
+    /// VFS context.
     context: RwLock<VfsContext>,
 }
 
 impl VfsResolver {
     /// Creates a new resolver.
-    pub fn new() -> Arc<Self> {
+    fn new() -> Arc<Self> {
         Arc::new(Self {
             context: RwLock::new(VfsContext::new()),
         })
     }
 
+    /// Retrieves a reference to the resolver.
     pub fn current() -> VfsResolverReference {
         CURRENT_RESOLVER.with(|resolver| resolver.clone())
+    }
+
+    /// Opens a file entry.
+    pub fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
+        match self.context.write() {
+            Ok(mut context) => context.open_file_entry(path),
+            Err(error) => Err(crate::error_to_io_error!(error)),
+        }
     }
 
     /// Opens a file system.
@@ -55,11 +65,32 @@ mod tests {
     use crate::vfs::enums::VfsPathType;
 
     #[test]
+    fn test_open_file_entry() -> io::Result<()> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "test_data/file.txt", None);
+        let result: Option<VfsFileEntryReference> = vfs_resolver.open_file_entry(&vfs_path)?;
+        assert!(result.is_some());
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "test_data/bogus.txt", None);
+        let result: Option<VfsFileEntryReference> = vfs_resolver.open_file_entry(&vfs_path)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_open_file_system() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        vfs_resolver.open_file_system(&vfs_path)?;
+        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+
+        let vfs_path_type: VfsPathType = match vfs_file_system.with_read_lock() {
+            Ok(file_system) => file_system.get_vfs_path_type(),
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        assert!(vfs_path_type == VfsPathType::Os);
 
         Ok(())
     }

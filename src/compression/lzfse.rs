@@ -168,7 +168,7 @@ impl<'a> Bitstream for LzfseBitstream<'a> {
     }
 
     /// Skips a number of bits.
-    fn skip_bits(&mut self, mut number_of_bits: usize) {
+    fn skip_bits(&mut self, number_of_bits: usize) {
         // Note that this does not check if number_of_bits <= 32
         let mut bit_offset: usize = 0;
         while bit_offset < number_of_bits {

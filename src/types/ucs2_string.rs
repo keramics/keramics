@@ -60,8 +60,14 @@ impl Ucs2String {
 
     /// Retrieves the string representation of an UCS-2 string.
     pub fn to_string(&self) -> String {
-        // TODO: add support for non-Unicode characters.
-        String::from_utf16(&self.elements).unwrap()
+        self.elements
+            .iter()
+            .map(|element| match char::from_u32(*element as u32) {
+                Some(unicode_character) => unicode_character.to_string(),
+                None => format!("\\{{{:04x}}}", element),
+            })
+            .collect::<Vec<String>>()
+            .join("")
     }
 }
 
@@ -77,7 +83,11 @@ mod tests {
         ];
 
         let ucs2_string: Ucs2String = Ucs2String::from_be_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), "UCS-2 string".to_string(),);
+        let expected_elements: Vec<u16> = vec![
+            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
+            0x0067,
+        ];
+        assert_eq!(&ucs2_string.elements, &expected_elements);
     }
 
     #[test]
@@ -88,6 +98,29 @@ mod tests {
         ];
 
         let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), "UCS-2 string".to_string(),);
+        let expected_elements: Vec<u16> = vec![
+            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
+            0x0067,
+        ];
+        assert_eq!(&ucs2_string.elements, &expected_elements);
+    }
+
+    #[test]
+    fn test_to_string() {
+        let test_data: [u8; 24] = [
+            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73, 0x00,
+            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
+        ];
+
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+
+        assert_eq!(ucs2_string.to_string(), "UCS-2 string".to_string());
+        let test_data: [u8; 24] = [
+            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x00, 0xd8, 0x20, 0x00, 0x73, 0x00,
+            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
+        ];
+
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        assert_eq!(ucs2_string.to_string(), "UCS-\\{d800} string".to_string());
     }
 }
