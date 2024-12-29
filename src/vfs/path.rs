@@ -30,25 +30,25 @@ pub struct VfsPath {
 
 impl VfsPath {
     /// Creates a new path.
-    pub fn new(path_type: VfsPathType, location: &str, parent: Option<VfsPath>) -> Self {
-        let parent_reference: Option<VfsPathReference> = match parent {
-            Some(value) => Some(Rc::new(value)),
-            None => None,
-        };
-        Self {
+    pub fn new(
+        path_type: VfsPathType,
+        location: &str,
+        parent: Option<&VfsPathReference>,
+    ) -> VfsPathReference {
+        Rc::new(Self {
             path_type: path_type.clone(),
             location: location.to_string(),
-            parent: parent_reference,
-        }
+            parent: parent.cloned(),
+        })
     }
 
     /// Creates a new path from another path.
-    pub fn new_from_path(path: &VfsPath, location: &str) -> Self {
-        Self {
+    pub fn new_from_path(path: &VfsPathReference, location: &str) -> VfsPathReference {
+        Rc::new(Self {
             path_type: path.path_type.clone(),
             location: location.to_string(),
             parent: path.get_parent(),
-        }
+        })
     }
 
     /// Retrieves the parent path.
@@ -66,10 +66,32 @@ mod tests {
 
     #[test]
     fn test_new() {
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let test_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
 
-        assert!(vfs_path.path_type == VfsPathType::Os);
-        assert_eq!(vfs_path.location, "./test_data/file.txt");
-        assert!(vfs_path.parent.is_none());
+        assert!(test_path.path_type == VfsPathType::Os);
+        assert_eq!(test_path.location, "./test_data/file.txt");
+        assert!(test_path.parent.is_none());
+
+        let os_vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let test_path: VfsPathReference = VfsPath::new(VfsPathType::Qcow, "/", Some(&os_vfs_path));
+
+        assert!(test_path.path_type == VfsPathType::Qcow);
+        assert_eq!(test_path.location, "/");
+        assert!(test_path.parent.is_some());
+    }
+
+    #[test]
+    fn test_new_from_path() {
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+
+        let test_path: VfsPathReference =
+            VfsPath::new_from_path(&vfs_path, "./test_data/bogus.txt");
+
+        assert!(test_path.path_type == VfsPathType::Os);
+        assert_eq!(test_path.location, "./test_data/bogus.txt");
+        assert!(test_path.parent.is_none());
     }
 }

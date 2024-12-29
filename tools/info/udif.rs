@@ -18,10 +18,13 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::udif::{UdifCompressionMethod, UdifFile};
-use keramics::vfs::{VfsFileSystemReference, VfsPath};
+use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
 
 /// Prints information about an UDIF file.
-pub fn print_udif_file(file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_udif_file(
+    file_system: &VfsFileSystemReference,
+    vfs_path: &VfsPathReference,
+) -> ExitCode {
     let mut udif_file: UdifFile = UdifFile::new();
 
     match udif_file.open(file_system, vfs_path) {

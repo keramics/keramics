@@ -125,7 +125,7 @@ impl VfsDataStream for GptPartition {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath, VfsPathReference, VfsPathType};
 
     #[test]
     fn test_open() -> io::Result<()> {
@@ -135,7 +135,8 @@ mod tests {
         let type_identifier: Uuid = Uuid::new();
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         let vfs_data_stream: VfsDataStreamReference =
             match vfs_context.open_data_stream(&vfs_path, None)? {
                 Some(data_stream) => data_stream,

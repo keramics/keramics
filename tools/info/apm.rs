@@ -16,7 +16,7 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::apm::{ApmPartition, ApmVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPath};
+use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPathReference};
 
 /// Prints the partition status flags.
 fn print_apm_partition_status_flags(flags: u32) {
@@ -63,7 +63,7 @@ fn print_apm_partition_status_flags(flags: u32) {
 /// Prints information about an APM volume system.
 pub fn print_apm_volume_system(
     file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
+    vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut apm_volume_system = ApmVolumeSystem::new();
 

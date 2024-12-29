@@ -32,6 +32,6 @@ fuzz_target!(|data: &[u8]| {
     let mut mbr_volume_system = MbrVolumeSystem::new();
 
     let vfs_file_system: VfsFileSystemReference = SharedValue::new(Box::new(fake_file_system));
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/input", None);
+    let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);
     _ = mbr_volume_system.open(&vfs_file_system, &vfs_path);
 });

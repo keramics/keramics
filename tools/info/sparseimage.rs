@@ -16,12 +16,12 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::sparseimage::SparseImageFile;
-use keramics::vfs::{VfsFileSystemReference, VfsPath};
+use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
 
 /// Prints information about a sparse image file.
 pub fn print_sparseimage_file(
     file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
+    vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 

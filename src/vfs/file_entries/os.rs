@@ -25,7 +25,6 @@ use std::os::windows::fs::MetadataExt;
 use crate::datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
-use crate::vfs::path::VfsPath;
 use crate::vfs::traits::VfsFileEntry;
 use crate::vfs::types::{VfsDataStreamReference, VfsPathReference};
 
@@ -76,7 +75,7 @@ impl OsVfsFileEntry {
 
     /// Initializes the file entry.
     #[cfg(unix)]
-    pub(crate) fn initialize(&mut self, path: &VfsPath) -> io::Result<()> {
+    pub(crate) fn initialize(&mut self, path: &VfsPathReference) -> io::Result<()> {
         let parent_path: Option<VfsPathReference> = path.get_parent();
         if parent_path.is_some() {
             return Err(io::Error::new(
@@ -137,7 +136,7 @@ impl OsVfsFileEntry {
 
     /// Initializes the file entry.
     #[cfg(windows)]
-    pub(crate) fn initialize(&mut self, path: &VfsPath) -> io::Result<()> {
+    pub(crate) fn initialize(&mut self, path: &VfsPathReference) -> io::Result<()> {
         // TODO: add Windows support.
         todo!();
     }
@@ -187,12 +186,14 @@ mod tests {
     use super::*;
 
     use crate::vfs::enums::VfsPathType;
+    use crate::vfs::path::VfsPath;
 
     #[test]
     fn test_initialize() -> io::Result<()> {
         let mut vfs_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         vfs_file_entry.initialize(&vfs_path)?;
 
         assert!(vfs_file_entry.file_type == VfsFileType::File);
@@ -204,7 +205,8 @@ mod tests {
     fn test_open_data_stream() -> io::Result<()> {
         let mut vfs_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         vfs_file_entry.initialize(&vfs_path)?;
 
         let expected_data: String = [

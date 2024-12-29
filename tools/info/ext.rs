@@ -23,7 +23,7 @@ use keramics::hashes::{DigestHashContext, Md5Context};
 use keramics::types::ByteString;
 use keramics::vfs::{
     VfsDataStream, VfsDataStreamReference, VfsFileEntry, VfsFileSystem, VfsFileSystemReference,
-    VfsPath,
+    VfsPathReference,
 };
 
 /// Retrieves the bodyfile representation of a date and time value.
@@ -256,7 +256,10 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
 }
 
 /// Prints information about an Extended File System (ext).
-pub fn print_ext_file_system(file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_ext_file_system(
+    file_system: &VfsFileSystemReference,
+    vfs_path: &VfsPathReference,
+) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
     match ext_file_system.open(file_system, vfs_path) {
@@ -512,7 +515,7 @@ fn print_ext_file_entry_path(
 /// Prints information about a specific entry of an Extended File System (ext).
 pub fn print_entry_ext_file_system(
     file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
+    vfs_path: &VfsPathReference,
     ext_entry_identifier: u64,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
@@ -557,7 +560,7 @@ pub fn print_entry_ext_file_system(
 /// Prints the hierarchy of an Extended File System (ext).
 pub fn print_hierarcy_ext_file_system(
     file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
+    vfs_path: &VfsPathReference,
     bodyfile: bool,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
@@ -622,7 +625,7 @@ fn print_hierarcy_ext_file_entry(
 /// Prints information about a specific path of an Extended File System (ext).
 pub fn print_path_ext_file_system(
     file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
+    vfs_path: &VfsPathReference,
     path: &String,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();

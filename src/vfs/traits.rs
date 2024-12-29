@@ -17,8 +17,9 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::datetime::DateTime;
 
 use super::enums::{VfsFileType, VfsPathType};
-use super::path::VfsPath;
-use super::types::{VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference};
+use super::types::{
+    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
+};
 
 /// Virtual File System (VFS) data stream trait.
 pub trait VfsDataStream: Read + Seek {
@@ -69,7 +70,7 @@ pub trait VfsFileEntry {
 /// Virtual File System (VFS) file system trait.
 pub trait VfsFileSystem {
     /// Determines if the file entry with the specified path exists.
-    fn file_entry_exists(&self, path: &VfsPath) -> io::Result<bool>;
+    fn file_entry_exists(&self, path: &VfsPathReference) -> io::Result<bool>;
 
     /// Retrieves the path type.
     fn get_vfs_path_type(&self) -> VfsPathType;
@@ -88,13 +89,17 @@ pub trait VfsFileSystem {
     }
 
     /// Opens a file system.
-    fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()>;
+    fn open(
+        &mut self,
+        file_system: &VfsFileSystemReference,
+        path: &VfsPathReference,
+    ) -> io::Result<()>;
 
     /// Opens a data stream with the specified path and name.
     #[inline(always)]
     fn open_data_stream(
         &self,
-        path: &VfsPath,
+        path: &VfsPathReference,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
         match self.open_file_entry(path)? {
@@ -104,5 +109,6 @@ pub trait VfsFileSystem {
     }
 
     /// Opens a file entry with the specified path.
-    fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>>;
+    fn open_file_entry(&self, path: &VfsPathReference)
+        -> io::Result<Option<VfsFileEntryReference>>;
 }

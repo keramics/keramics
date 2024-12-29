@@ -16,12 +16,12 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::gpt::{GptPartition, GptVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPath};
+use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPathReference};
 
 /// Prints information about a GPT volume system.
 pub fn print_gpt_volume_system(
     file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
+    vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut gpt_volume_system = GptVolumeSystem::new();
 
