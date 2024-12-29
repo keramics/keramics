@@ -12,11 +12,11 @@ path = "src/lib.rs"
 
 [[bin]]
 name = "keramicsinfo"
-path = "tools/infotool.rs"
+path = "tools/info_tool.rs"
 
 [[bin]]
 name = "keramicshash"
-path = "tools/hashtool.rs"
+path = "tools/hash_tool.rs"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }

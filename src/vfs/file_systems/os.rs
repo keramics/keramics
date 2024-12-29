@@ -57,6 +57,11 @@ impl VfsFileSystem for OsVfsFileSystem {
         }
     }
 
+    /// Retrieves the path type.
+    fn get_vfs_path_type(&self) -> VfsPathType {
+        VfsPathType::Os
+    }
+
     /// Opens a file system.
     fn open(
         &mut self,
@@ -86,10 +91,17 @@ impl VfsFileSystem for OsVfsFileSystem {
                 "Unsupported path type",
             ));
         }
-        let mut file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
-        file_entry.initialize(path)?;
+        let os_path: &Path = Path::new(&path.location);
 
-        Ok(Some(Box::new(file_entry)))
+        let result: Option<VfsFileEntryReference> = match os_path.try_exists()? {
+            false => None,
+            true => {
+                let mut file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
+                file_entry.initialize(path)?;
+                Some(Box::new(file_entry))
+            }
+        };
+        Ok(result)
     }
 }
 
@@ -130,6 +142,16 @@ mod tests {
 
         let directory_name: &str = vfs_file_system.get_directory_name("./test_data/file.txt");
         assert_eq!(directory_name, "./test_data");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_vfs_path_type() -> io::Result<()> {
+        let vfs_file_system: OsVfsFileSystem = OsVfsFileSystem::new();
+
+        let vfs_path_type: VfsPathType = vfs_file_system.get_vfs_path_type();
+        assert!(vfs_path_type == VfsPathType::Os);
 
         Ok(())
     }

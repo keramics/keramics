@@ -118,6 +118,11 @@ impl VfsFileSystem for VhdImage {
         }
     }
 
+    /// Retrieves the path type.
+    fn get_vfs_path_type(&self) -> VfsPathType {
+        VfsPathType::Vhd
+    }
+
     /// Opens a storage media image.
     fn open(
         &mut self,
@@ -211,7 +216,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut image = VhdImage::new();
+        let mut image: VhdImage = VhdImage::new();
 
         let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
@@ -297,6 +302,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_vfs_path_type() -> io::Result<()> {
+        let image: VhdImage = VhdImage::new();
+
+        let vfs_path_type: VfsPathType = image.get_vfs_path_type();
+        assert!(vfs_path_type == VfsPathType::Vhd);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -304,7 +319,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut image = VhdImage::new();
+        let mut image: VhdImage = VhdImage::new();
 
         let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
@@ -360,10 +375,9 @@ mod tests {
             None,
         );
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/bogus1", Some(os_vfs_path));
-        let vfs_file_entry: Option<VfsFileEntryReference> =
-            image.open_file_entry(&test_vfs_path)?;
+        let result: Option<VfsFileEntryReference> = image.open_file_entry(&test_vfs_path)?;
 
-        assert!(vfs_file_entry.is_none());
+        assert!(result.is_none());
 
         Ok(())
     }

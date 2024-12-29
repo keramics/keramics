@@ -314,6 +314,11 @@ impl VfsFileSystem for GptVolumeSystem {
         }
     }
 
+    /// Retrieves the path type.
+    fn get_vfs_path_type(&self) -> VfsPathType {
+        VfsPathType::Gpt
+    }
+
     /// Opens a volume system.
     fn open(
         &mut self,
@@ -360,7 +365,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut volume_system = GptVolumeSystem::new();
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         volume_system.open(&parent_file_system, &vfs_path)?;
@@ -370,7 +375,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/gpt2", None);
         assert_eq!(volume_system.file_entry_exists(&vfs_path)?, true);
@@ -383,7 +388,7 @@ mod tests {
 
     #[test]
     fn test_get_directory_name() -> io::Result<()> {
-        let volume_system = GptVolumeSystem::new();
+        let volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let directory_name: &str = volume_system.get_directory_name("/gpt1");
         assert_eq!(directory_name, "/");
@@ -393,7 +398,7 @@ mod tests {
 
     #[test]
     fn test_get_partition_by_index() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let partition: GptPartition = volume_system.get_partition_by_index(0)?;
 
@@ -405,7 +410,7 @@ mod tests {
 
     #[test]
     fn get_partition_index_by_path() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let partition_index: usize = volume_system.get_partition_index_by_path("/gpt1")?;
         assert_eq!(partition_index, 0);
@@ -421,7 +426,7 @@ mod tests {
 
     #[test]
     fn test_get_partition_by_path() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let result: Option<GptPartition> = volume_system.get_partition_by_path("/")?;
         assert!(result.is_none());
@@ -437,6 +442,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_vfs_path_type() -> io::Result<()> {
+        let volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+        let vfs_path_type: VfsPathType = volume_system.get_vfs_path_type();
+        assert!(vfs_path_type == VfsPathType::Gpt);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -444,7 +459,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut volume_system = GptVolumeSystem::new();
+        let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         volume_system.open(&parent_file_system, &vfs_path)?;
@@ -456,7 +471,7 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_of_root() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/", Some(os_vfs_path));
@@ -470,7 +485,7 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_of_partition() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/gpt2", Some(os_vfs_path));
@@ -484,21 +499,21 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_non_existing() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/bogus2", Some(os_vfs_path));
-        let vfs_file_entry: Option<VfsFileEntryReference> =
+        let result: Option<VfsFileEntryReference> =
             volume_system.open_file_entry(&test_vfs_path)?;
 
-        assert!(vfs_file_entry.is_none());
+        assert!(result.is_none());
 
         Ok(())
     }
 
     #[test]
     fn test_open_file_entry_with_unsupported_path_type() -> io::Result<()> {
-        let volume_system = get_volume_system()?;
+        let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::NotSet, "/", None);
 

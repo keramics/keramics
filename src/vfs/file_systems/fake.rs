@@ -76,6 +76,11 @@ impl VfsFileSystem for FakeVfsFileSystem {
         Ok(self.paths.contains_key(&path.location))
     }
 
+    /// Retrieves the path type.
+    fn get_vfs_path_type(&self) -> VfsPathType {
+        VfsPathType::Fake
+    }
+
     /// Opens a file system.
     fn open(
         &mut self,
@@ -155,6 +160,16 @@ mod tests {
 
         let directory_name: &str = vfs_file_system.get_directory_name("/fake/file.txt");
         assert_eq!(directory_name, "/fake");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_vfs_path_type() -> io::Result<()> {
+        let vfs_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
+
+        let vfs_path_type: VfsPathType = vfs_file_system.get_vfs_path_type();
+        assert!(vfs_path_type == VfsPathType::Fake);
 
         Ok(())
     }

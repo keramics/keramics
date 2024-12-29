@@ -375,6 +375,11 @@ impl VfsFileSystem for ExtFileSystem {
         Ok(result)
     }
 
+    /// Retrieves the path type.
+    fn get_vfs_path_type(&self) -> VfsPathType {
+        VfsPathType::Ext
+    }
+
     /// Opens a file system.
     fn open(
         &mut self,
@@ -421,7 +426,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut file_system = ExtFileSystem::new();
+        let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         file_system.open(&parent_file_system, &vfs_path)?;
@@ -431,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Ext, "/passwords.txt", None);
         assert_eq!(file_system.file_entry_exists(&vfs_path)?, true);
@@ -444,7 +449,7 @@ mod tests {
 
     #[test]
     fn test_get_file_entry_by_inode_number() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_inode_number(14)?;
 
@@ -458,7 +463,7 @@ mod tests {
 
     #[test]
     fn test_get_file_entry_by_path() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/passwords.txt");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
@@ -478,11 +483,21 @@ mod tests {
 
     #[test]
     fn test_get_root_directory() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let file_entry: ExtFileEntry = file_system.get_root_directory()?;
 
         assert_eq!(file_entry.inode_number, 2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_vfs_path_type() -> io::Result<()> {
+        let file_system: ExtFileSystem = ExtFileSystem::new();
+
+        let vfs_path_type: VfsPathType = file_system.get_vfs_path_type();
+        assert!(vfs_path_type == VfsPathType::Ext);
 
         Ok(())
     }
@@ -495,7 +510,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&parent_file_system_path)?;
 
-        let mut file_system = ExtFileSystem::new();
+        let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         file_system.open(&parent_file_system, &vfs_path)?;
@@ -520,7 +535,7 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_of_root() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Ext, "/", Some(os_vfs_path));
@@ -534,7 +549,7 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_of_file() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         let test_vfs_path: VfsPath =
@@ -549,21 +564,20 @@ mod tests {
 
     #[test]
     fn test_test_open_file_entry_non_existing() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Ext, "/bogus2", Some(os_vfs_path));
-        let vfs_file_entry: Option<VfsFileEntryReference> =
-            file_system.open_file_entry(&test_vfs_path)?;
+        let result: Option<VfsFileEntryReference> = file_system.open_file_entry(&test_vfs_path)?;
 
-        assert!(vfs_file_entry.is_none());
+        assert!(result.is_none());
 
         Ok(())
     }
 
     #[test]
     fn test_open_file_entry_with_unsupported_path_type() -> io::Result<()> {
-        let file_system = get_file_system()?;
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::NotSet, "/", None);
 
