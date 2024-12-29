@@ -21,13 +21,10 @@ use keramics::formats::udif::{UdifCompressionMethod, UdifFile};
 use keramics::vfs::{VfsFileSystemReference, VfsPath};
 
 /// Prints information about an UDIF file.
-pub fn print_udif_file(
-    parent_file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
-) -> ExitCode {
+pub fn print_udif_file(file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut udif_file: UdifFile = UdifFile::new();
 
-    match udif_file.open(parent_file_system, vfs_path) {
+    match udif_file.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open UDIF file with error: {}", error);

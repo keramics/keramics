@@ -82,15 +82,11 @@ impl VfsFileSystem for FakeVfsFileSystem {
     }
 
     /// Opens a file system.
-    fn open(
-        &mut self,
-        parent_file_system: &VfsFileSystemReference,
-        path: &VfsPath,
-    ) -> io::Result<()> {
-        if parent_file_system.is_some() {
+    fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()> {
+        if file_system.is_some() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Unsupported parent file system",
+                "Unsupported file system",
             ));
         }
         if path.path_type != VfsPathType::Fake {
@@ -127,38 +123,38 @@ mod tests {
     use crate::vfs::enums::VfsFileType;
 
     fn get_file_system() -> io::Result<FakeVfsFileSystem> {
-        let parent_file_system: VfsFileSystemReference = SharedValue::none();
+        let vfs_file_system: VfsFileSystemReference = SharedValue::none();
 
-        let mut vfs_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
+        let mut test_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
 
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
         let vfs_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&test_data);
-        vfs_file_system.add_file_entry("/fake/file.txt", vfs_file_entry)?;
+        test_file_system.add_file_entry("/fake/file.txt", vfs_file_entry)?;
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/", None);
-        vfs_file_system.open(&parent_file_system, &vfs_path)?;
+        test_file_system.open(&vfs_file_system, &vfs_path)?;
 
-        Ok(vfs_file_system)
+        Ok(test_file_system)
     }
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let vfs_file_system: FakeVfsFileSystem = get_file_system()?;
+        let test_file_system: FakeVfsFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/fake/file.txt", None);
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+        assert_eq!(test_file_system.file_entry_exists(&vfs_path)?, true);
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/fake/bogus.txt", None);
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+        assert_eq!(test_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
     }
 
     #[test]
     fn test_get_directory_name() -> io::Result<()> {
-        let vfs_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
+        let test_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
 
-        let directory_name: &str = vfs_file_system.get_directory_name("/fake/file.txt");
+        let directory_name: &str = test_file_system.get_directory_name("/fake/file.txt");
         assert_eq!(directory_name, "/fake");
 
         Ok(())
@@ -166,9 +162,9 @@ mod tests {
 
     #[test]
     fn test_get_vfs_path_type() -> io::Result<()> {
-        let vfs_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
+        let test_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
 
-        let vfs_path_type: VfsPathType = vfs_file_system.get_vfs_path_type();
+        let vfs_path_type: VfsPathType = test_file_system.get_vfs_path_type();
         assert!(vfs_path_type == VfsPathType::Fake);
 
         Ok(())
@@ -176,23 +172,23 @@ mod tests {
 
     #[test]
     fn test_open() -> io::Result<()> {
-        let parent_file_system: VfsFileSystemReference = SharedValue::none();
+        let vfs_file_system: VfsFileSystemReference = SharedValue::none();
 
-        let mut vfs_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
+        let mut test_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/", None);
-        vfs_file_system.open(&parent_file_system, &vfs_path)?;
+        test_file_system.open(&vfs_file_system, &vfs_path)?;
 
         Ok(())
     }
 
     #[test]
     fn test_open_file_entry() -> io::Result<()> {
-        let vfs_file_system: FakeVfsFileSystem = get_file_system()?;
+        let test_file_system: FakeVfsFileSystem = get_file_system()?;
 
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/fake/file.txt", None);
         let vfs_file_entry: VfsFileEntryReference =
-            vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
+            test_file_system.open_file_entry(&test_vfs_path)?.unwrap();
         assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
 
         Ok(())
@@ -200,10 +196,10 @@ mod tests {
 
     #[test]
     fn test_open_file_entry_with_unsupported_path_type() -> io::Result<()> {
-        let vfs_file_system: FakeVfsFileSystem = get_file_system()?;
+        let test_file_system: FakeVfsFileSystem = get_file_system()?;
 
         let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::NotSet, "/", None);
-        let result = vfs_file_system.open_file_entry(&test_vfs_path);
+        let result = test_file_system.open_file_entry(&test_vfs_path);
         assert!(result.is_err());
 
         Ok(())

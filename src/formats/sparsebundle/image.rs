@@ -26,8 +26,8 @@ pub struct SparseBundleImage {
     /// Mediator.
     mediator: MediatorReference,
 
-    /// Parent file system.
-    parent_file_system: VfsFileSystemReference,
+    /// File system.
+    file_system: VfsFileSystemReference,
 
     /// Path.
     path: VfsPath,
@@ -47,7 +47,7 @@ impl SparseBundleImage {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            parent_file_system: SharedValue::none(),
+            file_system: SharedValue::none(),
             path: VfsPath::new(VfsPathType::Fake, "/", None),
             block_size: 0,
             media_size: 0,
@@ -56,12 +56,8 @@ impl SparseBundleImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(
-        &mut self,
-        parent_file_system: &VfsFileSystemReference,
-        path: &VfsPath,
-    ) -> io::Result<()> {
-        match parent_file_system.with_write_lock() {
+    pub fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()> {
+        match file_system.with_write_lock() {
             Ok(file_system) => {
                 self.read_info_plist(file_system.as_ref(), path)?;
 
@@ -70,7 +66,7 @@ impl SparseBundleImage {
             }
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
-        self.parent_file_system = parent_file_system.clone();
+        self.file_system = file_system.clone();
 
         Ok(())
     }
@@ -222,11 +218,10 @@ impl SparseBundleImage {
             let band_file_path: VfsPath =
                 VfsPath::new_from_path(&self.path, band_file_location.as_str());
 
-            let result: Option<VfsDataStreamReference> =
-                match self.parent_file_system.with_write_lock() {
-                    Ok(file_system) => file_system.open_data_stream(&band_file_path, None)?,
-                    Err(error) => return Err(crate::error_to_io_error!(error)),
-                };
+            let result: Option<VfsDataStreamReference> = match self.file_system.with_write_lock() {
+                Ok(file_system) => file_system.open_data_stream(&band_file_path, None)?,
+                Err(error) => return Err(crate::error_to_io_error!(error)),
+            };
             let data_stream: VfsDataStreamReference = match result {
                 Some(data_stream) => data_stream,
                 None => {
@@ -306,9 +301,9 @@ mod tests {
     fn get_image() -> io::Result<SparseBundleImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
@@ -317,7 +312,7 @@ mod tests {
             "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
             None,
         );
-        image.open(&parent_file_system, &vfs_path)?;
+        image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(image)
     }
@@ -326,9 +321,9 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
@@ -337,7 +332,7 @@ mod tests {
             "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
             None,
         );
-        image.open(&parent_file_system, &vfs_path)?;
+        image.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(image.block_size, 8388608);
         assert_eq!(image.media_size, 4194304);

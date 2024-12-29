@@ -62,12 +62,12 @@ fn print_apm_partition_status_flags(flags: u32) {
 
 /// Prints information about an APM volume system.
 pub fn print_apm_volume_system(
-    parent_file_system: &VfsFileSystemReference,
+    file_system: &VfsFileSystemReference,
     vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut apm_volume_system = ApmVolumeSystem::new();
 
-    match apm_volume_system.open(parent_file_system, vfs_path) {
+    match apm_volume_system.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open APM volume system with error: {}", error);

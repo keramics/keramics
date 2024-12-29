@@ -50,9 +50,9 @@ impl VfsContext {
         path: &VfsPath,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
-        let parent_file_system: VfsFileSystemReference = self.open_file_system(path)?;
+        let file_system: VfsFileSystemReference = self.open_file_system(path)?;
 
-        let result: Option<VfsDataStreamReference> = match parent_file_system.with_write_lock() {
+        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
             Ok(file_system) => file_system.open_data_stream(path, name)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
@@ -61,9 +61,9 @@ impl VfsContext {
 
     /// Opens a file entry.
     pub fn open_file_entry(&mut self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
-        let parent_file_system: VfsFileSystemReference = self.open_file_system(path)?;
+        let file_system: VfsFileSystemReference = self.open_file_system(path)?;
 
-        let result: Option<VfsFileEntryReference> = match parent_file_system.with_write_lock() {
+        let result: Option<VfsFileEntryReference> = match file_system.with_write_lock() {
             Ok(file_system) => file_system.open_file_entry(path)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };

@@ -16,7 +16,7 @@ use std::io;
 use layout_map::LayoutMap;
 
 use crate::bytes_to_u32_be;
-use crate::mediator::Mediator;
+use crate::mediator::{Mediator, MediatorReference};
 use crate::vfs::VfsDataStreamReference;
 
 #[derive(LayoutMap)]
@@ -52,6 +52,9 @@ impl VhdBlockAllocationTableEntry {
 
 /// Virtual Hard Disk (VHD) block allocation table.
 pub struct VhdBlockAllocationTable {
+    /// Mediator.
+    mediator: MediatorReference,
+
     /// Offset.
     offset: u64,
 
@@ -63,6 +66,7 @@ impl VhdBlockAllocationTable {
     /// Creates a new block allocation table.
     pub fn new(offset: u64, number_of_entries: u32) -> Self {
         Self {
+            mediator: Mediator::current(),
             offset: offset,
             number_of_entries: number_of_entries,
         }
@@ -94,17 +98,17 @@ impl VhdBlockAllocationTable {
         };
         let mut entry: VhdBlockAllocationTableEntry = VhdBlockAllocationTableEntry::new();
 
-        let mediator = Mediator::current();
-        if mediator.debug_output {
-            mediator.debug_print(format!(
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
                 "VhdBlockAllocationTableEntry: {} data of size: {} at offset: {} (0x{:08x})\n",
                 entry_index,
                 data.len(),
                 entry_offset,
                 entry_offset
             ));
-            mediator.debug_print_data(&data, true);
-            mediator.debug_print(VhdBlockAllocationTableEntry::debug_read_data(&data));
+            self.mediator.debug_print_data(&data, true);
+            self.mediator
+                .debug_print(VhdBlockAllocationTableEntry::debug_read_data(&data));
         }
         entry.read_data(&data)?;
 

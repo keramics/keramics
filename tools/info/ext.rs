@@ -256,13 +256,10 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
 }
 
 /// Prints information about an Extended File System (ext).
-pub fn print_ext_file_system(
-    parent_file_system: &VfsFileSystemReference,
-    vfs_path: &VfsPath,
-) -> ExitCode {
+pub fn print_ext_file_system(file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(parent_file_system, vfs_path) {
+    match ext_file_system.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -514,13 +511,13 @@ fn print_ext_file_entry_path(
 
 /// Prints information about a specific entry of an Extended File System (ext).
 pub fn print_entry_ext_file_system(
-    parent_file_system: &VfsFileSystemReference,
+    file_system: &VfsFileSystemReference,
     vfs_path: &VfsPath,
     ext_entry_identifier: u64,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(parent_file_system, vfs_path) {
+    match ext_file_system.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -559,13 +556,13 @@ pub fn print_entry_ext_file_system(
 
 /// Prints the hierarchy of an Extended File System (ext).
 pub fn print_hierarcy_ext_file_system(
-    parent_file_system: &VfsFileSystemReference,
+    file_system: &VfsFileSystemReference,
     vfs_path: &VfsPath,
     bodyfile: bool,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(parent_file_system, vfs_path) {
+    match ext_file_system.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -624,13 +621,13 @@ fn print_hierarcy_ext_file_entry(
 
 /// Prints information about a specific path of an Extended File System (ext).
 pub fn print_path_ext_file_system(
-    parent_file_system: &VfsFileSystemReference,
+    file_system: &VfsFileSystemReference,
     vfs_path: &VfsPath,
     path: &String,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(parent_file_system, vfs_path) {
+    match ext_file_system.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
