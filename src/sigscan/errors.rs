@@ -30,12 +30,14 @@ impl BuildError {
 }
 
 impl Error for BuildError {
+    /// Retrieves the description.
     fn description(&self) -> &str {
         &self.message
     }
 }
 
 impl fmt::Display for BuildError {
+    /// Formats the error as a string.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.message)
     }

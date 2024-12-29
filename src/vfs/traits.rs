@@ -101,16 +101,10 @@ pub trait VfsFileSystem {
         path: &VfsPath,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
-        let file_entry: VfsFileEntryReference = match self.open_file_entry(path)? {
-            Some(file_entry) => file_entry,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing file entry",
-                ));
-            }
-        };
-        file_entry.open_data_stream(name)
+        match self.open_file_entry(path)? {
+            Some(file_entry) => file_entry.open_data_stream(name),
+            None => Ok(None),
+        }
     }
 
     /// Opens a file entry with the specified path.
