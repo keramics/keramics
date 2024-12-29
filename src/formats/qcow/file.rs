@@ -129,12 +129,8 @@ impl QcowFile {
     }
 
     /// Opens a file.
-    pub fn open(
-        &mut self,
-        parent_file_system: &VfsFileSystemReference,
-        path: &VfsPath,
-    ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match parent_file_system.with_write_lock() {
+    pub fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()> {
+        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
             Ok(file_system) => file_system.open_data_stream(path, None)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
@@ -605,14 +601,14 @@ mod tests {
     fn get_file() -> io::Result<QcowFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: QcowFile = QcowFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        file.open(&parent_file_system, &vfs_path)?;
+        file.open(&vfs_file_system, &vfs_path)?;
 
         Ok(file)
     }
@@ -621,14 +617,14 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: QcowFile = QcowFile::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
-        file.open(&parent_file_system, &vfs_path)?;
+        file.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(file.media_size, 4194304);
 

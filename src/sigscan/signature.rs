@@ -86,7 +86,7 @@ impl Signature {
         };
         let scan_end_offset: usize = scan_offset + self.pattern_size;
 
-        if scan_end_offset >= buffer_size {
+        if scan_end_offset > buffer_size {
             return false;
         }
         if buffer[scan_offset..scan_end_offset] != self.pattern {
@@ -106,4 +106,37 @@ impl PartialEq for Signature {
     }
 }
 
-// TODO: add tests for scan_buffer
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_scan_buffer() {
+        let signature: Signature = Signature::new(
+            "qcow3",
+            PatternType::BoundToStart,
+            0,
+            &[0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03],
+        );
+
+        let test_data: [u8; 8] = [0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03];
+
+        // Test match at data offset 0.
+        let result: bool = signature.scan_buffer(0, 64, &test_data, 0, 8);
+        assert_eq!(result, true);
+
+        // Test match at data offset 8.
+        let result: bool = signature.scan_buffer(8, 64, &test_data, 0, 8);
+        assert_eq!(result, false);
+
+        // Test buffer too small for pattern.
+        let result: bool = signature.scan_buffer(0, 64, &test_data, 0, 7);
+        assert_eq!(result, false);
+
+        let test_data: [u8; 8] = [0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78];
+
+        // Test no match.
+        let result: bool = signature.scan_buffer(0, 64, &test_data, 0, 8);
+        assert_eq!(result, false);
+    }
+}

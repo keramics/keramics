@@ -21,10 +21,10 @@ use keramics::formats::vhd::{VhdDiskType, VhdFile};
 use keramics::vfs::{VfsFileSystemReference, VfsPath};
 
 /// Prints information about a VHD file.
-pub fn print_vhd_file(parent_file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_vhd_file(file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
     let mut vhd_file: VhdFile = VhdFile::new();
 
-    match vhd_file.open(parent_file_system, vfs_path) {
+    match vhd_file.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open VHD file with error: {}", error);

@@ -20,12 +20,12 @@ use keramics::vfs::{VfsFileSystemReference, VfsPath};
 
 /// Prints information about a sparse image file.
 pub fn print_sparseimage_file(
-    parent_file_system: &VfsFileSystemReference,
+    file_system: &VfsFileSystemReference,
     vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
-    match sparseimage_file.open(parent_file_system, vfs_path) {
+    match sparseimage_file.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open sparse image file with error: {}", error);

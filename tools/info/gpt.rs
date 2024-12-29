@@ -20,12 +20,12 @@ use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPath};
 
 /// Prints information about a GPT volume system.
 pub fn print_gpt_volume_system(
-    parent_file_system: &VfsFileSystemReference,
+    file_system: &VfsFileSystemReference,
     vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut gpt_volume_system = GptVolumeSystem::new();
 
-    match gpt_volume_system.open(parent_file_system, vfs_path) {
+    match gpt_volume_system.open(file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open GPT volume system with error: {}", error);

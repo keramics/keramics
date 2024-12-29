@@ -88,11 +88,7 @@ pub trait VfsFileSystem {
     }
 
     /// Opens a file system.
-    fn open(
-        &mut self,
-        parent_file_system: &VfsFileSystemReference,
-        path: &VfsPath,
-    ) -> io::Result<()>;
+    fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()>;
 
     /// Opens a data stream with the specified path and name.
     #[inline(always)]

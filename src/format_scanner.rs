@@ -19,36 +19,7 @@ use std::io::SeekFrom;
 use crate::sigscan::{BuildError, PatternType, ScanContext, Scanner, Signature};
 use crate::vfs::VfsDataStreamReference;
 
-#[derive(Clone, Default, Eq, Hash, PartialEq)]
-pub enum FormatIdentifier {
-    Apm,
-    Ext,
-    Gpt,
-    Qcow,
-    SparseImage,
-    Udif,
-    #[default]
-    Unknown,
-    Vhd,
-    Vhdx,
-}
-
-impl FormatIdentifier {
-    /// Retrieves a string representation of the format identifier.
-    pub fn to_string(&self) -> &str {
-        match self {
-            FormatIdentifier::Apm => "apm",
-            FormatIdentifier::Ext => "ext",
-            FormatIdentifier::Gpt => "gpt",
-            FormatIdentifier::Qcow => "qcow",
-            FormatIdentifier::SparseImage => "sparseimage",
-            FormatIdentifier::Udif => "udif",
-            FormatIdentifier::Unknown => "Unknown",
-            FormatIdentifier::Vhd => "vhd",
-            FormatIdentifier::Vhdx => "vhdx",
-        }
-    }
-}
+use super::enums::FormatIdentifier;
 
 /// Format scanner.
 pub struct FormatScanner {

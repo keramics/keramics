@@ -131,14 +131,14 @@ mod tests {
     fn test_open_data_stream() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut volume_system = ApmVolumeSystem::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        volume_system.open(&parent_file_system, &vfs_path)?;
+        volume_system.open(&vfs_file_system, &vfs_path)?;
 
         let partition: ApmPartition = volume_system.get_partition_by_index(0)?;
 

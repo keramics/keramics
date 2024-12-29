@@ -124,19 +124,15 @@ impl VfsFileSystem for VhdxImage {
     }
 
     /// Opens a storage media image.
-    fn open(
-        &mut self,
-        parent_file_system: &VfsFileSystemReference,
-        path: &VfsPath,
-    ) -> io::Result<()> {
-        let directory_name: &str = match parent_file_system.with_read_lock() {
+    fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()> {
+        let directory_name: &str = match file_system.with_read_lock() {
             Ok(file_system) => file_system.get_directory_name(&path.location),
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
         let mut files: Vec<VhdxFile> = Vec::new();
 
         let mut file: VhdxFile = VhdxFile::new();
-        file.open(&parent_file_system, path)?;
+        file.open(&file_system, path)?;
 
         while file.parent_identifier.is_some() {
             let parent_filename: Ucs2String = match file.get_parent_filename() {
@@ -153,7 +149,7 @@ impl VfsFileSystem for VhdxImage {
                 format!("{}/{}", directory_name, parent_filename.to_string());
             let parent_path: VfsPath = VfsPath::new_from_path(&path, parent_location.as_str());
 
-            let file_exists: bool = match parent_file_system.with_read_lock() {
+            let file_exists: bool = match file_system.with_read_lock() {
                 Ok(file_system) => file_system.file_entry_exists(&parent_path)?,
                 Err(error) => return Err(crate::error_to_io_error!(error)),
             };
@@ -164,7 +160,7 @@ impl VfsFileSystem for VhdxImage {
                 ));
             }
             let mut parent_file: VhdxFile = VhdxFile::new();
-            parent_file.open(&parent_file_system, &parent_path)?;
+            parent_file.open(&file_system, &parent_path)?;
 
             files.push(file);
 
@@ -212,9 +208,9 @@ mod tests {
     fn get_image() -> io::Result<VhdxImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: VhdxImage = VhdxImage::new();
 
@@ -223,7 +219,7 @@ mod tests {
             "./test_data/vhdx/ntfs-differential.vhdx",
             None,
         );
-        image.open(&parent_file_system, &vfs_path)?;
+        image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(image)
     }
@@ -315,9 +311,9 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: VhdxImage = VhdxImage::new();
 
@@ -326,7 +322,7 @@ mod tests {
             "./test_data/vhdx/ntfs-differential.vhdx",
             None,
         );
-        image.open(&parent_file_system, &vfs_path)?;
+        image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(())
     }

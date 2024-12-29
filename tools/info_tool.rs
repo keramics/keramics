@@ -16,8 +16,9 @@ use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
 
+use keramics::enums::FormatIdentifier;
+use keramics::format_scanner::FormatScanner;
 use keramics::mediator::Mediator;
-use keramics::signatures::{FormatIdentifier, FormatScanner};
 use keramics::vfs::{
     VfsDataStreamReference, VfsFileSystemReference, VfsPath, VfsPathType, VfsResolver,
     VfsResolverReference,
