@@ -18,10 +18,13 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::vhdx::{VhdxDiskType, VhdxFile};
-use keramics::vfs::{VfsFileSystemReference, VfsPath};
+use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
 
 /// Prints information about a VHDX file.
-pub fn print_vhdx_file(file_system: &VfsFileSystemReference, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_vhdx_file(
+    file_system: &VfsFileSystemReference,
+    vfs_path: &VfsPathReference,
+) -> ExitCode {
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
     match vhdx_file.open(file_system, vfs_path) {

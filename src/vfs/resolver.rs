@@ -15,9 +15,9 @@ use std::io;
 use std::sync::{Arc, RwLock};
 
 use super::context::VfsContext;
-use super::path::VfsPath;
 use super::types::{
-    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsResolverReference,
+    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
+    VfsResolverReference,
 };
 
 /// Virtual File System (VFS) resolver.
@@ -42,7 +42,7 @@ impl VfsResolver {
     /// Opens a data stream with the specified name.
     pub fn open_data_stream(
         &self,
-        path: &VfsPath,
+        path: &VfsPathReference,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
         match self.context.write() {
@@ -52,7 +52,10 @@ impl VfsResolver {
     }
 
     /// Opens a file entry.
-    pub fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
+    pub fn open_file_entry(
+        &self,
+        path: &VfsPathReference,
+    ) -> io::Result<Option<VfsFileEntryReference>> {
         match self.context.write() {
             Ok(mut context) => context.open_file_entry(path),
             Err(error) => Err(crate::error_to_io_error!(error)),
@@ -60,7 +63,7 @@ impl VfsResolver {
     }
 
     /// Opens a file system.
-    pub fn open_file_system(&self, path: &VfsPath) -> io::Result<VfsFileSystemReference> {
+    pub fn open_file_system(&self, path: &VfsPathReference) -> io::Result<VfsFileSystemReference> {
         match self.context.write() {
             Ok(mut context) => context.open_file_system(path),
             Err(error) => Err(crate::error_to_io_error!(error)),
@@ -77,17 +80,20 @@ mod tests {
     use super::*;
 
     use crate::vfs::enums::VfsPathType;
+    use crate::vfs::path::VfsPath;
 
     #[test]
     fn test_open_data_stream() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         let result: Option<VfsDataStreamReference> =
             vfs_resolver.open_data_stream(&vfs_path, None)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
         let result: Option<VfsDataStreamReference> =
             vfs_resolver.open_data_stream(&vfs_path, None)?;
         assert!(result.is_none());
@@ -99,11 +105,13 @@ mod tests {
     fn test_open_file_entry() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         let result: Option<VfsFileEntryReference> = vfs_resolver.open_file_entry(&vfs_path)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
         let result: Option<VfsFileEntryReference> = vfs_resolver.open_file_entry(&vfs_path)?;
         assert!(result.is_none());
 
@@ -114,7 +122,7 @@ mod tests {
     fn test_open_file_system() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
 
         let vfs_path_type: VfsPathType = match vfs_file_system.with_read_lock() {

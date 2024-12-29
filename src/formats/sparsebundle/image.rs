@@ -18,7 +18,8 @@ use crate::formats::plist::XmlPlist;
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::SharedValue;
 use crate::vfs::{
-    VfsDataStreamReference, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathType,
+    VfsDataStreamReference, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathReference,
+    VfsPathType,
 };
 
 /// Mac OS sparse bundle (.sparsebundle) storage media image.
@@ -30,7 +31,7 @@ pub struct SparseBundleImage {
     file_system: VfsFileSystemReference,
 
     /// Path.
-    path: VfsPath,
+    path: VfsPathReference,
 
     /// Block size.
     pub block_size: u32,
@@ -56,7 +57,11 @@ impl SparseBundleImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(&mut self, file_system: &VfsFileSystemReference, path: &VfsPath) -> io::Result<()> {
+    pub fn open(
+        &mut self,
+        file_system: &VfsFileSystemReference,
+        path: &VfsPathReference,
+    ) -> io::Result<()> {
         match file_system.with_write_lock() {
             Ok(file_system) => {
                 self.read_info_plist(file_system.as_ref(), path)?;
@@ -75,7 +80,7 @@ impl SparseBundleImage {
     fn read_info_plist(
         &mut self,
         file_system: &dyn VfsFileSystem,
-        path: &VfsPath,
+        path: &VfsPathReference,
     ) -> io::Result<()> {
         let result: Option<VfsDataStreamReference> = file_system.open_data_stream(path, None)?;
 
@@ -215,7 +220,7 @@ impl SparseBundleImage {
             // TODO: add file_system.join function
             let band_file_location: String =
                 format!("{}/bands/{:x}", self.path.location, block_number);
-            let band_file_path: VfsPath =
+            let band_file_path: VfsPathReference =
                 VfsPath::new_from_path(&self.path, band_file_location.as_str());
 
             let result: Option<VfsDataStreamReference> = match self.file_system.with_write_lock() {
@@ -301,13 +306,13 @@ mod tests {
     fn get_image() -> io::Result<SparseBundleImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let vfs_path: VfsPath = VfsPath::new(
+        let vfs_path: VfsPathReference = VfsPath::new(
             VfsPathType::Os,
             "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
             None,
@@ -321,13 +326,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let vfs_path: VfsPath = VfsPath::new(
+        let vfs_path: VfsPathReference = VfsPath::new(
             VfsPathType::Os,
             "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
             None,

@@ -230,7 +230,7 @@ impl FormatScanner {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath, VfsPathReference, VfsPathType};
 
     #[test]
     fn test_scan_data_stream() -> io::Result<()> {
@@ -250,7 +250,8 @@ mod tests {
         };
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         let vfs_data_stream: VfsDataStreamReference =
             match vfs_context.open_data_stream(&vfs_path, None)? {
                 Some(data_stream) => data_stream,

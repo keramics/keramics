@@ -16,7 +16,6 @@ use std::io;
 use crate::datetime::DateTime;
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
-use crate::vfs::path::VfsPath;
 use crate::vfs::traits::{VfsDataStream, VfsFileEntry};
 use crate::vfs::types::{VfsDataStreamReference, VfsPathReference};
 
@@ -47,7 +46,7 @@ impl WrapperVfsFileEntry {
     }
 
     /// Initializes the file entry.
-    pub(crate) fn initialize(&mut self, path: &VfsPath) -> io::Result<()> {
+    pub(crate) fn initialize(&mut self, path: &VfsPathReference) -> io::Result<()> {
         let parent_path: Option<VfsPathReference> = path.get_parent();
         if parent_path.is_none() {
             return Err(io::Error::new(
@@ -111,6 +110,7 @@ mod tests {
     use crate::formats::apm::{ApmPartition, ApmVolumeSystem};
     use crate::vfs::context::VfsContext;
     use crate::vfs::enums::VfsPathType;
+    use crate::vfs::path::VfsPath;
     use crate::vfs::traits::VfsFileSystem;
     use crate::vfs::types::VfsFileSystemReference;
 
@@ -119,8 +119,9 @@ mod tests {
         let mut vfs_file_entry: WrapperVfsFileEntry =
             WrapperVfsFileEntry::new::<ApmPartition>(None);
 
-        let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", Some(os_vfs_path));
+        let os_vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
+        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", Some(&os_vfs_path));
         vfs_file_entry.initialize(&vfs_path)?;
         assert!(vfs_file_entry.file_type == VfsFileType::Directory);
 
@@ -131,13 +132,14 @@ mod tests {
     fn test_open_data_stream() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut volume_system = ApmVolumeSystem::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         let partition: ApmPartition = volume_system.get_partition_by_index(0)?;
@@ -145,8 +147,10 @@ mod tests {
         let mut vfs_file_entry: WrapperVfsFileEntry =
             WrapperVfsFileEntry::new::<ApmPartition>(Some(partition));
 
-        let os_vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/apm1", Some(os_vfs_path));
+        let os_vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Apm, "/apm1", Some(&os_vfs_path));
         vfs_file_entry.initialize(&vfs_path)?;
 
         let result: Option<VfsDataStreamReference> = vfs_file_entry.open_data_stream(None)?;
