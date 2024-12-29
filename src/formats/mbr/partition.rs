@@ -128,11 +128,20 @@ mod tests {
         let mut partition = MbrPartition::new(0, 512, 66048, 0);
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
-        let data_stream: VfsDataStreamReference = match parent_file_system.with_write_lock() {
+        let result: Option<VfsDataStreamReference> = match parent_file_system.with_write_lock() {
             Ok(file_system) => file_system.open_data_stream(&vfs_path, None)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
-        partition.open(&data_stream)?;
+        let vfs_data_stream: VfsDataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("No such file: {}", vfs_path.location),
+                ))
+            }
+        };
+        partition.open(&vfs_data_stream)?;
 
         Ok(())
     }

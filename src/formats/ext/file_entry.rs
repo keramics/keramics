@@ -304,34 +304,22 @@ impl VfsFileEntry for ExtFileEntry {
     }
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<VfsDataStreamReference> {
-        match name {
-            None => {}
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported data stream name",
-                ))
-            }
-        };
-        if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported file type",
-            ));
+    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>> {
+        if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE || name.is_some() {
+            return Ok(None);
         }
         if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
             let mut inline_stream: ExtInlineDataStream =
                 ExtInlineDataStream::new(self.inode.data_size);
             inline_stream.open(&self.inode.data_reference)?;
 
-            return Ok(SharedValue::new(Box::new(inline_stream)));
+            return Ok(Some(SharedValue::new(Box::new(inline_stream))));
         }
         let mut block_stream: ExtBlockStream =
             ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
         block_stream.open(&self.data_stream, &self.inode.block_ranges)?;
 
-        Ok(SharedValue::new(Box::new(block_stream)))
+        Ok(Some(SharedValue::new(Box::new(block_stream))))
     }
 }
 

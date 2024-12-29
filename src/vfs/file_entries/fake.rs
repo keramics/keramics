@@ -103,23 +103,11 @@ impl VfsFileEntry for FakeVfsFileEntry {
     }
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<VfsDataStreamReference> {
-        match name {
-            None => {}
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported data stream name",
-                ))
-            }
-        };
-        if self.file_type != VfsFileType::File {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported file type",
-            ));
+    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>> {
+        if self.file_type != VfsFileType::File || name.is_some() || self.data_stream.is_none() {
+            return Ok(None);
         }
-        Ok(self.data_stream.clone())
+        Ok(Some(self.data_stream.clone()))
     }
 }
 
@@ -150,7 +138,7 @@ impl VfsFileEntry for Rc<FakeVfsFileEntry> {
     }
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<VfsDataStreamReference> {
+    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>> {
         (**self).open_data_stream(name)
     }
 }
@@ -191,8 +179,17 @@ mod tests {
         ]
         .join("");
 
-        let vfs_data_stream: VfsDataStreamReference = vfs_file_entry.open_data_stream(None)?;
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.open_data_stream(None)?;
 
+        let vfs_data_stream: VfsDataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Missing data stream"),
+                ))
+            }
+        };
         let mut test_data: Vec<u8> = vec![];
         let read_count: usize = match vfs_data_stream.with_write_lock() {
             Ok(mut data_stream) => data_stream.read_to_end(&mut test_data)?,

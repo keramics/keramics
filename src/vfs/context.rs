@@ -26,7 +26,9 @@ use super::enums::VfsPathType;
 use super::file_systems::*;
 use super::path::VfsPath;
 use super::traits::VfsFileSystem;
-use super::types::{VfsFileEntryReference, VfsFileSystemReference, VfsPathReference};
+use super::types::{
+    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
+};
 
 /// Virtual File System (VFS) context.
 pub struct VfsContext {
@@ -42,15 +44,30 @@ impl VfsContext {
         }
     }
 
+    /// Opens a data stream with the specified name.
+    pub fn open_data_stream(
+        &mut self,
+        path: &VfsPath,
+        name: Option<&str>,
+    ) -> io::Result<Option<VfsDataStreamReference>> {
+        let parent_file_system: VfsFileSystemReference = self.open_file_system(path)?;
+
+        let result: Option<VfsDataStreamReference> = match parent_file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, name)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        Ok(result)
+    }
+
     /// Opens a file entry.
     pub fn open_file_entry(&mut self, path: &VfsPath) -> io::Result<Option<VfsFileEntryReference>> {
         let parent_file_system: VfsFileSystemReference = self.open_file_system(path)?;
 
-        let file_entry: Option<VfsFileEntryReference> = match parent_file_system.with_write_lock() {
+        let result: Option<VfsFileEntryReference> = match parent_file_system.with_write_lock() {
             Ok(file_system) => file_system.open_file_entry(path)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
-        Ok(file_entry)
+        Ok(result)
     }
 
     /// Opens a file system.
@@ -101,6 +118,8 @@ mod tests {
     use super::*;
 
     use crate::vfs::enums::VfsPathType;
+
+    // TODO: add tests for open_data_stream
 
     #[test]
     fn test_open_file_entry() -> io::Result<()> {

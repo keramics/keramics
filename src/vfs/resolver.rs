@@ -16,7 +16,9 @@ use std::sync::{Arc, RwLock};
 
 use super::context::VfsContext;
 use super::path::VfsPath;
-use super::types::{VfsFileEntryReference, VfsFileSystemReference, VfsResolverReference};
+use super::types::{
+    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsResolverReference,
+};
 
 /// Virtual File System (VFS) resolver.
 pub struct VfsResolver {
@@ -35,6 +37,18 @@ impl VfsResolver {
     /// Retrieves a reference to the resolver.
     pub fn current() -> VfsResolverReference {
         CURRENT_RESOLVER.with(|resolver| resolver.clone())
+    }
+
+    /// Opens a data stream with the specified name.
+    pub fn open_data_stream(
+        &self,
+        path: &VfsPath,
+        name: Option<&str>,
+    ) -> io::Result<Option<VfsDataStreamReference>> {
+        match self.context.write() {
+            Ok(mut context) => context.open_data_stream(path, name),
+            Err(error) => Err(crate::error_to_io_error!(error)),
+        }
     }
 
     /// Opens a file entry.
@@ -63,6 +77,8 @@ mod tests {
     use super::*;
 
     use crate::vfs::enums::VfsPathType;
+
+    // TODO: add tests for open_data_stream
 
     #[test]
     fn test_open_file_entry() -> io::Result<()> {

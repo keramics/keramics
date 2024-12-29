@@ -441,16 +441,17 @@ fn print_ext_file_entry_bodyfile(
     let file_mode: u16 = file_entry.get_file_mode();
 
     // TODO: have flag control calculate md5
-    let md5: String = if file_mode & 0xf000 == EXT_FILE_MODE_TYPE_REGULAR_FILE {
-        let vfs_data_stream: VfsDataStreamReference = file_entry.open_data_stream(None)?;
-        let md5_string: String = match vfs_data_stream.with_write_lock() {
-            Ok(mut data_stream) => calculate_md5(&mut data_stream)?,
-            Err(error) => return Err(keramics::error_to_io_error!(error)),
-        };
-        md5_string
-    } else {
-        String::from("00000000000000000000000000000000")
-        // String::from("0")
+    // String::from("0")
+    let result: Option<VfsDataStreamReference> = file_entry.open_data_stream(None)?;
+    let md5: String = match result {
+        Some(vfs_data_stream) => {
+            let md5_string: String = match vfs_data_stream.with_write_lock() {
+                Ok(mut data_stream) => calculate_md5(&mut data_stream)?,
+                Err(error) => return Err(keramics::error_to_io_error!(error)),
+            };
+            md5_string
+        }
+        None => String::from("00000000000000000000000000000000"),
     };
     let path: String = if file_entry.inode_number == 2 {
         String::from("/")
