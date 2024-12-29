@@ -66,9 +66,18 @@ impl SparseImageFile {
         parent_file_system: &VfsFileSystemReference,
         path: &VfsPath,
     ) -> io::Result<()> {
-        self.data_stream = match parent_file_system.with_write_lock() {
+        let result: Option<VfsDataStreamReference> = match parent_file_system.with_write_lock() {
             Ok(file_system) => file_system.open_data_stream(path, None)?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        self.data_stream = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("No such file: {}", path.location),
+                ))
+            }
         };
         self.read_header_block()
     }

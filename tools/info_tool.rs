@@ -252,9 +252,9 @@ fn main() -> ExitCode {
     };
     let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, source, None);
 
-    let vfs_data_stream: VfsDataStreamReference = match vfs_file_system.with_write_lock() {
+    let result: Option<VfsDataStreamReference> = match vfs_file_system.with_write_lock() {
         Ok(file_system) => match file_system.open_data_stream(&vfs_path, None) {
-            Ok(data_stream) => data_stream,
+            Ok(result) => result,
             Err(error) => {
                 println!("Unable to open data stream with error: {}", error);
                 return ExitCode::FAILURE;
@@ -262,6 +262,13 @@ fn main() -> ExitCode {
         },
         Err(error) => {
             println!("{}", error);
+            return ExitCode::FAILURE;
+        }
+    };
+    let vfs_data_stream: VfsDataStreamReference = match result {
+        Some(data_stream) => data_stream,
+        None => {
+            println!("No such file: {}", source);
             return ExitCode::FAILURE;
         }
     };

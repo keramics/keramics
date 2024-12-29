@@ -63,7 +63,7 @@ pub trait VfsFileEntry {
     fn get_vfs_file_type(&self) -> VfsFileType;
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<VfsDataStreamReference>;
+    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>>;
 }
 
 /// Virtual File System (VFS) file system trait.
@@ -100,7 +100,7 @@ pub trait VfsFileSystem {
         &self,
         path: &VfsPath,
         name: Option<&str>,
-    ) -> io::Result<VfsDataStreamReference> {
+    ) -> io::Result<Option<VfsDataStreamReference>> {
         let file_entry: VfsFileEntryReference = match self.open_file_entry(path)? {
             Some(file_entry) => file_entry,
             None => {

@@ -81,8 +81,17 @@ impl SparseBundleImage {
         file_system: &dyn VfsFileSystem,
         path: &VfsPath,
     ) -> io::Result<()> {
-        let data_stream: VfsDataStreamReference = file_system.open_data_stream(path, None)?;
+        let result: Option<VfsDataStreamReference> = file_system.open_data_stream(path, None)?;
 
+        let data_stream: VfsDataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("No such file: {}", path.location),
+                ))
+            }
+        };
         let string: String = match data_stream.with_write_lock() {
             Ok(mut data_stream) => {
                 let data_stream_size: u64 = data_stream.get_size()?;
@@ -213,11 +222,20 @@ impl SparseBundleImage {
             let band_file_path: VfsPath =
                 VfsPath::new_from_path(&self.path, band_file_location.as_str());
 
-            let data_stream: VfsDataStreamReference =
+            let result: Option<VfsDataStreamReference> =
                 match self.parent_file_system.with_write_lock() {
                     Ok(file_system) => file_system.open_data_stream(&band_file_path, None)?,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
                 };
+            let data_stream: VfsDataStreamReference = match result {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("No such file: {}", band_file_path.location),
+                    ))
+                }
+            };
             let range_read_count: usize = match data_stream.with_write_lock() {
                 Ok(mut data_stream) => data_stream.read_at_position(
                     &mut data[data_offset..data_end_offset],

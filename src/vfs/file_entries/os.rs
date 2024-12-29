@@ -170,26 +170,15 @@ impl VfsFileEntry for OsVfsFileEntry {
     }
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<VfsDataStreamReference> {
-        match name {
-            None => {}
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported data stream name",
-                ))
-            }
-        };
-        if self.file_type != VfsFileType::File {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported file type",
-            ));
+    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>> {
+        // TODO: add support for non-default data stream.
+        if self.file_type != VfsFileType::File || name.is_some() {
+            return Ok(None);
         }
         let os_path: &Path = Path::new(self.location.as_str());
         let file: File = File::open(os_path)?;
 
-        Ok(SharedValue::new(Box::new(file)))
+        Ok(Some(SharedValue::new(Box::new(file))))
     }
 }
 
@@ -225,8 +214,17 @@ mod tests {
         ]
         .join("");
 
-        let vfs_data_stream: VfsDataStreamReference = vfs_file_entry.open_data_stream(None)?;
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.open_data_stream(None)?;
 
+        let vfs_data_stream: VfsDataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Missing data stream"),
+                ))
+            }
+        };
         let mut test_data: Vec<u8> = vec![];
         let read_count: usize = match vfs_data_stream.with_write_lock() {
             Ok(mut data_stream) => data_stream.read_to_end(&mut test_data)?,
