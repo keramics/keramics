@@ -505,6 +505,7 @@ impl VhdxFile {
                 )?;
                 match parent_locator.entries.get("parent_linkage") {
                     Some(ucs2_string) => {
+                        // TODO: improve handling of invalid string.
                         let uuid_string: String = ucs2_string.to_string();
                         let mut parent_identifier: Uuid = Uuid::new();
 

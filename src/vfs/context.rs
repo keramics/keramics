@@ -119,17 +119,32 @@ mod tests {
 
     use crate::vfs::enums::VfsPathType;
 
-    // TODO: add tests for open_data_stream
+    #[test]
+    fn test_open_data_stream() -> io::Result<()> {
+        let mut vfs_context: VfsContext = VfsContext::new();
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let result: Option<VfsDataStreamReference> =
+            vfs_context.open_data_stream(&vfs_path, None)?;
+        assert!(result.is_some());
+
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let result: Option<VfsDataStreamReference> =
+            vfs_context.open_data_stream(&vfs_path, None)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_open_file_entry() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "test_data/file.txt", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         let result: Option<VfsFileEntryReference> = vfs_context.open_file_entry(&vfs_path)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "test_data/bogus.txt", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
         let result: Option<VfsFileEntryReference> = vfs_context.open_file_entry(&vfs_path)?;
         assert!(result.is_none());
 

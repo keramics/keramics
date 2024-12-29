@@ -30,12 +30,14 @@ impl InsertError {
 }
 
 impl Error for InsertError {
+    /// Retrieves the description.
     fn description(&self) -> &str {
         &self.message
     }
 }
 
 impl fmt::Display for InsertError {
+    /// Formats the error as a string.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.message)
     }
@@ -57,12 +59,14 @@ impl ParseError {
 }
 
 impl Error for ParseError {
+    /// Retrieves the description.
     fn description(&self) -> &str {
         &self.message
     }
 }
 
 impl fmt::Display for ParseError {
+    /// Formats the error as a string.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.message)
     }

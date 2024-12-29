@@ -115,32 +115,25 @@ impl VfsDataStream for MbrPartition {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
 
     #[test]
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let parent_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let parent_file_system: VfsFileSystemReference =
-            vfs_context.open_file_system(&parent_file_system_path)?;
-
         let mut partition = MbrPartition::new(0, 512, 66048, 0);
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
-        let result: Option<VfsDataStreamReference> = match parent_file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(&vfs_path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        let vfs_data_stream: VfsDataStreamReference = match result {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", vfs_path.location),
-                ))
-            }
-        };
+        let vfs_data_stream: VfsDataStreamReference =
+            match vfs_context.open_data_stream(&vfs_path, None)? {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("No such file: {}", vfs_path.location),
+                    ))
+                }
+            };
         partition.open(&vfs_data_stream)?;
 
         Ok(())

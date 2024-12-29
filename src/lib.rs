@@ -20,6 +20,7 @@ pub mod formatters;
 pub mod hashes;
 pub mod macros;
 pub mod mediator;
+pub mod signatures;
 pub mod sigscan;
 pub mod types;
 pub mod vfs;

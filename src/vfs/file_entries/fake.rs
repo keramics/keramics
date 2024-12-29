@@ -18,7 +18,6 @@ use crate::datetime::DateTime;
 use crate::types::SharedValue;
 use crate::vfs::data_streams::new_fake_data_stream;
 use crate::vfs::enums::VfsFileType;
-use crate::vfs::path::VfsPath;
 use crate::vfs::traits::VfsFileEntry;
 use crate::vfs::types::VfsDataStreamReference;
 
