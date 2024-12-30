@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::hashes::{DigestHashContext, Md5Context};
 
-/// MD5 hash fuzz target.
+// MD5 hash fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut md5_context: Md5Context = Md5Context::new();
     md5_context.update(&data);

@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::compression::Bzip2Context;
 
-/// Bzip2 decompression fuzz target.
+// Bzip2 decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut bzip2_context: Bzip2Context = Bzip2Context::new();
     let mut uncompressed_data: [u8; 65536] = [0; 65536];

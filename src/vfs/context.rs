@@ -14,17 +14,9 @@
 use std::collections::HashMap;
 use std::io;
 
-use crate::formats::apm::ApmVolumeSystem;
-use crate::formats::gpt::GptVolumeSystem;
-use crate::formats::mbr::MbrVolumeSystem;
-use crate::formats::qcow::QcowImage;
-use crate::formats::vhd::VhdImage;
-use crate::formats::vhdx::VhdxImage;
 use crate::types::SharedValue;
 
-use super::enums::VfsPathType;
-use super::file_systems::*;
-use super::traits::VfsFileSystem;
+use super::file_system::VfsFileSystem;
 use super::types::{
     VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
 };
@@ -95,21 +87,7 @@ impl VfsContext {
             Some(parent_path) => parent_path,
             None => path,
         };
-        let mut file_system: Box<dyn VfsFileSystem> = match &path.path_type {
-            VfsPathType::Apm => Box::new(ApmVolumeSystem::new()),
-            VfsPathType::Gpt => Box::new(GptVolumeSystem::new()),
-            VfsPathType::Mbr => Box::new(MbrVolumeSystem::new()),
-            VfsPathType::Os => Box::new(OsVfsFileSystem::new()),
-            VfsPathType::Qcow => Box::new(QcowImage::new()),
-            VfsPathType::Vhd => Box::new(VhdImage::new()),
-            VfsPathType::Vhdx => Box::new(VhdxImage::new()),
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                ));
-            }
-        };
+        let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.path_type);
         file_system.open(&parent_file_system, file_system_path)?;
 
         self.file_systems

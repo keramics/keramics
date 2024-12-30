@@ -16,7 +16,7 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::gpt::{GptPartition, GptVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
 
 /// Prints information about a GPT volume system.
 pub fn print_gpt_volume_system(

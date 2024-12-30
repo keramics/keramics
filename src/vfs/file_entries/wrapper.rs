@@ -111,7 +111,6 @@ mod tests {
     use crate::vfs::context::VfsContext;
     use crate::vfs::enums::VfsPathType;
     use crate::vfs::path::VfsPath;
-    use crate::vfs::traits::VfsFileSystem;
     use crate::vfs::types::VfsFileSystemReference;
 
     #[test]

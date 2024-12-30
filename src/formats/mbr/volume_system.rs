@@ -14,10 +14,7 @@
 use std::io;
 
 use crate::types::SharedValue;
-use crate::vfs::{
-    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference,
-    VfsPathReference, VfsPathType, WrapperVfsFileEntry,
-};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPathReference};
 
 use super::constants::*;
 use super::extended_boot_record::MbrExtendedBootRecord;
@@ -43,7 +40,7 @@ pub struct MbrVolumeSystem {
 }
 
 impl MbrVolumeSystem {
-    const PATH_PREFIX: &'static str = "/mbr";
+    pub const PATH_PREFIX: &'static str = "/mbr";
 
     /// Creates a volume system.
     pub fn new() -> Self {
@@ -93,7 +90,7 @@ impl MbrVolumeSystem {
     }
 
     /// Retrieves the partition index with the specific location.
-    fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
+    pub(crate) fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
         if !location.starts_with(MbrVolumeSystem::PATH_PREFIX) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -119,7 +116,7 @@ impl MbrVolumeSystem {
     }
 
     /// Retrieves the partition with the specific location.
-    fn get_partition_by_path(&self, location: &str) -> io::Result<Option<MbrPartition>> {
+    pub(crate) fn get_partition_by_path(&self, location: &str) -> io::Result<Option<MbrPartition>> {
         if location == "/" {
             return Ok(None);
         }
@@ -128,6 +125,28 @@ impl MbrVolumeSystem {
         let partition: MbrPartition = self.get_partition_by_index(partition_index)?;
 
         Ok(Some(partition))
+    }
+
+    /// Opens a volume system.
+    pub fn open(
+        &mut self,
+        file_system: &VfsFileSystemReference,
+        path: &VfsPathReference,
+    ) -> io::Result<()> {
+        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, None)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        self.data_stream = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("No such file: {}", path.location),
+                ))
+            }
+        };
+        self.read_master_boot_record()
     }
 
     /// Reads the master and extended boot records.
@@ -236,6 +255,7 @@ impl MbrVolumeSystem {
         Ok(())
     }
 
+    /// Sets the number of bytes per sector.
     pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> io::Result<()> {
         if !SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
             return Err(io::Error::new(
@@ -249,79 +269,11 @@ impl MbrVolumeSystem {
     }
 }
 
-impl VfsFileSystem for MbrVolumeSystem {
-    /// Determines if the file entry with the specified path exists.
-    fn file_entry_exists(&self, path: &VfsPathReference) -> io::Result<bool> {
-        if path.path_type != VfsPathType::Mbr {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        if path.location == "/" {
-            return Ok(true);
-        }
-        match self.get_partition_index_by_path(&path.location) {
-            Ok(_) => Ok(true),
-            Err(_) => Ok(false),
-        }
-    }
-
-    /// Retrieves the path type.
-    fn get_vfs_path_type(&self) -> VfsPathType {
-        VfsPathType::Mbr
-    }
-
-    /// Opens a volume system.
-    fn open(
-        &mut self,
-        file_system: &VfsFileSystemReference,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.data_stream = match result {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.location),
-                ))
-            }
-        };
-        self.read_master_boot_record()
-    }
-
-    /// Opens a file entry with the specified path.
-    fn open_file_entry(
-        &self,
-        path: &VfsPathReference,
-    ) -> io::Result<Option<VfsFileEntryReference>> {
-        if path.path_type != VfsPathType::Mbr {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        let partition: Option<MbrPartition> = match self.get_partition_by_path(&path.location) {
-            Ok(partition) => partition,
-            Err(_) => return Ok(None),
-        };
-        let mut file_entry: WrapperVfsFileEntry =
-            WrapperVfsFileEntry::new::<MbrPartition>(partition);
-        file_entry.initialize(path)?;
-
-        Ok(Some(Box::new(file_entry)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileType, VfsPath};
+    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
 
     fn get_volume_system() -> io::Result<MbrVolumeSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
@@ -337,29 +289,6 @@ mod tests {
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         Ok(volume_system)
-    }
-
-    #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Mbr, "/mbr2", None);
-        assert_eq!(volume_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Mbr, "./bogus2", None);
-        assert_eq!(volume_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_directory_name() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
-
-        let directory_name: &str = volume_system.get_directory_name("/mbr1");
-        assert_eq!(directory_name, "/");
-
-        Ok(())
     }
 
     #[test]
@@ -408,16 +337,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_vfs_path_type() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
-
-        let vfs_path_type: VfsPathType = volume_system.get_vfs_path_type();
-        assert!(vfs_path_type == VfsPathType::Mbr);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -432,66 +351,6 @@ mod tests {
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_of_root() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let os_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
-        let test_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Mbr, "/", Some(&os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference =
-            volume_system.open_file_entry(&test_vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_of_partition() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let os_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
-        let test_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Mbr, "/mbr2", Some(&os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference =
-            volume_system.open_file_entry(&test_vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_non_existing() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let os_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
-        let test_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Mbr, "/bogus2", Some(&os_vfs_path));
-        let result: Option<VfsFileEntryReference> =
-            volume_system.open_file_entry(&test_vfs_path)?;
-
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_with_unsupported_path_type() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let test_vfs_path: VfsPathReference = VfsPath::new(VfsPathType::NotSet, "/", None);
-
-        let result = volume_system.open_file_entry(&test_vfs_path);
-        assert!(result.is_err());
 
         Ok(())
     }

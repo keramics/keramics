@@ -64,7 +64,7 @@ impl SparseBundleImage {
     ) -> io::Result<()> {
         match file_system.with_write_lock() {
             Ok(file_system) => {
-                self.read_info_plist(file_system.as_ref(), path)?;
+                self.read_info_plist(&file_system, path)?;
 
                 let directory_name: &str = file_system.get_directory_name(&path.location);
                 self.path = VfsPath::new_from_path(&path, directory_name);
@@ -79,7 +79,7 @@ impl SparseBundleImage {
     /// Reads Info.plist or Info.bckup.
     fn read_info_plist(
         &mut self,
-        file_system: &dyn VfsFileSystem,
+        file_system: &VfsFileSystem,
         path: &VfsPathReference,
     ) -> io::Result<()> {
         let result: Option<VfsDataStreamReference> = file_system.open_data_stream(path, None)?;

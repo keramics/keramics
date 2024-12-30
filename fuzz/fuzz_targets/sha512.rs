@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::hashes::{DigestHashContext, Sha512Context};
 
-/// SHA-512 hash fuzz target.
+// SHA-512 hash fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut sha512_context: Sha512Context = Sha512Context::new();
     sha512_context.update(&data);

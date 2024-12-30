@@ -18,20 +18,20 @@ use libfuzzer_sys::fuzz_target;
 use keramics::formats::vhdx::VhdxFile;
 use keramics::types::SharedValue;
 use keramics::vfs::{
-    FakeVfsFileEntry, FakeVfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathReference,
+    FakeVfsFileEntry, VfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathReference,
     VfsPathType,
 };
 
-/// Virtual Hard Disk version 2 (VHDX) file fuzz target.
+// Virtual Hard Disk version 2 (VHDX) file fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut fake_file_system: FakeVfsFileSystem = FakeVfsFileSystem::new();
-
-    let fake_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&data);
-    _ = fake_file_system.add_file_entry("/input", fake_file_entry);
-
+    let mut fake_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Fake);
+    if let VfsFileSystem::Fake(file_system) = &mut fake_file_system {
+        let fake_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&data);
+        _ = file_system.add_file_entry("/input", fake_file_entry);
+    }
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
-    let vfs_file_system: VfsFileSystemReference = SharedValue::new(Box::new(fake_file_system));
+    let vfs_file_system: VfsFileSystemReference = SharedValue::new(fake_file_system);
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);
     _ = vhdx_file.open(&vfs_file_system, &vfs_path);
 });
