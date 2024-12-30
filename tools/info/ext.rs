@@ -22,7 +22,7 @@ use keramics::formatters::format_as_string;
 use keramics::hashes::{DigestHashContext, Md5Context};
 use keramics::types::ByteString;
 use keramics::vfs::{
-    VfsDataStream, VfsDataStreamReference, VfsFileEntry, VfsFileSystemReference, VfsPathReference,
+    VfsDataStream, VfsDataStreamReference, VfsFileSystemReference, VfsPathReference,
 };
 
 /// Retrieves the bodyfile representation of a date and time value.

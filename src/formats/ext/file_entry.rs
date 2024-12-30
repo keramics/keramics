@@ -19,7 +19,7 @@ use std::rc::Rc;
 use crate::bytes_to_u16_le;
 use crate::datetime::DateTime;
 use crate::types::{ByteString, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileEntry, VfsFileType};
+use crate::vfs::{VfsDataStreamReference, VfsFileType};
 
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
@@ -77,61 +77,24 @@ impl ExtFileEntry {
         }
     }
 
-    /// Reads the directory tree.
-    fn read_directory_tree(&mut self) -> io::Result<()> {
-        if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY {
-            let mut directory_tree: ExtDirectoryTree =
-                ExtDirectoryTree::new(self.inode_table.block_size);
+    /// Retrieves the access time.
+    pub fn get_access_time(&self) -> Option<&DateTime> {
+        Some(&self.inode.access_time)
+    }
 
-            if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-                directory_tree
-                    .read_inline_data(&self.inode.data_reference, &mut self.directory_tree)?;
-            } else {
-                directory_tree.read_block_data(
-                    &self.data_stream,
-                    &self.inode.block_ranges,
-                    &mut self.directory_tree,
-                )?;
-            }
-        }
-        self.read_directory_tree = true;
+    /// Retrieves the change time.
+    pub fn get_change_time(&self) -> Option<&DateTime> {
+        Some(&self.inode.change_time)
+    }
 
-        Ok(())
+    /// Retrieves the creation time.
+    pub fn get_creation_time(&self) -> Option<&DateTime> {
+        self.inode.creation_time.as_ref()
     }
 
     /// Retrieves the deletion time.
     pub fn get_deletion_time(&self) -> &DateTime {
         &self.inode.deletion_time
-    }
-
-    /// Retrieves the file mode.
-    pub fn get_file_mode(&self) -> u16 {
-        self.inode.file_mode
-    }
-
-    /// Retrieves the size.
-    pub fn get_size(&self) -> u64 {
-        match self.inode.file_mode & 0xf000 {
-            EXT_FILE_MODE_TYPE_REGULAR_FILE | EXT_FILE_MODE_TYPE_SYMBOLIC_LINK => {
-                self.inode.data_size
-            }
-            _ => 0,
-        }
-    }
-
-    /// Retrieves the number of links.
-    pub fn get_number_of_links(&self) -> u16 {
-        self.inode.number_of_links
-    }
-
-    /// Retrieves the owner identifier.
-    pub fn get_owner_identifier(&self) -> u32 {
-        self.inode.owner_identifier
-    }
-
-    /// Retrieves the group identifier.
-    pub fn get_group_identifier(&self) -> u32 {
-        self.inode.group_identifier
     }
 
     /// Retrieves the device identifier.
@@ -154,9 +117,44 @@ impl ExtFileEntry {
         Ok(None)
     }
 
+    /// Retrieves the file mode.
+    pub fn get_file_mode(&self) -> u16 {
+        self.inode.file_mode
+    }
+
+    /// Retrieves the group identifier.
+    pub fn get_group_identifier(&self) -> u32 {
+        self.inode.group_identifier
+    }
+
+    /// Retrieves the modification time.
+    pub fn get_modification_time(&self) -> Option<&DateTime> {
+        Some(&self.inode.modification_time)
+    }
+
     /// Retrieves the name.
     pub fn get_name(&self) -> &ByteString {
         &self.name
+    }
+
+    /// Retrieves the number of links.
+    pub fn get_number_of_links(&self) -> u16 {
+        self.inode.number_of_links
+    }
+
+    /// Retrieves the owner identifier.
+    pub fn get_owner_identifier(&self) -> u32 {
+        self.inode.owner_identifier
+    }
+
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self.inode.file_mode & 0xf000 {
+            EXT_FILE_MODE_TYPE_REGULAR_FILE | EXT_FILE_MODE_TYPE_SYMBOLIC_LINK => {
+                self.inode.data_size
+            }
+            _ => 0,
+        }
     }
 
     /// Retrieves the symbolic link target.
@@ -266,45 +264,12 @@ impl ExtFileEntry {
         );
         Ok(Some(file_entry))
     }
-}
-
-impl VfsFileEntry for ExtFileEntry {
-    /// Retrieves the access time.
-    fn get_access_time(&self) -> Option<&DateTime> {
-        Some(&self.inode.access_time)
-    }
-
-    /// Retrieves the change time.
-    fn get_change_time(&self) -> Option<&DateTime> {
-        Some(&self.inode.change_time)
-    }
-
-    /// Retrieves the creation time.
-    fn get_creation_time(&self) -> Option<&DateTime> {
-        self.inode.creation_time.as_ref()
-    }
-
-    /// Retrieves the modification time.
-    fn get_modification_time(&self) -> Option<&DateTime> {
-        Some(&self.inode.modification_time)
-    }
-
-    /// Retrieves the file type.
-    fn get_vfs_file_type(&self) -> VfsFileType {
-        match self.inode.file_mode & 0xf000 {
-            EXT_FILE_MODE_TYPE_FIFO => VfsFileType::NamedPipe,
-            EXT_FILE_MODE_TYPE_CHARACTER_DEVICE => VfsFileType::CharacterDevice,
-            EXT_FILE_MODE_TYPE_DIRECTORY => VfsFileType::Directory,
-            EXT_FILE_MODE_TYPE_BLOCK_DEVICE => VfsFileType::BlockDevice,
-            EXT_FILE_MODE_TYPE_REGULAR_FILE => VfsFileType::File,
-            EXT_FILE_MODE_TYPE_SYMBOLIC_LINK => VfsFileType::SymbolicLink,
-            EXT_FILE_MODE_TYPE_SOCKET => VfsFileType::Socket,
-            _ => VfsFileType::Unknown,
-        }
-    }
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>> {
+    pub fn open_data_stream(
+        &self,
+        name: Option<&str>,
+    ) -> io::Result<Option<VfsDataStreamReference>> {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE || name.is_some() {
             return Ok(None);
         }
@@ -321,6 +286,280 @@ impl VfsFileEntry for ExtFileEntry {
 
         Ok(Some(SharedValue::new(Box::new(block_stream))))
     }
+
+    /// Reads the directory tree.
+    fn read_directory_tree(&mut self) -> io::Result<()> {
+        if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY {
+            let mut directory_tree: ExtDirectoryTree =
+                ExtDirectoryTree::new(self.inode_table.block_size);
+
+            if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
+                directory_tree
+                    .read_inline_data(&self.inode.data_reference, &mut self.directory_tree)?;
+            } else {
+                directory_tree.read_block_data(
+                    &self.data_stream,
+                    &self.inode.block_ranges,
+                    &mut self.directory_tree,
+                )?;
+            }
+        }
+        self.read_directory_tree = true;
+
+        Ok(())
+    }
 }
 
-// TODO: add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::datetime::PosixTime32;
+    use crate::formats::ext::file_system::ExtFileSystem;
+    use crate::formats::ext::path::ExtPath;
+    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathReference, VfsPathType};
+
+    fn get_file_system() -> io::Result<ExtFileSystem> {
+        let mut vfs_context: VfsContext = VfsContext::new();
+
+        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_context.open_file_system(&vfs_file_system_path)?;
+
+        let mut file_system: ExtFileSystem = ExtFileSystem::new();
+
+        let vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
+        file_system.open(&vfs_file_system, &vfs_path)?;
+
+        Ok(file_system)
+    }
+
+    #[test]
+    fn test_get_access_time() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(
+            ext_file_entry.get_access_time(),
+            Some(&DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1626962852
+            }))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(
+            ext_file_entry.get_change_time(),
+            Some(&DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1626962852
+            }))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        // TODO: test with block or character device file entry
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_file_mode(), 0o100664);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_group_identifier(), 1000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_deletion_time() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_deletion_time(), &DateTime::NotSet);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(
+            ext_file_entry.get_modification_time(),
+            Some(&DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1626962852
+            }))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_name().to_string(), "passwords.txt");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_number_of_links(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_owner_identifier(), 1000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_size(), 116);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let symbolic_link_target: Option<&ByteString> =
+            ext_file_entry.get_symbolic_link_target()?;
+        assert_eq!(symbolic_link_target, None);
+
+        // TODO: test with symbolic link file entry
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_attributes() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let number_of_attributes: usize = ext_file_entry.get_number_of_attributes()?;
+        assert_eq!(number_of_attributes, 0);
+
+        // TODO: test with file entry with attributes
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> io::Result<()> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let number_of_sub_file_entries: usize = ext_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        // TODO: test with directory file entry
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_sub_file_entry_by_index
+    // TODO: add tests for get_sub_file_entry_by_name
+    // TODO: add tests for open_data_stream
+    // TODO: add tests for read_directory_tree
+}

@@ -14,17 +14,19 @@
 use std::io;
 use std::path::{Path, MAIN_SEPARATOR_STR};
 
-use crate::formats::apm::{ApmPartition, ApmVolumeSystem};
+use crate::formats::apm::ApmVolumeSystem;
 use crate::formats::ext::{ExtFileSystem, ExtPath};
-use crate::formats::gpt::{GptPartition, GptVolumeSystem};
-use crate::formats::mbr::{MbrPartition, MbrVolumeSystem};
-use crate::formats::qcow::{QcowImage, QcowLayer};
-use crate::formats::vhd::{VhdImage, VhdLayer};
-use crate::formats::vhdx::{VhdxImage, VhdxLayer};
+use crate::formats::gpt::GptVolumeSystem;
+use crate::formats::mbr::MbrVolumeSystem;
+use crate::formats::qcow::QcowImage;
+use crate::formats::vhd::VhdImage;
+use crate::formats::vhdx::VhdxImage;
+use crate::types::SharedValue;
 
 use super::enums::VfsPathType;
 use super::fake::FakeFileSystem;
-use super::file_entries::{OsVfsFileEntry, WrapperVfsFileEntry};
+use super::file_entries::OsVfsFileEntry;
+use super::file_entry::VfsFileEntry;
 use super::types::{
     VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
 };
@@ -234,13 +236,12 @@ impl VfsFileSystem {
             VfsFileSystem::Apm(apm_volume_system) => {
                 let result: Option<VfsFileEntryReference> =
                     match apm_volume_system.get_partition_by_path(&path.location) {
-                        Ok(apm_partition) => {
-                            let mut file_entry: WrapperVfsFileEntry =
-                                WrapperVfsFileEntry::new::<ApmPartition>(apm_partition);
-                            file_entry.initialize(path)?;
-
-                            Some(Box::new(file_entry))
-                        }
+                        Ok(result) => match result {
+                            Some(apm_partition) => Some(VfsFileEntry::Apm(Some(SharedValue::new(
+                                Box::new(apm_partition),
+                            )))),
+                            None => Some(VfsFileEntry::Apm(None)),
+                        },
                         Err(_) => None,
                     };
                 Ok(result)
@@ -250,24 +251,28 @@ impl VfsFileSystem {
 
                 let result: Option<VfsFileEntryReference> =
                     match ext_file_system.get_file_entry_by_path(&ext_path)? {
-                        Some(file_entry) => Some(Box::new(file_entry)),
+                        Some(file_entry) => Some(VfsFileEntry::Ext(file_entry)),
                         None => None,
                     };
                 Ok(result)
             }
             VfsFileSystem::Fake(fake_file_system) => {
-                fake_file_system.open_file_entry(&path.location)
+                let result: Option<VfsFileEntryReference> =
+                    match fake_file_system.get_file_entry_by_path(&path.location)? {
+                        Some(file_entry) => Some(VfsFileEntry::Fake(file_entry.clone())),
+                        None => None,
+                    };
+                Ok(result)
             }
             VfsFileSystem::Gpt(gpt_volume_system) => {
                 let result: Option<VfsFileEntryReference> =
                     match gpt_volume_system.get_partition_by_path(&path.location) {
-                        Ok(gpt_partition) => {
-                            let mut file_entry: WrapperVfsFileEntry =
-                                WrapperVfsFileEntry::new::<GptPartition>(gpt_partition);
-                            file_entry.initialize(path)?;
-
-                            Some(Box::new(file_entry))
-                        }
+                        Ok(result) => match result {
+                            Some(gpt_partition) => Some(VfsFileEntry::Gpt(Some(SharedValue::new(
+                                Box::new(gpt_partition),
+                            )))),
+                            None => Some(VfsFileEntry::Gpt(None)),
+                        },
                         Err(_) => None,
                     };
                 Ok(result)
@@ -275,13 +280,12 @@ impl VfsFileSystem {
             VfsFileSystem::Mbr(mbr_volume_system) => {
                 let result: Option<VfsFileEntryReference> =
                     match mbr_volume_system.get_partition_by_path(&path.location) {
-                        Ok(mbr_partition) => {
-                            let mut file_entry: WrapperVfsFileEntry =
-                                WrapperVfsFileEntry::new::<MbrPartition>(mbr_partition);
-                            file_entry.initialize(path)?;
-
-                            Some(Box::new(file_entry))
-                        }
+                        Ok(result) => match result {
+                            Some(mbr_partition) => Some(VfsFileEntry::Mbr(Some(SharedValue::new(
+                                Box::new(mbr_partition),
+                            )))),
+                            None => Some(VfsFileEntry::Mbr(None)),
+                        },
                         Err(_) => None,
                     };
                 Ok(result)
@@ -292,9 +296,9 @@ impl VfsFileSystem {
                 let result: Option<VfsFileEntryReference> = match os_path.try_exists()? {
                     false => None,
                     true => {
-                        let mut file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
-                        file_entry.initialize(path)?;
-                        Some(Box::new(file_entry))
+                        let mut os_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
+                        os_file_entry.initialize(path)?;
+                        Some(VfsFileEntry::Os(os_file_entry))
                     }
                 };
                 Ok(result)
@@ -302,13 +306,12 @@ impl VfsFileSystem {
             VfsFileSystem::Qcow(qcow_image) => {
                 let result: Option<VfsFileEntryReference> =
                     match qcow_image.get_layer_by_path(&path.location) {
-                        Ok(qcow_layer) => {
-                            let mut file_entry: WrapperVfsFileEntry =
-                                WrapperVfsFileEntry::new::<QcowLayer>(qcow_layer);
-                            file_entry.initialize(path)?;
-
-                            Some(Box::new(file_entry))
-                        }
+                        Ok(result) => match result {
+                            Some(qcow_layer) => Some(VfsFileEntry::Qcow(Some(SharedValue::new(
+                                Box::new(qcow_layer),
+                            )))),
+                            None => Some(VfsFileEntry::Qcow(None)),
+                        },
                         Err(_) => None,
                     };
                 Ok(result)
@@ -316,13 +319,12 @@ impl VfsFileSystem {
             VfsFileSystem::Vhd(vhd_image) => {
                 let result: Option<VfsFileEntryReference> =
                     match vhd_image.get_layer_by_path(&path.location) {
-                        Ok(vhd_layer) => {
-                            let mut file_entry: WrapperVfsFileEntry =
-                                WrapperVfsFileEntry::new::<VhdLayer>(vhd_layer);
-                            file_entry.initialize(path)?;
-
-                            Some(Box::new(file_entry))
-                        }
+                        Ok(result) => match result {
+                            Some(vhd_layer) => Some(VfsFileEntry::Vhd(Some(SharedValue::new(
+                                Box::new(vhd_layer),
+                            )))),
+                            None => Some(VfsFileEntry::Vhd(None)),
+                        },
                         Err(_) => None,
                     };
                 Ok(result)
@@ -330,13 +332,12 @@ impl VfsFileSystem {
             VfsFileSystem::Vhdx(vhdx_image) => {
                 let result: Option<VfsFileEntryReference> =
                     match vhdx_image.get_layer_by_path(&path.location) {
-                        Ok(vhdx_layer) => {
-                            let mut file_entry: WrapperVfsFileEntry =
-                                WrapperVfsFileEntry::new::<VhdxLayer>(vhdx_layer);
-                            file_entry.initialize(path)?;
-
-                            Some(Box::new(file_entry))
-                        }
+                        Ok(result) => match result {
+                            Some(vhdx_layer) => Some(VfsFileEntry::Vhdx(Some(SharedValue::new(
+                                Box::new(vhdx_layer),
+                            )))),
+                            None => Some(VfsFileEntry::Vhdx(None)),
+                        },
                         Err(_) => None,
                     };
                 Ok(result)
@@ -349,8 +350,8 @@ impl VfsFileSystem {
 mod tests {
     use super::*;
 
-    use crate::types::SharedValue;
     use crate::vfs::enums::VfsFileType;
+    use crate::vfs::fake::FakeFileEntry;
     use crate::vfs::path::VfsPath;
 
     fn get_apm_file_system() -> io::Result<VfsFileSystem> {
@@ -374,6 +375,20 @@ mod tests {
             VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         vfs_file_system.open(&parent_file_system, &vfs_path)?;
 
+        Ok(vfs_file_system)
+    }
+
+    fn get_fake_file_system() -> io::Result<VfsFileSystem> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Fake);
+        if let VfsFileSystem::Fake(fake_file_system) = &mut vfs_file_system {
+            let data: [u8; 4] = [1, 2, 3, 4];
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
+            _ = fake_file_system.add_file_entry("/fake1", fake_file_entry);
+
+            let data: [u8; 4] = [5, 6, 7, 8];
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
+            _ = fake_file_system.add_file_entry("/fake2", fake_file_entry);
+        }
         Ok(vfs_file_system)
     }
 
@@ -464,6 +479,19 @@ mod tests {
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
         let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Ext, "./bogus", None);
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_fake() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
+
+        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/fake2", None);
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "./bogus", None);
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -664,6 +692,34 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_open_file_entry_with_fake_file() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
+
+        let test_vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/fake2", None);
+        let vfs_file_entry: VfsFileEntryReference =
+            vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_file_entry_with_fake_non_existing() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
+
+        let test_vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/bogus", None);
+        let result: Option<VfsFileEntryReference> =
+            vfs_file_system.open_file_entry(&test_vfs_path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // TODO: add tests fir open_file_entry of fake root
 
     #[test]
     fn test_open_file_entry_with_gpt_non_existing() -> io::Result<()> {
