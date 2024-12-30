@@ -21,7 +21,7 @@ use super::file::VhdFile;
 
 /// Virtual Hard Disk (VHD) storage media image layer.
 pub struct VhdLayer {
-    /// The data stream.
+    /// The file.
     file: SharedValue<VhdFile>,
 
     /// The current offset.

@@ -18,7 +18,7 @@ use libfuzzer_sys::fuzz_target;
 use keramics::formats::vhd::VhdFile;
 use keramics::types::SharedValue;
 use keramics::vfs::{
-    FakeVfsFileEntry, FakeVfsFileSystem, VfsFileSystem, VfsFileSystemReference, VfsPath,
+    FakeVfsFileEntry, FakeVfsFileSystem, VfsFileSystemReference, VfsPath, VfsPathReference,
     VfsPathType,
 };
 
@@ -29,7 +29,7 @@ fuzz_target!(|data: &[u8]| {
     let fake_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&data);
     _ = fake_file_system.add_file_entry("/input", fake_file_entry);
 
-    let mut vhd_file = VhdFile::new();
+    let mut vhd_file: VhdFile = VhdFile::new();
 
     let vfs_file_system: VfsFileSystemReference = SharedValue::new(Box::new(fake_file_system));
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);

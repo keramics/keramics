@@ -77,8 +77,38 @@ test = false
 doc = false
 
 [[bin]]
+name = "md5"
+path = "fuzz_targets/md5.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "qcow"
 path = "fuzz_targets/qcow.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "sha1"
+path = "fuzz_targets/sha1.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "sha224"
+path = "fuzz_targets/sha224.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "sha256"
+path = "fuzz_targets/sha256.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "sha512"
+path = "fuzz_targets/sha512.rs"
 test = false
 doc = false
 

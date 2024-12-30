@@ -57,9 +57,16 @@ const MD5_VALUES_32BIT_INDEX: [usize; 64] = [
 
 /// Context for calculating a MD5 hash.
 pub struct Md5Context {
+    /// Hash values.
     hash_values: [u32; 4],
+
+    /// Number of bytes hashed.
     number_of_bytes_hashed: u64,
+
+    /// Block offset.
     block_offset: usize,
+
+    /// Block.
     block: [u8; MD5_BLOCK_SIZE * 2],
 }
 

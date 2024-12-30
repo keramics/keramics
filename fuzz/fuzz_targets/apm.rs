@@ -19,7 +19,7 @@ use keramics::formats::apm::ApmVolumeSystem;
 use keramics::types::SharedValue;
 use keramics::vfs::{
     FakeVfsFileEntry, FakeVfsFileSystem, VfsFileSystem, VfsFileSystemReference, VfsPath,
-    VfsPathType,
+    VfsPathReference, VfsPathType,
 };
 
 /// Apple Partition Map (APM) volume system fuzz target.
@@ -29,7 +29,7 @@ fuzz_target!(|data: &[u8]| {
     let fake_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&data);
     _ = fake_file_system.add_file_entry("/input", fake_file_entry);
 
-    let mut apm_volume_system = ApmVolumeSystem::new();
+    let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
     let vfs_file_system: VfsFileSystemReference = SharedValue::new(Box::new(fake_file_system));
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);

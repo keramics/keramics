@@ -21,7 +21,7 @@ use super::file::QcowFile;
 
 /// QEMU Copy-On-Write (QCOW) storage media image layer.
 pub struct QcowLayer {
-    /// The data stream.
+    /// The file.
     file: SharedValue<QcowFile>,
 
     /// The current offset.

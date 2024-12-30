@@ -41,9 +41,16 @@ const SHA224_PRIME_CUBE_ROOTS: [u32; 64] = [
 
 /// Context for calculating a SHA-224 hash.
 pub struct Sha224Context {
+    /// Hash values.
     hash_values: [u32; 8],
+
+    /// Number of bytes hashed.
     number_of_bytes_hashed: u64,
+
+    /// Block offset.
     block_offset: usize,
+
+    /// Block.
     block: [u8; SHA224_BLOCK_SIZE * 2],
 }
 
