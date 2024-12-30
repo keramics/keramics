@@ -95,6 +95,38 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds Master Boot Record (MBR) signatures.
+    pub fn add_mbr_signatures(&mut self) {
+        // Signature for 512 bytes per sector.
+        self.signature_scanner.add_signature(Signature::new(
+            "mbr1",
+            PatternType::BoundToStart,
+            510,
+            &[0x55, 0xaa],
+        ));
+        // Signature for 1024 bytes per sector.
+        self.signature_scanner.add_signature(Signature::new(
+            "mbr2",
+            PatternType::BoundToStart,
+            1022,
+            &[0x55, 0xaa],
+        ));
+        // Signature for 2048 bytes per sector.
+        self.signature_scanner.add_signature(Signature::new(
+            "mbr3",
+            PatternType::BoundToStart,
+            2046,
+            &[0x55, 0xaa],
+        ));
+        // Signature for 4096 bytes per sector.
+        self.signature_scanner.add_signature(Signature::new(
+            "mbr4",
+            PatternType::BoundToStart,
+            4094,
+            &[0x55, 0xaa],
+        ));
+    }
+
     /// Adds QEMU Copy-On-Write (QCOW) signatures.
     pub fn add_qcow_signatures(&mut self) {
         // Version 1 signature and version in header.
@@ -213,6 +245,7 @@ impl FormatScanner {
                 "apm1" => FormatIdentifier::Apm,
                 "ext1" => FormatIdentifier::Ext,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
+                "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
                 "sparseimage1" => FormatIdentifier::SparseImage,
                 "udif1" => FormatIdentifier::Udif,
@@ -231,6 +264,21 @@ mod tests {
     use super::*;
 
     use crate::vfs::{VfsContext, VfsPath, VfsPathReference, VfsPathType};
+
+    #[test]
+    fn test_build() -> Result<(), BuildError> {
+        let mut format_scanner: FormatScanner = FormatScanner::new();
+        format_scanner.add_apm_signatures();
+        format_scanner.add_ext_signatures();
+        format_scanner.add_gpt_signatures();
+        format_scanner.add_qcow_signatures();
+        format_scanner.add_sparseimage_signatures();
+        format_scanner.add_udif_signatures();
+        format_scanner.add_vhd_signatures();
+        format_scanner.add_vhdx_signatures();
+
+        format_scanner.build()
+    }
 
     #[test]
     fn test_scan_data_stream() -> io::Result<()> {

@@ -76,6 +76,7 @@ impl MbrVolumeSystem {
                     partition_entry.index,
                     partition_offset,
                     partition_size,
+                    partition_entry.partition_type,
                     partition_entry.flags,
                 );
                 partition.open(&self.data_stream)?;

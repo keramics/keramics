@@ -40,7 +40,7 @@ pub fn print_vhd_file(
         (VhdDiskType::Fixed, "Fixed"),
         (VhdDiskType::Unknown, "Unknown"),
     ]);
-    let disk_type_string: String = disk_types.get(&vhd_file.disk_type).unwrap().to_string();
+    let disk_type_string: &str = disk_types.get(&vhd_file.disk_type).unwrap();
     let media_size_string: String = formatters::format_as_bytesize(vhd_file.media_size, 1024);
 
     println!("Virtual Hard Disk (VHD) information:");
