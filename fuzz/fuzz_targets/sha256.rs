@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::hashes::{DigestHashContext, Sha256Context};
 
-/// SHA-256 hash fuzz target.
+// SHA-256 hash fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut sha256_context: Sha256Context = Sha256Context::new();
     sha256_context.update(&data);

@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::compression::ZlibContext;
 
-/// ZLIB decompression fuzz target.
+// ZLIB decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut zlib_context: ZlibContext = ZlibContext::new();
     let mut uncompressed_data: [u8; 65536] = [0; 65536];

@@ -16,10 +16,7 @@ use std::io;
 use crate::checksums::ReversedCrc32Context;
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{SharedValue, Uuid};
-use crate::vfs::{
-    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystem, VfsFileSystemReference,
-    VfsPathReference, VfsPathType, WrapperVfsFileEntry,
-};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPathReference};
 
 use super::partition::GptPartition;
 use super::partition_entry::GptPartitionEntry;
@@ -46,7 +43,7 @@ pub struct GptVolumeSystem {
 }
 
 impl GptVolumeSystem {
-    const PATH_PREFIX: &'static str = "/gpt";
+    pub const PATH_PREFIX: &'static str = "/gpt";
 
     /// Creates a volume system.
     pub fn new() -> Self {
@@ -96,7 +93,7 @@ impl GptVolumeSystem {
     }
 
     /// Retrieves the partition index with the specific location.
-    fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
+    pub(crate) fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
         if !location.starts_with(GptVolumeSystem::PATH_PREFIX) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -124,7 +121,7 @@ impl GptVolumeSystem {
     }
 
     /// Retrieves the partition with the specific location.
-    fn get_partition_by_path(&self, location: &str) -> io::Result<Option<GptPartition>> {
+    pub(crate) fn get_partition_by_path(&self, location: &str) -> io::Result<Option<GptPartition>> {
         if location == "/" {
             return Ok(None);
         }
@@ -137,6 +134,27 @@ impl GptVolumeSystem {
 
     // TODO: add get_partition_index_by_identifier
 
+    /// Opens a volume system.
+    pub fn open(
+        &mut self,
+        file_system: &VfsFileSystemReference,
+        path: &VfsPathReference,
+    ) -> io::Result<()> {
+        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
+            Ok(file_system) => file_system.open_data_stream(path, None)?,
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        };
+        self.data_stream = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("No such file: {}", path.location),
+                ))
+            }
+        };
+        self.read_partition_table()
+    }
     /// Reads the partition table.
     fn read_partition_table(&mut self) -> io::Result<()> {
         let mut partition_table_header = GptPartitionTableHeader::new();
@@ -283,6 +301,7 @@ impl GptVolumeSystem {
         Ok(())
     }
 
+    /// Sets the number of bytes per sector.
     pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> io::Result<()> {
         if !SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
             return Err(io::Error::new(
@@ -296,79 +315,11 @@ impl GptVolumeSystem {
     }
 }
 
-impl VfsFileSystem for GptVolumeSystem {
-    /// Determines if the file entry with the specified path exists.
-    fn file_entry_exists(&self, path: &VfsPathReference) -> io::Result<bool> {
-        if path.path_type != VfsPathType::Gpt {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        if path.location == "/" {
-            return Ok(true);
-        }
-        match self.get_partition_index_by_path(&path.location) {
-            Ok(_) => Ok(true),
-            Err(_) => Ok(false),
-        }
-    }
-
-    /// Retrieves the path type.
-    fn get_vfs_path_type(&self) -> VfsPathType {
-        VfsPathType::Gpt
-    }
-
-    /// Opens a volume system.
-    fn open(
-        &mut self,
-        file_system: &VfsFileSystemReference,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.data_stream = match result {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.location),
-                ))
-            }
-        };
-        self.read_partition_table()
-    }
-
-    /// Opens a file entry with the specified path.
-    fn open_file_entry(
-        &self,
-        path: &VfsPathReference,
-    ) -> io::Result<Option<VfsFileEntryReference>> {
-        if path.path_type != VfsPathType::Gpt {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported path type",
-            ));
-        }
-        let partition: Option<GptPartition> = match self.get_partition_by_path(&path.location) {
-            Ok(paritition) => paritition,
-            Err(_) => return Ok(None),
-        };
-        let mut file_entry: WrapperVfsFileEntry =
-            WrapperVfsFileEntry::new::<GptPartition>(partition);
-        file_entry.initialize(path)?;
-
-        Ok(Some(Box::new(file_entry)))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileType, VfsPath};
+    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
 
     fn get_volume_system() -> io::Result<GptVolumeSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
@@ -384,29 +335,6 @@ mod tests {
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         Ok(volume_system)
-    }
-
-    #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Gpt, "/gpt2", None);
-        assert_eq!(volume_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Gpt, "./bogus2", None);
-        assert_eq!(volume_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_directory_name() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = GptVolumeSystem::new();
-
-        let directory_name: &str = volume_system.get_directory_name("/gpt1");
-        assert_eq!(directory_name, "/");
-
-        Ok(())
     }
 
     #[test]
@@ -455,16 +383,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_vfs_path_type() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = GptVolumeSystem::new();
-
-        let vfs_path_type: VfsPathType = volume_system.get_vfs_path_type();
-        assert!(vfs_path_type == VfsPathType::Gpt);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -479,66 +397,6 @@ mod tests {
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_of_root() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let os_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
-        let test_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Gpt, "/", Some(&os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference =
-            volume_system.open_file_entry(&test_vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_of_partition() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let os_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
-        let test_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Gpt, "/gpt2", Some(&os_vfs_path));
-        let vfs_file_entry: VfsFileEntryReference =
-            volume_system.open_file_entry(&test_vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_non_existing() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let os_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
-        let test_vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Gpt, "/bogus2", Some(&os_vfs_path));
-        let result: Option<VfsFileEntryReference> =
-            volume_system.open_file_entry(&test_vfs_path)?;
-
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_file_entry_with_unsupported_path_type() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let test_vfs_path: VfsPathReference = VfsPath::new(VfsPathType::NotSet, "/", None);
-
-        let result = volume_system.open_file_entry(&test_vfs_path);
-        assert!(result.is_err());
 
         Ok(())
     }

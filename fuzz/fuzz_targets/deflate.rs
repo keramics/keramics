@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::compression::DeflateContext;
 
-/// DEFLATE decompression fuzz target.
+// DEFLATE decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut deflate_context: DeflateContext = DeflateContext::new();
     let mut uncompressed_data: [u8; 65536] = [0; 65536];

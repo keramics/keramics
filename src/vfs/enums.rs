@@ -31,11 +31,10 @@ pub enum VfsFileType {
 pub enum VfsPathType {
     Apm,
     Ext,
+    #[default]
     Fake,
     Gpt,
     Mbr,
-    #[default]
-    NotSet,
     Os,
     Qcow,
     Vhd,

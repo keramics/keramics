@@ -16,7 +16,7 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::apm::{ApmPartition, ApmVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
 
 /// Prints the partition status flags.
 fn print_apm_partition_status_flags(flags: u32) {

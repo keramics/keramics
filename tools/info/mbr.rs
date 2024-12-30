@@ -17,7 +17,7 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::mbr::{MbrPartition, MbrVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
 
 /// Prints information about a MBR volume system.
 pub fn print_mbr_volume_system(

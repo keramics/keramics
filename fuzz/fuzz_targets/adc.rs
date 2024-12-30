@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::compression::AdcContext;
 
-/// ADC decompression fuzz target.
+// ADC decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut adc_context: AdcContext = AdcContext::new();
     let mut uncompressed_data: [u8; 65536] = [0; 65536];

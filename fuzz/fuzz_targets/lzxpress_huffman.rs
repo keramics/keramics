@@ -17,7 +17,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::compression::LzxpressHuffmanContext;
 
-/// LZXPRESS Huffman decompression fuzz target.
+// LZXPRESS Huffman decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
     let mut lzxpress_huffman_context: LzxpressHuffmanContext = LzxpressHuffmanContext::new();
     let mut uncompressed_data: [u8; 65536] = [0; 65536];

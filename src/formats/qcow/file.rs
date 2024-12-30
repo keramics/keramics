@@ -348,7 +348,7 @@ impl QcowFile {
             // TODO: handle encryption
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported encryption method",),
+                "Unsupported encryption method",
             ));
         }
         Ok(())

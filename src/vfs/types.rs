@@ -16,15 +16,16 @@ use std::sync::Arc;
 
 use crate::types::SharedValue;
 
+use super::file_system::VfsFileSystem;
 use super::path::VfsPath;
 use super::resolver::VfsResolver;
-use super::traits::{VfsDataStream, VfsFileEntry, VfsFileSystem};
+use super::traits::{VfsDataStream, VfsFileEntry};
 
 pub type VfsDataStreamReference = SharedValue<Box<dyn VfsDataStream>>;
 
 pub type VfsFileEntryReference = Box<dyn VfsFileEntry>;
 
-pub type VfsFileSystemReference = SharedValue<Box<dyn VfsFileSystem>>;
+pub type VfsFileSystemReference = SharedValue<VfsFileSystem>;
 
 pub type VfsPathReference = Rc<VfsPath>;
 

@@ -17,9 +17,7 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::datetime::DateTime;
 
 use super::enums::{VfsFileType, VfsPathType};
-use super::types::{
-    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
-};
+use super::types::VfsDataStreamReference;
 
 /// Virtual File System (VFS) data stream trait.
 pub trait VfsDataStream: Read + Seek {
@@ -65,50 +63,4 @@ pub trait VfsFileEntry {
 
     /// Opens a data stream with the specified name.
     fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>>;
-}
-
-/// Virtual File System (VFS) file system trait.
-pub trait VfsFileSystem {
-    /// Determines if the file entry with the specified path exists.
-    fn file_entry_exists(&self, path: &VfsPathReference) -> io::Result<bool>;
-
-    /// Retrieves the path type.
-    fn get_vfs_path_type(&self) -> VfsPathType;
-
-    /// Retrieves the directory name of the specified location.
-    fn get_directory_name<'a>(&self, location: &'a str) -> &'a str {
-        let directory_name: &str = match location.rsplit_once("/") {
-            Some(path_components) => path_components.0,
-            None => "",
-        };
-        if directory_name == "" {
-            "/"
-        } else {
-            directory_name
-        }
-    }
-
-    /// Opens a file system.
-    fn open(
-        &mut self,
-        file_system: &VfsFileSystemReference,
-        path: &VfsPathReference,
-    ) -> io::Result<()>;
-
-    /// Opens a data stream with the specified path and name.
-    #[inline(always)]
-    fn open_data_stream(
-        &self,
-        path: &VfsPathReference,
-        name: Option<&str>,
-    ) -> io::Result<Option<VfsDataStreamReference>> {
-        match self.open_file_entry(path)? {
-            Some(file_entry) => file_entry.open_data_stream(name),
-            None => Ok(None),
-        }
-    }
-
-    /// Opens a file entry with the specified path.
-    fn open_file_entry(&self, path: &VfsPathReference)
-        -> io::Result<Option<VfsFileEntryReference>>;
 }
