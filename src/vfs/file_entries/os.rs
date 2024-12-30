@@ -25,7 +25,6 @@ use std::os::windows::fs::MetadataExt;
 use crate::datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
-use crate::vfs::traits::VfsFileEntry;
 use crate::vfs::types::{VfsDataStreamReference, VfsPathReference};
 
 /// Determines the POSIX date and time value.
@@ -71,6 +70,30 @@ impl OsVfsFileEntry {
             creation_time: None,
             modification_time: None,
         }
+    }
+    /// Retrieves the access time.
+    pub fn get_access_time(&self) -> Option<&DateTime> {
+        self.access_time.as_ref()
+    }
+
+    /// Retrieves the change time.
+    pub fn get_change_time(&self) -> Option<&DateTime> {
+        self.change_time.as_ref()
+    }
+
+    /// Retrieves the creation time.
+    pub fn get_creation_time(&self) -> Option<&DateTime> {
+        self.creation_time.as_ref()
+    }
+
+    /// Retrieves the modification time.
+    pub fn get_modification_time(&self) -> Option<&DateTime> {
+        self.modification_time.as_ref()
+    }
+
+    /// Retrieves the file type.
+    pub fn get_vfs_file_type(&self) -> VfsFileType {
+        self.file_type.clone()
     }
 
     /// Initializes the file entry.
@@ -140,36 +163,12 @@ impl OsVfsFileEntry {
         // TODO: add Windows support.
         todo!();
     }
-}
-
-impl VfsFileEntry for OsVfsFileEntry {
-    /// Retrieves the access time.
-    fn get_access_time(&self) -> Option<&DateTime> {
-        self.access_time.as_ref()
-    }
-
-    /// Retrieves the change time.
-    fn get_change_time(&self) -> Option<&DateTime> {
-        self.change_time.as_ref()
-    }
-
-    /// Retrieves the creation time.
-    fn get_creation_time(&self) -> Option<&DateTime> {
-        self.creation_time.as_ref()
-    }
-
-    /// Retrieves the modification time.
-    fn get_modification_time(&self) -> Option<&DateTime> {
-        self.modification_time.as_ref()
-    }
-
-    /// Retrieves the file type.
-    fn get_vfs_file_type(&self) -> VfsFileType {
-        self.file_type.clone()
-    }
 
     /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>> {
+    pub fn open_data_stream(
+        &self,
+        name: Option<&str>,
+    ) -> io::Result<Option<VfsDataStreamReference>> {
         // TODO: add support for non-default data stream.
         if self.file_type != VfsFileType::File || name.is_some() {
             return Ok(None);

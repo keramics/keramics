@@ -14,11 +14,6 @@
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
 
-use crate::datetime::DateTime;
-
-use super::enums::{VfsFileType, VfsPathType};
-use super::types::VfsDataStreamReference;
-
 /// Virtual File System (VFS) data stream trait.
 pub trait VfsDataStream: Read + Seek {
     // TODO: add get_extents()
@@ -40,27 +35,4 @@ pub trait VfsDataStream: Read + Seek {
         self.read_exact(data)?;
         Ok(offset)
     }
-}
-
-/// Virtual File System (VFS) file entry trait.
-pub trait VfsFileEntry {
-    // TODO: add get_attributes()
-
-    /// Retrieves the access time.
-    fn get_access_time(&self) -> Option<&DateTime>;
-
-    /// Retrieves the change time.
-    fn get_change_time(&self) -> Option<&DateTime>;
-
-    /// Retrieves the creation time.
-    fn get_creation_time(&self) -> Option<&DateTime>;
-
-    /// Retrieves the modification time.
-    fn get_modification_time(&self) -> Option<&DateTime>;
-
-    /// Retrieves the file type.
-    fn get_vfs_file_type(&self) -> VfsFileType;
-
-    /// Opens a data stream with the specified name.
-    fn open_data_stream(&self, name: Option<&str>) -> io::Result<Option<VfsDataStreamReference>>;
 }

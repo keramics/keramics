@@ -11,10 +11,6 @@
  * under the License.
  */
 
-mod fake;
 mod os;
-mod wrapper;
 
-pub use fake::FakeVfsFileEntry;
 pub use os::OsVfsFileEntry;
-pub use wrapper::WrapperVfsFileEntry;
