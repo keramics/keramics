@@ -40,7 +40,7 @@ pub fn print_vhdx_file(
         (VhdxDiskType::Fixed, "Fixed"),
         (VhdxDiskType::Unknown, "Unknown"),
     ]);
-    let disk_type_string: String = disk_types.get(&vhdx_file.disk_type).unwrap().to_string();
+    let disk_type_string: &str = disk_types.get(&vhdx_file.disk_type).unwrap();
     let media_size_string: String = formatters::format_as_bytesize(vhdx_file.media_size, 1024);
 
     println!("Virtual Hard Disk (VHDX) information:");

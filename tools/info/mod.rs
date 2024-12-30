@@ -14,6 +14,7 @@
 mod apm;
 mod ext;
 mod gpt;
+mod mbr;
 mod qcow;
 mod sparseimage;
 mod udif;
@@ -26,6 +27,7 @@ pub use ext::{
     print_path_ext_file_system,
 };
 pub use gpt::print_gpt_volume_system;
+pub use mbr::print_mbr_volume_system;
 pub use qcow::print_qcow_file;
 pub use sparseimage::print_sparseimage_file;
 pub use udif::print_udif_file;

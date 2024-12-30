@@ -43,10 +43,9 @@ pub fn print_udif_file(
         (UdifCompressionMethod::Zlib, "zlib"),
     ]);
 
-    let compression_method_string: String = compression_methods
+    let compression_method_string: &str = compression_methods
         .get(&udif_file.compression_method)
-        .unwrap()
-        .to_string();
+        .unwrap();
     let media_size_string: String = formatters::format_as_bytesize(udif_file.media_size, 1024);
 
     println!("Universal Disk Image Format (UDIF) information:");

@@ -29,7 +29,7 @@ pub struct QcowImage {
 }
 
 impl QcowImage {
-    const PATH_PREFIX: &'static str = "/qcow";
+    pub const PATH_PREFIX: &'static str = "/qcow";
 
     /// Creates a new storage media image.
     pub fn new() -> Self {

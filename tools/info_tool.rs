@@ -12,6 +12,7 @@
  */
 
 use std::collections::HashSet;
+use std::io;
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
@@ -72,23 +73,11 @@ struct PathCommandArguments {
     path: String,
 }
 
-fn main() -> ExitCode {
-    let arguments = CommandLineArguments::parse();
-
-    // TODO: add option to list supported formats
-
-    let source: &str = match arguments.source.to_str() {
-        Some(value) => value,
-        None => {
-            println!("Missing source");
-            return ExitCode::FAILURE;
-        }
-    };
+fn scan_for_formats(data_stream: &VfsDataStreamReference) -> io::Result<Option<FormatIdentifier>> {
     let mut format_scanner: FormatScanner = FormatScanner::new();
     format_scanner.add_apm_signatures();
     format_scanner.add_ext_signatures();
     format_scanner.add_gpt_signatures();
-    // TODO: support for MBR.
     format_scanner.add_qcow_signatures();
     // TODO: support for sparse bundle.
     format_scanner.add_sparseimage_signatures();
@@ -98,8 +87,49 @@ fn main() -> ExitCode {
 
     match format_scanner.build() {
         Ok(_) => {}
-        Err(error) => {
-            println!("{}", error);
+        Err(error) => return Err(keramics::error_to_io_error!(error)),
+    };
+    let mut scan_results: HashSet<FormatIdentifier> =
+        format_scanner.scan_data_stream(data_stream)?;
+
+    if scan_results.len() > 1 {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!("Found multiple known format signatures"),
+        ));
+    }
+    let mut result: Option<FormatIdentifier> = scan_results.drain().next();
+    if result.is_none() {
+        let mut format_scanner: FormatScanner = FormatScanner::new();
+        format_scanner.add_mbr_signatures();
+
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => return Err(keramics::error_to_io_error!(error)),
+        };
+        let mut scan_results: HashSet<FormatIdentifier> =
+            format_scanner.scan_data_stream(data_stream)?;
+
+        if scan_results.len() > 1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Found multiple known format signatures"),
+            ));
+        }
+        result = scan_results.drain().next();
+    }
+    Ok(result)
+}
+
+fn main() -> ExitCode {
+    let arguments = CommandLineArguments::parse();
+
+    // TODO: add option to list supported formats
+
+    let source: &str = match arguments.source.to_str() {
+        Some(value) => value,
+        None => {
+            println!("Missing source");
             return ExitCode::FAILURE;
         }
     };
@@ -135,23 +165,18 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let scan_results: HashSet<FormatIdentifier> =
-        match format_scanner.scan_data_stream(&vfs_data_stream) {
-            Ok(scan_results) => scan_results,
-            Err(error) => {
-                println!(
-                    "Unable to scan data stream for known format signatures with error: {}",
-                    error
-                );
-                return ExitCode::FAILURE;
-            }
-        };
-    if scan_results.len() > 1 {
-        println!("Found multiple known format signatures",);
-        return ExitCode::FAILURE;
-    }
-    let format_identifier: FormatIdentifier = match scan_results.iter().next() {
-        Some(format_identifier) => format_identifier.clone(),
+    let result: Option<FormatIdentifier> = match scan_for_formats(&vfs_data_stream) {
+        Ok(result) => result,
+        Err(error) => {
+            println!(
+                "Unable to scan data stream for known format signatures with error: {}",
+                error
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+    let format_identifier: FormatIdentifier = match result {
+        Some(format_identifier) => format_identifier,
         None => {
             println!("No known format signatures found");
             return ExitCode::FAILURE;
@@ -164,64 +189,53 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => {
-                return info::print_entry_ext_file_system(
-                    &vfs_file_system,
-                    &vfs_path,
-                    command_arguments.entry,
-                )
-            }
+            FormatIdentifier::Ext => info::print_entry_ext_file_system(
+                &vfs_file_system,
+                &vfs_path,
+                command_arguments.entry,
+            ),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
-                return ExitCode::FAILURE;
+                ExitCode::FAILURE
             }
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => {
-                return info::print_hierarcy_ext_file_system(
-                    &vfs_file_system,
-                    &vfs_path,
-                    command_arguments.bodyfile,
-                )
-            }
+            FormatIdentifier::Ext => info::print_hierarcy_ext_file_system(
+                &vfs_file_system,
+                &vfs_path,
+                command_arguments.bodyfile,
+            ),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
-                return ExitCode::FAILURE;
+                ExitCode::FAILURE
             }
         },
         Some(Commands::Path(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => {
-                return info::print_path_ext_file_system(
-                    &vfs_file_system,
-                    &vfs_path,
-                    &command_arguments.path,
-                )
-            }
+            FormatIdentifier::Ext => info::print_path_ext_file_system(
+                &vfs_file_system,
+                &vfs_path,
+                &command_arguments.path,
+            ),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
-                return ExitCode::FAILURE;
+                ExitCode::FAILURE
             }
         },
         None => match &format_identifier {
-            FormatIdentifier::Apm => {
-                return info::print_apm_volume_system(&vfs_file_system, &vfs_path)
-            }
-            FormatIdentifier::Ext => {
-                return info::print_ext_file_system(&vfs_file_system, &vfs_path)
-            }
-            FormatIdentifier::Gpt => {
-                return info::print_gpt_volume_system(&vfs_file_system, &vfs_path)
-            }
-            FormatIdentifier::Qcow => return info::print_qcow_file(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Apm => info::print_apm_volume_system(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Ext => info::print_ext_file_system(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Gpt => info::print_gpt_volume_system(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Mbr => info::print_mbr_volume_system(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Qcow => info::print_qcow_file(&vfs_file_system, &vfs_path),
             FormatIdentifier::SparseImage => {
-                return info::print_sparseimage_file(&vfs_file_system, &vfs_path)
+                info::print_sparseimage_file(&vfs_file_system, &vfs_path)
             }
-            FormatIdentifier::Udif => return info::print_udif_file(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Vhd => return info::print_vhd_file(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Vhdx => return info::print_vhdx_file(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Udif => info::print_udif_file(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Vhd => info::print_vhd_file(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Vhdx => info::print_vhdx_file(&vfs_file_system, &vfs_path),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
-                return ExitCode::FAILURE;
+                ExitCode::FAILURE
             }
         },
     }

@@ -34,19 +34,29 @@ pub struct MbrPartition {
     /// The size of the partition.
     pub size: u64,
 
+    /// The partition type.
+    pub partition_type: u8,
+
     /// The flags.
     pub flags: u8,
 }
 
 impl MbrPartition {
     /// Creates a new partition.
-    pub(super) fn new(entry_index: usize, offset: u64, size: u64, flags: u8) -> Self {
+    pub(super) fn new(
+        entry_index: usize,
+        offset: u64,
+        size: u64,
+        partition_type: u8,
+        flags: u8,
+    ) -> Self {
         Self {
             data_stream: SharedValue::none(),
             current_offset: 0,
             entry_index: entry_index,
             offset: offset,
             size: size,
+            partition_type: partition_type,
             flags: flags,
         }
     }
@@ -121,7 +131,7 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let mut partition = MbrPartition::new(0, 512, 66048, 0);
+        let mut partition = MbrPartition::new(0, 512, 66048, 0x83, 0x00);
 
         let vfs_path: VfsPathReference =
             VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);

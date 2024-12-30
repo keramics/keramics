@@ -29,7 +29,7 @@ pub struct VhdImage {
 }
 
 impl VhdImage {
-    const PATH_PREFIX: &'static str = "/vhd";
+    pub const PATH_PREFIX: &'static str = "/vhd";
 
     /// Creates a new storage media image.
     pub fn new() -> Self {

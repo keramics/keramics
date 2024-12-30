@@ -45,14 +45,12 @@ pub fn print_qcow_file(
         (QcowEncryptionMethod::Unknown, "Unknown"),
     ]);
 
-    let compression_method_string: String = compression_methods
+    let compression_method_string: &str = compression_methods
         .get(&qcow_file.compression_method)
-        .unwrap()
-        .to_string();
-    let encryption_method_string: String = encryption_methods
+        .unwrap();
+    let encryption_method_string: &str = encryption_methods
         .get(&qcow_file.encryption_method)
-        .unwrap()
-        .to_string();
+        .unwrap();
     let media_size_string: String = formatters::format_as_bytesize(qcow_file.media_size, 1024);
 
     println!("QEMU Copy-On-Write (QCOW) information:");
