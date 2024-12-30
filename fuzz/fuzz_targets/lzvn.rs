@@ -19,7 +19,7 @@ use keramics::compression::LzvnContext;
 
 /// LZVN decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut lzvn_context = LzvnContext::new();
+    let mut lzvn_context: LzvnContext = LzvnContext::new();
     let mut uncompressed_data: [u8; 65536] = [0; 65536];
     _ = lzvn_context.decompress(&data, &mut uncompressed_data);
 });

@@ -238,7 +238,7 @@ impl ExtFileEntry {
         Ok(file_entry)
     }
 
-    // TODO: add  get_sub_file_entries
+    // TODO: add get_sub_file_entries
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(

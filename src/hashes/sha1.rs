@@ -27,9 +27,16 @@ const SHA1_HASH_VALUES: [u32; 5] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x103254
 
 /// Context for calculating a SHA1 hash.
 pub struct Sha1Context {
+    /// Hash values.
     hash_values: [u32; 5],
+
+    /// Number of bytes hashed.
     number_of_bytes_hashed: u64,
+
+    /// Block offset.
     block_offset: usize,
+
+    /// Block.
     block: [u8; SHA1_BLOCK_SIZE * 2],
 }
 

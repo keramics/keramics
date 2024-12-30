@@ -56,9 +56,16 @@ const SHA512_PRIME_CUBE_ROOTS: [u64; 80] = [
 
 /// Context for calculating a SHA-512 hash.
 pub struct Sha512Context {
+    /// Hash values.
     hash_values: [u64; 8],
+
+    /// Number of bytes hashed.
     number_of_bytes_hashed: u64,
+
+    /// Block offset.
     block_offset: usize,
+
+    /// Block.
     block: [u8; SHA512_BLOCK_SIZE * 2],
 }
 

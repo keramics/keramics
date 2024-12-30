@@ -19,9 +19,9 @@ use crate::vfs::VfsDataStream;
 
 use super::file::VhdxFile;
 
-/// Virtual Hard Disk (VHD) storage media image layer.
+/// Virtual Hard Disk version 2 (VHDX) storage media image layer.
 pub struct VhdxLayer {
-    /// The data stream.
+    /// The file.
     file: SharedValue<VhdxFile>,
 
     /// The current offset.

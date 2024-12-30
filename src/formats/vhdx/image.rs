@@ -22,7 +22,7 @@ use crate::vfs::{
 use super::file::VhdxFile;
 use super::layer::VhdxLayer;
 
-/// Virtual Hard Disk (VHD) storage media image.
+/// Virtual Hard Disk version 2 (VHDX) storage media image.
 pub struct VhdxImage {
     /// Files.
     files: Vec<SharedValue<VhdxFile>>,

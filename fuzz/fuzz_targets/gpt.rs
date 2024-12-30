@@ -19,7 +19,7 @@ use keramics::formats::gpt::GptVolumeSystem;
 use keramics::types::SharedValue;
 use keramics::vfs::{
     FakeVfsFileEntry, FakeVfsFileSystem, VfsFileSystem, VfsFileSystemReference, VfsPath,
-    VfsPathType,
+    VfsPathReference, VfsPathType,
 };
 
 /// GUID Partition Table (GPT) volume system fuzz target.
@@ -29,7 +29,7 @@ fuzz_target!(|data: &[u8]| {
     let fake_file_entry: FakeVfsFileEntry = FakeVfsFileEntry::new_file(&data);
     _ = fake_file_system.add_file_entry("/input", fake_file_entry);
 
-    let mut gpt_volume_system = GptVolumeSystem::new();
+    let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
     let vfs_file_system: VfsFileSystemReference = SharedValue::new(Box::new(fake_file_system));
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);

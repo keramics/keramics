@@ -15,11 +15,11 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use keramics::compression::DeflateContext;
+use keramics::hashes::{DigestHashContext, Sha256Context};
 
-/// DEFLATE decompression fuzz target.
+/// SHA-256 hash fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut deflate_context: DeflateContext = DeflateContext::new();
-    let mut uncompressed_data: [u8; 65536] = [0; 65536];
-    _ = deflate_context.decompress(&data, &mut uncompressed_data);
+    let mut sha256_context: Sha256Context = Sha256Context::new();
+    sha256_context.update(&data);
+    _ = sha256_context.finalize();
 });

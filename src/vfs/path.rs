@@ -94,4 +94,20 @@ mod tests {
         assert_eq!(test_path.location, "./test_data/bogus.txt");
         assert!(test_path.parent.is_none());
     }
+
+    #[test]
+    fn test_get_parent() {
+        let test_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+
+        let parent: Option<VfsPathReference> = test_path.get_parent();
+        assert!(parent.is_none());
+
+        let os_vfs_path: VfsPathReference =
+            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let test_path: VfsPathReference = VfsPath::new(VfsPathType::Qcow, "/", Some(&os_vfs_path));
+
+        let parent: Option<VfsPathReference> = test_path.get_parent();
+        assert!(parent.is_some());
+    }
 }
