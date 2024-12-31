@@ -12,24 +12,22 @@
  */
 
 mod context;
-mod data_streams;
 mod enums;
 mod fake;
-mod file_entries;
 mod file_entry;
 mod file_system;
+mod os;
 mod path;
 mod resolver;
 mod traits;
 mod types;
 
 pub use context::VfsContext;
-pub use data_streams::*;
 pub use enums::*;
-pub use fake::{FakeFileEntry, FakeFileSystem};
-pub use file_entries::*;
+pub use fake::{new_fake_data_stream, FakeFileEntry, FakeFileSystem};
 pub use file_entry::VfsFileEntry;
 pub use file_system::VfsFileSystem;
+pub use os::OsFileEntry;
 pub use path::VfsPath;
 pub use resolver::VfsResolver;
 pub use traits::*;

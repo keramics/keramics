@@ -13,18 +13,16 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::rc::Rc;
 
-use crate::types::SharedValue;
-
+use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
-use super::types::{
-    VfsDataStreamReference, VfsFileEntryReference, VfsFileSystemReference, VfsPathReference,
-};
+use super::types::{VfsDataStreamReference, VfsPathReference};
 
 /// Virtual File System (VFS) context.
 pub struct VfsContext {
     /// File systems.
-    file_systems: HashMap<String, VfsFileSystemReference>,
+    file_systems: HashMap<String, Rc<VfsFileSystem>>,
 }
 
 impl VfsContext {
@@ -41,34 +39,18 @@ impl VfsContext {
         path: &VfsPathReference,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
-        let file_system: VfsFileSystemReference = self.open_file_system(path)?;
-
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, name)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        Ok(result)
+        let file_system: Rc<VfsFileSystem> = self.open_file_system(path)?;
+        file_system.open_data_stream(path, name)
     }
 
     /// Opens a file entry.
-    pub fn open_file_entry(
-        &mut self,
-        path: &VfsPathReference,
-    ) -> io::Result<Option<VfsFileEntryReference>> {
-        let file_system: VfsFileSystemReference = self.open_file_system(path)?;
-
-        let result: Option<VfsFileEntryReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_file_entry(path)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        Ok(result)
+    pub fn open_file_entry(&mut self, path: &VfsPathReference) -> io::Result<Option<VfsFileEntry>> {
+        let file_system: Rc<VfsFileSystem> = self.open_file_system(path)?;
+        file_system.open_file_entry(path)
     }
 
     /// Opens a file system.
-    pub fn open_file_system(
-        &mut self,
-        path: &VfsPathReference,
-    ) -> io::Result<VfsFileSystemReference> {
+    pub fn open_file_system(&mut self, path: &VfsPathReference) -> io::Result<Rc<VfsFileSystem>> {
         // TODO: ensure the lookup key is unique for nested VFS paths.
         let parent_path: Option<VfsPathReference> = path.get_parent();
         let lookup_key: &str = match parent_path.as_ref() {
@@ -79,19 +61,19 @@ impl VfsContext {
             Some(value) => return Ok(value.clone()),
             None => {}
         };
-        let parent_file_system: VfsFileSystemReference = match parent_path.as_ref() {
-            Some(parent_path) => self.open_file_system(parent_path)?,
-            None => SharedValue::none(),
+        let parent_file_system: Option<Rc<VfsFileSystem>> = match parent_path.as_ref() {
+            Some(parent_path) => Some(self.open_file_system(parent_path)?),
+            None => None,
         };
         let file_system_path: &VfsPathReference = match parent_path.as_ref() {
             Some(parent_path) => parent_path,
             None => path,
         };
         let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.path_type);
-        file_system.open(&parent_file_system, file_system_path)?;
+        file_system.open(parent_file_system, file_system_path)?;
 
         self.file_systems
-            .insert(lookup_key.to_string(), SharedValue::new(file_system));
+            .insert(lookup_key.to_string(), Rc::new(file_system));
 
         match self.file_systems.get(lookup_key) {
             Some(value) => return Ok(value.clone()),
@@ -132,12 +114,12 @@ mod tests {
 
         let vfs_path: VfsPathReference =
             VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        let result: Option<VfsFileEntryReference> = vfs_context.open_file_entry(&vfs_path)?;
+        let result: Option<VfsFileEntry> = vfs_context.open_file_entry(&vfs_path)?;
         assert!(result.is_some());
 
         let vfs_path: VfsPathReference =
             VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
-        let result: Option<VfsFileEntryReference> = vfs_context.open_file_entry(&vfs_path)?;
+        let result: Option<VfsFileEntry> = vfs_context.open_file_entry(&vfs_path)?;
         assert!(result.is_none());
 
         Ok(())
@@ -148,13 +130,9 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
-        let vfs_path_type: VfsPathType = match vfs_file_system.with_read_lock() {
-            Ok(file_system) => file_system.get_vfs_path_type(),
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        assert!(vfs_path_type == VfsPathType::Os);
+        assert!(vfs_file_system.get_vfs_path_type() == VfsPathType::Os);
 
         Ok(())
     }

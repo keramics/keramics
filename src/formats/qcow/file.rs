@@ -11,12 +11,14 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
+use std::rc::Rc;
 
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, ByteString, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
 
 use super::block_range::{QcowBlockRange, QcowBlockRangeType};
 use super::cluster_table::{QcowClusterTable, QcowClusterTableEntry};
@@ -89,7 +91,7 @@ pub struct QcowFile {
     pub backing_file_name: Option<ByteString>,
 
     /// Backing file.
-    backing_file: SharedValue<QcowFile>,
+    backing_file: Option<Rc<RefCell<QcowFile>>>,
 
     /// Media size.
     pub media_size: u64,
@@ -122,7 +124,7 @@ impl QcowFile {
             encryption_method: QcowEncryptionMethod::None,
             block_tree: BlockTree::<QcowBlockRange>::new(0, 0, 0),
             backing_file_name: None,
-            backing_file: SharedValue::none(),
+            backing_file: None,
             media_size: 0,
             media_offset: 0,
         }
@@ -131,14 +133,10 @@ impl QcowFile {
     /// Opens a file.
     pub fn open(
         &mut self,
-        file_system: &VfsFileSystemReference,
+        file_system: &Rc<VfsFileSystem>,
         path: &VfsPathReference,
     ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.data_stream = match result {
+        self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
@@ -518,13 +516,21 @@ impl QcowFile {
                     // TODO: add compression support.
                     todo!();
                 }
-                QcowBlockRangeType::InBackingFile => match self.backing_file.with_write_lock() {
-                    Ok(mut backing_file) => {
-                        backing_file.seek(io::SeekFrom::Start(media_offset))?;
+                QcowBlockRangeType::InBackingFile => match &self.backing_file {
+                    Some(backing_file) => match backing_file.try_borrow_mut() {
+                        Ok(mut file) => {
+                            file.seek(io::SeekFrom::Start(media_offset))?;
 
-                        backing_file.read(&mut data[data_offset..data_end_offset])?
+                            file.read(&mut data[data_offset..data_end_offset])?
+                        }
+                        Err(error) => return Err(crate::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing backing file",
+                        ));
                     }
-                    Err(error) => return Err(crate::error_to_io_error!(error)),
                 },
                 QcowBlockRangeType::InFile => match self.data_stream.with_write_lock() {
                     Ok(mut data_stream) => data_stream.read_at_position(
@@ -549,8 +555,8 @@ impl QcowFile {
     }
 
     /// Sets the backing file.
-    pub fn set_backing_file(&mut self, backing_file: &SharedValue<QcowFile>) -> io::Result<()> {
-        self.backing_file = backing_file.clone();
+    pub fn set_backing_file(&mut self, backing_file: &Rc<RefCell<QcowFile>>) -> io::Result<()> {
+        self.backing_file = Some(backing_file.clone());
 
         Ok(())
     }
@@ -606,7 +612,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: QcowFile = QcowFile::new();
@@ -623,7 +629,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: QcowFile = QcowFile::new();

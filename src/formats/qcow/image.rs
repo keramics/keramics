@@ -11,10 +11,12 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
+use std::rc::Rc;
 
-use crate::types::{ByteString, SharedValue};
-use crate::vfs::{VfsFileSystemReference, VfsPath, VfsPathReference};
+use crate::types::ByteString;
+use crate::vfs::{VfsFileSystem, VfsPath, VfsPathReference};
 
 use super::file::QcowFile;
 use super::layer::QcowLayer;
@@ -22,7 +24,7 @@ use super::layer::QcowLayer;
 /// QEMU Copy-On-Write (QCOW) storage media image.
 pub struct QcowImage {
     /// Files.
-    files: Vec<SharedValue<QcowFile>>,
+    files: Vec<Rc<RefCell<QcowFile>>>,
 }
 
 impl QcowImage {
@@ -41,12 +43,10 @@ impl QcowImage {
     /// Retrieves a layer by index.
     pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<QcowLayer> {
         match self.files.get(layer_index) {
-            Some(file) => {
-                let mut layer: QcowLayer = QcowLayer::new();
-                layer.open(&file)?;
-
-                Ok(layer)
-            }
+            Some(file) => match file.try_borrow() {
+                Ok(qcow_file) => Ok(QcowLayer::new(file, qcow_file.media_size)),
+                Err(error) => return Err(crate::error_to_io_error!(error)),
+            },
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("No layer with index: {}", layer_index),
@@ -95,13 +95,11 @@ impl QcowImage {
     /// Opens a storage media image.
     pub fn open(
         &mut self,
-        file_system: &VfsFileSystemReference,
+        file_system: &Rc<VfsFileSystem>,
         path: &VfsPathReference,
     ) -> io::Result<()> {
-        let directory_name: &str = match file_system.with_read_lock() {
-            Ok(file_system) => file_system.get_directory_name(&path.location),
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        let directory_name: &str = file_system.get_directory_name(&path.location);
+
         let mut files: Vec<QcowFile> = Vec::new();
 
         let mut file: QcowFile = QcowFile::new();
@@ -116,11 +114,7 @@ impl QcowImage {
             let backing_file_path: VfsPathReference =
                 VfsPath::new_from_path(&path, backing_file_location.as_str());
 
-            let file_exists: bool = match file_system.with_read_lock() {
-                Ok(file_system) => file_system.file_entry_exists(&backing_file_path)?,
-                Err(error) => return Err(crate::error_to_io_error!(error)),
-            };
-            if !file_exists {
+            if !file_system.file_entry_exists(&backing_file_path)? {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Missing backing file: {}", backing_file_name.to_string()),
@@ -140,7 +134,7 @@ impl QcowImage {
             if file_index > 0 {
                 file.set_backing_file(&mut self.files[file_index - 1])?;
             }
-            self.files.push(SharedValue::new(file));
+            self.files.push(Rc::new(RefCell::new(file)));
 
             file_index += 1;
         }
@@ -158,7 +152,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: QcowImage = QcowImage::new();
@@ -219,7 +213,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: QcowImage = QcowImage::new();

@@ -13,20 +13,21 @@
 
 use std::collections::HashMap;
 use std::process::ExitCode;
+use std::rc::Rc;
 
 use crate::formatters;
 
 use keramics::formats::mbr::{MbrPartition, MbrVolumeSystem};
-use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPathReference};
 
 /// Prints information about a MBR volume system.
 pub fn print_mbr_volume_system(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut mbr_volume_system = MbrVolumeSystem::new();
 
-    match mbr_volume_system.open(file_system, vfs_path) {
+    match mbr_volume_system.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open MBR volume system with error: {}", error);

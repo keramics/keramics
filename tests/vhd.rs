@@ -11,14 +11,15 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
 use std::io::Read;
+use std::rc::Rc;
 
 use keramics::formats::vhd::VhdFile;
 use keramics::formatters::format_as_string;
 use keramics::hashes::{DigestHashContext, Md5Context};
-use keramics::types::SharedValue;
-use keramics::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathReference, VfsPathType};
+use keramics::vfs::{VfsContext, VfsFileSystem, VfsPath, VfsPathReference, VfsPathType};
 
 fn read_media_from_file(file: &mut VhdFile) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
@@ -45,7 +46,7 @@ fn read_media_fixed() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
 
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
 
@@ -65,7 +66,7 @@ fn read_media_dynamic() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
 
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
 
@@ -85,7 +86,7 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
 
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
 
@@ -105,7 +106,7 @@ fn read_media_differential() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
 
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut parent_file = VhdFile::new();
 
@@ -122,9 +123,7 @@ fn read_media_differential() -> io::Result<()> {
     );
     file.open(&vfs_file_system, &vfs_path)?;
 
-    let shared_parent_file: SharedValue<VhdFile> = SharedValue::new(parent_file);
-
-    file.set_parent(&shared_parent_file)?;
+    file.set_parent(&Rc::new(RefCell::new(parent_file)))?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

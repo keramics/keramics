@@ -14,6 +14,7 @@
 use std::collections::HashSet;
 use std::io;
 use std::process::ExitCode;
+use std::rc::Rc;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -21,8 +22,8 @@ use keramics::enums::FormatIdentifier;
 use keramics::format_scanner::FormatScanner;
 use keramics::mediator::Mediator;
 use keramics::vfs::{
-    VfsDataStreamReference, VfsFileSystemReference, VfsPath, VfsPathReference, VfsPathType,
-    VfsResolver, VfsResolverReference,
+    VfsDataStreamReference, VfsFileSystem, VfsPath, VfsPathReference, VfsPathType, VfsResolver,
+    VfsResolverReference,
 };
 
 mod formatters;
@@ -136,7 +137,7 @@ fn main() -> ExitCode {
     let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-    let vfs_file_system: VfsFileSystemReference = match vfs_resolver.open_file_system(&vfs_path) {
+    let vfs_file_system: Rc<VfsFileSystem> = match vfs_resolver.open_file_system(&vfs_path) {
         Ok(value) => value,
         Err(error) => {
             println!("Unable to open file system with error: {}", error);
@@ -145,19 +146,14 @@ fn main() -> ExitCode {
     };
     let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, source, None);
 
-    let result: Option<VfsDataStreamReference> = match vfs_file_system.with_write_lock() {
-        Ok(file_system) => match file_system.open_data_stream(&vfs_path, None) {
+    let result: Option<VfsDataStreamReference> =
+        match vfs_file_system.open_data_stream(&vfs_path, None) {
             Ok(result) => result,
             Err(error) => {
                 println!("Unable to open data stream with error: {}", error);
                 return ExitCode::FAILURE;
             }
-        },
-        Err(error) => {
-            println!("{}", error);
-            return ExitCode::FAILURE;
-        }
-    };
+        };
     let vfs_data_stream: VfsDataStreamReference = match result {
         Some(data_stream) => data_stream,
         None => {

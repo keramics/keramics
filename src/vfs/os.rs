@@ -13,6 +13,7 @@
 
 use std::fs::{metadata, File, Metadata};
 use std::io;
+use std::io::Seek;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
@@ -25,7 +26,8 @@ use std::os::windows::fs::MetadataExt;
 use crate::datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
-use crate::vfs::types::{VfsDataStreamReference, VfsPathReference};
+use crate::vfs::traits::VfsDataStream;
+use crate::vfs::types::VfsDataStreamReference;
 
 /// Determines the POSIX date and time value.
 fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
@@ -38,10 +40,17 @@ fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
     }
 }
 
+impl VfsDataStream for File {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        self.seek(io::SeekFrom::End(0))
+    }
+}
+
 /// Operating system file entry.
-pub struct OsVfsFileEntry {
-    /// Location.
-    location: String,
+pub struct OsFileEntry {
+    /// Path.
+    path: String,
 
     /// File type.
     file_type: VfsFileType,
@@ -59,11 +68,11 @@ pub struct OsVfsFileEntry {
     modification_time: Option<DateTime>,
 }
 
-impl OsVfsFileEntry {
+impl OsFileEntry {
     /// Creates a new file entry.
     pub fn new() -> Self {
         Self {
-            location: String::new(),
+            path: String::new(),
             file_type: VfsFileType::NotSet,
             access_time: None,
             change_time: None,
@@ -98,15 +107,8 @@ impl OsVfsFileEntry {
 
     /// Initializes the file entry.
     #[cfg(unix)]
-    pub(crate) fn initialize(&mut self, path: &VfsPathReference) -> io::Result<()> {
-        let parent_path: Option<VfsPathReference> = path.get_parent();
-        if parent_path.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Parent set in path",
-            ));
-        }
-        let os_path: &Path = Path::new(path.location.as_str());
+    pub(crate) fn initialize(&mut self, path: &str) -> io::Result<()> {
+        let os_path: &Path = Path::new(path);
 
         let file_metadata: Metadata = metadata(os_path)?;
 
@@ -152,14 +154,14 @@ impl OsVfsFileEntry {
             },
             Err(_) => None,
         };
-        self.location = path.location.clone();
+        self.path = path.to_string();
 
         Ok(())
     }
 
     /// Initializes the file entry.
     #[cfg(windows)]
-    pub(crate) fn initialize(&mut self, path: &VfsPathReference) -> io::Result<()> {
+    pub(crate) fn initialize(&mut self, path: &str) -> io::Result<()> {
         // TODO: add Windows support.
         todo!();
     }
@@ -173,7 +175,7 @@ impl OsVfsFileEntry {
         if self.file_type != VfsFileType::File || name.is_some() {
             return Ok(None);
         }
-        let os_path: &Path = Path::new(self.location.as_str());
+        let os_path: &Path = Path::new(self.path.as_str());
         let file: File = File::open(os_path)?;
 
         Ok(Some(SharedValue::new(Box::new(file))))
@@ -184,29 +186,22 @@ impl OsVfsFileEntry {
 mod tests {
     use super::*;
 
-    use crate::vfs::enums::VfsPathType;
-    use crate::vfs::path::VfsPath;
-
     #[test]
     fn test_initialize() -> io::Result<()> {
-        let mut vfs_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        vfs_file_entry.initialize(&vfs_path)?;
+        os_file_entry.initialize("./test_data/file.txt")?;
 
-        assert!(vfs_file_entry.file_type == VfsFileType::File);
+        assert!(os_file_entry.file_type == VfsFileType::File);
 
         Ok(())
     }
 
     #[test]
     fn test_open_data_stream() -> io::Result<()> {
-        let mut vfs_file_entry: OsVfsFileEntry = OsVfsFileEntry::new();
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        vfs_file_entry.initialize(&vfs_path)?;
+        os_file_entry.initialize("./test_data/file.txt")?;
 
         let expected_data: String = [
             "A ceramic is any of the various hard, brittle, heat-resistant, and ",
@@ -215,7 +210,7 @@ mod tests {
         ]
         .join("");
 
-        let result: Option<VfsDataStreamReference> = vfs_file_entry.open_data_stream(None)?;
+        let result: Option<VfsDataStreamReference> = os_file_entry.open_data_stream(None)?;
 
         let vfs_data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,

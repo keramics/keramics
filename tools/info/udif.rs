@@ -12,22 +12,23 @@
  */
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use std::process::ExitCode;
 
 use crate::formatters;
 
 use keramics::formats::udif::{UdifCompressionMethod, UdifFile};
-use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPathReference};
 
 /// Prints information about an UDIF file.
 pub fn print_udif_file(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut udif_file: UdifFile = UdifFile::new();
 
-    match udif_file.open(file_system, vfs_path) {
+    match udif_file.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open UDIF file with error: {}", error);

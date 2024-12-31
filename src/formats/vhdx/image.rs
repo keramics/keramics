@@ -11,10 +11,12 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
+use std::rc::Rc;
 
-use crate::types::{SharedValue, Ucs2String};
-use crate::vfs::{VfsFileSystemReference, VfsPath, VfsPathReference};
+use crate::types::Ucs2String;
+use crate::vfs::{VfsFileSystem, VfsPath, VfsPathReference};
 
 use super::file::VhdxFile;
 use super::layer::VhdxLayer;
@@ -22,7 +24,7 @@ use super::layer::VhdxLayer;
 /// Virtual Hard Disk version 2 (VHDX) storage media image.
 pub struct VhdxImage {
     /// Files.
-    files: Vec<SharedValue<VhdxFile>>,
+    files: Vec<Rc<RefCell<VhdxFile>>>,
 }
 
 impl VhdxImage {
@@ -41,12 +43,14 @@ impl VhdxImage {
     /// Retrieves a layer by index.
     pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<VhdxLayer> {
         match self.files.get(layer_index) {
-            Some(file) => {
-                let mut layer: VhdxLayer = VhdxLayer::new();
-                layer.open(&file)?;
-
-                Ok(layer)
-            }
+            Some(file) => match file.try_borrow() {
+                Ok(vhdx_file) => Ok(VhdxLayer::new(
+                    file,
+                    &vhdx_file.identifier,
+                    vhdx_file.media_size,
+                )),
+                Err(error) => return Err(crate::error_to_io_error!(error)),
+            },
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("No layer with index: {}", layer_index),
@@ -99,13 +103,11 @@ impl VhdxImage {
     /// Opens a storage media image.
     pub fn open(
         &mut self,
-        file_system: &VfsFileSystemReference,
+        file_system: &Rc<VfsFileSystem>,
         path: &VfsPathReference,
     ) -> io::Result<()> {
-        let directory_name: &str = match file_system.with_read_lock() {
-            Ok(file_system) => file_system.get_directory_name(&path.location),
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
+        let directory_name: &str = file_system.get_directory_name(&path.location);
+
         let mut files: Vec<VhdxFile> = Vec::new();
 
         let mut file: VhdxFile = VhdxFile::new();
@@ -127,11 +129,7 @@ impl VhdxImage {
             let parent_path: VfsPathReference =
                 VfsPath::new_from_path(&path, parent_location.as_str());
 
-            let file_exists: bool = match file_system.with_read_lock() {
-                Ok(file_system) => file_system.file_entry_exists(&parent_path)?,
-                Err(error) => return Err(crate::error_to_io_error!(error)),
-            };
-            if !file_exists {
+            if !file_system.file_entry_exists(&parent_path)? {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Missing parent file: {}", parent_filename.to_string()),
@@ -151,7 +149,7 @@ impl VhdxImage {
             if file_index > 0 {
                 file.set_parent(&mut self.files[file_index - 1])?;
             }
-            self.files.push(SharedValue::new(file));
+            self.files.push(Rc::new(RefCell::new(file)));
 
             file_index += 1;
         }
@@ -169,7 +167,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: VhdxImage = VhdxImage::new();
@@ -239,7 +237,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: VhdxImage = VhdxImage::new();

@@ -13,12 +13,13 @@
 
 use std::io;
 use std::io::{Read, Seek};
+use std::rc::Rc;
 
 use crate::compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
 use crate::formats::plist::{PlistObject, XmlPlist};
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, LruCache, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
 
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table::UdifBlockTable;
@@ -80,14 +81,10 @@ impl UdifFile {
     /// Opens a file.
     pub fn open(
         &mut self,
-        file_system: &VfsFileSystemReference,
+        file_system: &Rc<VfsFileSystem>,
         path: &VfsPathReference,
     ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.data_stream = match result {
+        self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
@@ -548,13 +545,13 @@ impl Seek for UdifFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
 
     fn get_file() -> io::Result<UdifFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: UdifFile = UdifFile::new();
@@ -571,7 +568,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: UdifFile = UdifFile::new();

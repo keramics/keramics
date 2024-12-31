@@ -14,6 +14,7 @@
 use std::io;
 use std::io::Read;
 use std::process::ExitCode;
+use std::rc::Rc;
 
 use keramics::datetime::DateTime;
 use keramics::formats::ext::constants::*;
@@ -21,9 +22,7 @@ use keramics::formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
 use keramics::formatters::format_as_string;
 use keramics::hashes::{DigestHashContext, Md5Context};
 use keramics::types::ByteString;
-use keramics::vfs::{
-    VfsDataStream, VfsDataStreamReference, VfsFileSystemReference, VfsPathReference,
-};
+use keramics::vfs::{VfsDataStream, VfsDataStreamReference, VfsFileSystem, VfsPathReference};
 
 /// Retrieves the bodyfile representation of a date and time value.
 fn get_date_time_bodyfile(date_time_value: Option<&DateTime>) -> io::Result<String> {
@@ -256,12 +255,12 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
 
 /// Prints information about an Extended File System (ext).
 pub fn print_ext_file_system(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(file_system, vfs_path) {
+    match ext_file_system.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -513,13 +512,13 @@ fn print_ext_file_entry_path(
 
 /// Prints information about a specific entry of an Extended File System (ext).
 pub fn print_entry_ext_file_system(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
     ext_entry_identifier: u64,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(file_system, vfs_path) {
+    match ext_file_system.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -558,13 +557,13 @@ pub fn print_entry_ext_file_system(
 
 /// Prints the hierarchy of an Extended File System (ext).
 pub fn print_hierarcy_ext_file_system(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
     bodyfile: bool,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(file_system, vfs_path) {
+    match ext_file_system.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -623,13 +622,13 @@ fn print_hierarcy_ext_file_entry(
 
 /// Prints information about a specific path of an Extended File System (ext).
 pub fn print_path_ext_file_system(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
     path: &String,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(file_system, vfs_path) {
+    match ext_file_system.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);

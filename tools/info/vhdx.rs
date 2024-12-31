@@ -12,22 +12,23 @@
  */
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use std::process::ExitCode;
 
 use crate::formatters;
 
 use keramics::formats::vhdx::{VhdxDiskType, VhdxFile};
-use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPathReference};
 
 /// Prints information about a VHDX file.
 pub fn print_vhdx_file(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
-    match vhdx_file.open(file_system, vfs_path) {
+    match vhdx_file.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open VHDX file with error: {}", error);

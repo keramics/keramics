@@ -12,22 +12,23 @@
  */
 
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use std::process::ExitCode;
 
 use crate::formatters;
 
 use keramics::formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
-use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPathReference};
 
 /// Prints information about a QCOW file.
 pub fn print_qcow_file(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut qcow_file: QcowFile = QcowFile::new();
 
-    match qcow_file.open(file_system, vfs_path) {
+    match qcow_file.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open QCOW file with error: {}", error);
