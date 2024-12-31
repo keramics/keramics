@@ -263,7 +263,9 @@ impl FormatScanner {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathReference, VfsPathType};
+    use std::rc::Rc;
+
+    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
 
     #[test]
     fn test_build() -> Result<(), BuildError> {
@@ -298,15 +300,14 @@ mod tests {
         };
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         let vfs_data_stream: VfsDataStreamReference =
             match vfs_context.open_data_stream(&vfs_path, None)? {
                 Some(data_stream) => data_stream,
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
-                        format!("No such file: {}", vfs_path.location),
+                        format!("No such file: {}", vfs_path.to_string()),
                     ))
                 }
             };

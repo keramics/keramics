@@ -22,8 +22,7 @@ use keramics::enums::FormatIdentifier;
 use keramics::format_scanner::FormatScanner;
 use keramics::mediator::Mediator;
 use keramics::vfs::{
-    VfsDataStreamReference, VfsFileSystem, VfsPath, VfsPathReference, VfsPathType, VfsResolver,
-    VfsResolverReference,
+    VfsDataStreamReference, VfsFileSystem, VfsPath, VfsPathType, VfsResolver, VfsResolverReference,
 };
 
 mod formatters;
@@ -136,7 +135,7 @@ fn main() -> ExitCode {
     };
     let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-    let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
     let vfs_file_system: Rc<VfsFileSystem> = match vfs_resolver.open_file_system(&vfs_path) {
         Ok(value) => value,
         Err(error) => {
@@ -144,7 +143,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Os, source, None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, source, None);
 
     let result: Option<VfsDataStreamReference> =
         match vfs_file_system.open_data_stream(&vfs_path, None) {

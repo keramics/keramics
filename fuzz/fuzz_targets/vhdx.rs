@@ -19,7 +19,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::vhdx::VhdxFile;
 use keramics::types::SharedValue;
-use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathReference, VfsPathType};
+use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // Virtual Hard Disk version 2 (VHDX) file fuzz target.
 fuzz_target!(|data: &[u8]| {
@@ -30,6 +30,6 @@ fuzz_target!(|data: &[u8]| {
     }
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
-    let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/input", None);
     _ = vhdx_file.open(&Rc::new(fake_file_system), &vfs_path);
 });

@@ -15,8 +15,7 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use crate::types::ByteString;
-use crate::vfs::{VfsFileSystem, VfsPath, VfsPathReference};
+use crate::vfs::{VfsFileSystem, VfsPath};
 
 use super::file::QcowFile;
 use super::layer::QcowLayer;
@@ -93,26 +92,17 @@ impl QcowImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(
-        &mut self,
-        file_system: &Rc<VfsFileSystem>,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
-        let directory_name: &str = file_system.get_directory_name(&path.location);
+    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+        let directory_path: VfsPath = path.new_of_parent_directory();
 
         let mut files: Vec<QcowFile> = Vec::new();
 
         let mut file: QcowFile = QcowFile::new();
         file.open(file_system, path)?;
 
-        while file.backing_file_name.is_some() {
-            let backing_file_name: &ByteString = file.backing_file_name.as_ref().unwrap();
-
-            // TODO: add file_system.join function
-            let backing_file_location: String =
-                format!("{}/{}", directory_name, backing_file_name.to_string());
-            let backing_file_path: VfsPathReference =
-                VfsPath::new_from_path(&path, backing_file_location.as_str());
+        while let Some(backing_file_name) = file.get_backing_file_name() {
+            let backing_file_path: VfsPath =
+                directory_path.new_with_suffix(&mut vec![backing_file_name.to_string().as_str()]);
 
             if !file_system.file_entry_exists(&backing_file_path)? {
                 return Err(io::Error::new(
@@ -151,14 +141,13 @@ mod tests {
     fn get_image() -> io::Result<QcowImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: QcowImage = QcowImage::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(image)
@@ -212,14 +201,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: QcowImage = QcowImage::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(())

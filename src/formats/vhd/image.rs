@@ -16,7 +16,7 @@ use std::io;
 use std::rc::Rc;
 
 use crate::types::Ucs2String;
-use crate::vfs::{VfsFileSystem, VfsPath, VfsPathReference};
+use crate::vfs::{VfsFileSystem, VfsPath};
 
 use super::file::VhdFile;
 use super::layer::VhdLayer;
@@ -101,12 +101,8 @@ impl VhdImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(
-        &mut self,
-        file_system: &Rc<VfsFileSystem>,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
-        let directory_name: &str = file_system.get_directory_name(&path.location);
+    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+        let directory_path: VfsPath = path.new_of_parent_directory();
 
         let mut files: Vec<VhdFile> = Vec::new();
 
@@ -123,12 +119,8 @@ impl VhdImage {
                     ));
                 }
             };
-            // TODO: add file_system.join function
-            let parent_location: String =
-                format!("{}/{}", directory_name, parent_filename.to_string());
-            let parent_path: VfsPathReference =
-                VfsPath::new_from_path(&path, parent_location.as_str());
-
+            let parent_path: VfsPath =
+                directory_path.new_with_suffix(&mut vec![parent_filename.to_string().as_str()]);
             if !file_system.file_entry_exists(&parent_path)? {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
@@ -166,13 +158,13 @@ mod tests {
     fn get_image() -> io::Result<VhdImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: VhdImage = VhdImage::new();
 
-        let vfs_path: VfsPathReference = VfsPath::new(
+        let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
             "./test_data/vhd/ntfs-differential.vhd",
             None,
@@ -236,13 +228,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut image: VhdImage = VhdImage::new();
 
-        let vfs_path: VfsPathReference = VfsPath::new(
+        let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
             "./test_data/vhd/ntfs-differential.vhd",
             None,

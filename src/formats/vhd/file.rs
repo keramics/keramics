@@ -17,7 +17,7 @@ use std::io::{Read, Seek};
 use std::rc::Rc;
 
 use crate::types::{BlockTree, SharedValue, Ucs2String, Uuid};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
 
 use super::block_allocation_table::{VhdBlockAllocationTable, VhdBlockAllocationTableEntry};
 use super::block_range::{VhdBlockRange, VhdBlockRangeType};
@@ -111,17 +111,13 @@ impl VhdFile {
     }
 
     /// Opens a file.
-    pub fn open(
-        &mut self,
-        file_system: &Rc<VfsFileSystem>,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.location),
+                    format!("No such file: {}", path.to_string()),
                 ))
             }
         };
@@ -443,14 +439,13 @@ mod tests {
     fn get_file() -> io::Result<VhdFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: VhdFile = VhdFile::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
         file.open(&vfs_file_system, &vfs_path)?;
 
         Ok(file)
@@ -460,13 +455,13 @@ mod tests {
     fn test_get_parent_filename() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: VhdFile = VhdFile::new();
 
-        let vfs_path: VfsPathReference = VfsPath::new(
+        let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
             "./test_data/vhd/ntfs-differential.vhd",
             None,
@@ -483,13 +478,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file = VhdFile::new();
 
-        let vfs_path: VfsPathReference = VfsPath::new(
+        let vfs_path: VfsPath = VfsPath::new(
             VfsPathType::Os,
             "./test_data/vhd/ntfs-differential.vhd",
             None,

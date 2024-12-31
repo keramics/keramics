@@ -11,17 +11,13 @@
  * under the License.
  */
 
-use std::rc::Rc;
 use std::sync::Arc;
 
 use crate::types::SharedValue;
 
-use super::path::VfsPath;
 use super::resolver::VfsResolver;
 use super::traits::VfsDataStream;
 
 pub type VfsDataStreamReference = SharedValue<Box<dyn VfsDataStream>>;
-
-pub type VfsPathReference = Rc<VfsPath>;
 
 pub type VfsResolverReference = Arc<VfsResolver>;

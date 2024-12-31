@@ -22,7 +22,7 @@ use keramics::formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
 use keramics::formatters::format_as_string;
 use keramics::hashes::{DigestHashContext, Md5Context};
 use keramics::types::ByteString;
-use keramics::vfs::{VfsDataStream, VfsDataStreamReference, VfsFileSystem, VfsPathReference};
+use keramics::vfs::{VfsDataStream, VfsDataStreamReference, VfsFileSystem, VfsPath};
 
 /// Retrieves the bodyfile representation of a date and time value.
 fn get_date_time_bodyfile(date_time_value: Option<&DateTime>) -> io::Result<String> {
@@ -254,10 +254,7 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
 }
 
 /// Prints information about an Extended File System (ext).
-pub fn print_ext_file_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
-) -> ExitCode {
+pub fn print_ext_file_system(vfs_file_system: &Rc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
     match ext_file_system.open(vfs_file_system, vfs_path) {
@@ -513,7 +510,7 @@ fn print_ext_file_entry_path(
 /// Prints information about a specific entry of an Extended File System (ext).
 pub fn print_entry_ext_file_system(
     vfs_file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
+    vfs_path: &VfsPath,
     ext_entry_identifier: u64,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
@@ -558,7 +555,7 @@ pub fn print_entry_ext_file_system(
 /// Prints the hierarchy of an Extended File System (ext).
 pub fn print_hierarcy_ext_file_system(
     vfs_file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
+    vfs_path: &VfsPath,
     bodyfile: bool,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
@@ -623,7 +620,7 @@ fn print_hierarcy_ext_file_entry(
 /// Prints information about a specific path of an Extended File System (ext).
 pub fn print_path_ext_file_system(
     vfs_file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
+    vfs_path: &VfsPath,
     path: &String,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();

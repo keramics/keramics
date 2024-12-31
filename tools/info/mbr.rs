@@ -18,12 +18,12 @@ use std::rc::Rc;
 use crate::formatters;
 
 use keramics::formats::mbr::{MbrPartition, MbrVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about a MBR volume system.
 pub fn print_mbr_volume_system(
     vfs_file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
+    vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut mbr_volume_system = MbrVolumeSystem::new();
 

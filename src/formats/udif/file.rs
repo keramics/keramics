@@ -19,7 +19,7 @@ use crate::compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
 use crate::formats::plist::{PlistObject, XmlPlist};
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, LruCache, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
 
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table::UdifBlockTable;
@@ -79,17 +79,13 @@ impl UdifFile {
     }
 
     /// Opens a file.
-    pub fn open(
-        &mut self,
-        file_system: &Rc<VfsFileSystem>,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.location),
+                    format!("No such file: {}", path.to_string()),
                 ))
             }
         };
@@ -550,13 +546,13 @@ mod tests {
     fn get_file() -> io::Result<UdifFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: UdifFile = UdifFile::new();
 
-        let vfs_path: VfsPathReference =
+        let vfs_path: VfsPath =
             VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_zlib.dmg", None);
         file.open(&vfs_file_system, &vfs_path)?;
 
@@ -567,13 +563,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: UdifFile = UdifFile::new();
 
-        let vfs_path: VfsPathReference =
+        let vfs_path: VfsPath =
             VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_zlib.dmg", None);
         file.open(&vfs_file_system, &vfs_path)?;
 

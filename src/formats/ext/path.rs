@@ -31,6 +31,15 @@ impl ExtPath {
     pub fn is_empty(&self) -> bool {
         self.components.len() == 0
     }
+
+    /// Retrieves a string representation of the path.
+    pub fn to_string(&self) -> String {
+        self.components
+            .iter()
+            .map(|component| component.to_string())
+            .collect::<Vec<String>>()
+            .join("")
+    }
 }
 
 impl From<&str> for ExtPath {
