@@ -19,7 +19,7 @@ use std::rc::Rc;
 use crate::bytes_to_u16_le;
 use crate::datetime::DateTime;
 use crate::types::{ByteString, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileType};
+use crate::vfs::VfsDataStreamReference;
 
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
@@ -317,13 +317,13 @@ mod tests {
     use crate::datetime::PosixTime32;
     use crate::formats::ext::file_system::ExtFileSystem;
     use crate::formats::ext::path::ExtPath;
-    use crate::vfs::{VfsContext, VfsFileSystemReference, VfsPath, VfsPathReference, VfsPathType};
+    use crate::vfs::{VfsContext, VfsFileSystem, VfsPath, VfsPathReference, VfsPathType};
 
     fn get_file_system() -> io::Result<ExtFileSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();

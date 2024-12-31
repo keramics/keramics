@@ -12,11 +12,12 @@
  */
 
 use std::process::ExitCode;
+use std::rc::Rc;
 
 use crate::formatters;
 
 use keramics::formats::apm::{ApmPartition, ApmVolumeSystem};
-use keramics::vfs::{VfsFileSystemReference, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPathReference};
 
 /// Prints the partition status flags.
 fn print_apm_partition_status_flags(flags: u32) {
@@ -62,12 +63,12 @@ fn print_apm_partition_status_flags(flags: u32) {
 
 /// Prints information about an APM volume system.
 pub fn print_apm_volume_system(
-    file_system: &VfsFileSystemReference,
+    vfs_file_system: &Rc<VfsFileSystem>,
     vfs_path: &VfsPathReference,
 ) -> ExitCode {
     let mut apm_volume_system = ApmVolumeSystem::new();
 
-    match apm_volume_system.open(file_system, vfs_path) {
+    match apm_volume_system.open(vfs_file_system, vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open APM volume system with error: {}", error);

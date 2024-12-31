@@ -11,10 +11,12 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
+use std::rc::Rc;
 
-use crate::types::{SharedValue, Uuid};
+use crate::types::Uuid;
 use crate::vfs::VfsDataStream;
 
 use super::file::VhdxFile;
@@ -22,13 +24,13 @@ use super::file::VhdxFile;
 /// Virtual Hard Disk version 2 (VHDX) storage media image layer.
 pub struct VhdxLayer {
     /// The file.
-    file: SharedValue<VhdxFile>,
-
-    /// The current offset.
-    current_offset: u64,
+    file: Rc<RefCell<VhdxFile>>,
 
     /// Identifier.
     pub identifier: Uuid,
+
+    /// The current offset.
+    current_offset: u64,
 
     /// The size of the layer.
     pub size: u64,
@@ -36,27 +38,13 @@ pub struct VhdxLayer {
 
 impl VhdxLayer {
     /// Creates a new layer.
-    pub(super) fn new() -> Self {
+    pub(super) fn new(file: &Rc<RefCell<VhdxFile>>, identifier: &Uuid, media_size: u64) -> Self {
         Self {
-            file: SharedValue::none(),
+            file: file.clone(),
+            identifier: identifier.clone(),
             current_offset: 0,
-            identifier: Uuid::new(),
-            size: 0,
+            size: media_size,
         }
-    }
-
-    /// Opens a layer.
-    pub(super) fn open(&mut self, file: &SharedValue<VhdxFile>) -> io::Result<()> {
-        match file.with_read_lock() {
-            Ok(file) => {
-                self.identifier = file.identifier.clone();
-                self.size = file.media_size;
-            }
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.file = file.clone();
-
-        Ok(())
     }
 }
 
@@ -72,7 +60,7 @@ impl Read for VhdxLayer {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = match self.file.with_write_lock() {
+        let read_count: usize = match self.file.try_borrow_mut() {
             Ok(mut file) => {
                 file.seek(io::SeekFrom::Start(self.current_offset))?;
 
@@ -112,3 +100,5 @@ impl VfsDataStream for VhdxLayer {
         Ok(self.size)
     }
 }
+
+// TODO: add tests.

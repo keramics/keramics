@@ -17,7 +17,7 @@ use std::rc::Rc;
 use crate::checksums::ReversedCrc32Context;
 use crate::datetime::DateTime;
 use crate::types::{ByteString, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
 
 use super::constants::*;
 use super::features::ExtFeatures;
@@ -157,14 +157,10 @@ impl ExtFileSystem {
     /// Opens a file system.
     pub fn open(
         &mut self,
-        file_system: &VfsFileSystemReference,
+        file_system: &Rc<VfsFileSystem>,
         path: &VfsPathReference,
     ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.data_stream = match result {
+        self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
@@ -386,7 +382,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
@@ -448,7 +444,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();

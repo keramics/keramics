@@ -11,10 +11,11 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
+use std::rc::Rc;
 
-use crate::types::SharedValue;
 use crate::vfs::VfsDataStream;
 
 use super::file::QcowFile;
@@ -22,7 +23,7 @@ use super::file::QcowFile;
 /// QEMU Copy-On-Write (QCOW) storage media image layer.
 pub struct QcowLayer {
     /// The file.
-    file: SharedValue<QcowFile>,
+    file: Rc<RefCell<QcowFile>>,
 
     /// The current offset.
     current_offset: u64,
@@ -33,25 +34,12 @@ pub struct QcowLayer {
 
 impl QcowLayer {
     /// Creates a new layer.
-    pub(super) fn new() -> Self {
+    pub(super) fn new(file: &Rc<RefCell<QcowFile>>, media_size: u64) -> Self {
         Self {
-            file: SharedValue::none(),
+            file: file.clone(),
             current_offset: 0,
-            size: 0,
+            size: media_size,
         }
-    }
-
-    /// Opens a layer.
-    pub(super) fn open(&mut self, file: &SharedValue<QcowFile>) -> io::Result<()> {
-        match file.with_read_lock() {
-            Ok(file) => {
-                self.size = file.media_size;
-            }
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.file = file.clone();
-
-        Ok(())
     }
 }
 
@@ -67,7 +55,7 @@ impl Read for QcowLayer {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = match self.file.with_write_lock() {
+        let read_count: usize = match self.file.try_borrow_mut() {
             Ok(mut file) => {
                 file.seek(io::SeekFrom::Start(self.current_offset))?;
 
@@ -107,3 +95,5 @@ impl VfsDataStream for QcowLayer {
         Ok(self.size)
     }
 }
+
+// TODO: add tests

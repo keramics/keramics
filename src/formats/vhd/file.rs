@@ -11,11 +11,13 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
+use std::rc::Rc;
 
 use crate::types::{BlockTree, SharedValue, Ucs2String, Uuid};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystemReference, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
 
 use super::block_allocation_table::{VhdBlockAllocationTable, VhdBlockAllocationTableEntry};
 use super::block_range::{VhdBlockRange, VhdBlockRangeType};
@@ -49,7 +51,7 @@ pub struct VhdFile {
     pub parent_name: Option<Ucs2String>,
 
     /// Parent file.
-    parent_file: SharedValue<VhdFile>,
+    parent_file: Option<Rc<RefCell<VhdFile>>>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -78,7 +80,7 @@ impl VhdFile {
             identifier: Uuid::new(),
             parent_identifier: None,
             parent_name: None,
-            parent_file: SharedValue::none(),
+            parent_file: None,
             bytes_per_sector: 0,
             block_size: 0,
             sector_bitmap_size: 0,
@@ -111,14 +113,10 @@ impl VhdFile {
     /// Opens a file.
     pub fn open(
         &mut self,
-        file_system: &VfsFileSystemReference,
+        file_system: &Rc<VfsFileSystem>,
         path: &VfsPathReference,
     ) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = match file_system.with_write_lock() {
-            Ok(file_system) => file_system.open_data_stream(path, None)?,
-            Err(error) => return Err(crate::error_to_io_error!(error)),
-        };
-        self.data_stream = match result {
+        self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
@@ -322,13 +320,21 @@ impl VhdFile {
                     )?,
                     Err(error) => return Err(crate::error_to_io_error!(error)),
                 },
-                VhdBlockRangeType::InParent => match self.parent_file.with_write_lock() {
-                    Ok(mut parent_file) => {
-                        parent_file.seek(io::SeekFrom::Start(media_offset))?;
+                VhdBlockRangeType::InParent => match &self.parent_file {
+                    Some(parent_file) => match parent_file.try_borrow_mut() {
+                        Ok(mut file) => {
+                            file.seek(io::SeekFrom::Start(media_offset))?;
 
-                        parent_file.read(&mut data[data_offset..data_end_offset])?
+                            file.read(&mut data[data_offset..data_end_offset])?
+                        }
+                        Err(error) => return Err(crate::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing parent file",
+                        ));
                     }
-                    Err(error) => return Err(crate::error_to_io_error!(error)),
                 },
                 VhdBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
@@ -348,7 +354,7 @@ impl VhdFile {
     }
 
     /// Sets the parent file.
-    pub fn set_parent(&mut self, parent_file: &SharedValue<VhdFile>) -> io::Result<()> {
+    pub fn set_parent(&mut self, parent_file: &Rc<RefCell<VhdFile>>) -> io::Result<()> {
         let parent_identifier: &Uuid = match &self.parent_identifier {
             Some(parent_identifier) => parent_identifier,
             None => {
@@ -358,22 +364,22 @@ impl VhdFile {
                 ))
             }
         };
-        match parent_file.with_write_lock() {
-            Ok(parent_file) => {
-                if *parent_identifier != parent_file.identifier {
+        match parent_file.try_borrow() {
+            Ok(file) => {
+                if *parent_identifier != file.identifier {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(
                             "Parent identifier: {} does not match identifier of parent file: {}",
                             parent_identifier.to_string(),
-                            parent_file.identifier.to_string(),
+                            file.identifier.to_string(),
                         ),
                     ));
                 }
             }
             Err(error) => return Err(crate::error_to_io_error!(error)),
         }
-        self.parent_file = parent_file.clone();
+        self.parent_file = Some(parent_file.clone());
 
         Ok(())
     }
@@ -438,7 +444,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: VhdFile = VhdFile::new();
@@ -455,7 +461,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: VhdFile = VhdFile::new();
@@ -478,7 +484,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: VfsFileSystemReference =
+        let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file = VhdFile::new();

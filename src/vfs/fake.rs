@@ -12,15 +12,29 @@
  */
 
 use std::collections::HashMap;
+use std::convert::AsRef;
 use std::io;
+use std::io::{Cursor, Seek};
 use std::rc::Rc;
 
 use crate::datetime::DateTime;
 use crate::types::SharedValue;
-use crate::vfs::data_streams::new_fake_data_stream;
 
 use super::enums::VfsFileType;
 use super::types::VfsDataStreamReference;
+use crate::vfs::traits::VfsDataStream;
+
+impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        self.seek(io::SeekFrom::End(0))
+    }
+}
+
+/// Creates a new fake data stream.
+pub fn new_fake_data_stream(data: Vec<u8>) -> VfsDataStreamReference {
+    SharedValue::new(Box::new(Cursor::new(data)))
+}
 
 /// Fake (or virtual) file entry.
 pub struct FakeFileEntry {
@@ -66,7 +80,7 @@ impl FakeFileEntry {
         // TODO: test timestamps with current time
         Self {
             location: String::new(),
-            data_stream: new_fake_data_stream(data.to_vec()),
+            data_stream: SharedValue::new(Box::new(Cursor::new(data.to_vec()))),
             file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
