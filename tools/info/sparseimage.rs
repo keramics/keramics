@@ -17,13 +17,10 @@ use std::rc::Rc;
 use crate::formatters;
 
 use keramics::formats::sparseimage::SparseImageFile;
-use keramics::vfs::{VfsFileSystem, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about a sparse image file.
-pub fn print_sparseimage_file(
-    file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
-) -> ExitCode {
+pub fn print_sparseimage_file(file_system: &Rc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
     let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
     match sparseimage_file.open(file_system, vfs_path) {

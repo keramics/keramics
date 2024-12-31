@@ -15,7 +15,7 @@ use std::io;
 use std::rc::Rc;
 
 use crate::types::SharedValue;
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
 
 use super::constants::*;
 use super::extended_boot_record::MbrExtendedBootRecord;
@@ -129,17 +129,13 @@ impl MbrVolumeSystem {
     }
 
     /// Opens a volume system.
-    pub fn open(
-        &mut self,
-        file_system: &Rc<VfsFileSystem>,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.location),
+                    format!("No such file: {}", path.to_string()),
                 ))
             }
         };
@@ -275,14 +271,13 @@ mod tests {
     fn get_volume_system() -> io::Result<MbrVolumeSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         Ok(volume_system)
@@ -337,14 +332,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
         volume_system.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);

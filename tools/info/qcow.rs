@@ -19,13 +19,10 @@ use std::process::ExitCode;
 use crate::formatters;
 
 use keramics::formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
-use keramics::vfs::{VfsFileSystem, VfsPathReference};
+use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about a QCOW file.
-pub fn print_qcow_file(
-    vfs_file_system: &Rc<VfsFileSystem>,
-    vfs_path: &VfsPathReference,
-) -> ExitCode {
+pub fn print_qcow_file(vfs_file_system: &Rc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
     let mut qcow_file: QcowFile = QcowFile::new();
 
     match qcow_file.open(vfs_file_system, vfs_path) {
@@ -66,7 +63,7 @@ pub fn print_qcow_file(
     );
     println!("    Encryption method\t\t\t: {}", encryption_method_string);
 
-    match &qcow_file.backing_file_name {
+    match qcow_file.get_backing_file_name() {
         Some(backing_file_name) => {
             println!(
                 "    Backing file name\t\t\t: {}",

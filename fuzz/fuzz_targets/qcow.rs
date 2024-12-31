@@ -19,7 +19,7 @@ use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::qcow::QcowFile;
 use keramics::types::SharedValue;
-use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathReference, VfsPathType};
+use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // QEMU Copy-On-Write (QCOW) file fuzz target.
 fuzz_target!(|data: &[u8]| {
@@ -30,6 +30,6 @@ fuzz_target!(|data: &[u8]| {
     }
     let mut qcow_file: QcowFile = QcowFile::new();
 
-    let vfs_path: VfsPathReference = VfsPath::new(VfsPathType::Fake, "/input", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/input", None);
     _ = qcow_file.open(&Rc::new(fake_file_system), &vfs_path);
 });

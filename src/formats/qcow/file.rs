@@ -18,7 +18,7 @@ use std::rc::Rc;
 
 use crate::mediator::{Mediator, MediatorReference};
 use crate::types::{BlockTree, ByteString, SharedValue};
-use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPathReference};
+use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
 
 use super::block_range::{QcowBlockRange, QcowBlockRangeType};
 use super::cluster_table::{QcowClusterTable, QcowClusterTableEntry};
@@ -88,7 +88,7 @@ pub struct QcowFile {
     block_tree: BlockTree<QcowBlockRange>,
 
     /// Backing file name.
-    pub backing_file_name: Option<ByteString>,
+    backing_file_name: Option<ByteString>,
 
     /// Backing file.
     backing_file: Option<Rc<RefCell<QcowFile>>>,
@@ -130,18 +130,19 @@ impl QcowFile {
         }
     }
 
+    /// Retrieves the backing file name.
+    pub fn get_backing_file_name(&self) -> Option<&ByteString> {
+        self.backing_file_name.as_ref()
+    }
+
     /// Opens a file.
-    pub fn open(
-        &mut self,
-        file_system: &Rc<VfsFileSystem>,
-        path: &VfsPathReference,
-    ) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.open_data_stream(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.location),
+                    format!("No such file: {}", path.to_string()),
                 ))
             }
         };
@@ -611,14 +612,13 @@ mod tests {
     fn get_file() -> io::Result<QcowFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: QcowFile = QcowFile::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         file.open(&vfs_file_system, &vfs_path)?;
 
         Ok(file)
@@ -628,14 +628,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPathReference = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let mut file: QcowFile = QcowFile::new();
 
-        let vfs_path: VfsPathReference =
-            VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         file.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(file.media_size, 4194304);
