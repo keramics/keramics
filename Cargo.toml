@@ -11,6 +11,11 @@ name = "keramics"
 path = "src/lib.rs"
 
 [[bin]]
+name = "image_analyzer"
+path = "tools/image_analyzer.rs"
+publish = false
+
+[[bin]]
 name = "keramicsinfo"
 path = "tools/info_tool.rs"
 

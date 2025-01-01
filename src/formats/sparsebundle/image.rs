@@ -27,8 +27,8 @@ pub struct SparseBundleImage {
     /// File system.
     file_system: Rc<VfsFileSystem>,
 
-    /// Path.
-    path: VfsPath,
+    /// Path of the directory that contains the sparse bundle.
+    directory_path: VfsPath,
 
     /// Block size.
     pub block_size: u32,
@@ -46,7 +46,7 @@ impl SparseBundleImage {
         Self {
             mediator: Mediator::current(),
             file_system: Rc::new(VfsFileSystem::new(&VfsPathType::Fake)),
-            path: VfsPath::new(VfsPathType::Fake, "/", None),
+            directory_path: VfsPath::new(VfsPathType::Fake, "/", None),
             block_size: 0,
             media_size: 0,
             media_offset: 0,
@@ -57,7 +57,7 @@ impl SparseBundleImage {
     pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.read_info_plist(file_system, path)?;
 
-        self.path = path.new_of_parent_directory();
+        self.directory_path = path.parent_directory();
         self.file_system = file_system.clone();
 
         Ok(())
@@ -193,17 +193,10 @@ impl SparseBundleImage {
             if media_offset >= self.media_size {
                 break;
             }
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
-            let data_end_offset: usize = data_offset + range_read_size;
-
             let band_file_name: String = format!("{:x}", block_number);
             let band_file_path: VfsPath = self
-                .path
-                .new_with_suffix(&mut vec!["bands", band_file_name.as_str()]);
+                .directory_path
+                .append_components(&mut vec!["bands", band_file_name.as_str()]);
             let data_stream: VfsDataStreamReference =
                 match self.file_system.open_data_stream(&band_file_path, None)? {
                     Some(data_stream) => data_stream,
@@ -214,6 +207,13 @@ impl SparseBundleImage {
                         ))
                     }
                 };
+            let mut range_read_size: usize = read_size - data_offset;
+
+            if (range_read_size as u64) > range_remainder_size {
+                range_read_size = range_remainder_size as usize;
+            }
+            let data_end_offset: usize = data_offset + range_read_size;
+
             let range_read_count: usize = match data_stream.with_write_lock() {
                 Ok(mut data_stream) => data_stream.read_at_position(
                     &mut data[data_offset..data_end_offset],

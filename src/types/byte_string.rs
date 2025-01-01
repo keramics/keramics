@@ -11,7 +11,7 @@
  * under the License.
  */
 
-/// String of 8-bit values.
+/// String of 8-bit elements.
 #[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ByteString {
     /// Elements.

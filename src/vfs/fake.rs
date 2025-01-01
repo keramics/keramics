@@ -104,14 +104,14 @@ impl FakeFileEntry {
         self.creation_time.as_ref()
     }
 
+    /// Retrieves the file type.
+    pub fn get_file_type(&self) -> VfsFileType {
+        self.file_type.clone()
+    }
+
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         self.modification_time.as_ref()
-    }
-
-    /// Retrieves the file type.
-    pub fn get_vfs_file_type(&self) -> VfsFileType {
-        self.file_type.clone()
     }
 
     /// Opens a data stream with the specified name.
@@ -204,6 +204,12 @@ mod tests {
             0x74, 0x75, 0x72, 0x65, 0x2e, 0x0a,
         ];
     }
+
+    // TODO: add tests for FakeFileEntry::get_access_time
+    // TODO: add tests for FakeFileEntry::get_change_time
+    // TODO: add tests for FakeFileEntry::get_creation_time
+    // TODO: add tests for FakeFileEntry::get_file_type
+    // TODO: add tests for FakeFileEntry::get_modification_time
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {

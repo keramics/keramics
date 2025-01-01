@@ -125,8 +125,6 @@ impl VfsDataStream for ApmPartition {
 mod tests {
     use super::*;
 
-    use std::rc::Rc;
-
     use crate::vfs::{VfsContext, VfsPath, VfsPathType};
 
     #[test]

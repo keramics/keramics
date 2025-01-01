@@ -19,6 +19,7 @@ mod file_system;
 mod os;
 mod path;
 mod resolver;
+mod scanner;
 mod traits;
 mod types;
 
@@ -30,5 +31,6 @@ pub use file_system::VfsFileSystem;
 pub use os::OsFileEntry;
 pub use path::VfsPath;
 pub use resolver::VfsResolver;
+pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner};
 pub use traits::*;
 pub use types::*;

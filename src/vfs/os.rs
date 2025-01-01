@@ -95,14 +95,14 @@ impl OsFileEntry {
         self.creation_time.as_ref()
     }
 
+    /// Retrieves the file type.
+    pub fn get_file_type(&self) -> VfsFileType {
+        self.file_type.clone()
+    }
+
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         self.modification_time.as_ref()
-    }
-
-    /// Retrieves the file type.
-    pub fn get_vfs_file_type(&self) -> VfsFileType {
-        self.file_type.clone()
     }
 
     /// Initializes the file entry.
@@ -196,6 +196,12 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for OsFileEntry::get_access_time
+    // TODO: add tests for OsFileEntry::get_change_time
+    // TODO: add tests for OsFileEntry::get_creation_time
+    // TODO: add tests for OsFileEntry::get_file_type
+    // TODO: add tests for OsFileEntry::get_modification_time
 
     #[test]
     fn test_open_data_stream() -> io::Result<()> {

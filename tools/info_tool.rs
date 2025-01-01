@@ -133,9 +133,10 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, source, None);
+
     let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
     let vfs_file_system: Rc<VfsFileSystem> = match vfs_resolver.open_file_system(&vfs_path) {
         Ok(value) => value,
         Err(error) => {
@@ -143,8 +144,6 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, source, None);
-
     let result: Option<VfsDataStreamReference> =
         match vfs_file_system.open_data_stream(&vfs_path, None) {
             Ok(result) => result,
