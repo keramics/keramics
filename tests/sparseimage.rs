@@ -68,17 +68,14 @@ fn read_media_from_file(file: &mut SparseImageFile) -> io::Result<(u64, String)>
 #[test]
 fn read_media() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
-
-    let mut file = SparseImageFile::new();
-
     let vfs_path: VfsPath = VfsPath::new(
         VfsPathType::Os,
         "./test_data/sparseimage/hfsplus.sparseimage",
         None,
     );
+    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+
+    let mut file = SparseImageFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;

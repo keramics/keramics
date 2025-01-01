@@ -79,8 +79,8 @@ impl VfsFileSystem {
                 )),
             },
             VfsFileSystem::Ext(ext_file_system) => match path {
-                VfsPath::Ext { location, .. } => {
-                    match ext_file_system.get_file_entry_by_path(&location)? {
+                VfsPath::Ext { ext_path, .. } => {
+                    match ext_file_system.get_file_entry_by_path(&ext_path)? {
                         Some(_) => Ok(true),
                         None => Ok(false),
                     }
@@ -305,9 +305,9 @@ impl VfsFileSystem {
                 )),
             },
             VfsFileSystem::Ext(ext_file_system) => match path {
-                VfsPath::Ext { location, .. } => {
+                VfsPath::Ext { ext_path, .. } => {
                     let result: Option<VfsFileEntry> =
-                        match ext_file_system.get_file_entry_by_path(&location)? {
+                        match ext_file_system.get_file_entry_by_path(&ext_path)? {
                             Some(file_entry) => Some(VfsFileEntry::Ext(file_entry)),
                             None => None,
                         };
@@ -747,7 +747,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -765,7 +765,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -801,7 +801,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -819,7 +819,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -832,7 +832,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -881,7 +881,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -899,7 +899,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -934,7 +934,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -952,7 +952,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -987,7 +987,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -1005,7 +1005,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -1040,7 +1040,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -1058,7 +1058,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }
@@ -1093,7 +1093,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::File);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
         Ok(())
     }
@@ -1111,7 +1111,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.open_file_entry(&test_vfs_path)?.unwrap();
 
-        assert!(vfs_file_entry.get_vfs_file_type() == VfsFileType::Directory);
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
         Ok(())
     }

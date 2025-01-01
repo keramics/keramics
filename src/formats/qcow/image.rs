@@ -93,21 +93,22 @@ impl QcowImage {
 
     /// Opens a storage media image.
     pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
-        let directory_path: VfsPath = path.new_of_parent_directory();
+        let directory_path: VfsPath = path.parent_directory();
 
         let mut files: Vec<QcowFile> = Vec::new();
 
         let mut file: QcowFile = QcowFile::new();
         file.open(file_system, path)?;
 
-        while let Some(backing_file_name) = file.get_backing_file_name() {
+        while let Some(file_name) = file.get_backing_file_name() {
+            let backing_file_name: String = file_name.to_string();
             let backing_file_path: VfsPath =
-                directory_path.new_with_suffix(&mut vec![backing_file_name.to_string().as_str()]);
+                directory_path.append_components(&mut vec![backing_file_name.as_str()]);
 
             if !file_system.file_entry_exists(&backing_file_path)? {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Missing backing file: {}", backing_file_name.to_string()),
+                    format!("Missing backing file: {}", backing_file_name),
                 ));
             }
             let mut backing_file: QcowFile = QcowFile::new();

@@ -43,13 +43,10 @@ fn read_media_from_file(file: &mut UdifFile) -> io::Result<(u64, String)> {
 #[test]
 fn read_media_adc_compressed() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_adc.dmg", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_adc.dmg", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
@@ -62,14 +59,11 @@ fn read_media_adc_compressed() -> io::Result<()> {
 #[test]
 fn read_media_bzip2_compressed() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath =
+        VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_bzip2.dmg", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
-
-    let vfs_path: VfsPath =
-        VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_bzip2.dmg", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
@@ -82,14 +76,11 @@ fn read_media_bzip2_compressed() -> io::Result<()> {
 #[test]
 fn read_media_lzfse_compressed() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath =
+        VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_lzfse.dmg", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
-
-    let vfs_path: VfsPath =
-        VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_lzfse.dmg", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
@@ -102,14 +93,11 @@ fn read_media_lzfse_compressed() -> io::Result<()> {
 #[test]
 fn read_media_zlib_compressed() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath =
+        VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_zlib.dmg", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
-
-    let vfs_path: VfsPath =
-        VfsPath::new(VfsPathType::Os, "./test_data/udif/hfsplus_zlib.dmg", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;

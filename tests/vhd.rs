@@ -44,13 +44,10 @@ fn read_media_from_file(file: &mut VhdFile) -> io::Result<(u64, String)> {
 #[test]
 fn read_media_fixed() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-parent.vhd", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-parent.vhd", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
@@ -63,13 +60,10 @@ fn read_media_fixed() -> io::Result<()> {
 #[test]
 fn read_media_dynamic() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-dynamic.vhd", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-dynamic.vhd", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
@@ -82,13 +76,10 @@ fn read_media_dynamic() -> io::Result<()> {
 #[test]
 fn read_media_sparse_dynamic() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ext2.vhd", None);
     file.open(&vfs_file_system, &vfs_path)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
@@ -101,17 +92,13 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
 #[test]
 fn read_media_differential() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-parent.vhd", None);
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut parent_file = VhdFile::new();
-
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhd/ntfs-parent.vhd", None);
     parent_file.open(&vfs_file_system, &vfs_path)?;
 
     let mut file = VhdFile::new();
-
     let vfs_path: VfsPath = VfsPath::new(
         VfsPathType::Os,
         "./test_data/vhd/ntfs-differential.vhd",

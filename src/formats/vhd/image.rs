@@ -102,7 +102,7 @@ impl VhdImage {
 
     /// Opens a storage media image.
     pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
-        let directory_path: VfsPath = path.new_of_parent_directory();
+        let directory_path: VfsPath = path.parent_directory();
 
         let mut files: Vec<VhdFile> = Vec::new();
 
@@ -110,8 +110,8 @@ impl VhdImage {
         file.open(file_system, path)?;
 
         while file.parent_identifier.is_some() {
-            let parent_filename: Ucs2String = match file.get_parent_filename() {
-                Some(parent_filename) => parent_filename,
+            let parent_filename: String = match file.get_parent_filename() {
+                Some(file_name) => file_name.to_string(),
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
@@ -120,11 +120,11 @@ impl VhdImage {
                 }
             };
             let parent_path: VfsPath =
-                directory_path.new_with_suffix(&mut vec![parent_filename.to_string().as_str()]);
+                directory_path.append_components(&mut vec![parent_filename.as_str()]);
             if !file_system.file_entry_exists(&parent_path)? {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Missing parent file: {}", parent_filename.to_string()),
+                    format!("Missing parent file: {}", parent_filename),
                 ));
             }
             let mut parent_file: VhdFile = VhdFile::new();

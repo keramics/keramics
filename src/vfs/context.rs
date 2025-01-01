@@ -13,7 +13,8 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::rc::Rc;
+use std::ops::Deref;
+use std::rc::{Rc, Weak};
 
 use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
@@ -23,7 +24,10 @@ use super::types::VfsDataStreamReference;
 /// Virtual File System (VFS) context.
 pub struct VfsContext {
     /// File systems.
-    file_systems: HashMap<String, Rc<VfsFileSystem>>,
+    file_systems: HashMap<Rc<VfsPath>, Weak<VfsFileSystem>>,
+
+    /// Operating system (OS) file system path.
+    os_vfs_path: Rc<VfsPath>,
 }
 
 impl VfsContext {
@@ -31,6 +35,9 @@ impl VfsContext {
     pub fn new() -> Self {
         Self {
             file_systems: HashMap::new(),
+            os_vfs_path: Rc::new(VfsPath::Os {
+                location: "/".to_string(),
+            }),
         }
     }
 
@@ -52,34 +59,51 @@ impl VfsContext {
 
     /// Opens a file system.
     pub fn open_file_system(&mut self, path: &VfsPath) -> io::Result<Rc<VfsFileSystem>> {
-        // TODO: ensure the lookup key is unique for nested VFS paths.
+        match path {
+            VfsPath::Fake { .. } => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Unsupported path type",
+                ));
+            }
+            _ => {}
+        };
         let parent_path: Option<&Rc<VfsPath>> = path.get_parent();
-        let lookup_key: String = match parent_path.as_ref() {
-            Some(parent_path) => parent_path.to_string(),
-            None => String::new(),
+
+        let lookup_key: &Rc<VfsPath> = match parent_path {
+            Some(parent_path) => parent_path,
+            None => &self.os_vfs_path,
         };
-        match self.file_systems.get(&lookup_key) {
-            Some(value) => return Ok(value.clone()),
-            None => {}
-        };
-        let parent_file_system: Option<Rc<VfsFileSystem>> = match parent_path.as_ref() {
-            Some(parent_path) => Some(self.open_file_system(parent_path)?),
+        let cached_file_system: Option<Rc<VfsFileSystem>> = match self.file_systems.get(lookup_key)
+        {
+            Some(file_system) => file_system.upgrade(),
             None => None,
         };
-        let file_system_path: &VfsPath = match parent_path.as_ref() {
-            Some(parent_path) => parent_path,
-            None => path,
-        };
-        let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.get_path_type());
-        file_system.open(parent_file_system, file_system_path)?;
+        match cached_file_system {
+            Some(file_system) => Ok(file_system),
+            None => {
+                let parent_file_system: Option<Rc<VfsFileSystem>> = match parent_path {
+                    Some(parent_path) => Some(self.open_file_system(parent_path)?),
+                    None => None,
+                };
+                let file_system_path: &VfsPath = match parent_path {
+                    Some(parent_path) => parent_path,
+                    None => self.os_vfs_path.as_ref(),
+                };
+                let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.get_path_type());
+                file_system.open(parent_file_system, file_system_path)?;
 
-        // TODO: use a hash of the key?
-        self.file_systems
-            .insert(lookup_key.clone(), Rc::new(file_system));
+                let lookup_key: Rc<VfsPath> = match parent_path {
+                    Some(parent_path) => parent_path.clone(),
+                    None => self.os_vfs_path.clone(),
+                };
+                let cached_file_system: Rc<VfsFileSystem> = Rc::new(file_system);
 
-        match self.file_systems.get(&lookup_key) {
-            Some(value) => return Ok(value.clone()),
-            None => Err(io::Error::new(io::ErrorKind::Other, "Missing file system")),
+                self.file_systems
+                    .insert(lookup_key, Rc::downgrade(&cached_file_system));
+
+                Ok(cached_file_system)
+            }
         }
     }
 }

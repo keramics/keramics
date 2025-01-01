@@ -15,6 +15,7 @@ use std::path::MAIN_SEPARATOR_STR;
 use std::rc::Rc;
 
 use crate::formats::ext::ExtPath;
+use crate::types::ByteString;
 
 use super::enums::VfsPathType;
 
@@ -32,62 +33,40 @@ fn get_directory_name<'a>(path: &'a str, separator: &'a str) -> &'a str {
 }
 
 /// Virtual File System (VFS) path.
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum VfsPath {
     Apm {
-        /// Location.
         location: String,
-
-        /// Parent.
         parent: Rc<VfsPath>,
     },
     Ext {
-        /// Location.
-        location: ExtPath,
-
-        /// Parent.
+        ext_path: ExtPath,
         parent: Rc<VfsPath>,
     },
     Fake {
-        /// Location.
         location: String,
     },
     Gpt {
-        /// Location.
         location: String,
-
-        /// Parent.
         parent: Rc<VfsPath>,
     },
     Mbr {
-        /// Location.
         location: String,
-
-        /// Parent.
         parent: Rc<VfsPath>,
     },
     Os {
-        /// Location.
         location: String,
     },
     Qcow {
-        /// Location.
         location: String,
-
-        /// Parent.
         parent: Rc<VfsPath>,
     },
     Vhd {
-        /// Location.
         location: String,
-
-        /// Parent.
         parent: Rc<VfsPath>,
     },
     Vhdx {
-        /// Location.
         location: String,
-
-        /// Parent.
         parent: Rc<VfsPath>,
     },
 }
@@ -101,7 +80,7 @@ impl VfsPath {
                 parent: parent.cloned().unwrap(),
             },
             VfsPathType::Ext => VfsPath::Ext {
-                location: ExtPath::from(location),
+                ext_path: ExtPath::from(location),
                 parent: parent.cloned().unwrap(),
             },
             VfsPathType::Fake => VfsPath::Fake {
@@ -133,43 +112,6 @@ impl VfsPath {
         }
     }
 
-    /// Creates a new path from the parent directory of the current location.
-    pub fn new_of_parent_directory(&self) -> VfsPath {
-        match self {
-            VfsPath::Apm { location, parent } => VfsPath::Apm {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-                parent: parent.clone(),
-            },
-            VfsPath::Ext { .. } => todo!(),
-            VfsPath::Fake { location } => VfsPath::Fake {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-            },
-            VfsPath::Gpt { location, parent } => VfsPath::Gpt {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-                parent: parent.clone(),
-            },
-            VfsPath::Mbr { location, parent } => VfsPath::Mbr {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-                parent: parent.clone(),
-            },
-            VfsPath::Os { location } => VfsPath::Os {
-                location: get_directory_name(location.as_str(), MAIN_SEPARATOR_STR).to_string(),
-            },
-            VfsPath::Qcow { location, parent } => VfsPath::Qcow {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-                parent: parent.clone(),
-            },
-            VfsPath::Vhd { location, parent } => VfsPath::Vhd {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-                parent: parent.clone(),
-            },
-            VfsPath::Vhdx { location, parent } => VfsPath::Vhdx {
-                location: get_directory_name(location.as_str(), "/").to_string(),
-                parent: parent.clone(),
-            },
-        }
-    }
-
     /// Creates a new path from the location with the same parent.
     pub fn new_with_parent(&self, location: &str) -> VfsPath {
         let parent: Option<&Rc<VfsPath>> = self.get_parent();
@@ -179,7 +121,7 @@ impl VfsPath {
                 parent: parent.cloned().unwrap(),
             },
             VfsPath::Ext { .. } => VfsPath::Ext {
-                location: ExtPath::from(location),
+                ext_path: ExtPath::from(location),
                 parent: parent.cloned().unwrap(),
             },
             VfsPath::Fake { .. } => VfsPath::Fake {
@@ -211,8 +153,8 @@ impl VfsPath {
         }
     }
 
-    /// Creates a new path from the current location and additional path components.
-    pub fn new_with_suffix<'a>(&'a self, path_components: &mut Vec<&'a str>) -> VfsPath {
+    /// Creates a new path of the path and additional path components.
+    pub fn append_components<'a>(&'a self, path_components: &mut Vec<&'a str>) -> VfsPath {
         match self {
             VfsPath::Apm { location, parent } => {
                 let mut location_components: Vec<&str> = vec![location.as_str()];
@@ -222,7 +164,20 @@ impl VfsPath {
                     parent: parent.clone(),
                 }
             }
-            VfsPath::Ext { .. } => todo!(),
+            VfsPath::Ext { ext_path, parent } => {
+                let mut location_components: Vec<ByteString> = ext_path.components.clone();
+                location_components.append(
+                    &mut path_components
+                        .iter()
+                        .map(|component| ByteString::from_bytes(component.as_bytes()))
+                        .collect::<Vec<ByteString>>(),
+                );
+
+                VfsPath::Ext {
+                    ext_path: ExtPath::from(&location_components),
+                    parent: parent.clone(),
+                }
+            }
             VfsPath::Fake { location } => {
                 let mut location_components: Vec<&str> = vec![location.as_str()];
                 location_components.append(path_components);
@@ -281,17 +236,17 @@ impl VfsPath {
     }
 
     /// Retrieves the location.
-    pub fn get_location(&self) -> &str {
+    pub fn get_location(&self) -> String {
         match self {
-            VfsPath::Apm { location, .. } => location.as_str(),
-            VfsPath::Ext { .. } => todo!(),
-            VfsPath::Fake { location } => location.as_str(),
-            VfsPath::Gpt { location, .. } => location.as_str(),
-            VfsPath::Mbr { location, .. } => location.as_str(),
-            VfsPath::Os { location } => location.as_str(),
-            VfsPath::Qcow { location, .. } => location.as_str(),
-            VfsPath::Vhd { location, .. } => location.as_str(),
-            VfsPath::Vhdx { location, .. } => location.as_str(),
+            VfsPath::Apm { location, .. } => location.clone(),
+            VfsPath::Ext { ext_path, .. } => ext_path.to_string(),
+            VfsPath::Fake { location } => location.clone(),
+            VfsPath::Gpt { location, .. } => location.clone(),
+            VfsPath::Mbr { location, .. } => location.clone(),
+            VfsPath::Os { location } => location.clone(),
+            VfsPath::Qcow { location, .. } => location.clone(),
+            VfsPath::Vhd { location, .. } => location.clone(),
+            VfsPath::Vhdx { location, .. } => location.clone(),
         }
     }
 
@@ -325,6 +280,46 @@ impl VfsPath {
         }
     }
 
+    /// Creates a new path of the parent directory.
+    pub fn parent_directory(&self) -> VfsPath {
+        match self {
+            VfsPath::Apm { location, parent } => VfsPath::Apm {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Ext { ext_path, parent } => VfsPath::Ext {
+                ext_path: ext_path.parent_directory(),
+                parent: parent.clone(),
+            },
+            VfsPath::Fake { location } => VfsPath::Fake {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+            },
+            VfsPath::Gpt { location, parent } => VfsPath::Gpt {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Mbr { location, parent } => VfsPath::Mbr {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Os { location } => VfsPath::Os {
+                location: get_directory_name(location.as_str(), MAIN_SEPARATOR_STR).to_string(),
+            },
+            VfsPath::Qcow { location, parent } => VfsPath::Qcow {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Vhd { location, parent } => VfsPath::Vhd {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Vhdx { location, parent } => VfsPath::Vhdx {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+        }
+    }
+
     /// Retrieves a string representation of the path.
     pub fn to_string(&self) -> String {
         match self {
@@ -333,10 +328,10 @@ impl VfsPath {
                 parent.to_string(),
                 location
             ),
-            VfsPath::Ext { location, parent } => format!(
+            VfsPath::Ext { ext_path, parent } => format!(
                 "{}\ntype: EXT: location: {}\n",
                 parent.to_string(),
-                location.to_string()
+                ext_path.to_string()
             ),
             VfsPath::Fake { location } => format!("type: FAKE: location: {}\n", location),
             VfsPath::Gpt { location, parent } => format!(
