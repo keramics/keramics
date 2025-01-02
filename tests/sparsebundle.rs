@@ -25,8 +25,7 @@ fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, Stri
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
-    loop {
-        let read_count: usize = image.read(&mut data)?;
+    while let Ok(read_count) = image.read(&mut data) {
         if read_count == 0 {
             break;
         }

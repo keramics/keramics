@@ -13,7 +13,6 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::ops::Deref;
 use std::rc::{Rc, Weak};
 
 use super::file_entry::VfsFileEntry;
@@ -41,20 +40,20 @@ impl VfsContext {
         }
     }
 
-    /// Opens a data stream with the specified name.
-    pub fn open_data_stream(
+    /// Retrieves a data stream with the specified path and name.
+    pub fn get_data_stream_by_path_and_name(
         &mut self,
         path: &VfsPath,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
         let file_system: Rc<VfsFileSystem> = self.open_file_system(path)?;
-        file_system.open_data_stream(path, name)
+        file_system.get_data_stream_by_path_and_name(path, name)
     }
 
-    /// Opens a file entry.
-    pub fn open_file_entry(&mut self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
+    /// Retrieves a file entry with the specified path.
+    pub fn get_file_entry_by_path(&mut self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
         let file_system: Rc<VfsFileSystem> = self.open_file_system(path)?;
-        file_system.open_file_entry(path)
+        file_system.get_file_entry_by_path(path)
     }
 
     /// Opens a file system.
@@ -116,32 +115,32 @@ mod tests {
     use crate::vfs::path::VfsPath;
 
     #[test]
-    fn test_open_data_stream() -> io::Result<()> {
+    fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         let result: Option<VfsDataStreamReference> =
-            vfs_context.open_data_stream(&vfs_path, None)?;
+            vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_some());
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
         let result: Option<VfsDataStreamReference> =
-            vfs_context.open_data_stream(&vfs_path, None)?;
+            vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_none());
 
         Ok(())
     }
 
     #[test]
-    fn test_open_file_entry() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        let result: Option<VfsFileEntry> = vfs_context.open_file_entry(&vfs_path)?;
+        let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
-        let result: Option<VfsFileEntry> = vfs_context.open_file_entry(&vfs_path)?;
+        let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 
         Ok(())

@@ -26,8 +26,7 @@ fn read_media_from_file(file: &mut VhdFile) -> io::Result<(u64, String)> {
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
-    loop {
-        let read_count: usize = file.read(&mut data)?;
+    while let Ok(read_count) = file.read(&mut data) {
         if read_count == 0 {
             break;
         }

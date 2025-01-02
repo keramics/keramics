@@ -73,6 +73,7 @@ struct PathCommandArguments {
     path: String,
 }
 
+/// Scans a data stream for format signatures.
 fn scan_for_formats(data_stream: &VfsDataStreamReference) -> io::Result<Option<FormatIdentifier>> {
     let mut format_scanner: FormatScanner = FormatScanner::new();
     format_scanner.add_apm_signatures();
@@ -145,7 +146,7 @@ fn main() -> ExitCode {
         }
     };
     let result: Option<VfsDataStreamReference> =
-        match vfs_file_system.open_data_stream(&vfs_path, None) {
+        match vfs_file_system.get_data_stream_by_path_and_name(&vfs_path, None) {
             Ok(result) => result,
             Err(error) => {
                 println!("Unable to open data stream with error: {}", error);

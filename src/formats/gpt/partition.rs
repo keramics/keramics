@@ -137,7 +137,7 @@ mod tests {
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
         let vfs_data_stream: VfsDataStreamReference =
-            match vfs_context.open_data_stream(&vfs_path, None)? {
+            match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
                 Some(data_stream) => data_stream,
                 None => {
                     return Err(io::Error::new(

@@ -11,36 +11,18 @@
  * under the License.
  */
 
-use std::collections::HashMap;
-use std::convert::AsRef;
 use std::io;
-use std::io::{Cursor, Seek};
-use std::rc::Rc;
+use std::io::Cursor;
 
 use crate::datetime::DateTime;
 use crate::types::SharedValue;
 
-use super::enums::VfsFileType;
-use super::types::VfsDataStreamReference;
-use crate::vfs::traits::VfsDataStream;
-
-impl<T: AsRef<[u8]>> VfsDataStream for Cursor<T> {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        self.seek(io::SeekFrom::End(0))
-    }
-}
-
-/// Creates a new fake data stream.
-pub fn new_fake_data_stream(data: Vec<u8>) -> VfsDataStreamReference {
-    SharedValue::new(Box::new(Cursor::new(data)))
-}
+use crate::vfs::enums::VfsFileType;
+use crate::vfs::types::VfsDataStreamReference;
 
 /// Fake (or virtual) file entry.
 pub struct FakeFileEntry {
-    /// Location.
-    location: String,
-
+    // TODO: add name
     /// File type.
     file_type: VfsFileType,
 
@@ -65,7 +47,6 @@ impl FakeFileEntry {
     pub fn new() -> Self {
         // TODO: test timestamps with current time
         Self {
-            location: String::new(),
             data_stream: SharedValue::none(),
             file_type: VfsFileType::NotSet,
             access_time: None,
@@ -79,7 +60,6 @@ impl FakeFileEntry {
     pub fn new_file(data: &[u8]) -> Self {
         // TODO: test timestamps with current time
         Self {
-            location: String::new(),
             data_stream: SharedValue::new(Box::new(Cursor::new(data.to_vec()))),
             file_type: VfsFileType::File,
             access_time: None,
@@ -114,8 +94,8 @@ impl FakeFileEntry {
         self.modification_time.as_ref()
     }
 
-    /// Opens a data stream with the specified name.
-    pub fn open_data_stream(
+    /// Retrieves a data stream with the specified name.
+    pub fn get_data_stream_by_name(
         &self,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
@@ -126,64 +106,9 @@ impl FakeFileEntry {
     }
 }
 
-/// Fake (or virtual) file system.
-pub struct FakeFileSystem {
-    /// Paths.
-    paths: HashMap<String, Rc<FakeFileEntry>>,
-}
-
-impl FakeFileSystem {
-    /// Creates a new file system.
-    pub fn new() -> Self {
-        Self {
-            paths: HashMap::new(),
-        }
-    }
-
-    /// Adds a new file entry.
-    pub fn add_file_entry(&mut self, path: &str, file_entry: FakeFileEntry) -> io::Result<()> {
-        match self.paths.insert(path.to_string(), Rc::new(file_entry)) {
-            Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unable to add file entry given path is already set",
-                ));
-            }
-            None => {}
-        }
-        Ok(())
-    }
-
-    /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, path: &str) -> io::Result<bool> {
-        Ok(self.paths.contains_key(path))
-    }
-
-    /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(&self, path: &str) -> io::Result<Option<Rc<FakeFileEntry>>> {
-        let result: Option<Rc<FakeFileEntry>> = match self.paths.get(path) {
-            Some(file_entry) => Some(file_entry.clone()),
-            None => None,
-        };
-        Ok(result)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::vfs::enums::VfsFileType;
-
-    fn get_file_system() -> io::Result<FakeFileSystem> {
-        let mut test_file_system: FakeFileSystem = FakeFileSystem::new();
-
-        let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
-        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
-        test_file_system.add_file_entry("/fake/file.txt", fake_file_entry)?;
-
-        Ok(test_file_system)
-    }
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -212,32 +137,7 @@ mod tests {
     // TODO: add tests for FakeFileEntry::get_modification_time
 
     #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
-        let test_file_system: FakeFileSystem = get_file_system()?;
-
-        assert_eq!(test_file_system.file_entry_exists("/fake/file.txt")?, true);
-        assert_eq!(
-            test_file_system.file_entry_exists("/fake/bogus.txt")?,
-            false
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
-        let test_file_system: FakeFileSystem = get_file_system()?;
-
-        let fake_file_entry: Rc<FakeFileEntry> = test_file_system
-            .get_file_entry_by_path("/fake/file.txt")?
-            .unwrap();
-        assert!(fake_file_entry.file_type == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_open_data_stream() -> io::Result<()> {
+    fn test_get_data_stream_by_name() -> io::Result<()> {
         let test_data: Vec<u8> = get_test_data();
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
 
@@ -248,7 +148,8 @@ mod tests {
         ]
         .join("");
 
-        let result: Option<VfsDataStreamReference> = fake_file_entry.open_data_stream(None)?;
+        let result: Option<VfsDataStreamReference> =
+            fake_file_entry.get_data_stream_by_name(None)?;
 
         let vfs_data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,

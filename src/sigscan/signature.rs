@@ -86,7 +86,7 @@ impl Signature {
         };
         let scan_end_offset: usize = scan_offset + self.pattern_size;
 
-        if scan_end_offset > buffer_size {
+        if scan_end_offset > buffer_size || (scan_end_offset as u64) > data_size {
             return false;
         }
         if buffer[scan_offset..scan_end_offset] != self.pattern {
@@ -118,7 +118,6 @@ mod tests {
             0,
             &[0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03],
         );
-
         let test_data: [u8; 8] = [0x51, 0x46, 0x49, 0xfb, 0x00, 0x00, 0x00, 0x03];
 
         // Test match at data offset 0.
@@ -131,6 +130,10 @@ mod tests {
 
         // Test buffer too small for pattern.
         let result: bool = signature.scan_buffer(0, 64, &test_data, 0, 7);
+        assert_eq!(result, false);
+
+        // Test data size too small for pattern.
+        let result: bool = signature.scan_buffer(0, 7, &test_data, 0, 8);
         assert_eq!(result, false);
 
         let test_data: [u8; 8] = [0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78];

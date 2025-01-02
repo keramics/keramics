@@ -11,29 +11,29 @@
  * under the License.
  */
 
-mod context;
-mod enums;
-mod fake;
-mod file_entry;
-mod file_system;
-mod finder;
-mod iterators;
-mod os;
-mod path;
-mod resolver;
-mod scanner;
-mod traits;
-mod types;
+use super::scan_node::VfsScanNode;
+use super::traits::VfsScannerMediator;
 
-pub use context::VfsContext;
-pub use enums::*;
-pub use fake::{new_fake_data_stream, FakeFileEntry, FakeFileSystem};
-pub use file_entry::VfsFileEntry;
-pub use file_system::VfsFileSystem;
-pub use finder::VfsFinder;
-pub use os::OsFileEntry;
-pub use path::VfsPath;
-pub use resolver::VfsResolver;
-pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
-pub use traits::VfsDataStream;
-pub use types::*;
+/// Virtual File System (VFS) scan context.
+pub struct VfsScanContext<'a> {
+    /// Mediator.
+    mediator: Option<&'a dyn VfsScannerMediator>,
+
+    /// Root node.
+    pub root_node: Option<VfsScanNode>,
+}
+
+impl<'a> VfsScanContext<'a> {
+    /// Creates a new scan context.
+    pub fn new() -> Self {
+        Self {
+            mediator: None,
+            root_node: None,
+        }
+    }
+
+    /// Sets a mediator.
+    pub fn set_mediator(&mut self, mediator: &'a dyn VfsScannerMediator) {
+        self.mediator = Some(mediator);
+    }
+}

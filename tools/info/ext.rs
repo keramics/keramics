@@ -437,7 +437,7 @@ fn print_ext_file_entry_bodyfile(
 
     // TODO: have flag control calculate md5
     // String::from("0")
-    let result: Option<VfsDataStreamReference> = file_entry.open_data_stream(None)?;
+    let result: Option<VfsDataStreamReference> = file_entry.get_data_stream_by_name(None)?;
     let md5: String = match result {
         Some(vfs_data_stream) => {
             let md5_string: String = match vfs_data_stream.with_write_lock() {

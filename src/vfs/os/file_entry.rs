@@ -13,7 +13,6 @@
 
 use std::fs::{metadata, File, Metadata};
 use std::io;
-use std::io::Seek;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
@@ -26,7 +25,6 @@ use std::os::windows::fs::MetadataExt;
 use crate::datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use crate::types::SharedValue;
 use crate::vfs::enums::VfsFileType;
-use crate::vfs::traits::VfsDataStream;
 use crate::vfs::types::VfsDataStreamReference;
 
 /// Determines the POSIX date and time value.
@@ -37,13 +35,6 @@ fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
         DateTime::PosixTime32(PosixTime32::new(timestamp as i32))
     } else {
         DateTime::NotSet
-    }
-}
-
-impl VfsDataStream for File {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        self.seek(io::SeekFrom::End(0))
     }
 }
 
@@ -167,7 +158,7 @@ impl OsFileEntry {
     }
 
     /// Opens a data stream with the specified name.
-    pub fn open_data_stream(
+    pub fn get_data_stream_by_name(
         &self,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
@@ -204,7 +195,7 @@ mod tests {
     // TODO: add tests for OsFileEntry::get_modification_time
 
     #[test]
-    fn test_open_data_stream() -> io::Result<()> {
+    fn test_get_data_stream_by_name() -> io::Result<()> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
         os_file_entry.initialize("./test_data/file.txt")?;
@@ -216,7 +207,7 @@ mod tests {
         ]
         .join("");
 
-        let result: Option<VfsDataStreamReference> = os_file_entry.open_data_stream(None)?;
+        let result: Option<VfsDataStreamReference> = os_file_entry.get_data_stream_by_name(None)?;
 
         let vfs_data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,

@@ -40,22 +40,22 @@ impl VfsResolver {
         CURRENT_RESOLVER.with(|resolver| resolver.clone())
     }
 
-    /// Opens a data stream with the specified name.
-    pub fn open_data_stream(
+    /// Retrieves a data stream with the specified path and name.
+    pub fn get_data_stream_by_path_and_name(
         &self,
         path: &VfsPath,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
         match self.context.write() {
-            Ok(mut context) => context.open_data_stream(path, name),
+            Ok(mut context) => context.get_data_stream_by_path_and_name(path, name),
             Err(error) => Err(crate::error_to_io_error!(error)),
         }
     }
 
-    /// Opens a file entry.
-    pub fn open_file_entry(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
+    /// Retrieves a file entry with the specified path.
+    pub fn get_file_entry_by_path(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
         match self.context.write() {
-            Ok(mut context) => context.open_file_entry(path),
+            Ok(mut context) => context.get_file_entry_by_path(path),
             Err(error) => Err(crate::error_to_io_error!(error)),
         }
     }
@@ -81,32 +81,32 @@ mod tests {
     use crate::vfs::path::VfsPath;
 
     #[test]
-    fn test_open_data_stream() -> io::Result<()> {
+    fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
         let result: Option<VfsDataStreamReference> =
-            vfs_resolver.open_data_stream(&vfs_path, None)?;
+            vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_some());
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
         let result: Option<VfsDataStreamReference> =
-            vfs_resolver.open_data_stream(&vfs_path, None)?;
+            vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_none());
 
         Ok(())
     }
 
     #[test]
-    fn test_open_file_entry() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
-        let result: Option<VfsFileEntry> = vfs_resolver.open_file_entry(&vfs_path)?;
+        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
-        let result: Option<VfsFileEntry> = vfs_resolver.open_file_entry(&vfs_path)?;
+        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 
         Ok(())

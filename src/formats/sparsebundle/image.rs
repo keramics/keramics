@@ -65,7 +65,8 @@ impl SparseBundleImage {
 
     /// Reads Info.plist or Info.bckup.
     fn read_info_plist(&mut self, file_system: &VfsFileSystem, path: &VfsPath) -> io::Result<()> {
-        let result: Option<VfsDataStreamReference> = file_system.open_data_stream(path, None)?;
+        let result: Option<VfsDataStreamReference> =
+            file_system.get_data_stream_by_path_and_name(path, None)?;
 
         let data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,
@@ -197,16 +198,18 @@ impl SparseBundleImage {
             let band_file_path: VfsPath = self
                 .directory_path
                 .append_components(&mut vec!["bands", band_file_name.as_str()]);
-            let data_stream: VfsDataStreamReference =
-                match self.file_system.open_data_stream(&band_file_path, None)? {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", band_file_path.to_string()),
-                        ))
-                    }
-                };
+            let data_stream: VfsDataStreamReference = match self
+                .file_system
+                .get_data_stream_by_path_and_name(&band_file_path, None)?
+            {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("No such file: {}", band_file_path.to_string()),
+                    ))
+                }
+            };
             let mut range_read_size: usize = read_size - data_offset;
 
             if (range_read_size as u64) > range_remainder_size {
