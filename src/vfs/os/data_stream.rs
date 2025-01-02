@@ -11,29 +11,17 @@
  * under the License.
  */
 
-mod context;
-mod enums;
-mod fake;
-mod file_entry;
-mod file_system;
-mod finder;
-mod iterators;
-mod os;
-mod path;
-mod resolver;
-mod scanner;
-mod traits;
-mod types;
+use std::fs::File;
+use std::io;
+use std::io::Seek;
 
-pub use context::VfsContext;
-pub use enums::*;
-pub use fake::{new_fake_data_stream, FakeFileEntry, FakeFileSystem};
-pub use file_entry::VfsFileEntry;
-pub use file_system::VfsFileSystem;
-pub use finder::VfsFinder;
-pub use os::OsFileEntry;
-pub use path::VfsPath;
-pub use resolver::VfsResolver;
-pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
-pub use traits::VfsDataStream;
-pub use types::*;
+use crate::vfs::traits::VfsDataStream;
+
+impl VfsDataStream for File {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        self.seek(io::SeekFrom::End(0))
+    }
+}
+
+// TODO: add tests

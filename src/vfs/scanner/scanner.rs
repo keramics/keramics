@@ -25,47 +25,17 @@ use crate::formats::qcow::QcowImage;
 use crate::formats::vhd::VhdImage;
 use crate::formats::vhdx::VhdxImage;
 use crate::sigscan::BuildError;
+use crate::vfs::enums::{VfsFileType, VfsPathType};
+use crate::vfs::file_entry::VfsFileEntry;
+use crate::vfs::file_system::VfsFileSystem;
+use crate::vfs::path::VfsPath;
+use crate::vfs::resolver::VfsResolver;
+use crate::vfs::types::{VfsDataStreamReference, VfsResolverReference};
 
-use super::enums::{VfsFileType, VfsPathType};
-use super::file_entry::VfsFileEntry;
-use super::file_system::VfsFileSystem;
-use super::path::VfsPath;
-use super::resolver::VfsResolver;
-use super::types::{VfsDataStreamReference, VfsResolverReference};
+use super::scan_context::VfsScanContext;
+use super::scan_node::VfsScanNode;
 
-/// Virtual File System (VFS) format scan node.
-pub struct VfsScanNode {
-    /// Path.
-    pub path: Rc<VfsPath>,
-
-    /// Sub nodes.
-    pub sub_nodes: Vec<VfsScanNode>,
-}
-
-impl VfsScanNode {
-    /// Creates a new format scan node.
-    fn new(path: &Rc<VfsPath>) -> Self {
-        Self {
-            path: path.clone(),
-            sub_nodes: Vec::new(),
-        }
-    }
-}
-
-/// Virtual File System (VFS) format scan context.
-pub struct VfsScanContext {
-    /// Root node.
-    pub root_node: Option<VfsScanNode>,
-}
-
-impl VfsScanContext {
-    /// Creates a new format scan context.
-    pub fn new() -> Self {
-        Self { root_node: None }
-    }
-}
-
-/// Virtual File System (VFS) format scanner.
+/// Virtual File System (VFS) scanner.
 pub struct VfsScanner {
     /// Resolver.
     resolver: VfsResolverReference,
@@ -84,7 +54,7 @@ pub struct VfsScanner {
 }
 
 impl VfsScanner {
-    /// Creates a new format scanner.
+    /// Creates a new scanner.
     pub fn new() -> Self {
         Self {
             resolver: VfsResolver::current(),
@@ -127,7 +97,7 @@ impl VfsScanner {
 
         let file_system: Rc<VfsFileSystem> = self.resolver.open_file_system(path)?;
 
-        let file_entry: VfsFileEntry = match file_system.open_file_entry(path)? {
+        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(path)? {
             Some(file_entry) => file_entry,
             None => {
                 return Err(io::Error::new(
@@ -165,7 +135,8 @@ impl VfsScanner {
         file_system: &VfsFileSystem,
         path: &Rc<VfsPath>,
     ) -> io::Result<Option<VfsPathType>> {
-        let result: Option<VfsDataStreamReference> = file_system.open_data_stream(path, None)?;
+        let result: Option<VfsDataStreamReference> =
+            file_system.get_data_stream_by_path_and_name(path, None)?;
 
         let data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,
@@ -521,7 +492,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(VfsPathType::Os, location, None));
-        match vfs_context.open_data_stream(&vfs_path, None)? {
+        match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
             Some(data_stream) => Ok(data_stream),
             None => Err(io::Error::new(
                 io::ErrorKind::NotFound,

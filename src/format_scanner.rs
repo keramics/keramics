@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::cmp::min;
 use std::collections::HashSet;
 use std::io;
 use std::io::SeekFrom;
@@ -212,31 +211,37 @@ impl FormatScanner {
         };
         let mut scan_context: ScanContext = ScanContext::new(&self.signature_scanner, data_size);
 
-        let (range_start_offset, range_end_offset): (u64, u64) = scan_context.get_header_range();
-        let range_size: usize = (range_end_offset - range_start_offset) as usize;
-
-        let read_size: usize = min(range_size, data_size as usize);
-        let mut data: Vec<u8> = vec![0; read_size];
+        // The size of the header range can be larger than the size of the data stream.
+        let mut data: Vec<u8> = vec![0; scan_context.header_range_size as usize];
 
         match data_stream.with_write_lock() {
-            Ok(mut data_stream) => data_stream
-                .read_exact_at_position(&mut data, SeekFrom::Start(range_start_offset))?,
+            Ok(mut data_stream) => data_stream.read_at_position(&mut data, SeekFrom::Start(0))?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
+        scan_context.data_offset = 0;
         scan_context.scan_buffer(&data);
 
-        let (range_start_offset, range_end_offset): (u64, u64) = scan_context.get_footer_range();
-        let range_size: usize = (range_end_offset - range_start_offset) as usize;
+        // The size of the footer range can be larger than the size of the data stream.
+        let mut data: Vec<u8> = vec![0; scan_context.footer_range_size as usize];
 
-        let read_size: usize = min(range_size, data_size as usize);
-        let mut data: Vec<u8> = vec![0; read_size];
-
+        let data_offset: usize = if scan_context.footer_range_size < data_size {
+            0
+        } else {
+            (scan_context.footer_range_size - data_size) as usize
+        };
+        let data_stream_offset: u64 = if scan_context.footer_range_size < data_size {
+            data_size - scan_context.footer_range_size
+        } else {
+            0
+        };
         match data_stream.with_write_lock() {
-            Ok(mut data_stream) => data_stream
-                .read_exact_at_position(&mut data, SeekFrom::Start(range_start_offset))?,
+            Ok(mut data_stream) => data_stream.read_at_position(
+                &mut data[data_offset..],
+                SeekFrom::Start(data_stream_offset),
+            )?,
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
-        scan_context.data_offset = range_start_offset;
+        scan_context.data_offset = data_stream_offset;
         scan_context.scan_buffer(&data);
 
         let mut scan_results: HashSet<FormatIdentifier> = HashSet::new();
@@ -300,7 +305,7 @@ mod tests {
 
         let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         let vfs_data_stream: VfsDataStreamReference =
-            match vfs_context.open_data_stream(&vfs_path, None)? {
+            match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
                 Some(data_stream) => data_stream,
                 None => {
                     return Err(io::Error::new(

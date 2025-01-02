@@ -194,7 +194,7 @@ impl ExtFileEntry {
         Ok(self.inode.attributes.len())
     }
 
-    // TODO: add get extended_attributes
+    // TODO: add get extended_attributes iterator
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
@@ -236,7 +236,7 @@ impl ExtFileEntry {
         Ok(file_entry)
     }
 
-    // TODO: add get_sub_file_entries
+    // TODO: add get_sub_file_entries iterator
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(
@@ -265,8 +265,8 @@ impl ExtFileEntry {
         Ok(Some(file_entry))
     }
 
-    /// Opens a data stream with the specified name.
-    pub fn open_data_stream(
+    /// Retrieves a data stream with the specified name.
+    pub fn get_data_stream_by_name(
         &self,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
@@ -559,6 +559,6 @@ mod tests {
 
     // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for get_sub_file_entry_by_name
-    // TODO: add tests for open_data_stream
+    // TODO: add tests for get_data_stream_by_name
     // TODO: add tests for read_directory_tree
 }

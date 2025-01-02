@@ -29,8 +29,7 @@ fn read_media_from_file_with_output_file(file: &mut SparseImageFile) -> io::Resu
     let mut media_offset: u64 = 0;
     let mut output_file = File::create("test.raw")?;
 
-    loop {
-        let read_count: usize = file.read(&mut data)?;
+    while let Ok(read_count) = file.read(&mut data) {
         if read_count == 0 {
             break;
         }
@@ -50,8 +49,7 @@ fn read_media_from_file(file: &mut SparseImageFile) -> io::Result<(u64, String)>
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
-    loop {
-        let read_count: usize = file.read(&mut data)?;
+    while let Ok(read_count) = file.read(&mut data) {
         if read_count == 0 {
             break;
         }

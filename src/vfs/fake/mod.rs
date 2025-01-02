@@ -11,29 +11,10 @@
  * under the License.
  */
 
-mod context;
-mod enums;
-mod fake;
+mod data_stream;
 mod file_entry;
 mod file_system;
-mod finder;
-mod iterators;
-mod os;
-mod path;
-mod resolver;
-mod scanner;
-mod traits;
-mod types;
 
-pub use context::VfsContext;
-pub use enums::*;
-pub use fake::{new_fake_data_stream, FakeFileEntry, FakeFileSystem};
-pub use file_entry::VfsFileEntry;
-pub use file_system::VfsFileSystem;
-pub use finder::VfsFinder;
-pub use os::OsFileEntry;
-pub use path::VfsPath;
-pub use resolver::VfsResolver;
-pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
-pub use traits::VfsDataStream;
-pub use types::*;
+pub use data_stream::new_fake_data_stream;
+pub use file_entry::FakeFileEntry;
+pub use file_system::FakeFileSystem;

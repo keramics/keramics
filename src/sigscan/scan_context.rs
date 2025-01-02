@@ -32,11 +32,11 @@ pub struct ScanContext<'a> {
     /// Data size.
     data_size: u64,
 
-    /// Header (range) end offset.
-    header_end_offset: u64,
+    /// Header (range) size.
+    pub header_range_size: u64,
 
-    /// Footer (range) start offset.
-    footer_start_offset: u64,
+    /// Footer (range) size.
+    pub footer_range_size: u64,
 
     /// Unbound range size.
     unbound_range_size: usize,
@@ -54,8 +54,7 @@ impl<'a> ScanContext<'a> {
 
         // The footer range ends at data_size since the footer scan tree is relative to offset end
         // of the data.
-        let (_, range_end_offset): (usize, usize) = scanner.footer_scan_tree.get_spanning_range();
-        let footer_start_offset: u64 = data_size - range_end_offset as u64;
+        let (_, footer_end_offset): (usize, usize) = scanner.footer_scan_tree.get_spanning_range();
 
         let (range_start_offset, range_end_offset): (usize, usize) =
             scanner.unbound_scan_tree.get_spanning_range();
@@ -65,8 +64,8 @@ impl<'a> ScanContext<'a> {
             scanner: scanner,
             data_offset: 0,
             data_size: data_size,
-            header_end_offset: header_end_offset as u64,
-            footer_start_offset: footer_start_offset,
+            header_range_size: header_end_offset as u64,
+            footer_range_size: footer_end_offset as u64,
             unbound_range_size: unbound_range_size,
             results: HashMap::new(),
         }
@@ -135,22 +134,22 @@ impl<'a> ScanContext<'a> {
 
     /// Scans the buffer for signatures.
     pub fn scan_buffer(&mut self, buffer: &[u8]) {
-        if self.data_offset >= self.data_size {
+        let buffer_size: usize = buffer.len();
+        if buffer_size == 0 {
             return;
         }
-        let remaining_data_size: usize = (self.data_size - self.data_offset) as usize;
-
-        let mut buffer_size: usize = buffer.len();
-        if buffer_size > remaining_data_size {
-            buffer_size = remaining_data_size;
+        if self.data_offset < self.header_range_size {
+            self.scan_buffer_with_scan_tree(&self.scanner.header_scan_tree, buffer, 0, buffer_size);
         }
         let next_data_offset: u64 = self.data_offset + buffer_size as u64;
 
-        if self.data_offset < self.header_end_offset {
-            self.scan_buffer_with_scan_tree(&self.scanner.header_scan_tree, buffer, 0, buffer_size);
-        }
-        if next_data_offset >= self.footer_start_offset {
-            let remaining_data_size: usize = (next_data_offset - self.footer_start_offset) as usize;
+        let footer_start_offset: u64 = if self.footer_range_size <= self.data_size {
+            self.data_size - self.footer_range_size
+        } else {
+            0
+        };
+        if next_data_offset >= footer_start_offset {
+            let remaining_data_size: usize = (next_data_offset - footer_start_offset) as usize;
 
             let buffer_start_offset: usize = if remaining_data_size < buffer_size {
                 buffer_size - remaining_data_size
@@ -174,16 +173,6 @@ impl<'a> ScanContext<'a> {
         }
         self.data_offset = next_data_offset;
     }
-
-    /// Retrieves the footer range.
-    pub fn get_footer_range(&self) -> (u64, u64) {
-        (self.footer_start_offset, self.data_size)
-    }
-
-    /// Retrieves the header range.
-    pub fn get_header_range(&self) -> (u64, u64) {
-        (0, self.header_end_offset)
-    }
 }
 
 #[cfg(test)]
@@ -195,15 +184,6 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_bound_to_start_signature() {
-        let mut scanner: Scanner = Scanner::new();
-        scanner.add_signature(Signature::new(
-            "msiecf1",
-            PatternType::BoundToStart,
-            0,
-            "Client UrlCache MMF Ver ".as_bytes(),
-        ));
-        scanner.build().unwrap();
-
         let data: [u8; 128] = [
             0x43, 0x6c, 0x69, 0x65, 0x6e, 0x74, 0x20, 0x55, 0x72, 0x6c, 0x43, 0x61, 0x63, 0x68,
             0x65, 0x20, 0x4d, 0x4d, 0x46, 0x20, 0x56, 0x65, 0x72, 0x20, 0x00, 0x00, 0x00, 0x00,
@@ -216,6 +196,51 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ];
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "msiecf1",
+            PatternType::BoundToStart,
+            0,
+            "Client UrlCache MMF Ver ".as_bytes(),
+        ));
+        scanner.build().unwrap();
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+
+        // Test with buffer size smaller than signature.
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
+        scan_context.scan_buffer(&data[0..15]);
+
+        assert_eq!(scan_context.results.len(), 0);
+
+        // Test with data size smaller than signature.
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 8);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 0);
+
+        // Test with data size smaller than header range size.
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "apm1",
+            PatternType::BoundToStart,
+            560,
+            &[
+                0x41, 0x70, 0x70, 0x6c, 0x65, 0x5f, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f,
+                0x6e, 0x5f, 0x6d, 0x61, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ],
+        ));
+        scanner.add_signature(Signature::new(
+            "msiecf1",
+            PatternType::BoundToStart,
+            0,
+            "Client UrlCache MMF Ver ".as_bytes(),
+        ));
+        scanner.build().unwrap();
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
         scan_context.scan_buffer(&data);
@@ -225,15 +250,6 @@ mod tests {
 
     #[test]
     fn test_scan_buffer_with_bound_to_end_signature() {
-        let mut scanner: Scanner = Scanner::new();
-        scanner.add_signature(Signature::new(
-            "vhd1",
-            PatternType::BoundToEnd,
-            72,
-            "conectix".as_bytes(),
-        ));
-        scanner.build().unwrap();
-
         let data: [u8; 128] = [
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -246,6 +262,47 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ];
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "vhd1",
+            PatternType::BoundToEnd,
+            72,
+            "conectix".as_bytes(),
+        ));
+        scanner.build().unwrap();
+
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 1);
+
+        // Test with buffer size smaller than signature.
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
+        scan_context.scan_buffer(&data[73..]);
+
+        assert_eq!(scan_context.results.len(), 0);
+
+        // Test with data size smaller than signature.
+        let mut scan_context: ScanContext = ScanContext::new(&scanner, 8);
+        scan_context.scan_buffer(&data);
+
+        assert_eq!(scan_context.results.len(), 0);
+
+        // Test with data size smaller than footer range size.
+        let mut scanner: Scanner = Scanner::new();
+        scanner.add_signature(Signature::new(
+            "udif1",
+            PatternType::BoundToEnd,
+            512,
+            &[0x6b, 0x6f, 0x6c, 0x79],
+        ));
+        scanner.add_signature(Signature::new(
+            "vhd1",
+            PatternType::BoundToEnd,
+            72,
+            "conectix".as_bytes(),
+        ));
+        scanner.build().unwrap();
 
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
         scan_context.scan_buffer(&data);
@@ -276,7 +333,6 @@ mod tests {
             0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20,
             0x20, 0x20,
         ];
-
         let mut scan_context: ScanContext = ScanContext::new(&scanner, 128);
         scan_context.scan_buffer(&data);
 

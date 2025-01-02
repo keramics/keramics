@@ -119,7 +119,7 @@ impl ApmVolumeSystem {
 
     /// Opens a volume system.
     pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
-        self.data_stream = match file_system.open_data_stream(path, None)? {
+        self.data_stream = match file_system.get_data_stream_by_path_and_name(path, None)? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(

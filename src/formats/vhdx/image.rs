@@ -15,7 +15,6 @@ use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
 
-use crate::types::Ucs2String;
 use crate::vfs::{VfsFileSystem, VfsPath};
 
 use super::file::VhdxFile;

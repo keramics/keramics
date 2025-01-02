@@ -25,6 +25,7 @@ struct CommandLineArguments {
     source: std::path::PathBuf,
 }
 
+/// Prints information about a scan node.
 fn print_scan_node(scan_node: &VfsScanNode, depth: usize) {
     let indentation: String = vec![" "; depth * 4].join("");
     let format_identifier: &str = match scan_node.path.get_path_type() {
