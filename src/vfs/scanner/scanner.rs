@@ -13,7 +13,7 @@
 
 use std::collections::HashSet;
 use std::io;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::enums::FormatIdentifier;
 use crate::format_scanner::FormatScanner;
@@ -98,7 +98,7 @@ impl VfsScanner {
     ) -> io::Result<()> {
         let mut scan_node: VfsScanNode = VfsScanNode::new(path.clone());
 
-        let file_system: Rc<VfsFileSystem> = self.resolver.open_file_system(path)?;
+        let file_system: Arc<VfsFileSystem> = self.resolver.open_file_system(path)?;
 
         let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(path)? {
             Some(file_entry) => file_entry,
@@ -255,7 +255,7 @@ impl VfsScanner {
             return Ok(());
         }
         let node_file_system_path: VfsPath = path.new_child(scan_node.path.get_path_type(), "/");
-        let node_file_system: Rc<VfsFileSystem> =
+        let node_file_system: Arc<VfsFileSystem> =
             self.resolver.open_file_system(&node_file_system_path)?;
 
         // TODO: add support for configuration driven scanning older image layers
@@ -279,7 +279,7 @@ impl VfsScanner {
     /// Scans a node for supported formats.
     fn scan_for_sub_nodes(
         &self,
-        file_system: &Rc<VfsFileSystem>,
+        file_system: &Arc<VfsFileSystem>,
         path: &VfsPath,
         scan_node: &mut VfsScanNode,
     ) -> io::Result<()> {
@@ -443,7 +443,7 @@ impl VfsScanner {
         number_of_volumes: usize,
     ) -> io::Result<()> {
         let node_file_system_path: VfsPath = path.new_child(scan_node.path.get_path_type(), "/");
-        let node_file_system: Rc<VfsFileSystem> =
+        let node_file_system: Arc<VfsFileSystem> =
             self.resolver.open_file_system(&node_file_system_path)?;
 
         for volume_index in 0..number_of_volumes {
@@ -495,7 +495,7 @@ mod tests {
         }
     }
 
-    fn get_file_system() -> io::Result<Rc<VfsFileSystem>> {
+    fn get_file_system() -> io::Result<Arc<VfsFileSystem>> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsPath = VfsPath::Os {
@@ -545,7 +545,7 @@ mod tests {
             Ok(_) => {}
             Err(error) => return Err(crate::error_to_io_error!(error)),
         }
-        let vfs_file_system: Rc<VfsFileSystem> = get_file_system()?;
+        let vfs_file_system: Arc<VfsFileSystem> = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/qcow/ext2.qcow2".to_string(),
@@ -572,7 +572,7 @@ mod tests {
             location: "./test_data/qcow/ext2.qcow2".to_string(),
         };
         let vfs_file_system_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
-        let vfs_file_system: Rc<VfsFileSystem> =
+        let vfs_file_system: Arc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
@@ -598,7 +598,7 @@ mod tests {
             location: "./test_data/gpt/gpt.raw".to_string(),
         };
         let vfs_file_system_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/");
-        let vfs_file_system: Rc<VfsFileSystem> =
+        let vfs_file_system: Arc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
         let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");

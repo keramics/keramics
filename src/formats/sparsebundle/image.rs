@@ -13,7 +13,7 @@
 
 use std::io;
 use std::io::{Read, Seek};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::formats::plist::XmlPlist;
 use crate::mediator::{Mediator, MediatorReference};
@@ -25,7 +25,7 @@ pub struct SparseBundleImage {
     mediator: MediatorReference,
 
     /// File system.
-    file_system: Rc<VfsFileSystem>,
+    file_system: Arc<VfsFileSystem>,
 
     /// Path of the directory that contains the sparse bundle.
     directory_path: VfsPath,
@@ -45,7 +45,7 @@ impl SparseBundleImage {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            file_system: Rc::new(VfsFileSystem::new(&VfsPathType::Fake)),
+            file_system: Arc::new(VfsFileSystem::new(&VfsPathType::Fake)),
             directory_path: VfsPath::Fake {
                 location: "/".to_string(),
             },
@@ -56,7 +56,7 @@ impl SparseBundleImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Arc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.read_info_plist(file_system, path)?;
 
         self.directory_path = path.parent_directory();
@@ -292,7 +292,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
@@ -308,7 +308,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: SparseBundleImage = SparseBundleImage::new();
 

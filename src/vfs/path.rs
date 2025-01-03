@@ -72,39 +72,6 @@ pub enum VfsPath {
 }
 
 impl VfsPath {
-    /// Creates a new path.
-    pub fn new(path_type: VfsPathType, location: &str, parent: Option<&Arc<VfsPath>>) -> VfsPath {
-        match &path_type {
-            VfsPathType::Apm => {
-                panic!("Unsupported path_type: VfsPathType::Apm")
-            }
-            VfsPathType::Ext => {
-                panic!("Unsupported path_type: VfsPathType::Ext")
-            }
-            VfsPathType::Fake => VfsPath::Fake {
-                location: location.to_string(),
-            },
-            VfsPathType::Gpt => {
-                panic!("Unsupported path_type: VfsPathType::Gpt")
-            }
-            VfsPathType::Mbr => {
-                panic!("Unsupported path_type: VfsPathType::Mbr")
-            }
-            VfsPathType::Os => VfsPath::Os {
-                location: location.to_string(),
-            },
-            VfsPathType::Qcow => {
-                panic!("Unsupported path_type: VfsPathType::Qcow")
-            }
-            VfsPathType::Vhd => {
-                panic!("Unsupported path_type: VfsPathType::Vhd")
-            }
-            VfsPathType::Vhdx => {
-                panic!("Unsupported path_type: VfsPathType::Vhdx")
-            }
-        }
-    }
-
     /// Creates a new child path.
     pub fn new_child(&self, path_type: VfsPathType, location: &str) -> VfsPath {
         let parent: Arc<VfsPath> = Arc::new(self.clone());

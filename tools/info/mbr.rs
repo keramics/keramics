@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::formatters;
 
@@ -22,7 +22,7 @@ use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about a MBR volume system.
 pub fn print_mbr_volume_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
+    vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut mbr_volume_system = MbrVolumeSystem::new();

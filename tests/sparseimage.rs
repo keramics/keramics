@@ -13,7 +13,7 @@
 
 use std::io;
 use std::io::Read;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics::formats::sparseimage::SparseImageFile;
 use keramics::formatters::format_as_string;
@@ -69,7 +69,7 @@ fn read_media() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/sparseimage/hfsplus.sparseimage".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = SparseImageFile::new();
     file.open(&vfs_file_system, &vfs_path)?;

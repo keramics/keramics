@@ -314,6 +314,8 @@ impl ExtFileEntry {
 mod tests {
     use super::*;
 
+    use std::sync::Arc;
+
     use crate::datetime::PosixTime32;
     use crate::formats::ext::file_system::ExtFileSystem;
     use crate::formats::ext::path::ExtPath;
@@ -325,7 +327,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 

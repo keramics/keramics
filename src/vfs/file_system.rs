@@ -13,7 +13,7 @@
 
 use std::io;
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::formats::apm::ApmVolumeSystem;
 use crate::formats::ext::{ExtFileEntry, ExtFileSystem};
@@ -402,19 +402,19 @@ impl VfsFileSystem {
     /// Opens the file system.
     pub(super) fn open(
         &mut self,
-        parent_file_system: Option<Rc<VfsFileSystem>>,
+        parent_file_system: Option<&Arc<VfsFileSystem>>,
         path: &VfsPath,
     ) -> io::Result<()> {
         match self {
             VfsFileSystem::Apm(apm_volume_system) => match parent_file_system {
-                Some(vfs_file_system) => apm_volume_system.open(&vfs_file_system, path),
+                Some(file_system) => apm_volume_system.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
                 )),
             },
             VfsFileSystem::Ext(ext_file_system) => match parent_file_system {
-                Some(vfs_file_system) => ext_file_system.open(&vfs_file_system, path),
+                Some(file_system) => ext_file_system.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
@@ -430,35 +430,35 @@ impl VfsFileSystem {
                 Ok(())
             }
             VfsFileSystem::Gpt(gpt_volume_system) => match parent_file_system {
-                Some(vfs_file_system) => gpt_volume_system.open(&vfs_file_system, path),
+                Some(file_system) => gpt_volume_system.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
                 )),
             },
             VfsFileSystem::Mbr(mbr_volume_system) => match parent_file_system {
-                Some(vfs_file_system) => mbr_volume_system.open(&vfs_file_system, path),
+                Some(file_system) => mbr_volume_system.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
                 )),
             },
             VfsFileSystem::Qcow(qcow_image) => match parent_file_system {
-                Some(vfs_file_system) => qcow_image.open(&vfs_file_system, path),
+                Some(file_system) => qcow_image.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
                 )),
             },
             VfsFileSystem::Vhd(vhd_image) => match parent_file_system {
-                Some(vfs_file_system) => vhd_image.open(&vfs_file_system, path),
+                Some(file_system) => vhd_image.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
                 )),
             },
             VfsFileSystem::Vhdx(vhdx_image) => match parent_file_system {
-                Some(vfs_file_system) => vhdx_image.open(&vfs_file_system, path),
+                Some(file_system) => vhdx_image.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
@@ -476,18 +476,18 @@ mod tests {
     use crate::vfs::fake::FakeFileEntry;
     use crate::vfs::path::VfsPath;
 
-    fn get_parent_file_system() -> Rc<VfsFileSystem> {
-        Rc::new(VfsFileSystem::new(&VfsPathType::Os))
+    fn get_parent_file_system() -> Arc<VfsFileSystem> {
+        Arc::new(VfsFileSystem::new(&VfsPathType::Os))
     }
 
     fn get_apm_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Apm);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/apm/apm.dmg".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -495,11 +495,11 @@ mod tests {
     fn get_ext_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Ext);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -521,11 +521,11 @@ mod tests {
     fn get_gpt_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Gpt);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/gpt/gpt.raw".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -533,11 +533,11 @@ mod tests {
     fn get_mbr_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Mbr);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/mbr/mbr.raw".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -545,11 +545,11 @@ mod tests {
     fn get_qcow_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Qcow);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/qcow/ext2.qcow2".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -557,11 +557,11 @@ mod tests {
     fn get_vhd_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhd);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -569,11 +569,11 @@ mod tests {
     fn get_vhdx_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhdx);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }

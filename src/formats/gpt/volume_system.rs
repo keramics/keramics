@@ -12,7 +12,7 @@
  */
 
 use std::io;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::checksums::ReversedCrc32Context;
 use crate::mediator::{Mediator, MediatorReference};
@@ -136,7 +136,7 @@ impl GptVolumeSystem {
     // TODO: add get_partition_index_by_identifier
 
     /// Opens a volume system.
-    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Arc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.get_data_stream_by_path_and_name(path, None)? {
             Some(data_stream) => data_stream,
             None => {
@@ -320,7 +320,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/gpt/gpt.raw".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
@@ -381,7 +381,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/gpt/gpt.raw".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 

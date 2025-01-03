@@ -264,23 +264,25 @@ impl VfsFileEntry {
 mod tests {
     use super::*;
 
+    use std::sync::Arc;
+
     use crate::datetime::PosixTime32;
     use crate::vfs::enums::{VfsFileType, VfsPathType};
     use crate::vfs::file_system::VfsFileSystem;
     use crate::vfs::path::VfsPath;
 
-    fn get_parent_file_system() -> Rc<VfsFileSystem> {
-        Rc::new(VfsFileSystem::new(&VfsPathType::Os))
+    fn get_parent_file_system() -> Arc<VfsFileSystem> {
+        Arc::new(VfsFileSystem::new(&VfsPathType::Os))
     }
 
     fn get_apm_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Apm);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/apm/apm.dmg".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -288,11 +290,11 @@ mod tests {
     fn get_ext_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Ext);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -300,11 +302,11 @@ mod tests {
     fn get_gpt_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Gpt);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/gpt/gpt.raw".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -312,11 +314,11 @@ mod tests {
     fn get_mbr_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Mbr);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/mbr/mbr.raw".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -324,11 +326,11 @@ mod tests {
     fn get_qcow_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Qcow);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/qcow/ext2.qcow2".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -336,11 +338,11 @@ mod tests {
     fn get_vhd_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhd);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }
@@ -348,11 +350,11 @@ mod tests {
     fn get_vhdx_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhdx);
 
-        let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
+        let parent_file_system: Arc<VfsFileSystem> = get_parent_file_system();
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
         };
-        vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
     }

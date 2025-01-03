@@ -14,7 +14,7 @@
 use std::io;
 use std::io::Read;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics::datetime::DateTime;
 use keramics::formats::ext::constants::*;
@@ -254,7 +254,7 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
 }
 
 /// Prints information about an Extended File System (ext).
-pub fn print_ext_file_system(vfs_file_system: &Rc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_ext_file_system(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
     match ext_file_system.open(vfs_file_system, vfs_path) {
@@ -509,7 +509,7 @@ fn print_ext_file_entry_path(
 
 /// Prints information about a specific entry of an Extended File System (ext).
 pub fn print_entry_ext_file_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
+    vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
     ext_entry_identifier: u64,
 ) -> ExitCode {
@@ -554,7 +554,7 @@ pub fn print_entry_ext_file_system(
 
 /// Prints the hierarchy of an Extended File System (ext).
 pub fn print_hierarcy_ext_file_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
+    vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
     bodyfile: bool,
 ) -> ExitCode {
@@ -619,7 +619,7 @@ fn print_hierarcy_ext_file_entry(
 
 /// Prints information about a specific path of an Extended File System (ext).
 pub fn print_path_ext_file_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
+    vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
     path: &String,
 ) -> ExitCode {

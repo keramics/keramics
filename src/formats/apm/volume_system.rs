@@ -12,7 +12,7 @@
  */
 
 use std::io;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::types::SharedValue;
 use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
@@ -118,7 +118,7 @@ impl ApmVolumeSystem {
     }
 
     /// Opens a volume system.
-    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Arc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.get_data_stream_by_path_and_name(path, None)? {
             Some(data_stream) => data_stream,
             None => {
@@ -191,7 +191,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/apm/apm.dmg".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
@@ -252,7 +252,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/apm/apm.dmg".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 

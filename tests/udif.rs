@@ -13,7 +13,7 @@
 
 use std::io;
 use std::io::Read;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics::formats::udif::UdifFile;
 use keramics::formatters::format_as_string;
@@ -45,7 +45,7 @@ fn read_media_adc_compressed() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/udif/hfsplus_adc.dmg".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
@@ -63,7 +63,7 @@ fn read_media_bzip2_compressed() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/udif/hfsplus_bzip2.dmg".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
@@ -81,7 +81,7 @@ fn read_media_lzfse_compressed() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/udif/hfsplus_lzfse.dmg".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
@@ -99,7 +99,7 @@ fn read_media_zlib_compressed() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/udif/hfsplus_zlib.dmg".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = UdifFile::new();
     file.open(&vfs_file_system, &vfs_path)?;

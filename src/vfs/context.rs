@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::rc::{Rc, Weak};
+use std::sync::{Arc, Weak};
 
 use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
@@ -46,18 +46,18 @@ impl VfsContext {
         path: &VfsPath,
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
-        let file_system: Rc<VfsFileSystem> = self.open_file_system(path)?;
+        let file_system: Arc<VfsFileSystem> = self.open_file_system(path)?;
         file_system.get_data_stream_by_path_and_name(path, name)
     }
 
     /// Retrieves a file entry with the specified path.
     pub fn get_file_entry_by_path(&mut self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
-        let file_system: Rc<VfsFileSystem> = self.open_file_system(path)?;
+        let file_system: Arc<VfsFileSystem> = self.open_file_system(path)?;
         file_system.get_file_entry_by_path(path)
     }
 
     /// Opens a file system.
-    pub fn open_file_system(&mut self, path: &VfsPath) -> io::Result<Rc<VfsFileSystem>> {
+    pub fn open_file_system(&mut self, path: &VfsPath) -> io::Result<Arc<VfsFileSystem>> {
         match path {
             VfsPath::Fake { .. } => {
                 return Err(io::Error::new(
@@ -73,7 +73,7 @@ impl VfsContext {
             Some(parent_path) => parent_path,
             None => &self.os_vfs_path,
         };
-        let cached_file_system: Option<Rc<VfsFileSystem>> = match self.file_systems.get(lookup_key)
+        let cached_file_system: Option<Arc<VfsFileSystem>> = match self.file_systems.get(lookup_key)
         {
             Some(file_system) => file_system.upgrade(),
             None => None,
@@ -81,7 +81,7 @@ impl VfsContext {
         match cached_file_system {
             Some(file_system) => Ok(file_system),
             None => {
-                let parent_file_system: Option<Rc<VfsFileSystem>> = match parent_path {
+                let parent_file_system: Option<Arc<VfsFileSystem>> = match parent_path {
                     Some(parent_path) => Some(self.open_file_system(parent_path)?),
                     None => None,
                 };
@@ -90,12 +90,12 @@ impl VfsContext {
                     None => self.os_vfs_path.clone(),
                 };
                 let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.get_path_type());
-                file_system.open(parent_file_system, &file_system_path)?;
+                file_system.open(parent_file_system.as_ref(), &file_system_path)?;
 
-                let cached_file_system: Rc<VfsFileSystem> = Rc::new(file_system);
+                let cached_file_system: Arc<VfsFileSystem> = Arc::new(file_system);
 
                 self.file_systems
-                    .insert(file_system_path, Rc::downgrade(&cached_file_system));
+                    .insert(file_system_path, Arc::downgrade(&cached_file_system));
 
                 Ok(cached_file_system)
             }
@@ -157,7 +157,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "/".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         assert!(vfs_file_system.get_vfs_path_type() == VfsPathType::Os);
 
