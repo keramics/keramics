@@ -14,7 +14,7 @@
 use std::collections::HashSet;
 use std::io;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use clap::{Args, Parser, Subcommand};
 
@@ -140,7 +140,7 @@ fn main() -> ExitCode {
 
     let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-    let vfs_file_system: Rc<VfsFileSystem> = match vfs_resolver.open_file_system(&vfs_path) {
+    let vfs_file_system: Arc<VfsFileSystem> = match vfs_resolver.open_file_system(&vfs_path) {
         Ok(value) => value,
         Err(error) => {
             println!("Unable to open file system with error: {}", error);

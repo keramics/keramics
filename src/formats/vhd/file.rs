@@ -15,6 +15,7 @@ use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::types::{BlockTree, SharedValue, Ucs2String, Uuid};
 use crate::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
@@ -111,7 +112,7 @@ impl VhdFile {
     }
 
     /// Opens a file.
-    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Arc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         self.data_stream = match file_system.get_data_stream_by_path_and_name(path, None)? {
             Some(data_stream) => data_stream,
             None => {
@@ -442,7 +443,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhd/ext2.vhd".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file: VhdFile = VhdFile::new();
 
@@ -458,7 +459,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file: VhdFile = VhdFile::new();
 
@@ -477,7 +478,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file = VhdFile::new();
 

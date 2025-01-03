@@ -12,7 +12,7 @@
  */
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use std::process::ExitCode;
 
@@ -22,7 +22,7 @@ use keramics::formats::udif::{UdifCompressionMethod, UdifFile};
 use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about an UDIF file.
-pub fn print_udif_file(vfs_file_system: &Rc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_udif_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
     let mut udif_file: UdifFile = UdifFile::new();
 
     match udif_file.open(vfs_file_system, vfs_path) {

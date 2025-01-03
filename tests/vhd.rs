@@ -15,6 +15,7 @@ use std::cell::RefCell;
 use std::io;
 use std::io::Read;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics::formats::vhd::VhdFile;
 use keramics::formatters::format_as_string;
@@ -46,7 +47,7 @@ fn read_media_fixed() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/vhd/ntfs-parent.vhd".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
@@ -64,7 +65,7 @@ fn read_media_dynamic() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/vhd/ntfs-dynamic.vhd".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
@@ -82,7 +83,7 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/vhd/ext2.vhd".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file = VhdFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
@@ -100,7 +101,7 @@ fn read_media_differential() -> io::Result<()> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: "./test_data/vhd/ntfs-parent.vhd".to_string(),
     };
-    let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut parent_file = VhdFile::new();
     parent_file.open(&vfs_file_system, &vfs_path)?;

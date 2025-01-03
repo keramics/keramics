@@ -15,7 +15,7 @@ use std::io;
 use std::io::{BufReader, Stdin};
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
 
@@ -88,7 +88,7 @@ fn calculate_hash_from_scan_node(
     if vfs_scan_node.sub_nodes.is_empty() {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let file_system: Rc<VfsFileSystem> = vfs_resolver.open_file_system(&vfs_scan_node.path)?;
+        let file_system: Arc<VfsFileSystem> = vfs_resolver.open_file_system(&vfs_scan_node.path)?;
 
         for result in VfsFinder::new(&file_system) {
             match result {

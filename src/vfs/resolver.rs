@@ -12,7 +12,6 @@
  */
 
 use std::io;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use super::context::VfsContext;
@@ -61,7 +60,7 @@ impl VfsResolver {
     }
 
     /// Opens a file system.
-    pub fn open_file_system(&self, path: &VfsPath) -> io::Result<Rc<VfsFileSystem>> {
+    pub fn open_file_system(&self, path: &VfsPath) -> io::Result<Arc<VfsFileSystem>> {
         match self.context.write() {
             Ok(mut context) => context.open_file_system(path),
             Err(error) => Err(crate::error_to_io_error!(error)),
@@ -127,7 +126,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "/".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_resolver.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_resolver.open_file_system(&vfs_path)?;
 
         assert!(vfs_file_system.get_vfs_path_type() == VfsPathType::Os);
 

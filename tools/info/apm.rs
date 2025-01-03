@@ -12,7 +12,7 @@
  */
 
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::formatters;
 
@@ -63,7 +63,7 @@ fn print_apm_partition_status_flags(flags: u32) {
 
 /// Prints information about an APM volume system.
 pub fn print_apm_volume_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
+    vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut apm_volume_system = ApmVolumeSystem::new();

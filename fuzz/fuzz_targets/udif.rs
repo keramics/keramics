@@ -13,7 +13,7 @@
 
 #![no_main]
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use libfuzzer_sys::fuzz_target;
 

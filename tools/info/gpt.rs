@@ -12,7 +12,7 @@
  */
 
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::formatters;
 
@@ -21,7 +21,7 @@ use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about a GPT volume system.
 pub fn print_gpt_volume_system(
-    vfs_file_system: &Rc<VfsFileSystem>,
+    vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
 ) -> ExitCode {
     let mut gpt_volume_system = GptVolumeSystem::new();

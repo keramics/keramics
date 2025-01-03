@@ -14,6 +14,7 @@
 use std::cell::RefCell;
 use std::io;
 use std::rc::Rc;
+use std::sync::Arc;
 
 use crate::vfs::{VfsFileSystem, VfsPath};
 
@@ -92,7 +93,7 @@ impl QcowImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(&mut self, file_system: &Rc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
+    pub fn open(&mut self, file_system: &Arc<VfsFileSystem>, path: &VfsPath) -> io::Result<()> {
         let directory_path: VfsPath = path.parent_directory();
 
         let mut files: Vec<QcowFile> = Vec::new();
@@ -145,7 +146,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/qcow/ext2.qcow2".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: QcowImage = QcowImage::new();
 
@@ -205,7 +206,7 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/qcow/ext2.qcow2".to_string(),
         };
-        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+        let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: QcowImage = QcowImage::new();
 

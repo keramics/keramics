@@ -12,7 +12,7 @@
  */
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use std::process::ExitCode;
 
@@ -22,7 +22,7 @@ use keramics::formats::vhdx::{VhdxDiskType, VhdxFile};
 use keramics::vfs::{VfsFileSystem, VfsPath};
 
 /// Prints information about a VHDX file.
-pub fn print_vhdx_file(vfs_file_system: &Rc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_vhdx_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
     match vhdx_file.open(vfs_file_system, vfs_path) {
