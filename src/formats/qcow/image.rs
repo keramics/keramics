@@ -137,18 +137,18 @@ impl QcowImage {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPathType};
+    use crate::vfs::VfsContext;
 
     fn get_image() -> io::Result<QcowImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: QcowImage = QcowImage::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(image)
@@ -202,13 +202,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: QcowImage = QcowImage::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
         image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(())

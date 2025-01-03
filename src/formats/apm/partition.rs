@@ -125,7 +125,7 @@ impl VfsDataStream for ApmPartition {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath};
 
     #[test]
     fn test_open() -> io::Result<()> {
@@ -135,7 +135,9 @@ mod tests {
         let type_identifier: ByteString = ByteString::new();
         let mut partition = ApmPartition::new(32768, 4153344, &type_identifier, &name, 0x40000033);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
         let vfs_data_stream: VfsDataStreamReference =
             match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
                 Some(data_stream) => data_stream,

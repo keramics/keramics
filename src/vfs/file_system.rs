@@ -472,8 +472,6 @@ impl VfsFileSystem {
 mod tests {
     use super::*;
 
-    use std::rc::Rc;
-
     use crate::vfs::enums::VfsFileType;
     use crate::vfs::fake::FakeFileEntry;
     use crate::vfs::path::VfsPath;
@@ -486,7 +484,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Apm);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/apm/apm.dmg", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -496,7 +496,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Ext);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -520,7 +522,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Gpt);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/gpt/gpt.raw", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -530,7 +534,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Mbr);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/mbr/mbr.raw", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/mbr/mbr.raw".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -540,7 +546,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Qcow);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -550,11 +558,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhd);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        );
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -564,11 +570,9 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhdx);
 
         let parent_file_system: Rc<VfsFileSystem> = get_parent_file_system();
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        );
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
         vfs_file_system.open(Some(parent_file_system), &vfs_path)?;
 
         Ok(vfs_file_system)
@@ -577,16 +581,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_apm() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/apm/apm.dmg",
-            None,
-        ));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/apm2", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/apm2");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -595,17 +597,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_ext() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/ext/ext2.raw",
-            None,
-        ));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
 
-        let vfs_path: VfsPath =
-            VfsPath::new(VfsPathType::Ext, "/passwords.txt", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/passwords.txt");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Ext, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -615,10 +614,14 @@ mod tests {
     fn test_file_entry_exists_with_fake() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/fake2", None);
+        let vfs_path: VfsPath = VfsPath::Fake {
+            location: "/fake2".to_string(),
+        };
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "./bogus", None);
+        let vfs_path: VfsPath = VfsPath::Fake {
+            location: "./bogus".to_string(),
+        };
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -627,16 +630,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_gpt() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/gpt/gpt.raw",
-            None,
-        ));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/gpt2", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt2");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -645,16 +646,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_mbr() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/mbr/mbr.raw",
-            None,
-        ));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/mbr/mbr.raw".to_string(),
+        };
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Mbr, "/mbr2", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/mbr2");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Mbr, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -664,10 +663,14 @@ mod tests {
     fn test_file_entry_exists_with_os() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Os);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/file.txt".to_string(),
+        };
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/bogus.txt".to_string(),
+        };
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -676,16 +679,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_qcow() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/qcow1", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -694,15 +695,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_vhd() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        ));
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/vhd2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/vhd2");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -711,15 +711,14 @@ mod tests {
     #[test]
     fn test_file_entry_exists_with_vhdx() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        ));
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/vhdx2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx2");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "./bogus", Some(&os_vfs_path));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -729,12 +728,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_apm_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/apm/apm.dmg",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -747,12 +744,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_apm_partition() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/apm/apm.dmg",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/apm2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/apm2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -766,12 +761,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_apm_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/apm/apm.dmg",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Apm, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -785,12 +778,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_ext_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/ext/ext2.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Ext, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -803,13 +794,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_ext_partition() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/ext/ext2.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath =
-            VfsPath::new(VfsPathType::Ext, "/passwords.txt", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/passwords.txt");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -823,12 +811,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_ext_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/ext/ext2.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Ext, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -842,7 +828,9 @@ mod tests {
     fn test_get_file_entry_by_path_with_fake_file() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/fake2", None);
+        let test_vfs_path: VfsPath = VfsPath::Fake {
+            location: "/fake2".to_string(),
+        };
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -856,7 +844,9 @@ mod tests {
     fn test_get_file_entry_by_path_with_fake_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/bogus", None);
+        let test_vfs_path: VfsPath = VfsPath::Fake {
+            location: "/bogus".to_string(),
+        };
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -871,12 +861,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_gpt_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/gpt/gpt.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -889,12 +877,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_gpt_partition() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/gpt/gpt.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/gpt2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -908,12 +894,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_gpt_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/gpt/gpt.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -927,12 +911,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_mbr_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/mbr/mbr.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Mbr, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/mbr/mbr.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -945,12 +927,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_mbr_partition() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/mbr/mbr.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Mbr, "/mbr2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/mbr/mbr.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/mbr2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -964,12 +944,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_mbr_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/mbr/mbr.raw",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Mbr, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/mbr/mbr.raw".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -983,12 +961,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_qcow_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -1001,12 +977,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_qcow_layer() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/qcow1", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -1020,12 +994,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_qcow_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Qcow, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -1039,12 +1011,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_vhd_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -1057,12 +1027,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_vhd_layer() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/vhd2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/vhd2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -1076,12 +1044,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_vhd_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhd, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -1095,12 +1061,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_vhdx_non_existing() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/bogus", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/bogus");
         let result: Option<VfsFileEntry> =
             vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
 
@@ -1113,12 +1077,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_vhdx_layer() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/vhdx2", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -1132,12 +1094,10 @@ mod tests {
     fn test_get_file_entry_by_path_with_vhdx_root() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        ));
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Vhdx, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();
@@ -1151,7 +1111,9 @@ mod tests {
     fn test_get_file_entry_by_path_with_unsupported_path_type() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Os);
 
-        let test_vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/", None);
+        let test_vfs_path: VfsPath = VfsPath::Fake {
+            location: "/".to_string(),
+        };
 
         let result = vfs_file_system.get_file_entry_by_path(&test_vfs_path);
         assert!(result.is_err());

@@ -372,18 +372,18 @@ impl ExtFileSystem {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath};
 
     fn get_file_system() -> io::Result<ExtFileSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         file_system.open(&vfs_file_system, &vfs_path)?;
 
         Ok(file_system)
@@ -438,13 +438,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         file_system.open(&vfs_file_system, &vfs_path)?;
 
         let format_version: u8 = file_system.get_format_version();

@@ -84,12 +84,16 @@ mod tests {
     fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/file.txt".to_string(),
+        };
         let result: Option<VfsDataStreamReference> =
             vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/bogus.txt".to_string(),
+        };
         let result: Option<VfsDataStreamReference> =
             vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_none());
@@ -101,11 +105,15 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/file.txt".to_string(),
+        };
         let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/bogus.txt".to_string(),
+        };
         let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 
@@ -116,7 +124,9 @@ mod tests {
     fn test_open_file_system() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "/".to_string(),
+        };
         let vfs_file_system: Rc<VfsFileSystem> = vfs_resolver.open_file_system(&vfs_path)?;
 
         assert!(vfs_file_system.get_vfs_path_type() == VfsPathType::Os);

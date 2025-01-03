@@ -317,18 +317,18 @@ mod tests {
     use crate::datetime::PosixTime32;
     use crate::formats::ext::file_system::ExtFileSystem;
     use crate::formats::ext::path::ExtPath;
-    use crate::vfs::{VfsContext, VfsFileSystem, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsFileSystem, VfsPath};
 
     fn get_file_system() -> io::Result<ExtFileSystem> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/ext/ext2.raw".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/ext/ext2.raw", None);
         file_system.open(&vfs_file_system, &vfs_path)?;
 
         Ok(file_system)

@@ -152,22 +152,18 @@ impl VhdImage {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPathType};
+    use crate::vfs::VfsContext;
 
     fn get_image() -> io::Result<VhdImage> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: VhdImage = VhdImage::new();
 
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        );
         image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(image)
@@ -227,17 +223,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut image: VhdImage = VhdImage::new();
 
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhd/ntfs-differential.vhd",
-            None,
-        );
         image.open(&vfs_file_system, &vfs_path)?;
 
         Ok(())
