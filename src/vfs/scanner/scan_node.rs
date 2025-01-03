@@ -11,14 +11,12 @@
  * under the License.
  */
 
-use std::rc::Rc;
-
 use crate::vfs::path::VfsPath;
 
 /// Virtual File System (VFS) scan node.
 pub struct VfsScanNode {
     /// Path.
-    pub path: Rc<VfsPath>,
+    pub path: VfsPath,
 
     /// Sub nodes.
     pub sub_nodes: Vec<VfsScanNode>,
@@ -26,9 +24,9 @@ pub struct VfsScanNode {
 
 impl VfsScanNode {
     /// Creates a new scan node.
-    pub(super) fn new(path: &Rc<VfsPath>) -> Self {
+    pub(super) fn new(path: VfsPath) -> Self {
         Self {
-            path: path.clone(),
+            path: path,
             sub_nodes: Vec::new(),
         }
     }

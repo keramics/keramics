@@ -13,7 +13,6 @@
 
 use std::collections::HashSet;
 use std::io;
-use std::ops::Deref;
 use std::rc::Rc;
 
 use crate::enums::FormatIdentifier;
@@ -92,8 +91,12 @@ impl VfsScanner {
     }
 
     /// Scans a storage media image file for supported formats.
-    pub fn scan(&self, scan_context: &mut VfsScanContext, path: &Rc<VfsPath>) -> io::Result<()> {
-        let mut scan_node: VfsScanNode = VfsScanNode::new(path);
+    pub fn scan<'a>(
+        &self,
+        scan_context: &mut VfsScanContext<'a>,
+        path: &'a VfsPath,
+    ) -> io::Result<()> {
+        let mut scan_node: VfsScanNode = VfsScanNode::new(path.clone());
 
         let file_system: Rc<VfsFileSystem> = self.resolver.open_file_system(path)?;
 
@@ -133,7 +136,7 @@ impl VfsScanner {
     fn scan_for_format(
         &self,
         file_system: &VfsFileSystem,
-        path: &Rc<VfsPath>,
+        path: &VfsPath,
     ) -> io::Result<Option<VfsPathType>> {
         let result: Option<VfsDataStreamReference> =
             file_system.get_data_stream_by_path_and_name(path, None)?;
@@ -147,7 +150,7 @@ impl VfsScanner {
                 ))
             }
         };
-        match path.deref() {
+        match path {
             VfsPath::Apm { .. } | VfsPath::Gpt { .. } | VfsPath::Mbr { .. } => {
                 self.scan_for_file_system_format(&data_stream)
             }
@@ -243,7 +246,7 @@ impl VfsScanner {
     fn scan_for_storage_media_image_sub_nodes(
         &self,
         file_system: &VfsFileSystem,
-        path: &Rc<VfsPath>,
+        path: &VfsPath,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
         number_of_layers: usize,
@@ -251,8 +254,7 @@ impl VfsScanner {
         if number_of_layers == 0 {
             return Ok(());
         }
-        let node_file_system_path: VfsPath =
-            VfsPath::new(scan_node.path.get_path_type(), "/", Some(path));
+        let node_file_system_path: VfsPath = path.new_child(scan_node.path.get_path_type(), "/");
         let node_file_system: Rc<VfsFileSystem> =
             self.resolver.open_file_system(&node_file_system_path)?;
 
@@ -260,16 +262,11 @@ impl VfsScanner {
 
         // TODO: use layer identifier in location?
         let location: String = format!("{}{}", path_prefix, number_of_layers);
-        let node_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            scan_node.path.get_path_type(),
-            location.as_str(),
-            Some(path),
-        ));
+        let node_path: VfsPath = path.new_child(scan_node.path.get_path_type(), location.as_str());
         match self.scan_for_format(&node_file_system, &node_path)? {
             Some(path_type) => {
-                let sub_node_path: Rc<VfsPath> =
-                    Rc::new(VfsPath::new(path_type, "/", Some(&node_path)));
-                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(&sub_node_path);
+                let sub_node_path: VfsPath = node_path.new_child(path_type, "/");
+                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
                 self.scan_for_sub_nodes(&node_file_system, &node_path, &mut sub_scan_node)?;
 
                 scan_node.sub_nodes.push(sub_scan_node);
@@ -283,11 +280,11 @@ impl VfsScanner {
     fn scan_for_sub_nodes(
         &self,
         file_system: &Rc<VfsFileSystem>,
-        path: &Rc<VfsPath>,
+        path: &VfsPath,
         scan_node: &mut VfsScanNode,
     ) -> io::Result<()> {
         // TODO: handle image with both gpt and mbr volume systems
-        match scan_node.path.deref() {
+        match &scan_node.path {
             VfsPath::Apm { .. } => {
                 let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
                 apm_volume_system.open(file_system, path)?;
@@ -330,9 +327,8 @@ impl VfsScanner {
             }
             VfsPath::Os { .. } => match self.scan_for_format(&file_system, &path)? {
                 Some(path_type) => {
-                    let sub_node_path: Rc<VfsPath> =
-                        Rc::new(VfsPath::new(path_type, "/", Some(path)));
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(&sub_node_path);
+                    let sub_node_path: VfsPath = path.new_child(path_type, "/");
+                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
                     self.scan_for_sub_nodes(file_system, path, &mut sub_scan_node)?;
 
                     scan_node.sub_nodes.push(sub_scan_node);
@@ -441,16 +437,12 @@ impl VfsScanner {
     fn scan_for_volume_system_sub_nodes(
         &self,
         file_system: &VfsFileSystem,
-        path: &Rc<VfsPath>,
+        path: &VfsPath,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
         number_of_volumes: usize,
     ) -> io::Result<()> {
-        let node_file_system_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            scan_node.path.get_path_type(),
-            "/",
-            Some(path),
-        ));
+        let node_file_system_path: VfsPath = path.new_child(scan_node.path.get_path_type(), "/");
         let node_file_system: Rc<VfsFileSystem> =
             self.resolver.open_file_system(&node_file_system_path)?;
 
@@ -458,19 +450,19 @@ impl VfsScanner {
             // TODO: use volume identifier in location?
             let location: String = format!("{}{}", path_prefix, volume_index + 1);
 
-            let node_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-                scan_node.path.get_path_type(),
-                location.as_str(),
-                Some(path),
-            ));
-            let mut volume_scan_node: VfsScanNode = VfsScanNode::new(&node_path);
+            let node_path: VfsPath =
+                path.new_child(scan_node.path.get_path_type(), location.as_str());
+            let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_path);
 
-            match self.scan_for_format(&node_file_system, &node_path)? {
+            match self.scan_for_format(&node_file_system, &volume_scan_node.path)? {
                 Some(path_type) => {
-                    let sub_node_path: Rc<VfsPath> =
-                        Rc::new(VfsPath::new(path_type, "/", Some(&node_path)));
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(&sub_node_path);
-                    self.scan_for_sub_nodes(&node_file_system, &node_path, &mut sub_scan_node)?;
+                    let sub_node_path: VfsPath = volume_scan_node.path.new_child(path_type, "/");
+                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
+                    self.scan_for_sub_nodes(
+                        &node_file_system,
+                        &volume_scan_node.path,
+                        &mut sub_scan_node,
+                    )?;
 
                     volume_scan_node.sub_nodes.push(sub_scan_node);
                 }
@@ -491,7 +483,9 @@ mod tests {
     fn get_data_stream(location: &str) -> io::Result<VfsDataStreamReference> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(VfsPathType::Os, location, None));
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: location.to_string(),
+        };
         match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
             Some(data_stream) => Ok(data_stream),
             None => Err(io::Error::new(
@@ -504,7 +498,9 @@ mod tests {
     fn get_file_system() -> io::Result<Rc<VfsFileSystem>> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_file_system_path: VfsPath = VfsPath::Os {
+            location: "/".to_string(),
+        };
         vfs_context.open_file_system(&vfs_file_system_path)
     }
 
@@ -521,11 +517,9 @@ mod tests {
             Ok(_) => {}
             Err(error) => return Err(crate::error_to_io_error!(error)),
         }
-        let vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         format_scanner.scan(&mut scan_context, &vfs_path)?;
 
@@ -553,12 +547,9 @@ mod tests {
         }
         let vfs_file_system: Rc<VfsFileSystem> = get_file_system()?;
 
-        let vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
-
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
         let vfs_path_type: VfsPathType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_path)?
             .unwrap();
@@ -577,21 +568,14 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/qcow/ext2.qcow2",
-            None,
-        ));
-        let vfs_file_system_path: VfsPath =
-            VfsPath::new(VfsPathType::Qcow, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let vfs_file_system_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Qcow,
-            "/qcow1",
-            Some(&os_vfs_path),
-        ));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
         let vfs_path_type: VfsPathType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_path)?
             .unwrap();
@@ -610,17 +594,14 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_path: Rc<VfsPath> = Rc::new(VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/gpt/gpt.raw",
-            None,
-        ));
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Gpt, "/", Some(&os_vfs_path));
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
+        let vfs_file_system_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/");
         let vfs_file_system: Rc<VfsFileSystem> =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: Rc<VfsPath> =
-            Rc::new(VfsPath::new(VfsPathType::Gpt, "/gpt1", Some(&os_vfs_path)));
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");
         let vfs_path_type: VfsPathType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_path)?
             .unwrap();

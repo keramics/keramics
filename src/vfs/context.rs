@@ -23,10 +23,10 @@ use super::types::VfsDataStreamReference;
 /// Virtual File System (VFS) context.
 pub struct VfsContext {
     /// File systems.
-    file_systems: HashMap<Rc<VfsPath>, Weak<VfsFileSystem>>,
+    file_systems: HashMap<VfsPath, Weak<VfsFileSystem>>,
 
     /// Operating system (OS) file system path.
-    os_vfs_path: Rc<VfsPath>,
+    os_vfs_path: VfsPath,
 }
 
 impl VfsContext {
@@ -34,9 +34,9 @@ impl VfsContext {
     pub fn new() -> Self {
         Self {
             file_systems: HashMap::new(),
-            os_vfs_path: Rc::new(VfsPath::Os {
+            os_vfs_path: VfsPath::Os {
                 location: "/".to_string(),
-            }),
+            },
         }
     }
 
@@ -67,9 +67,9 @@ impl VfsContext {
             }
             _ => {}
         };
-        let parent_path: Option<&Rc<VfsPath>> = path.get_parent();
+        let parent_path: Option<&VfsPath> = path.get_parent();
 
-        let lookup_key: &Rc<VfsPath> = match parent_path {
+        let lookup_key: &VfsPath = match parent_path {
             Some(parent_path) => parent_path,
             None => &self.os_vfs_path,
         };
@@ -85,21 +85,17 @@ impl VfsContext {
                     Some(parent_path) => Some(self.open_file_system(parent_path)?),
                     None => None,
                 };
-                let file_system_path: &VfsPath = match parent_path {
-                    Some(parent_path) => parent_path,
-                    None => self.os_vfs_path.as_ref(),
-                };
-                let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.get_path_type());
-                file_system.open(parent_file_system, file_system_path)?;
-
-                let lookup_key: Rc<VfsPath> = match parent_path {
+                let file_system_path: VfsPath = match parent_path {
                     Some(parent_path) => parent_path.clone(),
                     None => self.os_vfs_path.clone(),
                 };
+                let mut file_system: VfsFileSystem = VfsFileSystem::new(&path.get_path_type());
+                file_system.open(parent_file_system, &file_system_path)?;
+
                 let cached_file_system: Rc<VfsFileSystem> = Rc::new(file_system);
 
                 self.file_systems
-                    .insert(lookup_key, Rc::downgrade(&cached_file_system));
+                    .insert(file_system_path, Rc::downgrade(&cached_file_system));
 
                 Ok(cached_file_system)
             }
@@ -118,12 +114,16 @@ mod tests {
     fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/file.txt".to_string(),
+        };
         let result: Option<VfsDataStreamReference> =
             vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/bogus.txt".to_string(),
+        };
         let result: Option<VfsDataStreamReference> =
             vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)?;
         assert!(result.is_none());
@@ -135,11 +135,15 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/file.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/file.txt".to_string(),
+        };
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/bogus.txt", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/bogus.txt".to_string(),
+        };
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 
@@ -150,7 +154,9 @@ mod tests {
     fn test_open_file_system() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "/".to_string(),
+        };
         let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         assert!(vfs_file_system.get_vfs_path_type() == VfsPathType::Os);

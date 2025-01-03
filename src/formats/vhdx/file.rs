@@ -788,18 +788,18 @@ impl Seek for VhdxFile {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath};
 
     fn get_file() -> io::Result<VhdxFile> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ext2.vhdx".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file: VhdxFile = VhdxFile::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/vhdx/ext2.vhdx", None);
         file.open(&vfs_file_system, &vfs_path)?;
 
         Ok(file)
@@ -809,17 +809,13 @@ mod tests {
     fn test_get_parent_filename() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file: VhdxFile = VhdxFile::new();
 
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        );
         file.open(&vfs_file_system, &vfs_path)?;
 
         let parent_filename: Option<Ucs2String> = file.get_parent_filename();
@@ -832,17 +828,13 @@ mod tests {
     fn test_open() -> io::Result<()> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::new(VfsPathType::Os, "/", None);
-        let vfs_file_system: Rc<VfsFileSystem> =
-            vfs_context.open_file_system(&vfs_file_system_path)?;
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+        let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
         let mut file: VhdxFile = VhdxFile::new();
 
-        let vfs_path: VfsPath = VfsPath::new(
-            VfsPathType::Os,
-            "./test_data/vhdx/ntfs-differential.vhdx",
-            None,
-        );
         file.open(&vfs_file_system, &vfs_path)?;
 
         assert_eq!(file.bytes_per_sector, 512);

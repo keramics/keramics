@@ -12,11 +12,10 @@
  */
 
 use std::process::ExitCode;
-use std::rc::Rc;
 
 use clap::Parser;
 
-use keramics::vfs::{VfsPath, VfsPathType, VfsScanContext, VfsScanNode, VfsScanner};
+use keramics::vfs::{VfsPath, VfsScanContext, VfsScanNode, VfsScanner};
 
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]
@@ -28,16 +27,16 @@ struct CommandLineArguments {
 /// Prints information about a scan node.
 fn print_scan_node(scan_node: &VfsScanNode, depth: usize) {
     let indentation: String = vec![" "; depth * 4].join("");
-    let format_identifier: &str = match scan_node.path.get_path_type() {
-        VfsPathType::Apm => "APM",
-        VfsPathType::Ext => "EXT",
-        VfsPathType::Fake => "FAKE",
-        VfsPathType::Gpt => "GPT",
-        VfsPathType::Mbr => "MBR",
-        VfsPathType::Os => "OS",
-        VfsPathType::Qcow => "QCOW",
-        VfsPathType::Vhd => "VHD",
-        VfsPathType::Vhdx => "VHDX",
+    let format_identifier: &str = match &scan_node.path {
+        VfsPath::Apm { .. } => "APM",
+        VfsPath::Ext { .. } => "EXT",
+        VfsPath::Fake { .. } => "FAKE",
+        VfsPath::Gpt { .. } => "GPT",
+        VfsPath::Mbr { .. } => "MBR",
+        VfsPath::Os { .. } => "OS",
+        VfsPath::Qcow { .. } => "QCOW",
+        VfsPath::Vhd { .. } => "VHD",
+        VfsPath::Vhdx { .. } => "VHDX",
     };
     println!(
         "{}{}: location: {}",
@@ -61,7 +60,9 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, source, None);
+    let vfs_path: VfsPath = VfsPath::Os {
+        location: source.to_string(),
+    };
 
     let mut vfs_scanner: VfsScanner = VfsScanner::new();
     match vfs_scanner.build() {
@@ -72,7 +73,7 @@ fn main() -> ExitCode {
         }
     };
     let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-    match vfs_scanner.scan(&mut vfs_scan_context, &Rc::new(vfs_path)) {
+    match vfs_scanner.scan(&mut vfs_scan_context, &vfs_path) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to scan: {} with error: {}", source, error);

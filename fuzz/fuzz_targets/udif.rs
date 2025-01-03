@@ -30,6 +30,6 @@ fuzz_target!(|data: &[u8]| {
     }
     let mut udif_file: UdifFile = UdifFile::new();
 
-    let vfs_path: VfsPath = VfsPath::new(VfsPathType::Fake, "/input", None);
+    let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
     _ = udif_file.open(&Rc::new(fake_file_system), &vfs_path);
 });

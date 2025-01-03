@@ -22,7 +22,7 @@ use clap::{Parser, ValueEnum};
 use keramics::formatters::format_as_string;
 use keramics::vfs::{
     VfsDataStreamReference, VfsFileEntry, VfsFileSystem, VfsFileType, VfsFinder, VfsPath,
-    VfsPathType, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
 };
 
 mod hasher;
@@ -133,7 +133,9 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, source, None);
+            let vfs_path: VfsPath = VfsPath::Os {
+                location: source.to_string(),
+            };
 
             // TODO: add scanner options.
             // TODO: add scanner mediator.
@@ -146,7 +148,7 @@ fn main() -> ExitCode {
                 }
             };
             let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-            match vfs_scanner.scan(&mut vfs_scan_context, &Rc::new(vfs_path)) {
+            match vfs_scanner.scan(&mut vfs_scan_context, &vfs_path) {
                 Ok(_) => {}
                 Err(error) => {
                     println!("Unable to scan: {} with error: {}", source, error);

@@ -268,7 +268,7 @@ impl FormatScanner {
 mod tests {
     use super::*;
 
-    use crate::vfs::{VfsContext, VfsPath, VfsPathType};
+    use crate::vfs::{VfsContext, VfsPath};
 
     #[test]
     fn test_build() -> Result<(), BuildError> {
@@ -303,7 +303,9 @@ mod tests {
         };
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::new(VfsPathType::Os, "./test_data/qcow/ext2.qcow2", None);
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
         let vfs_data_stream: VfsDataStreamReference =
             match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
                 Some(data_stream) => data_stream,

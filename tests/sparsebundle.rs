@@ -18,7 +18,7 @@ use std::rc::Rc;
 use keramics::formats::sparsebundle::SparseBundleImage;
 use keramics::formatters::format_as_string;
 use keramics::hashes::{DigestHashContext, Md5Context};
-use keramics::vfs::{VfsContext, VfsFileSystem, VfsPath, VfsPathType};
+use keramics::vfs::{VfsContext, VfsFileSystem, VfsPath};
 
 fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
@@ -42,11 +42,9 @@ fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, Stri
 #[test]
 fn read_media() -> io::Result<()> {
     let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::new(
-        VfsPathType::Os,
-        "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist",
-        None,
-    );
+    let vfs_path: VfsPath = VfsPath::Os {
+        location: "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist".to_string(),
+    };
     let vfs_file_system: Rc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
     let mut image = SparseBundleImage::new();
