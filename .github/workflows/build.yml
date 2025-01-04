@@ -5,8 +5,13 @@ permissions: read-all
 env:
   CARGO_TERM_COLOR: always
 jobs:
-  build:
-    runs-on: ubuntu-latest
+  cargo_build:
+    strategy:
+      matrix:
+        include:
+        - os: macos-latest
+        - os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - name: Build

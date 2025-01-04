@@ -151,6 +151,7 @@ assert_availability_binary mkfs.xfs
 assert_availability_binary mkntfs
 assert_availability_binary pvcreate
 assert_availability_binary qemu-img
+assert_availability_binary setfattr
 assert_availability_binary vgchange
 assert_availability_binary vgcreate
 
@@ -179,7 +180,7 @@ mke2fs -I 128 -L ext2_test -q -t ext2 ${IMAGE_FILE}
 
 sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -195,7 +196,7 @@ mke2fs -L ext3_test -q -t ext3 ${IMAGE_FILE}
 
 sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -211,7 +212,7 @@ mke2fs -L ext4_test -q -t ext4 ${IMAGE_FILE}
 
 sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -263,7 +264,7 @@ n
 n
 2
 4096
-+1024K
++1536K
 0700
 w
 y
@@ -275,7 +276,7 @@ sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
 sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -283,13 +284,17 @@ sudo umount ${MOUNT_POINT}
 
 sudo losetup -d /dev/loop99
 
-mkntfs -F -L "ntfs_test" -p $(( 4096 * ${SECTOR_SIZE} )) -q -s ${SECTOR_SIZE} ${IMAGE_FILE} $(( 1024 * 1024 ))
+sudo losetup -o $(( 4096 * ${SECTOR_SIZE} )) --sizelimit $(( 1536 * 1024 )) /dev/loop99 ${IMAGE_FILE}
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} /dev/loop99
+
+sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
 
 create_test_file_entries ${MOUNT_POINT}
 
 sudo umount ${MOUNT_POINT}
+
+sudo losetup -d /dev/loop99
 
 # Create an empty GPT volume system and a MBR volume system with 1 partition.
 # * the partition is a primary partition with an ext2 file system.
@@ -323,7 +328,7 @@ sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
 sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -352,7 +357,7 @@ sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/test_volume_group/test_logical
 
 sudo mount -o loop,rw /dev/test_volume_group/test_logical_volume1 ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -384,7 +389,7 @@ sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/mapper/keramics_luks
 
 sudo mount -o loop,rw /dev/mapper/keramics_luks ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -418,7 +423,10 @@ e
 
 n
 
-+1024K
++1536K
+t
+5
+7
 w
 EOT
 
@@ -428,7 +436,7 @@ sudo mke2fs -I 128 -L "ext2_test" -q -t ext2 /dev/loop99
 
 sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
@@ -436,13 +444,17 @@ sudo umount ${MOUNT_POINT}
 
 sudo losetup -d /dev/loop99
 
-mkntfs -F -L "ntfs_test" -p $(( 2049 * ${SECTOR_SIZE} )) -q -s ${SECTOR_SIZE} ${IMAGE_FILE} $(( 1024 * 1024 ))
+sudo losetup -o $(( 4096 * ${SECTOR_SIZE} )) --sizelimit $(( 1536 * 1024 )) /dev/loop99 ${IMAGE_FILE}
 
-sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
+sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} /dev/loop99
+
+sudo mount -o loop,rw /dev/loop99 ${MOUNT_POINT}
 
 create_test_file_entries ${MOUNT_POINT}
 
 sudo umount ${MOUNT_POINT}
+
+sudo losetup -d /dev/loop99
 
 # Create a NTFS file system.
 IMAGE_FILE="test_data/ntfs/ntfs.raw"
@@ -452,7 +464,7 @@ mkdir -p test_data/ntfs
 
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} ${IMAGE_FILE}
+sudo mkntfs -F -L "ntfs_test" -q -s ${SECTOR_SIZE} ${IMAGE_FILE}
 
 sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
 
@@ -540,11 +552,19 @@ mkdir -p test_data/xfs
 dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
 # Note that the environment variables are necessary to allow for a XFS file system < 300 MiB.
-TEST_DEV=1; TEST_DIR=1; QA_CHECK_FS=1; mkfs.xfs -b size=4096 -i size=512 -L "xfs_test" -m bigtime=0 -q -s size=${SECTOR_SIZE} ${IMAGE_FILE}
+export TEST_DEV=1
+export TEST_DIR=1
+export QA_CHECK_FS=1
+
+mkfs.xfs -b size=4096 -i size=512 -L "xfs_test" -m bigtime=0 -q -s size=${SECTOR_SIZE} ${IMAGE_FILE}
+
+export TEST_DEV=
+export TEST_DIR=
+export QA_CHECK_FS=
 
 sudo mount -o loop,rw ${IMAGE_FILE} ${MOUNT_POINT}
 
-sudo chown ${USERNAME} ${MOUNT_POINT}
+sudo chown ${USER} ${MOUNT_POINT}
 
 create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
