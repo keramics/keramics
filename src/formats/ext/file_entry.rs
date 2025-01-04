@@ -340,14 +340,14 @@ mod tests {
     fn test_get_access_time() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
         assert_eq!(
             ext_file_entry.get_access_time(),
             Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1626962852
+                timestamp: 1735977482
             }))
         );
 
@@ -358,14 +358,14 @@ mod tests {
     fn test_get_change_time() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
         assert_eq!(
             ext_file_entry.get_change_time(),
             Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1626962852
+                timestamp: 1735977481
             }))
         );
 
@@ -376,7 +376,7 @@ mod tests {
     fn test_get_creation_time() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -389,7 +389,7 @@ mod tests {
     fn test_get_device_identifier() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -405,11 +405,11 @@ mod tests {
     fn test_get_file_mode() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        assert_eq!(ext_file_entry.get_file_mode(), 0o100664);
+        assert_eq!(ext_file_entry.get_file_mode(), 0o100644);
 
         Ok(())
     }
@@ -418,7 +418,7 @@ mod tests {
     fn test_get_group_identifier() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -431,7 +431,7 @@ mod tests {
     fn test_get_deletion_time() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -444,14 +444,14 @@ mod tests {
     fn test_get_modification_time() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
         assert_eq!(
             ext_file_entry.get_modification_time(),
             Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1626962852
+                timestamp: 1735977481
             }))
         );
 
@@ -462,11 +462,11 @@ mod tests {
     fn test_get_name() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        assert_eq!(ext_file_entry.get_name().to_string(), "passwords.txt");
+        assert_eq!(ext_file_entry.get_name().to_string(), "testfile1");
 
         Ok(())
     }
@@ -475,11 +475,11 @@ mod tests {
     fn test_get_number_of_links() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        assert_eq!(ext_file_entry.get_number_of_links(), 1);
+        assert_eq!(ext_file_entry.get_number_of_links(), 2);
 
         Ok(())
     }
@@ -488,7 +488,7 @@ mod tests {
     fn test_get_owner_identifier() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -501,11 +501,11 @@ mod tests {
     fn test_get_size() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        assert_eq!(ext_file_entry.get_size(), 116);
+        assert_eq!(ext_file_entry.get_size(), 9);
 
         Ok(())
     }
@@ -514,7 +514,7 @@ mod tests {
     fn test_get_symbolic_link_target() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -531,7 +531,7 @@ mod tests {
     fn test_get_number_of_attributes() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -547,7 +547,7 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> io::Result<()> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 

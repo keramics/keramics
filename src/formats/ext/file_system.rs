@@ -394,9 +394,9 @@ mod tests {
     fn test_get_file_entry_by_inode_number() -> io::Result<()> {
         let file_system: ExtFileSystem = get_file_system()?;
 
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_inode_number(14)?;
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_inode_number(12)?;
 
-        assert_eq!(file_entry.inode_number, 14);
+        assert_eq!(file_entry.inode_number, 12);
 
         let name: &ByteString = file_entry.get_name();
         assert!(name.is_empty());
@@ -408,15 +408,15 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/passwords.txt");
+        let ext_path: ExtPath = ExtPath::from("/emptyfile");
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(file_entry.inode_number, 12);
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
         assert_eq!(file_entry.inode_number, 14);
-
-        let ext_path: ExtPath = ExtPath::from("/a_directory/a_file");
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
-
-        assert_eq!(file_entry.inode_number, 13);
 
         let name: &ByteString = file_entry.get_name();
         assert!(!name.is_empty());

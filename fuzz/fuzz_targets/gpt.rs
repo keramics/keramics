@@ -18,7 +18,6 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::gpt::GptVolumeSystem;
-use keramics::types::SharedValue;
 use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // GUID Partition Table (GPT) volume system fuzz target.
@@ -31,5 +30,5 @@ fuzz_target!(|data: &[u8]| {
     let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
     let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = gpt_volume_system.open(&Rc::new(fake_file_system), &vfs_path);
+    _ = gpt_volume_system.open(&Arc::new(fake_file_system), &vfs_path);
 });

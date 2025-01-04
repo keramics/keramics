@@ -18,7 +18,6 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::mbr::MbrVolumeSystem;
-use keramics::types::SharedValue;
 use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // Master Boot Record (MBR) volume system fuzz target.
@@ -31,5 +30,5 @@ fuzz_target!(|data: &[u8]| {
     let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
     let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = mbr_volume_system.open(&Rc::new(fake_file_system), &vfs_path);
+    _ = mbr_volume_system.open(&Arc::new(fake_file_system), &vfs_path);
 });

@@ -382,14 +382,14 @@ mod tests {
         let os_vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/passwords.txt");
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert_eq!(
             vfs_file_entry.get_access_time(),
             Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1626962852
+                timestamp: 1735977482
             }))
         );
 
@@ -503,14 +503,14 @@ mod tests {
         let os_vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/passwords.txt");
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert_eq!(
             vfs_file_entry.get_change_time(),
             Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1626962852
+                timestamp: 1735977481
             }))
         );
 
@@ -624,7 +624,7 @@ mod tests {
         let os_vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/passwords.txt");
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1062,14 +1062,14 @@ mod tests {
         let os_vfs_path: VfsPath = VfsPath::Os {
             location: "./test_data/ext/ext2.raw".to_string(),
         };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/passwords.txt");
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Ext, "/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert_eq!(
             vfs_file_entry.get_modification_time(),
             Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1626962852
+                timestamp: 1735977481
             }))
         );
 

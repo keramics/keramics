@@ -90,7 +90,9 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "3f0e360a1211f80b3f5633a68dbe98ba");
+    // Note that the VHD has 18432 bytes of additional storage media data due to the image
+    // creation process.
+    assert_eq!(md5_hash.as_str(), "a30f111f411d3f3d567b13f0c909e58c");
 
     Ok(())
 }

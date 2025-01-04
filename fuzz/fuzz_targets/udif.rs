@@ -18,7 +18,6 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::udif::UdifFile;
-use keramics::types::SharedValue;
 use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // Universal Disk Image Format (UDIF) file fuzz target.
@@ -31,5 +30,5 @@ fuzz_target!(|data: &[u8]| {
     let mut udif_file: UdifFile = UdifFile::new();
 
     let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = udif_file.open(&Rc::new(fake_file_system), &vfs_path);
+    _ = udif_file.open(&Arc::new(fake_file_system), &vfs_path);
 });

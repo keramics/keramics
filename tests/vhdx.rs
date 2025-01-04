@@ -90,7 +90,7 @@ fn read_media_sparse_dynamic() -> io::Result<()> {
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "196066add11fb71c4c49cf1bb50d6d24");
+    assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
 
     Ok(())
 }
