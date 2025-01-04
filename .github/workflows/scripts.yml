@@ -1,0 +1,23 @@
+# Checks scripts.
+name: scripts
+on: [push, pull_request]
+permissions: read-all
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  generate_test_data_macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Generate test data
+      run: ./scripts/generate_test_data_macos.sh
+  generate_test_data_linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        sudo apt-get update &&
+        sudo apt-get install -y attr genisoimage qemu-utils
+    - name: Generate test data
+      run: ./scripts/generate_test_data_linux.sh

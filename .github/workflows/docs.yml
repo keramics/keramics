@@ -5,7 +5,7 @@ permissions: read-all
 env:
   CARGO_TERM_COLOR: always
 jobs:
-  mdbook_formats:
+  mdbook_build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4

@@ -290,7 +290,7 @@ mod tests {
         let partition: MbrPartition = volume_system.get_partition_by_index(0)?;
 
         assert_eq!(partition.offset, 512);
-        assert_eq!(partition.size, 66048);
+        assert_eq!(partition.size, 1049088);
 
         Ok(())
     }
@@ -322,8 +322,8 @@ mod tests {
         assert!(result.is_some());
 
         let partition: MbrPartition = result.unwrap();
-        assert_eq!(partition.offset, 67072);
-        assert_eq!(partition.size, 66048);
+        assert_eq!(partition.offset, 1050112);
+        assert_eq!(partition.size, 1573376);
 
         Ok(())
     }

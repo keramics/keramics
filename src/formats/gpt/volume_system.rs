@@ -336,7 +336,7 @@ mod tests {
         let partition: GptPartition = volume_system.get_partition_by_index(0)?;
 
         assert_eq!(partition.offset, 1048576);
-        assert_eq!(partition.size, 65536);
+        assert_eq!(partition.size, 1048576);
 
         Ok(())
     }
@@ -369,7 +369,7 @@ mod tests {
 
         let partition: GptPartition = result.unwrap();
         assert_eq!(partition.offset, 2097152);
-        assert_eq!(partition.size, 65536);
+        assert_eq!(partition.size, 1572864);
 
         Ok(())
     }
