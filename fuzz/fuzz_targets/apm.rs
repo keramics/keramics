@@ -18,7 +18,6 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::apm::ApmVolumeSystem;
-use keramics::types::SharedValue;
 use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // Apple Partition Map (APM) volume system fuzz target.
@@ -31,5 +30,5 @@ fuzz_target!(|data: &[u8]| {
     let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
     let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = apm_volume_system.open(&Rc::new(fake_file_system), &vfs_path);
+    _ = apm_volume_system.open(&Arc::new(fake_file_system), &vfs_path);
 });

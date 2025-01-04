@@ -18,7 +18,6 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::vhdx::VhdxFile;
-use keramics::types::SharedValue;
 use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 // Virtual Hard Disk version 2 (VHDX) file fuzz target.
@@ -31,5 +30,5 @@ fuzz_target!(|data: &[u8]| {
     let mut vhdx_file: VhdxFile = VhdxFile::new();
 
     let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = vhdx_file.open(&Rc::new(fake_file_system), &vfs_path);
+    _ = vhdx_file.open(&Arc::new(fake_file_system), &vfs_path);
 });

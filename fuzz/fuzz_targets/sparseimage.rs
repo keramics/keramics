@@ -18,7 +18,6 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics::formats::sparseimage::SparseImageFile;
-use keramics::types::SharedValue;
 use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
 
 //  Mac OS sparse image (.sparseimage) file fuzz target.
@@ -31,5 +30,5 @@ fuzz_target!(|data: &[u8]| {
     let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
     let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = sparseimage_file.open(&Rc::new(fake_file_system), &vfs_path);
+    _ = sparseimage_file.open(&Arc::new(fake_file_system), &vfs_path);
 });
