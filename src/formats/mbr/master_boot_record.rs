@@ -25,21 +25,24 @@ use super::partition_entry::MbrPartitionEntry;
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "boot_loader", data_type = "[u8; 440]"),
-        field(name = "disk_identity", data_type = "u32", format = "hex"),
-        field(name = "padding1", data_type = "[u8; 2]"),
-        field(
+        member(field(name = "boot_loader", data_type = "[u8; 440]", format = "hex")),
+        member(field(name = "disk_identity", data_type = "u32", format = "hex")),
+        member(field(name = "unknown1", data_type = "[u8; 2]")),
+        member(field(
             name = "partition_entries",
             data_type = "[Struct<MbrPartitionEntry; 16>; 4]"
-        ),
-        field(name = "boot_signature", data_type = "[u8; 2]", format = "hex"),
+        )),
+        member(field(name = "boot_signature", data_type = "[u8; 2]", format = "hex")),
     ),
     method(name = "debug_read_data"),
     method(name = "read_at_position")
 )]
 /// Master Boot Record (MBR).
 pub struct MbrMasterBootRecord {
+    /// Disk identity.
     pub disk_identity: u32,
+
+    /// Partition entries.
     pub partition_entries: VecDeque<MbrPartitionEntry>,
 }
 

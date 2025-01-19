@@ -194,12 +194,12 @@ impl<T> BlockTree<T> {
             }
             node = node.sub_nodes[sub_node_index as usize].as_ref().unwrap();
         }
-        let value_index: u64 = (offset - node.offset) / node.element_size;
+        let value_index: usize = ((offset - node.offset) / node.element_size) as usize;
 
-        if node.values[value_index as usize].is_none() {
+        if value_index >= node.values.len() || node.values[value_index].is_none() {
             return None;
         }
-        Some(node.values[value_index as usize].as_ref().unwrap())
+        Some(node.values[value_index].as_ref().unwrap())
     }
 
     /// Inserts a (leaf) value.

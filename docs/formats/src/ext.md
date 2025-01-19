@@ -400,7 +400,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | Value | Identifier | Description
 | --- | --- | ---
 | 0x00000001 | EXT2_FEATURE_INCOMPAT_COMPRESSION | Has compression, which is not yet implemented
-| 0x00000002 | EXT2_FEATURE_INCOMPAT_FILETYPE | Has directory type
+| 0x00000002 | EXT2_FEATURE_INCOMPAT_FILETYPE | Directory entry has file type
 | 0x00000004 | EXT3_FEATURE_INCOMPAT_RECOVER | Needs recovery
 | 0x00000008 | EXT3_FEATURE_INCOMPAT_JOURNAL_DEV | Has journal device
 | 0x00000010 | EXT2_FEATURE_INCOMPAT_META_BG | Has meta (or metadata) block groups

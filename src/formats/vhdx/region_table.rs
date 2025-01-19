@@ -46,9 +46,9 @@ impl VhdxRegionTable {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(VhdxRegionTableHeader::debug_read_data(&data[0..16]));
+                .debug_print(VhdxRegionTableHeader::debug_read_data(data));
         }
-        region_table_header.read_data(&data[0..16])?;
+        region_table_header.read_data(data)?;
 
         let mut data_offset: usize = 16;
 

@@ -104,6 +104,7 @@ impl StructureLayoutBitFieldsGroup {
     /// Retrieves the byte size.
     pub fn get_byte_size(&self) -> Option<usize> {
         match &self.data_type {
+            DataType::BitField8 => Some(1),
             DataType::BitField16 => Some(2),
             DataType::BitField32 => Some(4),
             DataType::BitField64 => Some(8),
@@ -118,6 +119,7 @@ impl StructureLayoutBitFieldsGroup {
         data_offset: TokenStream,
     ) -> TokenStream {
         match &self.data_type {
+            DataType::BitField8 => quote!(data[#data_offset]),
             DataType::BitField16 => match byte_order {
                 &ByteOrder::BigEndian => quote!(crate::bytes_to_u16_be!(data, #data_offset)),
                 &ByteOrder::LittleEndian => quote!(crate::bytes_to_u16_le!(data, #data_offset)),
@@ -140,6 +142,7 @@ impl StructureLayoutBitFieldsGroup {
     /// Retrieves a token stream of the type.
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
+            DataType::BitField8 => quote!(u8),
             DataType::BitField16 => quote!(u16),
             DataType::BitField32 => quote!(u32),
             DataType::BitField64 => quote!(u64),

@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::max;
 use std::collections::BTreeMap;
 use std::io;
 use std::io::Read;
@@ -29,7 +30,7 @@ use super::inline_stream::ExtInlineDataStream;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 
-/// Extended File System file entry.
+/// Extended File System (ext) file entry.
 pub struct ExtFileEntry {
     /// The data stream.
     data_stream: VfsDataStreamReference,
@@ -44,7 +45,7 @@ pub struct ExtFileEntry {
     inode: ExtInode,
 
     /// The name.
-    name: ByteString,
+    name: Option<ByteString>,
 
     /// Directory tree.
     directory_tree: BTreeMap<ByteString, ExtDirectoryEntry>,
@@ -63,7 +64,7 @@ impl ExtFileEntry {
         inode_table: &Rc<ExtInodeTable>,
         inode_number: u32,
         inode: ExtInode,
-        name: ByteString,
+        name: Option<ByteString>,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -133,8 +134,8 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> &ByteString {
-        &self.name
+    pub fn get_name(&self) -> Option<&ByteString> {
+        self.name.as_ref()
     }
 
     /// Retrieves the number of links.
@@ -175,9 +176,19 @@ impl ExtFileEntry {
             let byte_string: ByteString = if self.inode.data_size < 60 {
                 ByteString::from_bytes(&self.inode.data_reference)
             } else {
+                let number_of_blocks: u64 = max(
+                    self.inode
+                        .data_size
+                        .div_ceil(self.inode_table.block_size as u64),
+                    self.inode.number_of_blocks,
+                );
                 let mut block_stream: ExtBlockStream =
                     ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-                block_stream.open(&self.data_stream, &self.inode.block_ranges)?;
+                block_stream.open(
+                    &self.data_stream,
+                    number_of_blocks,
+                    &self.inode.block_ranges,
+                )?;
 
                 let mut data: Vec<u8> = vec![0; self.inode.data_size as usize];
                 block_stream.read_exact(&mut data)?;
@@ -231,7 +242,7 @@ impl ExtFileEntry {
             &self.inode_table,
             directory_entry.inode_number,
             inode,
-            name.clone(),
+            Some(name.clone()),
         );
         Ok(file_entry)
     }
@@ -260,7 +271,7 @@ impl ExtFileEntry {
             &self.inode_table,
             directory_entry.inode_number,
             inode,
-            name.clone(),
+            Some(name.clone()),
         );
         Ok(Some(file_entry))
     }
@@ -280,9 +291,19 @@ impl ExtFileEntry {
 
             return Ok(Some(SharedValue::new(Box::new(inline_stream))));
         }
+        let number_of_blocks: u64 = max(
+            self.inode
+                .data_size
+                .div_ceil(self.inode_table.block_size as u64),
+            self.inode.number_of_blocks,
+        );
         let mut block_stream: ExtBlockStream =
             ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-        block_stream.open(&self.data_stream, &self.inode.block_ranges)?;
+        block_stream.open(
+            &self.data_stream,
+            number_of_blocks,
+            &self.inode.block_ranges,
+        )?;
 
         Ok(Some(SharedValue::new(Box::new(block_stream))))
     }
@@ -466,7 +487,8 @@ mod tests {
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        assert_eq!(ext_file_entry.get_name().to_string(), "testfile1");
+        let name: &ByteString = ext_file_entry.get_name().unwrap();
+        assert_eq!(name.to_string(), "testfile1");
 
         Ok(())
     }

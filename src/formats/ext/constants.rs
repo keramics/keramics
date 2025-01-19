@@ -48,5 +48,5 @@ pub const EXT_FILE_MODE_TYPE_REGULAR_FILE: u16 = 0x8000;
 pub const EXT_FILE_MODE_TYPE_SYMBOLIC_LINK: u16 = 0xa000;
 pub const EXT_FILE_MODE_TYPE_SOCKET: u16 = 0xc000;
 
-/// ext root directory inode number.
-pub(super) const EXT_INODE_NUMBER_ROOT_DIRECTORY: u32 = 2;
+/// ext root directory identifier (inode number).
+pub(super) const EXT_ROOT_DIRECTORY_IDENTIFIER: u32 = 2;

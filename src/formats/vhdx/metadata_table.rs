@@ -45,9 +45,9 @@ impl VhdxMetadataTable {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(VhdxMetadataTableHeader::debug_read_data(&data[0..32]));
+                .debug_print(VhdxMetadataTableHeader::debug_read_data(data));
         }
-        metadata_table_header.read_data(&data[0..32])?;
+        metadata_table_header.read_data(data)?;
 
         let mut data_offset: usize = 32;
 

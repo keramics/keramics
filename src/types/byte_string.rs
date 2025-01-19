@@ -18,6 +18,7 @@ pub struct ByteString {
     pub elements: Vec<u8>,
 }
 
+// TODO: add support for encoding.
 impl ByteString {
     /// Creates a new byte string.
     pub fn new() -> Self {
@@ -32,6 +33,12 @@ impl ByteString {
         ByteString::read_elements(&mut elements, data);
 
         Self { elements: elements }
+    }
+
+    /// Creates a new byte string from a string.
+    pub fn from_string(string: &str) -> Self {
+        // TODO: add support for encoding.
+        ByteString::from_bytes(string.as_bytes())
     }
 
     /// Determines if the byte string is empty.
@@ -59,7 +66,7 @@ impl ByteString {
 
     /// Retrieves the string representation of the byte string.
     pub fn to_string(&self) -> String {
-        // TODO: add code page support
+        // TODO: add support for encoding.
         String::from_utf8(self.elements.to_vec()).unwrap()
     }
 }
@@ -70,16 +77,51 @@ mod tests {
 
     #[test]
     fn test_from_bytes() {
-        let test_data: [u8; 12] = [
+        let test_data: [u8; 14] = [
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from_bytes(&test_data);
+
+        let expected_elements: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
         ];
-
-        let byte_string: ByteString = ByteString::from_bytes(&test_data);
-        assert_eq!(byte_string.to_string(), "ASCII string".to_string(),);
+        assert_eq!(byte_string.elements, expected_elements);
     }
 
-    // TODO: add test for is_empty
-    // TODO: add test for len
+    #[test]
+    fn test_from_string() {
+        let byte_string: ByteString = ByteString::from_string("ASCII string");
+
+        let expected_elements: Vec<u8> = vec![
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+        ];
+        assert_eq!(byte_string.elements, expected_elements);
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let byte_string: ByteString = ByteString::new();
+        assert!(byte_string.is_empty());
+
+        let test_data: [u8; 14] = [
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from_bytes(&test_data);
+        assert!(!byte_string.is_empty());
+    }
+
+    #[test]
+    fn test_len() {
+        let byte_string: ByteString = ByteString::new();
+        assert_eq!(byte_string.len(), 0);
+
+        let test_data: [u8; 14] = [
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from_bytes(&test_data);
+        assert_eq!(byte_string.len(), 12);
+    }
+
     // TODO: add test for read_elements
     // TODO: add test for to_string
 }

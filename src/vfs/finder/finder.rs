@@ -84,7 +84,10 @@ impl<'a> Iterator for VfsFinder<'a> {
                                 Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
                                 Err(error) => return Some(Err(error)),
                             };
-                        self.path_components.push(file_entry.get_name());
+                        match file_entry.get_name() {
+                            Some(name) => self.path_components.push(name),
+                            None => self.path_components.push(String::new()),
+                        };
                         self.states
                             .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
                     }
@@ -115,7 +118,10 @@ impl<'a> Iterator for VfsFinder<'a> {
                             Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
                             Err(error) => return Some(Err(error)),
                         };
-                    self.path_components.push(file_entry.get_name());
+                    match file_entry.get_name() {
+                        Some(name) => self.path_components.push(name),
+                        None => self.path_components.push(String::new()),
+                    };
                     self.states
                         .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
                 }

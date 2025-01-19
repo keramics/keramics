@@ -102,7 +102,6 @@ impl ExtInodeTable {
         data_stream: &VfsDataStreamReference,
         inode_number: u32,
     ) -> io::Result<ExtInode> {
-        let inode_size: usize = self.inode_size as usize;
         let inode_table_offset: u64 = (inode_number as u64) * (self.inode_size as u64);
 
         let group_descriptor: &ExtGroupDescriptor =
@@ -120,6 +119,7 @@ impl ExtInodeTable {
         let mut inode_data_offset: u64 = (inode_group_index as u64) * (self.inode_size as u64);
         inode_data_offset += group_descriptor.inode_table_block_number * (self.block_size as u64);
 
+        let inode_size: usize = self.inode_size as usize;
         let mut data: Vec<u8> = vec![0; inode_size];
 
         match data_stream.with_write_lock() {

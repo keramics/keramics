@@ -11,11 +11,11 @@
  * under the License.
  */
 
-/// APM partition map signature.
+/// APM partition map signature: "PM".
 pub(super) const APM_PARTITION_MAP_SIGNATURE: [u8; 2] = [0x50, 0x4d];
 
-/// APM partition map partition type.
+/// APM partition map partition type: "Apple_partition_map".
 pub(super) const APM_PARTITION_MAP_TYPE: [u8; 19] = [
     0x41, 0x70, 0x70, 0x6c, 0x65, 0x5f, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f, 0x6e, 0x5f,
     0x6d, 0x61, 0x70,
-]; // "Apple_partition_map"
+];

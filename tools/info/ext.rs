@@ -144,7 +144,9 @@ fn print_ext_incompatible_feature_flags(flags: u32) {
         println!("        0x00000001: Has compression (EXT2_FEATURE_INCOMPAT_COMPRESSION)");
     }
     if flags & 0x00000002 != 0 {
-        println!("        0x00000002: Has directory type (EXT2_FEATURE_INCOMPAT_FILETYPE)");
+        println!(
+            "        0x00000002: Directory entry has file type (EXT2_FEATURE_INCOMPAT_FILETYPE)"
+        );
     }
     if flags & 0x00000004 != 0 {
         println!("        0x00000004: Needs recovery (EXT3_FEATURE_INCOMPAT_RECOVER)");
@@ -269,10 +271,9 @@ pub fn print_ext_file_system(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &Vf
     let format_version: u8 = ext_file_system.get_format_version();
     println!("    Format version\t\t\t: ext{}", format_version);
 
-    println!(
-        "    Volume label\t\t\t: {}",
-        ext_file_system.volume_label.to_string()
-    );
+    let volume_label: &ByteString = ext_file_system.get_volume_label();
+    println!("    Volume label\t\t\t: {}", volume_label.to_string());
+
     let feature_flags: u32 = ext_file_system.get_compatible_feature_flags();
     println!("    Compatible features\t\t\t: 0x{:08x}", feature_flags);
     print_ext_compatible_feature_flags(feature_flags);
@@ -319,15 +320,14 @@ pub fn print_ext_file_system(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &Vf
     ExitCode::SUCCESS
 }
 
-/// Prints information about an Extended File System (ext) entry.
+/// Prints information about an Extended File System (ext) file entry.
 fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
     println!("    Inode number\t\t\t: {}", file_entry.inode_number);
 
-    let name_byte_string: &ByteString = file_entry.get_name();
-    let name_string: String = name_byte_string.to_string();
-    if name_string != "" {
-        println!("    Name\t\t\t\t: {}", name_string);
-    }
+    match file_entry.get_name() {
+        Some(name) => println!("    Name\t\t\t\t: {}", name.to_string()),
+        None => {}
+    };
     println!("    Size\t\t\t\t: {}", file_entry.get_size());
 
     match file_entry.get_modification_time() {
@@ -412,7 +412,7 @@ fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
     Ok(())
 }
 
-/// Calculates the MD5 of the data of an Extended File System (ext) entry.
+/// Calculates the MD5 of the data of an Extended File System (ext) file entry.
 fn calculate_md5(data_stream: &mut Box<dyn VfsDataStream>) -> io::Result<String> {
     let mut data: Vec<u8> = vec![0; 65536];
     let mut md5_context: Md5Context = Md5Context::new();
@@ -428,7 +428,7 @@ fn calculate_md5(data_stream: &mut Box<dyn VfsDataStream>) -> io::Result<String>
     Ok(format_as_string(&hash_value))
 }
 
-/// Prints information about an Extended File System (ext) entry in bodyfile format.
+/// Prints information about an Extended File System (ext) file entry in bodyfile format.
 fn print_ext_file_entry_bodyfile(
     file_entry: &mut ExtFileEntry,
     path_segments: &mut Vec<String>,
@@ -451,8 +451,10 @@ fn print_ext_file_entry_bodyfile(
     let path: String = if file_entry.inode_number == 2 {
         String::from("/")
     } else {
-        let name_byte_string: &ByteString = file_entry.get_name();
-        let name_string: String = name_byte_string.to_string();
+        let name_string: String = match file_entry.get_name() {
+            Some(name) => name.to_string(),
+            None => String::new(),
+        };
         path_segments.push(name_string);
         format!("/{}", path_segments.join("/"))
     };
@@ -489,7 +491,7 @@ fn print_ext_file_entry_bodyfile(
     Ok(())
 }
 
-/// Prints path of an Extended File System (ext) entry.
+/// Prints path of an Extended File System (ext) file entry.
 fn print_ext_file_entry_path(
     file_entry: &ExtFileEntry,
     path_segments: &mut Vec<String>,
@@ -497,8 +499,10 @@ fn print_ext_file_entry_path(
     let path: String = if file_entry.inode_number == 2 {
         String::from("/")
     } else {
-        let name_byte_string: &ByteString = file_entry.get_name();
-        let name_string: String = name_byte_string.to_string();
+        let name_string: String = match file_entry.get_name() {
+            Some(name) => name.to_string(),
+            None => String::new(),
+        };
         path_segments.push(name_string);
         format!("/{}", path_segments.join("/"))
     };
@@ -530,7 +534,7 @@ pub fn print_entry_ext_file_system(
         return ExitCode::FAILURE;
     }
     let mut file_entry: ExtFileEntry =
-        match ext_file_system.get_file_entry_by_inode_number(ext_entry_identifier as u32) {
+        match ext_file_system.get_file_entry_by_identifier(ext_entry_identifier as u32) {
             Ok(file_entry) => file_entry,
             Err(error) => {
                 println!(

@@ -46,7 +46,7 @@ impl VhdxMetadataTableHeader {
 
     /// Reads the metadata table header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
-        if data.len() != 32 {
+        if data.len() < 32 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("Unsupported data size"),

@@ -93,6 +93,15 @@ impl ExtBlockNumbersTree {
                 3,
             )?;
         }
+        if logical_block_number < self.number_of_blocks {
+            let block_range: ExtBlockRange = ExtBlockRange::new(
+                logical_block_number,
+                0,
+                self.number_of_blocks - logical_block_number,
+                ExtBlockRangeType::Sparse,
+            );
+            block_ranges.push(block_range);
+        }
         Ok(())
     }
 
@@ -127,7 +136,7 @@ impl ExtBlockNumbersTree {
                         io::SeekFrom::Start(sub_node_offset),
                         logical_block_number,
                         block_ranges,
-                        depth - 1,
+                        depth,
                     )?;
                 }
             }
@@ -214,7 +223,7 @@ impl ExtBlockNumbersTree {
             data_stream,
             logical_block_number,
             block_ranges,
-            depth,
+            depth - 1,
         )
     }
 }

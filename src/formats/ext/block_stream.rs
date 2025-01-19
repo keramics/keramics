@@ -53,10 +53,10 @@ impl ExtBlockStream {
     pub(super) fn open(
         &mut self,
         data_stream: &VfsDataStreamReference,
+        number_of_blocks: u64,
         block_ranges: &Vec<ExtBlockRange>,
     ) -> io::Result<()> {
-        let block_tree_data_size: u64 =
-            self.size.div_ceil(16384) * 16384 * (self.block_size as u64);
+        let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
         self.block_tree =
             BlockTree::<ExtBlockRange>::new(block_tree_data_size, 16384, self.block_size as u64);
         for block_range in block_ranges.iter() {

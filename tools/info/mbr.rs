@@ -129,8 +129,10 @@ pub fn print_mbr_volume_system(
     ]);
     println!("Master Boot Record (MBR) information:");
 
-    // TODO: print disk identity
-
+    println!(
+        "    Disk identity\t\t\t: 0x{:x}",
+        mbr_volume_system.disk_identity
+    );
     println!(
         "    Bytes per sector\t\t\t: {} bytes",
         mbr_volume_system.bytes_per_sector

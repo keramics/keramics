@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::max;
 use std::collections::BTreeMap;
 use std::io;
 
@@ -499,9 +500,16 @@ impl ExtInode {
                 // The major and minor device numbers are stored in self.data_reference
             }
             _ => {
+                // Note that the number of blocks stored in the inode does not always contain
+                // the total number of blocks e.g. when the inode has leading sparse data.
+                let number_of_blocks: u64 = max(
+                    self.data_size.div_ceil(block_size as u64),
+                    self.number_of_blocks,
+                );
+
                 if format_version == 4 && self.flags & EXT_INODE_FLAG_HAS_EXTENTS != 0 {
                     let mut extents_tree: ExtExtentsTree =
-                        ExtExtentsTree::new(block_size, self.number_of_blocks);
+                        ExtExtentsTree::new(block_size, number_of_blocks);
                     extents_tree.read_data_reference(
                         &self.data_reference,
                         data_stream,
@@ -509,7 +517,7 @@ impl ExtInode {
                     )?;
                 } else {
                     let mut block_numbers_tree: ExtBlockNumbersTree =
-                        ExtBlockNumbersTree::new(block_size, self.number_of_blocks);
+                        ExtBlockNumbersTree::new(block_size, number_of_blocks);
                     block_numbers_tree.read_data_reference(
                         &self.data_reference,
                         data_stream,
