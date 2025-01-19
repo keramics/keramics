@@ -36,6 +36,9 @@ pub struct MbrVolumeSystem {
     /// First extended boot record offset.
     first_extended_boot_record_offset: u64,
 
+    /// Disk identity.
+    pub disk_identity: u32,
+
     /// Partition entries.
     partition_entries: Vec<MbrPartitionEntry>,
 }
@@ -49,6 +52,7 @@ impl MbrVolumeSystem {
             data_stream: SharedValue::none(),
             bytes_per_sector: 0,
             first_extended_boot_record_offset: 0,
+            disk_identity: 0,
             partition_entries: Vec::new(),
         }
     }
@@ -202,6 +206,8 @@ impl MbrVolumeSystem {
 
             self.read_extended_boot_record(extended_boot_record_offset, 4)?;
         }
+        self.disk_identity = master_boot_record.disk_identity;
+
         Ok(())
     }
 

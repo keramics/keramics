@@ -199,10 +199,13 @@ impl VfsFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&mut self) -> String {
+    pub fn get_name(&mut self) -> Option<String> {
         match self {
             VfsFileEntry::Apm(_) => todo!(),
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_name().to_string(),
+            VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
+                Some(name) => Some(name.to_string()),
+                None => None,
+            },
             VfsFileEntry::Fake(fake_file_entry) => todo!(),
             VfsFileEntry::Gpt(_) => todo!(),
             VfsFileEntry::Mbr(_) => todo!(),

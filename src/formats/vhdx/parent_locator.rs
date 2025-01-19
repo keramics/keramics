@@ -41,16 +41,16 @@ impl VhdxParentLocator {
 
     /// Reads the parent locator from a buffer.
     fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
-        let data_size: usize = data.len();
         let mut parent_locator_header: VhdxParentLocatorHeader = VhdxParentLocatorHeader::new();
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(VhdxParentLocatorHeader::debug_read_data(&data[0..20]));
+                .debug_print(VhdxParentLocatorHeader::debug_read_data(data));
         }
-        parent_locator_header.read_data(&data[0..20])?;
+        parent_locator_header.read_data(data)?;
 
         let mut data_offset: usize = 20;
+        let data_size: usize = data.len();
 
         for parent_locator_entry_index in 0..parent_locator_header.number_of_entries {
             let data_end_offset: usize = data_offset + 12;
@@ -164,10 +164,14 @@ impl VhdxParentLocator {
         data_size: u32,
         position: io::SeekFrom,
     ) -> io::Result<()> {
+        // Note that 65536 is an arbitrary chosen limit.
         if data_size < 20 || data_size > 65536 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported parent locator data size"),
+                format!(
+                    "Unsupported parent locator data size: {} value out of bounds",
+                    data_size
+                ),
             ));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
@@ -190,6 +194,8 @@ impl VhdxParentLocator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::vfs::{new_fake_data_stream, VfsDataStreamReference};
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -271,5 +277,18 @@ mod tests {
     // TODO: add test_read_data with invalid value data offset
     // TODO: add test_read_data with invalid key data size
     // TODO: add test_read_data with invalid value data size
-    // TODO: add test_read_at_position
+
+    #[test]
+    fn test_read_at_position() -> io::Result<()> {
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_size: u32 = test_data.len() as u32;
+        let data_stream: VfsDataStreamReference = new_fake_data_stream(test_data);
+
+        let mut test_struct = VhdxParentLocator::new();
+        test_struct.read_at_position(&data_stream, test_data_size, io::SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.entries.len(), 5);
+
+        Ok(())
+    }
 }

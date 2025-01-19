@@ -54,7 +54,7 @@ pub struct ExtFileSystem {
     metadata_checksum_seed: u32,
 
     /// Volume label.
-    pub volume_label: ByteString,
+    volume_label: ByteString,
 
     /// Last mount path.
     pub last_mount_path: ByteString,
@@ -104,8 +104,13 @@ impl ExtFileSystem {
         self.features.read_only_compatible_feature_flags
     }
 
-    /// Retrieves the file entry for a specific inode number.
-    pub fn get_file_entry_by_inode_number(&self, inode_number: u32) -> io::Result<ExtFileEntry> {
+    /// Retrieves the volume label.
+    pub fn get_volume_label(&self) -> &ByteString {
+        &self.volume_label
+    }
+
+    /// Retrieves the file entry for a specific identifier (inode number).
+    pub fn get_file_entry_by_identifier(&self, inode_number: u32) -> io::Result<ExtFileEntry> {
         if self.features.is_unsupported() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -122,13 +127,12 @@ impl ExtFileSystem {
             .inode_table
             .get_inode(&self.data_stream, inode_number)?;
 
-        let name: ByteString = ByteString::new();
         let file_entry: ExtFileEntry = ExtFileEntry::new(
             &self.data_stream,
             &self.inode_table,
             inode_number,
             inode,
-            name,
+            None,
         );
         Ok(file_entry)
     }
@@ -152,7 +156,7 @@ impl ExtFileSystem {
 
     /// Retrieves the root directory (file entry).
     pub fn get_root_directory(&self) -> io::Result<ExtFileEntry> {
-        self.get_file_entry_by_inode_number(EXT_INODE_NUMBER_ROOT_DIRECTORY)
+        self.get_file_entry_by_identifier(EXT_ROOT_DIRECTORY_IDENTIFIER)
     }
 
     /// Opens a file system.
@@ -365,6 +369,8 @@ impl ExtFileSystem {
                 ));
             }
         };
+        // TODO: sanity check self.number_of_inodes and size of inode table.
+
         Ok(())
     }
 }
@@ -391,15 +397,15 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_inode_number() -> io::Result<()> {
+    fn test_get_file_entry_by_identifier() -> io::Result<()> {
         let file_system: ExtFileSystem = get_file_system()?;
 
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_inode_number(12)?;
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(12)?;
 
         assert_eq!(file_entry.inode_number, 12);
 
-        let name: &ByteString = file_entry.get_name();
-        assert!(name.is_empty());
+        let name: Option<&ByteString> = file_entry.get_name();
+        assert!(name.is_none());
 
         Ok(())
     }
@@ -418,8 +424,8 @@ mod tests {
 
         assert_eq!(file_entry.inode_number, 14);
 
-        let name: &ByteString = file_entry.get_name();
-        assert!(!name.is_empty());
+        let name: &ByteString = file_entry.get_name().unwrap();
+        assert_eq!(name.to_string(), "testfile1");
 
         Ok(())
     }

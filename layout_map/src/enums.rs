@@ -29,6 +29,7 @@ pub enum ByteOrder {
 
 #[derive(Default, PartialEq)]
 pub enum DataType {
+    BitField8,
     BitField16,
     BitField32,
     BitField64,
@@ -56,6 +57,7 @@ pub enum DataType {
 impl Clone for DataType {
     fn clone(&self) -> DataType {
         match self {
+            DataType::BitField8 => DataType::BitField8,
             DataType::BitField16 => DataType::BitField16,
             DataType::BitField32 => DataType::BitField32,
             DataType::BitField64 => DataType::BitField64,

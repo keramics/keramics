@@ -58,8 +58,27 @@ impl Ucs2String {
         Self { elements: elements }
     }
 
+    /// Creates a new UCS-2 string from a string.
+    pub fn from_string(string: &str) -> Self {
+        // TODO: add support for escaped non UTF-16 characters.
+        let elements: Vec<u16> = string.encode_utf16().collect();
+
+        Self { elements: elements }
+    }
+
+    /// Determines if the UCS-2 string is empty.
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
+    }
+
+    /// Retrieves the length (or size) of the UCS-2 string.
+    pub fn len(&self) -> usize {
+        self.elements.len()
+    }
+
     /// Retrieves the string representation of an UCS-2 string.
     pub fn to_string(&self) -> String {
+        // TODO: escape the escape character (\)
         self.elements
             .iter()
             .map(|element| match char::from_u32(*element as u32) {
@@ -77,12 +96,12 @@ mod tests {
 
     #[test]
     fn test_from_be_bytes() {
-        let test_data: [u8; 24] = [
+        let test_data: [u8; 28] = [
             0x00, 0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73,
-            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67,
+            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00,
         ];
-
         let ucs2_string: Ucs2String = Ucs2String::from_be_bytes(&test_data);
+
         let expected_elements: Vec<u16> = vec![
             0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
             0x0067,
@@ -92,17 +111,43 @@ mod tests {
 
     #[test]
     fn test_from_le_bytes() {
-        let test_data: [u8; 24] = [
+        let test_data: [u8; 28] = [
             0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73, 0x00,
-            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
+            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-
         let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+
         let expected_elements: Vec<u16> = vec![
             0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
             0x0067,
         ];
         assert_eq!(&ucs2_string.elements, &expected_elements);
+    }
+
+    #[test]
+    fn test_is_empty() {
+        let ucs2_string: Ucs2String = Ucs2String::new();
+        assert!(ucs2_string.is_empty());
+
+        let test_data: [u8; 28] = [
+            0x00, 0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73,
+            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        assert!(!ucs2_string.is_empty());
+    }
+
+    #[test]
+    fn test_len() {
+        let ucs2_string: Ucs2String = Ucs2String::new();
+        assert_eq!(ucs2_string.len(), 0);
+
+        let test_data: [u8; 28] = [
+            0x00, 0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73,
+            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00,
+        ];
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        assert_eq!(ucs2_string.len(), 12);
     }
 
     #[test]

@@ -51,10 +51,25 @@ impl ExtExtentsTree {
         data_stream: &VfsDataStreamReference,
         block_ranges: &mut Vec<ExtBlockRange>,
     ) -> io::Result<()> {
-        self.read_node_data(data_reference, data_stream, block_ranges, 6)?;
+        let mut logical_block_number: u64 = 0;
 
-        // TODO add sparse extent
+        self.read_node_data(
+            data_reference,
+            data_stream,
+            &mut logical_block_number,
+            block_ranges,
+            6,
+        )?;
 
+        if logical_block_number < self.number_of_blocks {
+            let block_range: ExtBlockRange = ExtBlockRange::new(
+                logical_block_number,
+                0,
+                self.number_of_blocks - logical_block_number,
+                ExtBlockRangeType::Sparse,
+            );
+            block_ranges.push(block_range);
+        }
         Ok(())
     }
 
@@ -63,6 +78,7 @@ impl ExtExtentsTree {
         &mut self,
         data: &[u8],
         data_stream: &VfsDataStreamReference,
+        logical_block_number: &mut u64,
         block_ranges: &mut Vec<ExtBlockRange>,
         parent_depth: u16,
     ) -> io::Result<()> {
@@ -105,6 +121,7 @@ impl ExtExtentsTree {
                 self.read_node_at_position(
                     data_stream,
                     io::SeekFrom::Start(sub_node_offset),
+                    logical_block_number,
                     block_ranges,
                     extents_header.depth,
                 )?;
@@ -136,6 +153,9 @@ impl ExtExtentsTree {
                     range_type,
                 );
                 block_ranges.push(block_range);
+
+                *logical_block_number =
+                    (entry.logical_block_number as u64) + (entry.number_of_blocks as u64);
             }
         }
         if data_size - data_offset >= 4 {
@@ -157,6 +177,7 @@ impl ExtExtentsTree {
         &mut self,
         data_stream: &VfsDataStreamReference,
         position: io::SeekFrom,
+        logical_block_number: &mut u64,
         block_ranges: &mut Vec<ExtBlockRange>,
         parent_depth: u16,
     ) -> io::Result<()> {
@@ -173,7 +194,13 @@ impl ExtExtentsTree {
             ));
             self.mediator.debug_print_data(&data, true);
         }
-        self.read_node_data(&data, data_stream, block_ranges, parent_depth)
+        self.read_node_data(
+            &data,
+            data_stream,
+            logical_block_number,
+            block_ranges,
+            parent_depth,
+        )
     }
 }
 

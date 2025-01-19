@@ -69,7 +69,7 @@ impl From<&str> for ExtPath {
         } else {
             string
                 .split("/")
-                .map(|component| ByteString::from_bytes(component.as_bytes()))
+                .map(|component| ByteString::from_string(component))
                 .collect::<Vec<ByteString>>()
         };
         ExtPath {
@@ -104,7 +104,7 @@ impl From<&Vec<&str>> for ExtPath {
         components.append(
             &mut path_components
                 .iter()
-                .map(|component| ByteString::from_bytes(component.as_bytes()))
+                .map(|component| ByteString::from_string(component))
                 .collect::<Vec<ByteString>>(),
         );
         ExtPath {
@@ -121,7 +121,7 @@ impl From<&Vec<String>> for ExtPath {
         components.append(
             &mut path_components
                 .iter()
-                .map(|component| ByteString::from_bytes(component.as_bytes()))
+                .map(|component| ByteString::from_string(component))
                 .collect::<Vec<ByteString>>(),
         );
         ExtPath {
