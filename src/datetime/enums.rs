@@ -11,11 +11,12 @@
  * under the License.
  */
 
+use super::filetime::Filetime;
 use super::posix::{PosixTime32, PosixTime64Ns};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum DateTime {
-    Filetime,
+    Filetime(Filetime),
     #[default]
     NotSet,
     PosixTime32(PosixTime32),

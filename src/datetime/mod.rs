@@ -14,8 +14,10 @@
 pub mod constants;
 mod enums;
 mod epoch;
+mod filetime;
 mod posix;
 mod util;
 
 pub use enums::DateTime;
+pub use filetime::Filetime;
 pub use posix::{PosixTime32, PosixTime64Ns};

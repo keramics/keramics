@@ -130,16 +130,16 @@ mod tests {
     fn test_posix_time32_from_be_bytes() {
         let test_data: [u8; 4] = [0x67, 0x54, 0x0d, 0xd9];
 
-        let posix_time: PosixTime32 = PosixTime32::from_be_bytes(&test_data);
-        assert_eq!(posix_time.timestamp, 1733561817);
+        let test_struct: PosixTime32 = PosixTime32::from_be_bytes(&test_data);
+        assert_eq!(test_struct.timestamp, 1733561817);
     }
 
     #[test]
     fn test_posix_time32_from_le_bytes() {
         let test_data: [u8; 4] = [0xd9, 0x0d, 0x54, 0x67];
 
-        let posix_time: PosixTime32 = PosixTime32::from_le_bytes(&test_data);
-        assert_eq!(posix_time.timestamp, 1733561817);
+        let test_struct: PosixTime32 = PosixTime32::from_le_bytes(&test_data);
+        assert_eq!(test_struct.timestamp, 1733561817);
     }
 
     #[test]
