@@ -132,6 +132,7 @@ impl FieldOptions {
             number_of_elements_str = number_of_elements_str.trim();
         }
         let data_type: DataType = match data_type_str {
+            "Filetime" => DataType::Filetime,
             "i8" | "int8" | "SignedInteger8Bit" => DataType::SignedInteger8Bit,
             "i16" | "int16" | "SignedInteger16Bit" => DataType::SignedInteger16Bit,
             "i32" | "int32" | "SignedInteger32Bit" => DataType::SignedInteger32Bit,

@@ -71,17 +71,17 @@ impl ExtDirectoryEntry {
         Ok(())
     }
 
-    /// Reads the directory entry name from a buffer.
+    /// Reads the name from a buffer.
     pub fn read_name(&self, data: &[u8]) -> io::Result<ByteString> {
         let data_end_offset: usize = self.name_size as usize;
 
-        if data.len() < data_end_offset {
+        if data_end_offset > data.len() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("Unsupported data size"),
             ));
         }
-        let name: ByteString = ByteString::from_bytes(&data[0..self.name_size as usize]);
+        let name: ByteString = ByteString::from_bytes(&data[0..data_end_offset]);
 
         Ok(name)
     }

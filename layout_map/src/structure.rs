@@ -204,12 +204,13 @@ impl StructureLayoutField {
     pub fn get_byte_size(&self) -> Option<usize> {
         match &self.data_type {
             DataType::ByteString => Some(1),
+            DataType::Filetime => Some(8),
+            DataType::PosixTime32 => Some(4),
             DataType::SignedInteger8Bit => Some(1),
             DataType::SignedInteger16Bit => Some(2),
             DataType::SignedInteger32Bit => Some(4),
             DataType::SignedInteger64Bit => Some(8),
             DataType::Struct { size, .. } => Some(*size),
-            DataType::PosixTime32 => Some(4),
             DataType::Ucs2String => Some(2),
             DataType::Utf16String => Some(2),
             DataType::UnsignedInteger8Bit => Some(1),
@@ -368,6 +369,18 @@ impl StructureLayoutField {
         data_offset: TokenStream,
     ) -> TokenStream {
         match &self.data_type {
+            DataType::Filetime => {
+                quote!(crate::datetime::Filetime::from_bytes(&data[#data_offset..#data_offset + 8]))
+            }
+            DataType::PosixTime32 => match byte_order {
+                &ByteOrder::BigEndian => {
+                    quote!(crate::datetime::PosixTime32::from_be_bytes(&data[#data_offset..#data_offset + 4]))
+                }
+                &ByteOrder::LittleEndian => {
+                    quote!(crate::datetime::PosixTime32::from_le_bytes(&data[#data_offset..#data_offset + 4]))
+                }
+                _ => panic!("Unsupported byte order"),
+            },
             DataType::SignedInteger8Bit | DataType::UnsignedInteger8Bit => {
                 quote!(data[#data_offset])
             }
@@ -384,15 +397,6 @@ impl StructureLayoutField {
             DataType::SignedInteger64Bit => match byte_order {
                 &ByteOrder::BigEndian => quote!(crate::bytes_to_i64_be!(data, #data_offset)),
                 &ByteOrder::LittleEndian => quote!(crate::bytes_to_i64_le!(data, #data_offset)),
-                _ => panic!("Unsupported byte order"),
-            },
-            DataType::PosixTime32 => match byte_order {
-                &ByteOrder::BigEndian => {
-                    quote!(crate::datetime::PosixTime32::from_be_bytes(&data[#data_offset..#data_offset + 4]))
-                }
-                &ByteOrder::LittleEndian => {
-                    quote!(crate::datetime::PosixTime32::from_le_bytes(&data[#data_offset..#data_offset + 4]))
-                }
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger16Bit => match byte_order {
@@ -438,6 +442,7 @@ impl StructureLayoutField {
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
             DataType::ByteString => quote!(crate::types::ByteString),
+            DataType::Filetime => quote!(crate::datetime::Filetime),
             DataType::PosixTime32 => quote!(crate::datetime::PosixTime32),
             DataType::SignedInteger8Bit => quote!(i8),
             DataType::SignedInteger16Bit => quote!(i16),
