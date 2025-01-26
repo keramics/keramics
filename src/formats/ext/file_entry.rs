@@ -47,11 +47,11 @@ pub struct ExtFileEntry {
     /// The name.
     name: Option<ByteString>,
 
-    /// Directory tree.
-    directory_tree: BTreeMap<ByteString, ExtDirectoryEntry>,
+    /// Directory entries.
+    directory_entries: BTreeMap<ByteString, ExtDirectoryEntry>,
 
-    /// Value to indicate the directory was read.
-    read_directory_tree: bool,
+    /// Value to indicate the directory entries were read.
+    read_directory_entries: bool,
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
@@ -72,8 +72,8 @@ impl ExtFileEntry {
             inode_number: inode_number,
             inode: inode,
             name: name,
-            directory_tree: BTreeMap::new(),
-            read_directory_tree: false,
+            directory_entries: BTreeMap::new(),
+            read_directory_entries: false,
             symbolic_link_target: None,
         }
     }
@@ -209,10 +209,10 @@ impl ExtFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
-        if !self.read_directory_tree {
-            self.read_directory_tree()?;
+        if !self.read_directory_entries {
+            self.read_directory_entries()?;
         }
-        Ok(self.directory_tree.len())
+        Ok(self.directory_entries.len())
     }
 
     /// Retrieves a specific sub file entry.
@@ -220,11 +220,11 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> io::Result<ExtFileEntry> {
-        if !self.read_directory_tree {
-            self.read_directory_tree()?;
+        if !self.read_directory_entries {
+            self.read_directory_entries()?;
         }
         let (name, directory_entry): (&ByteString, &ExtDirectoryEntry) =
-            match self.directory_tree.iter().nth(sub_file_entry_index) {
+            match self.directory_entries.iter().nth(sub_file_entry_index) {
                 Some(key_and_value) => key_and_value,
                 None => {
                     return Err(io::Error::new(
@@ -254,11 +254,11 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_name: &ByteString,
     ) -> io::Result<Option<ExtFileEntry>> {
-        if !self.read_directory_tree {
-            self.read_directory_tree()?;
+        if !self.read_directory_entries {
+            self.read_directory_entries()?;
         }
         let (name, directory_entry): (&ByteString, &ExtDirectoryEntry) =
-            match self.directory_tree.get_key_value(sub_file_entry_name) {
+            match self.directory_entries.get_key_value(sub_file_entry_name) {
                 Some(key_and_value) => key_and_value,
                 None => return Ok(None),
             };
@@ -308,24 +308,24 @@ impl ExtFileEntry {
         Ok(Some(SharedValue::new(Box::new(block_stream))))
     }
 
-    /// Reads the directory tree.
-    fn read_directory_tree(&mut self) -> io::Result<()> {
+    /// Reads the directory entries.
+    fn read_directory_entries(&mut self) -> io::Result<()> {
         if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY {
             let mut directory_tree: ExtDirectoryTree =
                 ExtDirectoryTree::new(self.inode_table.block_size);
 
             if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
                 directory_tree
-                    .read_inline_data(&self.inode.data_reference, &mut self.directory_tree)?;
+                    .read_inline_data(&self.inode.data_reference, &mut self.directory_entries)?;
             } else {
                 directory_tree.read_block_data(
                     &self.data_stream,
                     &self.inode.block_ranges,
-                    &mut self.directory_tree,
+                    &mut self.directory_entries,
                 )?;
             }
         }
-        self.read_directory_tree = true;
+        self.read_directory_entries = true;
 
         Ok(())
     }
@@ -584,5 +584,5 @@ mod tests {
     // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for get_sub_file_entry_by_name
     // TODO: add tests for get_data_stream_by_name
-    // TODO: add tests for read_directory_tree
+    // TODO: add tests for read_directory_entries
 }

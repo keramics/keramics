@@ -431,7 +431,7 @@ fn calculate_md5(data_stream: &mut Box<dyn VfsDataStream>) -> io::Result<String>
 /// Prints information about an Extended File System (ext) file entry in bodyfile format.
 fn print_ext_file_entry_bodyfile(
     file_entry: &mut ExtFileEntry,
-    path_segments: &mut Vec<String>,
+    path_components: &mut Vec<String>,
 ) -> io::Result<()> {
     let file_mode: u16 = file_entry.get_file_mode();
 
@@ -455,8 +455,8 @@ fn print_ext_file_entry_bodyfile(
             Some(name) => name.to_string(),
             None => String::new(),
         };
-        path_segments.push(name_string);
-        format!("/{}", path_segments.join("/"))
+        path_components.push(name_string);
+        format!("/{}", path_components.join("/"))
     };
     let path_suffix: String = match file_entry.get_symbolic_link_target()? {
         Some(symbolic_link_target) => format!(" -> {}", symbolic_link_target.to_string()),
@@ -494,7 +494,7 @@ fn print_ext_file_entry_bodyfile(
 /// Prints path of an Extended File System (ext) file entry.
 fn print_ext_file_entry_path(
     file_entry: &ExtFileEntry,
-    path_segments: &mut Vec<String>,
+    path_components: &mut Vec<String>,
 ) -> io::Result<()> {
     let path: String = if file_entry.inode_number == 2 {
         String::from("/")
@@ -503,8 +503,8 @@ fn print_ext_file_entry_path(
             Some(name) => name.to_string(),
             None => String::new(),
         };
-        path_segments.push(name_string);
-        format!("/{}", path_segments.join("/"))
+        path_components.push(name_string);
+        format!("/{}", path_components.join("/"))
     };
     println!("{}", path);
 
@@ -586,8 +586,8 @@ pub fn print_hierarcy_ext_file_system(
             return ExitCode::FAILURE;
         }
     };
-    let mut path_segments: Vec<String> = Vec::new();
-    match print_hierarcy_ext_file_entry(&mut file_entry, &mut path_segments, bodyfile) {
+    let mut path_components: Vec<String> = Vec::new();
+    match print_hierarcy_ext_file_entry(&mut file_entry, &mut path_components, bodyfile) {
         Ok(_) => {}
         Err(error) => {
             println!("{}", error);
@@ -600,23 +600,23 @@ pub fn print_hierarcy_ext_file_system(
 /// Prints the hierarchy of an Extended File System (ext) file entry.
 fn print_hierarcy_ext_file_entry(
     file_entry: &mut ExtFileEntry,
-    path_segments: &mut Vec<String>,
+    path_components: &mut Vec<String>,
     bodyfile: bool,
 ) -> io::Result<()> {
     if bodyfile {
-        print_ext_file_entry_bodyfile(file_entry, path_segments)?;
+        print_ext_file_entry_bodyfile(file_entry, path_components)?;
     } else {
-        print_ext_file_entry_path(file_entry, path_segments)?;
+        print_ext_file_entry_path(file_entry, path_components)?;
     }
     let number_of_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
     for sub_file_entry_index in 0..number_of_file_entries {
         let mut sub_file_entry: ExtFileEntry =
             file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?;
 
-        print_hierarcy_ext_file_entry(&mut sub_file_entry, path_segments, bodyfile)?;
+        print_hierarcy_ext_file_entry(&mut sub_file_entry, path_components, bodyfile)?;
     }
     if file_entry.inode_number != 2 {
-        path_segments.pop();
+        path_components.pop();
     }
     Ok(())
 }

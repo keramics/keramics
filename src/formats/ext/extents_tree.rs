@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::max;
 use std::io;
 
 use crate::mediator::{Mediator, MediatorReference};

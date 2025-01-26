@@ -34,6 +34,7 @@ pub enum DataType {
     BitField32,
     BitField64,
     ByteString,
+    Filetime,
     #[default]
     NotSet,
     PosixTime32,
@@ -62,6 +63,7 @@ impl Clone for DataType {
             DataType::BitField32 => DataType::BitField32,
             DataType::BitField64 => DataType::BitField64,
             DataType::ByteString => DataType::ByteString,
+            DataType::Filetime => DataType::Filetime,
             DataType::NotSet => DataType::NotSet,
             DataType::PosixTime32 => DataType::PosixTime32,
             DataType::SignedInteger8Bit => DataType::SignedInteger8Bit,

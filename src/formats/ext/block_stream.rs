@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::max;
 use std::io;
 use std::io::{Read, Seek};
 
@@ -181,3 +182,5 @@ impl VfsDataStream for ExtBlockStream {
         Ok(self.size)
     }
 }
+
+// TODO: add tests
