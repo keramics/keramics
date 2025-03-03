@@ -15,6 +15,6 @@ mod data_stream;
 mod file_entry;
 mod file_system;
 
-pub use data_stream::new_fake_data_stream;
+pub use data_stream::{new_fake_data_stream, FakeDataStream};
 pub use file_entry::FakeFileEntry;
 pub use file_system::FakeFileSystem;

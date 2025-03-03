@@ -12,13 +12,14 @@
  */
 
 use std::io;
-use std::io::Cursor;
 
 use crate::datetime::DateTime;
 use crate::types::SharedValue;
 
 use crate::vfs::enums::VfsFileType;
 use crate::vfs::types::VfsDataStreamReference;
+
+use super::data_stream::FakeDataStream;
 
 /// Fake (or virtual) file entry.
 pub struct FakeFileEntry {
@@ -58,9 +59,12 @@ impl FakeFileEntry {
 
     /// Creates a new file entry.
     pub fn new_file(data: &[u8]) -> Self {
+        let data_size: u64 = data.len() as u64;
+        let data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
+
         // TODO: test timestamps with current time
         Self {
-            data_stream: SharedValue::new(Box::new(Cursor::new(data.to_vec()))),
+            data_stream: SharedValue::new(Box::new(data_stream)),
             file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
@@ -141,13 +145,6 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
 
-        let expected_data: String = [
-            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
-            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
-            "nonmetallic material, such as clay, at a high temperature.\n",
-        ]
-        .join("");
-
         let result: Option<VfsDataStreamReference> =
             fake_file_entry.get_data_stream_by_name(None)?;
 
@@ -166,6 +163,14 @@ mod tests {
             Err(error) => return Err(crate::error_to_io_error!(error)),
         };
         assert_eq!(read_count, 202);
+
+        let expected_data: String = [
+            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
+            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
+            "nonmetallic material, such as clay, at a high temperature.\n",
+        ]
+        .join("");
+
         assert_eq!(test_data, expected_data.as_bytes());
 
         Ok(())

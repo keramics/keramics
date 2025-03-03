@@ -17,6 +17,7 @@ use super::posix::{PosixTime32, PosixTime64Ns};
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum DateTime {
     Filetime(Filetime),
+    HfsTime,
     #[default]
     NotSet,
     PosixTime32(PosixTime32),

@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::cmp::max;
 use std::io;
 use std::io::{Read, Seek};
 
@@ -59,7 +58,7 @@ impl ExtBlockStream {
     ) -> io::Result<()> {
         let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
         self.block_tree =
-            BlockTree::<ExtBlockRange>::new(block_tree_data_size, 16384, self.block_size as u64);
+            BlockTree::<ExtBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
         for block_range in block_ranges.iter() {
             let logical_offset: u64 = block_range.logical_block_number * (self.block_size as u64);
             let range_size: u64 = block_range.number_of_blocks * (self.block_size as u64);

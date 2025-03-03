@@ -27,7 +27,7 @@ mod types;
 
 pub use context::VfsContext;
 pub use enums::*;
-pub use fake::{new_fake_data_stream, FakeFileEntry, FakeFileSystem};
+pub use fake::{new_fake_data_stream, FakeDataStream, FakeFileEntry, FakeFileSystem};
 pub use file_entry::VfsFileEntry;
 pub use file_system::VfsFileSystem;
 pub use finder::VfsFinder;

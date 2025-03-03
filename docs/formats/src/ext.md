@@ -739,7 +739,7 @@ The ext4 inode is 160 bytes in size and consists of:
 | 20 | 4 | | Deletion time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 24 | 2 | | Lower 16-bits of group identifier (GID)
 | 26 | 2 | | Number of (hard) links
-| 28 | 4 | | Lower 16-bits of number of blocks
+| 28 | 4 | | Lower 32-bits of number of blocks
 | 32 | 4 | | [Flags](#inode_flags)
 | <td colspan="4"> *If EXT4_EA_INODE_FL is not set*
 | 36 | 4 | | Unknown (lower 32-bits of version)
