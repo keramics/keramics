@@ -31,7 +31,6 @@ mod file_entry;
 mod file_system;
 mod group_descriptor;
 mod group_descriptor_table;
-mod inline_stream;
 mod inode;
 mod inode_table;
 mod path;

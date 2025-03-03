@@ -12,6 +12,7 @@
  */
 
 mod apm;
+mod bodyfile;
 mod ext;
 mod gpt;
 mod mbr;

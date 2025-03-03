@@ -12,7 +12,6 @@
  */
 
 use std::cmp::max;
-use std::collections::BTreeMap;
 use std::io;
 
 use layout_map::LayoutMap;
@@ -343,9 +342,11 @@ impl Ext4Inode {
         inode.number_of_links = bytes_to_u16_le!(data, 26);
 
         let lower_32bit: u32 = bytes_to_u32_le!(data, 28);
-        let upper_16bit: u16 = bytes_to_u16_le!(data, 44);
-        inode.number_of_blocks = ((upper_16bit as u64) << 32) | (lower_32bit as u64);
-
+        inode.number_of_blocks = lower_32bit as u64;
+        if data_size >= 120 {
+            let upper_16bit: u16 = bytes_to_u16_le!(data, 116);
+            inode.number_of_blocks |= (upper_16bit as u64) << 32;
+        }
         inode.data_reference.copy_from_slice(&data[40..100]);
 
         let lower_16bit: u16 = bytes_to_u16_le!(data, 124);

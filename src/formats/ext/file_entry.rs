@@ -20,13 +20,12 @@ use std::rc::Rc;
 use crate::bytes_to_u16_le;
 use crate::datetime::DateTime;
 use crate::types::{ByteString, SharedValue};
-use crate::vfs::VfsDataStreamReference;
+use crate::vfs::{FakeDataStream, VfsDataStreamReference};
 
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entry::ExtDirectoryEntry;
 use super::directory_tree::ExtDirectoryTree;
-use super::inline_stream::ExtInlineDataStream;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 
@@ -284,28 +283,29 @@ impl ExtFileEntry {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE || name.is_some() {
             return Ok(None);
         }
-        if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-            let mut inline_stream: ExtInlineDataStream =
-                ExtInlineDataStream::new(self.inode.data_size);
-            inline_stream.open(&self.inode.data_reference)?;
+        let data_stream: VfsDataStreamReference =
+            if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
+                let inline_stream: FakeDataStream =
+                    FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
 
-            return Ok(Some(SharedValue::new(Box::new(inline_stream))));
-        }
-        let number_of_blocks: u64 = max(
-            self.inode
-                .data_size
-                .div_ceil(self.inode_table.block_size as u64),
-            self.inode.number_of_blocks,
-        );
-        let mut block_stream: ExtBlockStream =
-            ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-        block_stream.open(
-            &self.data_stream,
-            number_of_blocks,
-            &self.inode.block_ranges,
-        )?;
-
-        Ok(Some(SharedValue::new(Box::new(block_stream))))
+                SharedValue::new(Box::new(inline_stream))
+            } else {
+                let number_of_blocks: u64 = max(
+                    self.inode
+                        .data_size
+                        .div_ceil(self.inode_table.block_size as u64),
+                    self.inode.number_of_blocks,
+                );
+                let mut block_stream: ExtBlockStream =
+                    ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
+                block_stream.open(
+                    &self.data_stream,
+                    number_of_blocks,
+                    &self.inode.block_ranges,
+                )?;
+                SharedValue::new(Box::new(block_stream))
+            };
+        Ok(Some(data_stream))
     }
 
     /// Reads the directory entries.

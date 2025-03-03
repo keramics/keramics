@@ -12,39 +12,16 @@
  */
 
 use std::io;
-use std::io::Read;
 use std::process::ExitCode;
 use std::sync::Arc;
 
 use keramics::datetime::DateTime;
 use keramics::formats::ext::constants::*;
 use keramics::formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
-use keramics::formatters::format_as_string;
-use keramics::hashes::{DigestHashContext, Md5Context};
 use keramics::types::ByteString;
-use keramics::vfs::{VfsDataStream, VfsDataStreamReference, VfsFileSystem, VfsPath};
+use keramics::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
 
-/// Retrieves the bodyfile representation of a date and time value.
-fn get_date_time_bodyfile(date_time_value: Option<&DateTime>) -> io::Result<String> {
-    match date_time_value {
-        Some(date_time) => match date_time {
-            DateTime::NotSet => Ok(String::from("0")),
-            DateTime::PosixTime32(posix_time32) => Ok(format!("{}", posix_time32.timestamp)),
-            DateTime::PosixTime64Ns(posix_time64ns) => Ok(format!(
-                "{}.{:09}",
-                posix_time64ns.timestamp / 1000000000,
-                posix_time64ns.timestamp % 1000000000
-            )),
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported date time"),
-            )),
-        },
-        // Note that a timestamp value of 0 can represent that the timestamp is not present or
-        // that timestamp was 0 (not set).
-        None => Ok(String::from("0")),
-    }
-}
+use super::bodyfile;
 
 /// Retrieves the string representation of a date and time value.
 fn get_date_time_string(date_time: &DateTime) -> io::Result<String> {
@@ -412,22 +389,6 @@ fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
     Ok(())
 }
 
-/// Calculates the MD5 of the data of an Extended File System (ext) file entry.
-fn calculate_md5(data_stream: &mut Box<dyn VfsDataStream>) -> io::Result<String> {
-    let mut data: Vec<u8> = vec![0; 65536];
-    let mut md5_context: Md5Context = Md5Context::new();
-
-    loop {
-        let read_count: usize = data_stream.read(&mut data)?;
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
-    }
-    let hash_value: Vec<u8> = md5_context.finalize();
-    Ok(format_as_string(&hash_value))
-}
-
 /// Prints information about an Extended File System (ext) file entry in bodyfile format.
 fn print_ext_file_entry_bodyfile(
     file_entry: &mut ExtFileEntry,
@@ -441,7 +402,7 @@ fn print_ext_file_entry_bodyfile(
     let md5: String = match result {
         Some(vfs_data_stream) => {
             let md5_string: String = match vfs_data_stream.with_write_lock() {
-                Ok(mut data_stream) => calculate_md5(&mut data_stream)?,
+                Ok(mut data_stream) => bodyfile::calculate_md5(&mut data_stream)?,
                 Err(error) => return Err(keramics::error_to_io_error!(error)),
             };
             md5_string
@@ -468,10 +429,11 @@ fn print_ext_file_entry_bodyfile(
     let group_identifier: u32 = file_entry.get_group_identifier();
     let size: u64 = file_entry.get_size();
 
-    let access_time: String = get_date_time_bodyfile(file_entry.get_access_time())?;
-    let modification_time: String = get_date_time_bodyfile(file_entry.get_modification_time())?;
-    let change_time: String = get_date_time_bodyfile(file_entry.get_change_time())?;
-    let creation_time: String = get_date_time_bodyfile(file_entry.get_creation_time())?;
+    let access_time: String = bodyfile::format_as_timestamp(file_entry.get_access_time())?;
+    let modification_time: String =
+        bodyfile::format_as_timestamp(file_entry.get_modification_time())?;
+    let change_time: String = bodyfile::format_as_timestamp(file_entry.get_change_time())?;
+    let creation_time: String = bodyfile::format_as_timestamp(file_entry.get_creation_time())?;
 
     println!(
         "{}|{}{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
@@ -560,7 +522,7 @@ pub fn print_entry_ext_file_system(
 pub fn print_hierarcy_ext_file_system(
     vfs_file_system: &Arc<VfsFileSystem>,
     vfs_path: &VfsPath,
-    bodyfile: bool,
+    in_bodyfile_format: bool,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
@@ -571,8 +533,8 @@ pub fn print_hierarcy_ext_file_system(
             return ExitCode::FAILURE;
         }
     };
-    if bodyfile {
-        println!("# extended bodyfile 3 format");
+    if in_bodyfile_format {
+        println!("{}", bodyfile::BODYFILE_HEADER);
     } else {
         println!("Extended File System (ext) hierarchy:");
     }
@@ -587,7 +549,7 @@ pub fn print_hierarcy_ext_file_system(
         }
     };
     let mut path_components: Vec<String> = Vec::new();
-    match print_hierarcy_ext_file_entry(&mut file_entry, &mut path_components, bodyfile) {
+    match print_hierarcy_ext_file_entry(&mut file_entry, &mut path_components, in_bodyfile_format) {
         Ok(_) => {}
         Err(error) => {
             println!("{}", error);
@@ -601,9 +563,9 @@ pub fn print_hierarcy_ext_file_system(
 fn print_hierarcy_ext_file_entry(
     file_entry: &mut ExtFileEntry,
     path_components: &mut Vec<String>,
-    bodyfile: bool,
+    in_bodyfile_format: bool,
 ) -> io::Result<()> {
-    if bodyfile {
+    if in_bodyfile_format {
         print_ext_file_entry_bodyfile(file_entry, path_components)?;
     } else {
         print_ext_file_entry_path(file_entry, path_components)?;
@@ -613,7 +575,7 @@ fn print_hierarcy_ext_file_entry(
         let mut sub_file_entry: ExtFileEntry =
             file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?;
 
-        print_hierarcy_ext_file_entry(&mut sub_file_entry, path_components, bodyfile)?;
+        print_hierarcy_ext_file_entry(&mut sub_file_entry, path_components, in_bodyfile_format)?;
     }
     if file_entry.inode_number != 2 {
         path_components.pop();
@@ -668,7 +630,6 @@ pub fn print_path_ext_file_system(
 mod tests {
     use super::*;
 
-    // TODO: add tests for get_date_time_bodyfile
     // TODO: add tests for get_date_time_string
 
     #[test]
