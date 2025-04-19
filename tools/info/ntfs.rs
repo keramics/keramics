@@ -227,7 +227,7 @@ pub fn print_entry_ntfs_file_system(
         );
         return ExitCode::FAILURE;
     }
-    let mut file_entry: NtfsFileEntry =
+    let file_entry: NtfsFileEntry =
         match ntfs_file_system.get_file_entry_by_identifier(ntfs_entry_identifier) {
             Ok(file_entry) => file_entry,
             Err(error) => {

@@ -241,7 +241,7 @@ impl Ext3Inode {
         member(field(name = "number_of_links", data_type = "u16")),
         member(field(name = "number_of_blocks_lower", data_type = "u32")),
         member(field(name = "flags", data_type = "u32", format = "hex")),
-        member(field(name = "unknown1", data_type = "[u8; 4]")),
+        member(field(name = "version_lower", data_type = "u32")),
         member(field(name = "data_reference", data_type = "[u8; 60]")),
         member(field(name = "nfs_generation_number", data_type = "u32")),
         member(field(name = "file_acl_block_number_lower", data_type = "u32")),
@@ -262,7 +262,8 @@ impl Ext3Inode {
             field(name = "access_time_extra_precision", data_type = "u32"),
             field(name = "creation_time", data_type = "PosixTime32"),
             field(name = "creation_time_extra_precision", data_type = "u32"),
-            field(name = "unknown3", data_type = "[u8; 8]"),
+            field(name = "version_upper", data_type = "u32"),
+            field(name = "unknown3", data_type = "[u8; 4]"),
         )),
     ),
     method(name = "debug_read_data")

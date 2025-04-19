@@ -742,7 +742,7 @@ The ext4 inode is 160 bytes in size and consists of:
 | 28 | 4 | | Lower 32-bits of number of blocks
 | 32 | 4 | | [Flags](#inode_flags)
 | <td colspan="4"> *If EXT4_EA_INODE_FL is not set*
-| 36 | 4 | | Unknown (lower 32-bits of version)
+| 36 | 4 | | Lower 32-bits of version
 | <td colspan="4"> *If EXT4_EA_INODE_FL is set*
 | 36 | 4 | | Unknown (upper 32-bits of extended attribute reference count)
 | <td colspan="4"> *If EXT4_EXTENTS_FL and EXT4_INLINE_DATA_FL are not set*
@@ -774,7 +774,7 @@ The ext4 inode is 160 bytes in size and consists of:
 | 140 | 4 | | (last) access time extra precision
 | 144 | 4 | | Creation time
 | 148 | 4 | | Creation time extra precision
-| 152 | 4 | | Unknown (upper 32-bits of version)
+| 152 | 4 | | Upper 32-bits of version
 | 156 | 4 | | Unknown (i_projid)
 
 If checksum type is CRC-32C, the checksum is stored as 0xffffffff - CRC-32C.
