@@ -12,6 +12,7 @@
  */
 
 mod context;
+mod data_fork;
 mod enums;
 mod fake;
 mod file_entry;
@@ -22,10 +23,12 @@ mod os;
 mod path;
 mod resolver;
 mod scanner;
+mod string;
 mod traits;
 mod types;
 
 pub use context::VfsContext;
+pub use data_fork::VfsDataFork;
 pub use enums::*;
 pub use fake::{new_fake_data_stream, FakeDataStream, FakeFileEntry, FakeFileSystem};
 pub use file_entry::VfsFileEntry;
@@ -35,5 +38,6 @@ pub use os::OsFileEntry;
 pub use path::VfsPath;
 pub use resolver::VfsResolver;
 pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
+pub use string::VfsString;
 pub use traits::VfsDataStream;
 pub use types::*;

@@ -126,6 +126,17 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds New Technologies File System (NTFS) signatures.
+    pub fn add_ntfs_signatures(&mut self) {
+        // Signature in boot record.
+        self.signature_scanner.add_signature(Signature::new(
+            "ntfs1",
+            PatternType::BoundToStart,
+            3,
+            &[0x4e, 0x54, 0x46, 0x53, 0x20, 0x20, 0x20, 0x20],
+        ));
+    }
+
     /// Adds QEMU Copy-On-Write (QCOW) signatures.
     pub fn add_qcow_signatures(&mut self) {
         // Version 1 signature and version in header.
@@ -251,6 +262,7 @@ impl FormatScanner {
                 "ext1" => FormatIdentifier::Ext,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
+                "ntfs1" => FormatIdentifier::Ntfs,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
                 "sparseimage1" => FormatIdentifier::SparseImage,
                 "udif1" => FormatIdentifier::Udif,
@@ -276,6 +288,7 @@ mod tests {
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_gpt_signatures();
+        format_scanner.add_ntfs_signatures();
         format_scanner.add_qcow_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();
@@ -291,6 +304,7 @@ mod tests {
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_gpt_signatures();
+        format_scanner.add_ntfs_signatures();
         format_scanner.add_qcow_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();

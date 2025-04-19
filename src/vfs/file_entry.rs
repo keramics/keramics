@@ -17,11 +17,15 @@ use std::rc::Rc;
 use crate::datetime::DateTime;
 use crate::formats::ext::constants::*;
 use crate::formats::ext::ExtFileEntry;
+use crate::formats::ntfs::{NtfsDataFork, NtfsFileEntry};
+use crate::types::Ucs2String;
 
+use super::data_fork::VfsDataFork;
 use super::enums::VfsFileType;
 use super::fake::FakeFileEntry;
 use super::iterators::VfsFileEntriesIterator;
 use super::os::OsFileEntry;
+use super::string::VfsString;
 use super::types::VfsDataStreamReference;
 
 /// Virtual File System (VFS) file entry.
@@ -31,6 +35,7 @@ pub enum VfsFileEntry {
     Fake(Rc<FakeFileEntry>),
     Gpt(Option<VfsDataStreamReference>),
     Mbr(Option<VfsDataStreamReference>),
+    Ntfs(NtfsFileEntry),
     Os(OsFileEntry),
     Qcow(Option<VfsDataStreamReference>),
     Vhd(Option<VfsDataStreamReference>),
@@ -46,6 +51,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_access_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_access_time(),
             VfsFileEntry::Qcow(_) => None,
             VfsFileEntry::Vhd(_) => None,
@@ -61,6 +67,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_change_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_change_time(),
             VfsFileEntry::Qcow(_) => None,
             VfsFileEntry::Vhd(_) => None,
@@ -76,66 +83,12 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_creation_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_creation_time(),
             VfsFileEntry::Qcow(_) => None,
             VfsFileEntry::Vhd(_) => None,
             VfsFileEntry::Vhdx(_) => None,
         }
-    }
-
-    /// Retrieves a data stream with the specified name.
-    pub fn get_data_stream_by_name(
-        &self,
-        name: Option<&str>,
-    ) -> io::Result<Option<VfsDataStreamReference>> {
-        let result: Option<VfsDataStreamReference> = match self {
-            VfsFileEntry::Apm(apm_partition) => match apm_partition {
-                Some(partition) => match name {
-                    Some(_) => None,
-                    None => Some(partition.clone()),
-                },
-                None => None,
-            },
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream_by_name(name)?,
-            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream_by_name(name)?,
-            VfsFileEntry::Gpt(gpt_partition) => match gpt_partition {
-                Some(partition) => match name {
-                    Some(_) => None,
-                    None => Some(partition.clone()),
-                },
-                None => None,
-            },
-            VfsFileEntry::Mbr(mbr_partition) => match mbr_partition {
-                Some(partition) => match name {
-                    Some(_) => None,
-                    None => Some(partition.clone()),
-                },
-                None => None,
-            },
-            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream_by_name(name)?,
-            VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
-                Some(layer) => match name {
-                    Some(_) => None,
-                    None => Some(layer.clone()),
-                },
-                None => None,
-            },
-            VfsFileEntry::Vhd(vhd_layer) => match vhd_layer {
-                Some(layer) => match name {
-                    Some(_) => None,
-                    None => Some(layer.clone()),
-                },
-                None => None,
-            },
-            VfsFileEntry::Vhdx(vhdx_layer) => match vhdx_layer {
-                Some(layer) => match name {
-                    Some(_) => None,
-                    None => Some(layer.clone()),
-                },
-                None => None,
-            },
-        };
-        Ok(result)
     }
 
     /// Retrieves the file type.
@@ -167,6 +120,19 @@ impl VfsFileEntry {
                 Some(_) => VfsFileType::File,
                 None => VfsFileType::Directory,
             },
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                let file_attribute_flags: u32 = ntfs_file_entry.get_file_attribute_flags();
+                // FILE_ATTRIBUTE_DEVICE is not used by NTFS.
+                if file_attribute_flags & 0x00000400 != 0 {
+                    VfsFileType::SymbolicLink
+                }
+                // FILE_ATTRIBUTE_DIRECTORY is not used by NTFS.
+                else if ntfs_file_entry.has_directory_entries() {
+                    VfsFileType::Directory
+                } else {
+                    VfsFileType::File
+                }
+            }
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_type(),
             VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
                 Some(_) => VfsFileType::File,
@@ -191,6 +157,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_modification_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_modification_time(),
             VfsFileEntry::Qcow(_) => None,
             VfsFileEntry::Vhd(_) => None,
@@ -199,21 +166,174 @@ impl VfsFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&mut self) -> Option<String> {
+    pub fn get_name(&mut self) -> Option<VfsString> {
         match self {
             VfsFileEntry::Apm(_) => todo!(),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
-                Some(name) => Some(name.to_string()),
+                Some(name) => Some(VfsString::Byte(name.clone())),
                 None => None,
             },
-            VfsFileEntry::Fake(fake_file_entry) => todo!(),
+            VfsFileEntry::Fake(_) => todo!(),
             VfsFileEntry::Gpt(_) => todo!(),
             VfsFileEntry::Mbr(_) => todo!(),
-            VfsFileEntry::Os(os_file_entry) => todo!(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_name() {
+                Some(name) => Some(VfsString::Ucs2(name.clone())),
+                None => None,
+            },
+            VfsFileEntry::Os(_) => todo!(),
             VfsFileEntry::Qcow(_) => todo!(),
             VfsFileEntry::Vhd(_) => todo!(),
             VfsFileEntry::Vhdx(_) => todo!(),
         }
+    }
+
+    /// Retrieves the number of data forks.
+    pub fn get_number_of_data_forks(&self) -> io::Result<usize> {
+        let result: usize = match self {
+            VfsFileEntry::Apm(apm_partition) => match apm_partition {
+                Some(_) => 1,
+                None => 0,
+            },
+            VfsFileEntry::Ext(ext_file_entry) => {
+                let file_mode: u16 = ext_file_entry.get_file_mode();
+                if file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
+                    0
+                } else {
+                    1
+                }
+            }
+            VfsFileEntry::Fake(fake_file_entry) => match fake_file_entry.get_file_type() {
+                VfsFileType::File => 1,
+                _ => 0,
+            },
+            VfsFileEntry::Gpt(gpt_partition) => match gpt_partition {
+                Some(_) => 1,
+                None => 0,
+            },
+            VfsFileEntry::Mbr(mbr_partition) => match mbr_partition {
+                Some(_) => 1,
+                None => 0,
+            },
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_number_of_data_forks()?,
+            VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_file_type() {
+                VfsFileType::File => 1,
+                _ => 0,
+            },
+            VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
+                Some(_) => 1,
+                None => 0,
+            },
+            VfsFileEntry::Vhd(vhd_layer) => match vhd_layer {
+                Some(_) => 1,
+                None => 0,
+            },
+            VfsFileEntry::Vhdx(vhdx_layer) => match vhdx_layer {
+                Some(_) => 1,
+                None => 0,
+            },
+        };
+        Ok(result)
+    }
+
+    /// Retrieves a specific data fork.
+    pub fn get_data_fork_by_index(&self, data_fork_index: usize) -> io::Result<VfsDataFork> {
+        let data_fork: VfsDataFork = match self {
+            VfsFileEntry::Apm(_) => todo!(),
+            VfsFileEntry::Ext(ext_file_entry) => {
+                if data_fork_index != 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("Invalid data fork index: {}", data_fork_index),
+                    ));
+                }
+                match ext_file_entry.get_data_stream()? {
+                    Some(data_stream) => VfsDataFork::Ext(data_stream),
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!("Missing data stream"),
+                        ))
+                    }
+                }
+            }
+            VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Gpt(_) => todo!(),
+            VfsFileEntry::Mbr(_) => todo!(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                let ntfs_data_fork: NtfsDataFork =
+                    ntfs_file_entry.get_data_fork_by_index(data_fork_index)?;
+                VfsDataFork::Ntfs(ntfs_data_fork)
+            }
+            VfsFileEntry::Os(_) => todo!(),
+            VfsFileEntry::Qcow(_) => todo!(),
+            VfsFileEntry::Vhd(_) => todo!(),
+            VfsFileEntry::Vhdx(_) => todo!(),
+        };
+        Ok(data_fork)
+    }
+
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<VfsDataStreamReference>> {
+        let result: Option<VfsDataStreamReference> = match self {
+            VfsFileEntry::Apm(apm_partition) => match apm_partition {
+                Some(partition) => Some(partition.clone()),
+                None => None,
+            },
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream()?,
+            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream()?,
+            VfsFileEntry::Gpt(gpt_partition) => match gpt_partition {
+                Some(partition) => Some(partition.clone()),
+                None => None,
+            },
+            VfsFileEntry::Mbr(mbr_partition) => match mbr_partition {
+                Some(partition) => Some(partition.clone()),
+                None => None,
+            },
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_data_stream()?,
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream()?,
+            VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
+                Some(layer) => Some(layer.clone()),
+                None => None,
+            },
+            VfsFileEntry::Vhd(vhd_layer) => match vhd_layer {
+                Some(layer) => Some(layer.clone()),
+                None => None,
+            },
+            VfsFileEntry::Vhdx(vhdx_layer) => match vhdx_layer {
+                Some(layer) => Some(layer.clone()),
+                None => None,
+            },
+        };
+        Ok(result)
+    }
+
+    /// Retrieves a data stream with the specified name.
+    pub fn get_data_stream_by_name(
+        &self,
+        name: Option<&str>,
+    ) -> io::Result<Option<VfsDataStreamReference>> {
+        let result: Option<VfsDataStreamReference> = match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ext(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => match name {
+                Some(_) => None,
+                None => self.get_data_stream()?,
+            },
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                let ntfs_name: Option<Ucs2String> = match name {
+                    Some(string) => Some(Ucs2String::from_string(string)),
+                    None => None,
+                };
+                ntfs_file_entry.get_data_stream_by_name(&ntfs_name)?
+            }
+        };
+        Ok(result)
     }
 
     /// Retrieves the number of sub file entries.
@@ -224,6 +344,9 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => todo!(),
             VfsFileEntry::Gpt(_) => todo!(),
             VfsFileEntry::Mbr(_) => todo!(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                ntfs_file_entry.get_number_of_sub_file_entries()?
+            }
             VfsFileEntry::Os(os_file_entry) => todo!(),
             VfsFileEntry::Qcow(_) => todo!(),
             VfsFileEntry::Vhd(_) => todo!(),
@@ -245,6 +368,9 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => todo!(),
             VfsFileEntry::Gpt(_) => todo!(),
             VfsFileEntry::Mbr(_) => todo!(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => VfsFileEntry::Ntfs(
+                ntfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            ),
             VfsFileEntry::Os(os_file_entry) => todo!(),
             VfsFileEntry::Qcow(_) => todo!(),
             VfsFileEntry::Vhd(_) => todo!(),
@@ -721,191 +847,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_data_stream_by_name_with_apm() -> io::Result<()> {
-        let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
-
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "./test_data/apm/apm.dmg".to_string(),
-        };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/apm2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_some());
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(Some("bogus"))?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    // TODO: add test_get_data_stream_by_name_with_ext
-    // TODO: add test_get_data_stream_by_name_with_fake
-
-    #[test]
-    fn test_get_data_stream_by_name_with_gpt() -> io::Result<()> {
-        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
-
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "./test_data/gpt/gpt.raw".to_string(),
-        };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_some());
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(Some("bogus"))?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_data_stream_by_name_with_mbr() -> io::Result<()> {
-        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
-
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "./test_data/mbr/mbr.raw".to_string(),
-        };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/mbr2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_some());
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(Some("bogus"))?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    // TODO: add test_get_data_stream_by_name_with_os
-
-    #[test]
-    fn test_get_data_stream_by_name_with_qcow() -> io::Result<()> {
-        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
-
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "./test_data/qcow/ext2.qcow2".to_string(),
-        };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_some());
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(Some("bogus"))?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_data_stream_by_name_with_vhd() -> io::Result<()> {
-        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
-
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
-        };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/vhd2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_some());
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(Some("bogus"))?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_data_stream_by_name_with_vhdx() -> io::Result<()> {
-        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
-
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
-        };
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(None)?;
-        assert!(result.is_some());
-
-        let result: Option<VfsDataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(Some("bogus"))?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
     fn test_get_file_type_with_apm() -> io::Result<()> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
@@ -1164,6 +1105,157 @@ mod tests {
     }
 
     // TODO: add tests for get_name
+    // TODO: add tests for get_number_of_data_forks
+
+    #[test]
+    fn test_get_data_stream_with_apm() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/apm/apm.dmg".to_string(),
+        };
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Apm, "/apm2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // TODO: add test_get_data_stream_with_ext
+    // TODO: add test_get_data_stream_with_fake
+
+    #[test]
+    fn test_get_data_stream_with_gpt() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/gpt/gpt.raw".to_string(),
+        };
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_mbr() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/mbr/mbr.raw".to_string(),
+        };
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Mbr, "/mbr2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // TODO: add test_get_data_stream_with_os
+
+    #[test]
+    fn test_get_data_stream_with_qcow() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/qcow/ext2.qcow2".to_string(),
+        };
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_vhd() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
+        };
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhd, "/vhd2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_vhdx() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "./test_data/vhdx/ntfs-differential.vhdx".to_string(),
+        };
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<VfsDataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
     // TODO: add tests for get_number_of_sub_file_entries
     // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for sub_file_entries

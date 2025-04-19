@@ -45,8 +45,11 @@ pub struct VfsScanner {
     /// Phase 1 volume system format signature scanner.
     phase1_volume_system_scanner: FormatScanner,
 
-    /// Phase 2 vvolume system format signature scanner.
+    /// Phase 2 volume system format signature scanner.
     phase2_volume_system_scanner: FormatScanner,
+
+    /// Phase 3 volume system format signature scanner.
+    phase3_volume_system_scanner: FormatScanner,
 
     /// Storage media image format signature scanner.
     storage_media_image_scanner: FormatScanner,
@@ -60,6 +63,7 @@ impl VfsScanner {
             file_system_scanner: FormatScanner::new(),
             phase1_volume_system_scanner: FormatScanner::new(),
             phase2_volume_system_scanner: FormatScanner::new(),
+            phase3_volume_system_scanner: FormatScanner::new(),
             storage_media_image_scanner: FormatScanner::new(),
         }
     }
@@ -74,17 +78,27 @@ impl VfsScanner {
         self.storage_media_image_scanner.add_vhdx_signatures();
         self.storage_media_image_scanner.build()?;
 
+        // The Master Boot Record (MBR) signatures are used in other volume
+        // system formats, such as BitLocker drive encryption (BDE) and
+        // New Technologies File System (NTFS).
+
+        // The scanner:
+        // * first looks for non-overlapping volume system signatures (phase 1)
+        // * next excludes overlapping signatures (phase 2)
+        // * last looks for overlapping volume system signatures (phase 3)
+
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
         self.phase1_volume_system_scanner.build()?;
 
-        // The Master Boot Record (MBR) signatures are used in other volume
-        // system formats, such as BitLocker drive encryption (BDE), hence
-        // they are scanned seperately.
-        self.phase2_volume_system_scanner.add_mbr_signatures();
+        self.phase2_volume_system_scanner.add_ntfs_signatures();
         self.phase2_volume_system_scanner.build()?;
 
+        self.phase3_volume_system_scanner.add_mbr_signatures();
+        self.phase3_volume_system_scanner.build()?;
+
         self.file_system_scanner.add_ext_signatures();
+        self.file_system_scanner.add_ntfs_signatures();
         self.file_system_scanner.build()?;
 
         Ok(())
@@ -199,6 +213,7 @@ impl VfsScanner {
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
                 FormatIdentifier::Ext => Ok(Some(VfsPathType::Ext)),
+                FormatIdentifier::Ntfs => Ok(Some(VfsPathType::Ntfs)),
                 _ => Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Found unsupported file system format signature"),
@@ -325,6 +340,7 @@ impl VfsScanner {
                     number_of_partitions,
                 )?;
             }
+            VfsPath::Ntfs { .. } => {}
             VfsPath::Os { .. } => match self.scan_for_format(&file_system, &path)? {
                 Some(path_type) => {
                     let sub_node_path: VfsPath = path.new_child(path_type, "/");
@@ -396,7 +412,7 @@ impl VfsScanner {
         if scan_results.len() > 1 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Found multiple known volume system format signatures"),
+                format!("Found multiple known non-overlapping volume system format signatures"),
             ));
         }
         match scan_results.iter().next() {
@@ -405,7 +421,7 @@ impl VfsScanner {
                 FormatIdentifier::Gpt => Ok(Some(VfsPathType::Gpt)),
                 _ => Err(io::Error::new(
                     io::ErrorKind::InvalidData,
-                    format!("Found unsupported volume system format signature"),
+                    format!("Found unsupported non-overlapping volume system format signature"),
                 )),
             },
             None => {
@@ -416,18 +432,41 @@ impl VfsScanner {
                 if scan_results.len() > 1 {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("Found multiple known volume system format signatures"),
+                        format!("Found multiple exclusion volume system format signatures"),
                     ));
                 }
                 match scan_results.iter().next() {
                     Some(format_identifier) => match format_identifier {
-                        FormatIdentifier::Mbr => Ok(Some(VfsPathType::Mbr)),
+                        FormatIdentifier::Ntfs => Ok(None),
                         _ => Err(io::Error::new(
                             io::ErrorKind::InvalidData,
-                            format!("Found unsupported volume system format signature"),
+                            format!("Found unsupported exclusion volume system format signature"),
                         )),
                     },
-                    None => Ok(None),
+                    None => {
+                        let scan_results: HashSet<FormatIdentifier> = self
+                            .phase3_volume_system_scanner
+                            .scan_data_stream(data_stream)?;
+
+                        if scan_results.len() > 1 {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidData,
+                                format!(
+                                    "Found multiple overlapping volume system format signatures"
+                                ),
+                            ));
+                        }
+                        match scan_results.iter().next() {
+                            Some(format_identifier) => match format_identifier {
+                                FormatIdentifier::Mbr => Ok(Some(VfsPathType::Mbr)),
+                                _ => Err(io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    format!("Found unsupported overlapping volume system format signature"),
+                                )),
+                            },
+                            None => Ok(None),
+                        }
+                    }
                 }
             }
         }
@@ -626,6 +665,23 @@ mod tests {
             .unwrap();
 
         assert!(vfs_path_type == VfsPathType::Ext);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_file_system_format_with_ntfs() -> io::Result<()> {
+        let mut format_scanner: VfsScanner = VfsScanner::new();
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => return Err(crate::error_to_io_error!(error)),
+        }
+        let vfs_data_stream: VfsDataStreamReference = get_data_stream("./test_data/ntfs/ntfs.raw")?;
+        let vfs_path_type: VfsPathType = format_scanner
+            .scan_for_file_system_format(&vfs_data_stream)?
+            .unwrap();
+
+        assert!(vfs_path_type == VfsPathType::Ntfs);
 
         Ok(())
     }

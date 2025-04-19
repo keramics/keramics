@@ -21,8 +21,8 @@ use clap::{Parser, ValueEnum};
 
 use keramics::formatters::format_as_string;
 use keramics::vfs::{
-    VfsDataStreamReference, VfsFileEntry, VfsFileSystem, VfsFileType, VfsFinder, VfsPath,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+    VfsDataFork, VfsDataStreamReference, VfsFileEntry, VfsFileSystem, VfsFileType, VfsFinder,
+    VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
 };
 
 mod hasher;
@@ -64,15 +64,27 @@ fn calculate_hash_from_file_entry(
 ) -> io::Result<()> {
     match file_entry.get_file_type() {
         VfsFileType::File => {
-            // TODO: add support for non-default data stream.
-            match file_entry.get_data_stream_by_name(None)? {
-                Some(data_stream) => {
-                    let hash: Vec<u8> =
-                        digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
-                    println!("{}  {}", format_as_string(&hash), path);
+            let number_of_data_forks: usize = file_entry.get_number_of_data_forks()?;
+
+            for data_fork_index in 0..number_of_data_forks {
+                let data_fork: VfsDataFork = file_entry.get_data_fork_by_index(data_fork_index)?;
+
+                let name: Option<String> = match data_fork.get_name() {
+                    Some(name) => Some(name.to_string()),
+                    None => None,
+                };
+                // TODO: create skip list
+                if path == "/$BadClus" && name == Some("$Bad".to_string()) {
+                    continue;
                 }
-                None => {}
-            };
+                let data_stream: VfsDataStreamReference = data_fork.get_data_stream()?;
+                let hash: Vec<u8> = digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
+
+                match name {
+                    Some(name) => println!("{}  {}:{}", format_as_string(&hash), path, name),
+                    None => println!("{}  {}", format_as_string(&hash), path),
+                };
+            }
         }
         // TODO: add support for other file types.
         _ => {}
@@ -85,6 +97,8 @@ fn calculate_hash_from_scan_node(
     digest_hasher: &hasher::DigestHasher,
     vfs_scan_node: &VfsScanNode,
 ) -> io::Result<()> {
+    // TODO: add paths to ignore e.g. NTFS: "$BadClus:$Bad"
+
     if vfs_scan_node.sub_nodes.is_empty() {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 

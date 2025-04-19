@@ -98,12 +98,9 @@ impl FakeFileEntry {
         self.modification_time.as_ref()
     }
 
-    /// Retrieves a data stream with the specified name.
-    pub fn get_data_stream_by_name(
-        &self,
-        name: Option<&str>,
-    ) -> io::Result<Option<VfsDataStreamReference>> {
-        if self.file_type != VfsFileType::File || name.is_some() || self.data_stream.is_none() {
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<VfsDataStreamReference>> {
+        if self.file_type != VfsFileType::File {
             return Ok(None);
         }
         Ok(Some(self.data_stream.clone()))
@@ -141,12 +138,11 @@ mod tests {
     // TODO: add tests for FakeFileEntry::get_modification_time
 
     #[test]
-    fn test_get_data_stream_by_name() -> io::Result<()> {
+    fn test_get_data_stream() -> io::Result<()> {
         let test_data: Vec<u8> = get_test_data();
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
 
-        let result: Option<VfsDataStreamReference> =
-            fake_file_entry.get_data_stream_by_name(None)?;
+        let result: Option<VfsDataStreamReference> = fake_file_entry.get_data_stream()?;
 
         let vfs_data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,

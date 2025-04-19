@@ -35,6 +35,7 @@ pub enum VfsPathType {
     Fake,
     Gpt,
     Mbr,
+    Ntfs,
     Os,
     Qcow,
     Vhd,

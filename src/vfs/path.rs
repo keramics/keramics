@@ -15,7 +15,8 @@ use std::path::MAIN_SEPARATOR_STR;
 use std::sync::Arc;
 
 use crate::formats::ext::ExtPath;
-use crate::types::ByteString;
+use crate::formats::ntfs::NtfsPath;
+use crate::types::{ByteString, Ucs2String};
 
 use super::enums::VfsPathType;
 
@@ -52,6 +53,10 @@ pub enum VfsPath {
     },
     Mbr {
         location: String,
+        parent: Arc<VfsPath>,
+    },
+    Ntfs {
+        ntfs_path: NtfsPath,
         parent: Arc<VfsPath>,
     },
     Os {
@@ -95,6 +100,10 @@ impl VfsPath {
                 location: location.to_string(),
                 parent: parent,
             },
+            VfsPathType::Ntfs => VfsPath::Ntfs {
+                ntfs_path: NtfsPath::from(location),
+                parent: parent,
+            },
             VfsPathType::Os => panic!("Unsupported path_type: VfsPathType::Os"),
             VfsPathType::Qcow => VfsPath::Qcow {
                 location: location.to_string(),
@@ -133,6 +142,10 @@ impl VfsPath {
                 location: location.to_string(),
                 parent: parent.clone(),
             },
+            VfsPath::Ntfs { parent, .. } => VfsPath::Ntfs {
+                ntfs_path: NtfsPath::from(location),
+                parent: parent.clone(),
+            },
             VfsPath::Os { .. } => VfsPath::Os {
                 location: location.to_string(),
             },
@@ -167,10 +180,9 @@ impl VfsPath {
                 location_components.append(
                     &mut path_components
                         .iter()
-                        .map(|component| ByteString::from_bytes(component.as_bytes()))
+                        .map(|component| ByteString::from_string(component))
                         .collect::<Vec<ByteString>>(),
                 );
-
                 VfsPath::Ext {
                     ext_path: ExtPath::from(&location_components),
                     parent: parent.clone(),
@@ -196,6 +208,19 @@ impl VfsPath {
                 location_components.append(path_components);
                 VfsPath::Mbr {
                     location: location_components.join("/"),
+                    parent: parent.clone(),
+                }
+            }
+            VfsPath::Ntfs { ntfs_path, parent } => {
+                let mut location_components: Vec<Ucs2String> = ntfs_path.components.clone();
+                location_components.append(
+                    &mut path_components
+                        .iter()
+                        .map(|component| Ucs2String::from_string(component))
+                        .collect::<Vec<Ucs2String>>(),
+                );
+                VfsPath::Ntfs {
+                    ntfs_path: NtfsPath::from(&location_components),
                     parent: parent.clone(),
                 }
             }
@@ -241,6 +266,7 @@ impl VfsPath {
             VfsPath::Fake { location } => location.clone(),
             VfsPath::Gpt { location, .. } => location.clone(),
             VfsPath::Mbr { location, .. } => location.clone(),
+            VfsPath::Ntfs { ntfs_path, .. } => ntfs_path.to_string(),
             VfsPath::Os { location } => location.clone(),
             VfsPath::Qcow { location, .. } => location.clone(),
             VfsPath::Vhd { location, .. } => location.clone(),
@@ -256,6 +282,7 @@ impl VfsPath {
             VfsPath::Fake { .. } => None,
             VfsPath::Gpt { parent, .. } => Some(parent.as_ref()),
             VfsPath::Mbr { parent, .. } => Some(parent.as_ref()),
+            VfsPath::Ntfs { parent, .. } => Some(parent.as_ref()),
             VfsPath::Os { .. } => None,
             VfsPath::Qcow { parent, .. } => Some(parent.as_ref()),
             VfsPath::Vhd { parent, .. } => Some(parent.as_ref()),
@@ -271,6 +298,7 @@ impl VfsPath {
             VfsPath::Fake { .. } => VfsPathType::Fake,
             VfsPath::Gpt { .. } => VfsPathType::Gpt,
             VfsPath::Mbr { .. } => VfsPathType::Mbr,
+            VfsPath::Ntfs { .. } => VfsPathType::Ntfs,
             VfsPath::Os { .. } => VfsPathType::Os,
             VfsPath::Qcow { .. } => VfsPathType::Qcow,
             VfsPath::Vhd { .. } => VfsPathType::Vhd,
@@ -298,6 +326,10 @@ impl VfsPath {
             },
             VfsPath::Mbr { location, parent } => VfsPath::Mbr {
                 location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Ntfs { ntfs_path, parent } => VfsPath::Ntfs {
+                ntfs_path: ntfs_path.parent_directory(),
                 parent: parent.clone(),
             },
             VfsPath::Os { location } => VfsPath::Os {
@@ -341,6 +373,11 @@ impl VfsPath {
                 "{}\ntype: MBR: location: {}\n",
                 parent.to_string(),
                 location
+            ),
+            VfsPath::Ntfs { ntfs_path, parent } => format!(
+                "{}\ntype: NTFS: location: {}\n",
+                parent.to_string(),
+                ntfs_path.to_string()
             ),
             VfsPath::Os { location } => format!("type: OS: location: {}\n", location),
             VfsPath::Qcow { location, parent } => format!(

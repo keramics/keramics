@@ -36,7 +36,7 @@ fn get_date_time_string(date_time: &DateTime) -> io::Result<String> {
     }
 }
 
-/// Retrieves the string representation of a file mode.
+/// Retrieves a file mode string representation.
 fn get_file_mode_string(file_mode: u16) -> String {
     let mut string_parts: Vec<&str> = vec!["-"; 10];
 
@@ -398,7 +398,7 @@ fn print_ext_file_entry_bodyfile(
 
     // TODO: have flag control calculate md5
     // String::from("0")
-    let result: Option<VfsDataStreamReference> = file_entry.get_data_stream_by_name(None)?;
+    let result: Option<VfsDataStreamReference> = file_entry.get_data_stream()?;
     let md5: String = match result {
         Some(vfs_data_stream) => {
             let md5_string: String = match vfs_data_stream.with_write_lock() {
