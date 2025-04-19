@@ -157,13 +157,9 @@ impl OsFileEntry {
         todo!();
     }
 
-    /// Opens a data stream with the specified name.
-    pub fn get_data_stream_by_name(
-        &self,
-        name: Option<&str>,
-    ) -> io::Result<Option<VfsDataStreamReference>> {
-        // TODO: add support for non-default data stream.
-        if self.file_type != VfsFileType::File || name.is_some() {
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<VfsDataStreamReference>> {
+        if self.file_type != VfsFileType::File {
             return Ok(None);
         }
         let os_path: &Path = Path::new(self.path.as_str());
@@ -195,7 +191,7 @@ mod tests {
     // TODO: add tests for OsFileEntry::get_modification_time
 
     #[test]
-    fn test_get_data_stream_by_name() -> io::Result<()> {
+    fn test_get_data_stream() -> io::Result<()> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
         os_file_entry.initialize("./test_data/file.txt")?;
@@ -207,7 +203,7 @@ mod tests {
         ]
         .join("");
 
-        let result: Option<VfsDataStreamReference> = os_file_entry.get_data_stream_by_name(None)?;
+        let result: Option<VfsDataStreamReference> = os_file_entry.get_data_stream()?;
 
         let vfs_data_stream: VfsDataStreamReference = match result {
             Some(data_stream) => data_stream,

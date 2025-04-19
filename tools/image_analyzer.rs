@@ -33,6 +33,7 @@ fn print_scan_node(scan_node: &VfsScanNode, depth: usize) {
         VfsPath::Fake { .. } => "FAKE",
         VfsPath::Gpt { .. } => "GPT",
         VfsPath::Mbr { .. } => "MBR",
+        VfsPath::Ntfs { .. } => "NTFS",
         VfsPath::Os { .. } => "OS",
         VfsPath::Qcow { .. } => "QCOW",
         VfsPath::Vhd { .. } => "VHD",

@@ -206,6 +206,36 @@ impl ExtFileEntry {
 
     // TODO: add get extended_attributes iterator
 
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<VfsDataStreamReference>> {
+        if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
+            return Ok(None);
+        }
+        let data_stream: VfsDataStreamReference =
+            if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
+                let inline_stream: FakeDataStream =
+                    FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
+
+                SharedValue::new(Box::new(inline_stream))
+            } else {
+                let number_of_blocks: u64 = max(
+                    self.inode
+                        .data_size
+                        .div_ceil(self.inode_table.block_size as u64),
+                    self.inode.number_of_blocks,
+                );
+                let mut block_stream: ExtBlockStream =
+                    ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
+                block_stream.open(
+                    &self.data_stream,
+                    number_of_blocks,
+                    &self.inode.block_ranges,
+                )?;
+                SharedValue::new(Box::new(block_stream))
+            };
+        Ok(Some(data_stream))
+    }
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
         if !self.read_directory_entries {
@@ -273,39 +303,6 @@ impl ExtFileEntry {
             Some(name.clone()),
         );
         Ok(Some(file_entry))
-    }
-
-    /// Retrieves a data stream with the specified name.
-    pub fn get_data_stream_by_name(
-        &self,
-        name: Option<&str>,
-    ) -> io::Result<Option<VfsDataStreamReference>> {
-        if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE || name.is_some() {
-            return Ok(None);
-        }
-        let data_stream: VfsDataStreamReference =
-            if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-                let inline_stream: FakeDataStream =
-                    FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
-
-                SharedValue::new(Box::new(inline_stream))
-            } else {
-                let number_of_blocks: u64 = max(
-                    self.inode
-                        .data_size
-                        .div_ceil(self.inode_table.block_size as u64),
-                    self.inode.number_of_blocks,
-                );
-                let mut block_stream: ExtBlockStream =
-                    ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-                block_stream.open(
-                    &self.data_stream,
-                    number_of_blocks,
-                    &self.inode.block_ranges,
-                )?;
-                SharedValue::new(Box::new(block_stream))
-            };
-        Ok(Some(data_stream))
     }
 
     /// Reads the directory entries.
@@ -548,6 +545,7 @@ mod tests {
 
         Ok(())
     }
+    // TODO: add tests for get_data_stream
 
     #[test]
     fn test_get_number_of_attributes() -> io::Result<()> {
@@ -583,6 +581,5 @@ mod tests {
 
     // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for get_sub_file_entry_by_name
-    // TODO: add tests for get_data_stream_by_name
     // TODO: add tests for read_directory_entries
 }

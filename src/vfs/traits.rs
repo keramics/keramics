@@ -16,8 +16,6 @@ use std::io::{Read, Seek, SeekFrom};
 
 /// Virtual File System (VFS) data stream trait.
 pub trait VfsDataStream: Read + Seek {
-    // TODO: add get_extents()
-
     /// Retrieves the size of the data stream.
     fn get_size(&mut self) -> io::Result<u64>;
 

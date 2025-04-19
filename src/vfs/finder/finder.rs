@@ -15,6 +15,7 @@ use std::io;
 
 use crate::vfs::file_entry::VfsFileEntry;
 use crate::vfs::file_system::VfsFileSystem;
+use crate::vfs::string::VfsString;
 
 /// Virtual File System (VFS) finder state.
 struct VfsFinderState {
@@ -45,7 +46,7 @@ pub struct VfsFinder<'a> {
     file_system: &'a VfsFileSystem,
 
     /// Path components.
-    pub path_components: Vec<String>,
+    pub path_components: Vec<VfsString>,
 
     /// Finder states.
     states: Vec<VfsFinderState>,
@@ -69,6 +70,7 @@ impl<'a> VfsFinder<'a> {
 }
 
 impl<'a> Iterator for VfsFinder<'a> {
+    // TODO: return VfsPath instead of String.
     type Item = io::Result<(VfsFileEntry, String)>;
 
     /// Retrieves the next file entry.
@@ -86,7 +88,7 @@ impl<'a> Iterator for VfsFinder<'a> {
                             };
                         match file_entry.get_name() {
                             Some(name) => self.path_components.push(name),
-                            None => self.path_components.push(String::new()),
+                            None => self.path_components.push(VfsString::Empty),
                         };
                         self.states
                             .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
@@ -99,9 +101,15 @@ impl<'a> Iterator for VfsFinder<'a> {
         while let Some(mut state) = self.states.pop() {
             if state.sub_file_entry_index >= state.number_of_sub_file_entries {
                 // TODO: make join file system specific.
-                let path: String = self.path_components.join("/");
+                let path: String = self
+                    .path_components
+                    .iter()
+                    .map(|component| component.to_string())
+                    .collect::<Vec<String>>()
+                    .join("/");
                 self.path_components.pop();
 
+                // TODO: return VfsPath instead of String.
                 return Some(Ok((state.file_entry, path)));
             }
             let result: io::Result<VfsFileEntry> = state
@@ -120,7 +128,7 @@ impl<'a> Iterator for VfsFinder<'a> {
                         };
                     match file_entry.get_name() {
                         Some(name) => self.path_components.push(name),
-                        None => self.path_components.push(String::new()),
+                        None => self.path_components.push(VfsString::Empty),
                     };
                     self.states
                         .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));

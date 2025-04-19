@@ -45,16 +45,9 @@ impl Ucs2String {
 
     /// Reads a little-endian UCS-2 string from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
-        let data_size: usize = data.len() / 2;
         let mut elements: Vec<u16> = Vec::new();
+        Ucs2String::read_elements_le(&mut elements, data);
 
-        for data_offset in 0..data_size {
-            let value_16bit = bytes_to_u16_le!(data, data_offset * 2);
-            if value_16bit == 0 {
-                break;
-            }
-            elements.push(value_16bit);
-        }
         Self { elements: elements }
     }
 
@@ -74,6 +67,21 @@ impl Ucs2String {
     /// Retrieves the length (or size) of the UCS-2 string.
     pub fn len(&self) -> usize {
         self.elements.len()
+    }
+
+    // TODO: add read_elements_be
+
+    /// Reads a little-endian UCS-2 string from a byte sequence.
+    pub fn read_elements_le(elements: &mut Vec<u16>, data: &[u8]) {
+        let data_size: usize = data.len() / 2;
+
+        for data_offset in 0..data_size {
+            let value_16bit = bytes_to_u16_le!(data, data_offset * 2);
+            if value_16bit == 0 {
+                break;
+            }
+            elements.push(value_16bit);
+        }
     }
 
     /// Retrieves the string representation of an UCS-2 string.
@@ -149,6 +157,9 @@ mod tests {
         let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
         assert_eq!(ucs2_string.len(), 12);
     }
+
+    // TODO: add tests for read_elements_be
+    // TODO: add tests for read_elements_le
 
     #[test]
     fn test_to_string() {

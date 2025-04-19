@@ -16,6 +16,7 @@ mod bodyfile;
 mod ext;
 mod gpt;
 mod mbr;
+mod ntfs;
 mod qcow;
 mod sparseimage;
 mod udif;
@@ -29,6 +30,10 @@ pub use ext::{
 };
 pub use gpt::print_gpt_volume_system;
 pub use mbr::print_mbr_volume_system;
+pub use ntfs::{
+    print_entry_ntfs_file_system, print_hierarcy_ntfs_file_system, print_ntfs_file_system,
+    print_path_ntfs_file_system,
+};
 pub use qcow::print_qcow_file;
 pub use sparseimage::print_sparseimage_file;
 pub use udif::print_udif_file;

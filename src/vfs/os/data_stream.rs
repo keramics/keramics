@@ -24,4 +24,17 @@ impl VfsDataStream for File {
     }
 }
 
-// TODO: add tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_size() -> io::Result<()> {
+        let mut file: File = File::open("./test_data/file.txt")?;
+
+        let size: u64 = file.get_size()?;
+        assert_eq!(size, 202);
+
+        Ok(())
+    }
+}

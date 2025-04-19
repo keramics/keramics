@@ -65,6 +65,8 @@ struct HierarchyCommandArguments {
     #[arg(long, default_value_t = false)]
     /// Output as a bodyfile
     bodyfile: bool,
+    // TODO: allow to set the path component/segment separator
+    // TODO: allow to set the data stream name separator
 }
 
 #[derive(Args, Debug)]
@@ -79,6 +81,7 @@ fn scan_for_formats(data_stream: &VfsDataStreamReference) -> io::Result<Option<F
     format_scanner.add_apm_signatures();
     format_scanner.add_ext_signatures();
     format_scanner.add_gpt_signatures();
+    format_scanner.add_ntfs_signatures();
     format_scanner.add_qcow_signatures();
     // TODO: support for sparse bundle.
     format_scanner.add_sparseimage_signatures();
@@ -191,6 +194,11 @@ fn main() -> ExitCode {
                 &vfs_path,
                 command_arguments.entry,
             ),
+            FormatIdentifier::Ntfs => info::print_entry_ntfs_file_system(
+                &vfs_file_system,
+                &vfs_path,
+                command_arguments.entry,
+            ),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE
@@ -198,6 +206,11 @@ fn main() -> ExitCode {
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
             FormatIdentifier::Ext => info::print_hierarcy_ext_file_system(
+                &vfs_file_system,
+                &vfs_path,
+                command_arguments.bodyfile,
+            ),
+            FormatIdentifier::Ntfs => info::print_hierarcy_ntfs_file_system(
                 &vfs_file_system,
                 &vfs_path,
                 command_arguments.bodyfile,
@@ -213,6 +226,11 @@ fn main() -> ExitCode {
                 &vfs_path,
                 &command_arguments.path,
             ),
+            FormatIdentifier::Ntfs => info::print_path_ntfs_file_system(
+                &vfs_file_system,
+                &vfs_path,
+                &command_arguments.path,
+            ),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE
@@ -223,7 +241,9 @@ fn main() -> ExitCode {
             FormatIdentifier::Ext => info::print_ext_file_system(&vfs_file_system, &vfs_path),
             FormatIdentifier::Gpt => info::print_gpt_volume_system(&vfs_file_system, &vfs_path),
             FormatIdentifier::Mbr => info::print_mbr_volume_system(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Ntfs => info::print_ntfs_file_system(&vfs_file_system, &vfs_path),
             FormatIdentifier::Qcow => info::print_qcow_file(&vfs_file_system, &vfs_path),
+            // TODO: add support for sparse bundle.
             FormatIdentifier::SparseImage => {
                 info::print_sparseimage_file(&vfs_file_system, &vfs_path)
             }

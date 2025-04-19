@@ -19,6 +19,7 @@ use crate::formats::apm::ApmVolumeSystem;
 use crate::formats::ext::{ExtFileEntry, ExtFileSystem};
 use crate::formats::gpt::GptVolumeSystem;
 use crate::formats::mbr::MbrVolumeSystem;
+use crate::formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
 use crate::formats::qcow::QcowImage;
 use crate::formats::vhd::VhdImage;
 use crate::formats::vhdx::VhdxImage;
@@ -38,6 +39,7 @@ pub enum VfsFileSystem {
     Fake(FakeFileSystem),
     Gpt(GptVolumeSystem),
     Mbr(MbrVolumeSystem),
+    Ntfs(NtfsFileSystem),
     Os,
     Qcow(QcowImage),
     Vhd(VhdImage),
@@ -53,6 +55,7 @@ impl VfsFileSystem {
             VfsPathType::Fake => VfsFileSystem::Fake(FakeFileSystem::new()),
             VfsPathType::Gpt => VfsFileSystem::Gpt(GptVolumeSystem::new()),
             VfsPathType::Mbr => VfsFileSystem::Mbr(MbrVolumeSystem::new()),
+            VfsPathType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
             VfsPathType::Os => VfsFileSystem::Os,
             VfsPathType::Qcow => VfsFileSystem::Qcow(QcowImage::new()),
             VfsPathType::Vhd => VfsFileSystem::Vhd(VhdImage::new()),
@@ -127,6 +130,18 @@ impl VfsFileSystem {
                     "Unsupported path type",
                 )),
             },
+            VfsFileSystem::Ntfs(ntfs_file_system) => match path {
+                VfsPath::Ntfs { ntfs_path, .. } => {
+                    match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+                        Some(_) => Ok(true),
+                        None => Ok(false),
+                    }
+                }
+                _ => Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Unsupported path type",
+                )),
+            },
             VfsFileSystem::Os => match path {
                 VfsPath::Os { location, .. } => {
                     let os_path: &Path = Path::new(&location);
@@ -194,6 +209,7 @@ impl VfsFileSystem {
         name: Option<&str>,
     ) -> io::Result<Option<VfsDataStreamReference>> {
         match self.get_file_entry_by_path(path)? {
+            // TODO: replace by get_data_fork_by_name
             Some(file_entry) => file_entry.get_data_stream_by_name(name),
             None => Ok(None),
         }
@@ -279,6 +295,20 @@ impl VfsFileSystem {
                                 None => Some(VfsFileEntry::Mbr(None)),
                             },
                             Err(_) => None,
+                        };
+                    Ok(result)
+                }
+                _ => Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Unsupported path type",
+                )),
+            },
+            VfsFileSystem::Ntfs(ntfs_file_system) => match path {
+                VfsPath::Ntfs { ntfs_path, .. } => {
+                    let result: Option<VfsFileEntry> =
+                        match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+                            Some(file_entry) => Some(VfsFileEntry::Ntfs(file_entry)),
+                            None => None,
                         };
                     Ok(result)
                 }
@@ -377,6 +407,10 @@ impl VfsFileSystem {
             VfsFileSystem::Fake(_) => todo!(),
             VfsFileSystem::Gpt(_) => todo!(),
             VfsFileSystem::Mbr(_) => todo!(),
+            VfsFileSystem::Ntfs(ntfs_file_system) => {
+                let ntfs_file_entry: NtfsFileEntry = ntfs_file_system.get_root_directory()?;
+                Ok(Some(VfsFileEntry::Ntfs(ntfs_file_entry)))
+            }
             VfsFileSystem::Os => todo!(),
             VfsFileSystem::Qcow(_) => todo!(),
             VfsFileSystem::Vhd(_) => todo!(),
@@ -392,6 +426,7 @@ impl VfsFileSystem {
             VfsFileSystem::Fake(_) => VfsPathType::Fake,
             VfsFileSystem::Gpt(_) => VfsPathType::Gpt,
             VfsFileSystem::Mbr(_) => VfsPathType::Mbr,
+            VfsFileSystem::Ntfs(_) => VfsPathType::Ntfs,
             VfsFileSystem::Os => VfsPathType::Os,
             VfsFileSystem::Qcow(_) => VfsPathType::Qcow,
             VfsFileSystem::Vhd(_) => VfsPathType::Vhd,
@@ -438,6 +473,13 @@ impl VfsFileSystem {
             },
             VfsFileSystem::Mbr(mbr_volume_system) => match parent_file_system {
                 Some(file_system) => mbr_volume_system.open(file_system, path),
+                None => Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing parent file system",
+                )),
+            },
+            VfsFileSystem::Ntfs(ntfs_file_system) => match parent_file_system {
+                Some(file_system) => ntfs_file_system.open(file_system, path),
                 None => Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",

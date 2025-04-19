@@ -29,3 +29,4 @@ pub mod mbr;
 
 // File system formats
 pub mod ext;
+pub mod ntfs;
