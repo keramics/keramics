@@ -335,6 +335,37 @@ impl NtfsFileEntry {
         Ok(file_entry)
     }
 
+    /// Retrieves a specific sub file entry.
+    pub fn get_sub_file_entry_by_name(
+        &mut self,
+        sub_file_entry_name: &Ucs2String,
+    ) -> io::Result<Option<NtfsFileEntry>> {
+        if !self.read_directory_entries {
+            self.read_directory_entries()?;
+        }
+        // TODO: case insensitive search
+        let (name, directory_entry): (&Ucs2String, &NtfsDirectoryEntry) =
+            match self.directory_entries.get_key_value(sub_file_entry_name) {
+                Some(key_and_value) => key_and_value,
+                None => return Ok(None),
+            };
+
+        let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
+        let mut mft_entry: NtfsMftEntry =
+            self.mft.get_entry(&self.data_stream, mft_entry_number)?;
+        mft_entry.read_attributes()?;
+
+        let file_entry: NtfsFileEntry = NtfsFileEntry::new(
+            &self.data_stream,
+            &self.mft,
+            mft_entry_number,
+            mft_entry,
+            Some(name.clone()),
+            Some(directory_entry.clone()),
+        );
+        Ok(Some(file_entry))
+    }
+
     /// Determines if the file entry has directory entries.
     pub fn has_directory_entries(&self) -> bool {
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
@@ -393,6 +424,7 @@ mod tests {
     // TODO: add tests for get_number_of_data_forks
     // TODO: add tests for get_number_of_sub_file_entries
     // TODO: add tests for get_sub_file_entry_by_index
+    // TODO: add tests for get_sub_file_entry_by_name
     // TODO: add tests for has_directory_entries
     // TODO: add tests for is_allocated
     // TODO: add tests for is_bad

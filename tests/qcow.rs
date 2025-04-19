@@ -39,16 +39,22 @@ fn read_media_from_file(file: &mut QcowFile) -> io::Result<(u64, String)> {
     Ok((media_offset, hash_string))
 }
 
-#[test]
-fn read_media() -> io::Result<()> {
+fn open_file(location: &str) -> io::Result<QcowFile> {
     let mut vfs_context: VfsContext = VfsContext::new();
     let vfs_path: VfsPath = VfsPath::Os {
-        location: "./test_data/qcow/ext2.qcow2".to_string(),
+        location: location.to_string(),
     };
     let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
-    let mut file = QcowFile::new();
+    let mut file: QcowFile = QcowFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
+
+    Ok(file)
+}
+
+#[test]
+fn read_media() -> io::Result<()> {
+    let mut file: QcowFile = open_file("./test_data/qcow/ext2.qcow2")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

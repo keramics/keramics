@@ -60,7 +60,6 @@ impl ExtExtentsTree {
             block_ranges,
             6,
         )?;
-
         if logical_block_number < self.number_of_blocks {
             let block_range: ExtBlockRange = ExtBlockRange::new(
                 logical_block_number,
@@ -141,21 +140,39 @@ impl ExtExtentsTree {
                 entry.read_data(&data[data_offset..data_end_offset])?;
                 data_offset = data_end_offset;
 
-                let range_type: ExtBlockRangeType = if entry.physical_block_number == 0 {
+                if entry.logical_block_number as u64 > *logical_block_number {
+                    let number_of_blocks: u64 =
+                        (entry.logical_block_number as u64) - *logical_block_number;
+
+                    let block_range: ExtBlockRange = ExtBlockRange::new(
+                        *logical_block_number,
+                        0,
+                        number_of_blocks,
+                        ExtBlockRangeType::Sparse,
+                    );
+                    block_ranges.push(block_range);
+
+                    *logical_block_number = entry.logical_block_number as u64;
+                }
+                let mut number_of_blocks: u64 = entry.number_of_blocks as u64;
+                let mut range_type: ExtBlockRangeType = if entry.physical_block_number == 0 {
                     ExtBlockRangeType::Sparse
                 } else {
                     ExtBlockRangeType::InFile
                 };
+                if number_of_blocks > 32768 {
+                    number_of_blocks -= 32768;
+                    range_type = ExtBlockRangeType::Sparse;
+                }
                 let block_range: ExtBlockRange = ExtBlockRange::new(
                     entry.logical_block_number as u64,
                     entry.physical_block_number,
-                    entry.number_of_blocks as u64,
+                    number_of_blocks,
                     range_type,
                 );
                 block_ranges.push(block_range);
 
-                *logical_block_number =
-                    (entry.logical_block_number as u64) + (entry.number_of_blocks as u64);
+                *logical_block_number = (entry.logical_block_number as u64) + number_of_blocks;
             }
         }
         if data_size - data_offset >= 4 {
@@ -204,4 +221,86 @@ impl ExtExtentsTree {
     }
 }
 
-// TODO: add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::vfs::{new_fake_data_stream, VfsDataStreamReference};
+
+    fn get_test_data() -> Vec<u8> {
+        return vec![];
+    }
+
+    #[test]
+    fn test_read_data_reference() -> io::Result<()> {
+        let mut test_struct = ExtExtentsTree::new(1024, 16);
+
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: VfsDataStreamReference = new_fake_data_stream(test_data);
+
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+        let test_data: Vec<u8> = vec![
+            0x0a, 0xf3, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x53, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+        test_struct.read_data_reference(&test_data, &test_data_stream, &mut block_ranges)?;
+
+        assert_eq!(block_ranges.len(), 2);
+
+        let block_range: &ExtBlockRange = &block_ranges[0];
+        assert_eq!(block_range.logical_block_number, 0);
+        assert_eq!(block_range.physical_block_number, 1363);
+        assert_eq!(block_range.number_of_blocks, 12);
+        assert!(block_range.range_type == ExtBlockRangeType::InFile);
+
+        let block_range: &ExtBlockRange = &block_ranges[1];
+        assert_eq!(block_range.logical_block_number, 12);
+        assert_eq!(block_range.physical_block_number, 0);
+        assert_eq!(block_range.number_of_blocks, 4);
+        assert!(block_range.range_type == ExtBlockRangeType::Sparse);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_node_data() -> io::Result<()> {
+        let mut test_struct = ExtExtentsTree::new(1024, 16);
+
+        let test_data: Vec<u8> = get_test_data();
+        let test_data_stream: VfsDataStreamReference = new_fake_data_stream(test_data);
+
+        let mut logical_block_number: u64 = 0;
+        let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+        let test_data: Vec<u8> = vec![
+            0x0a, 0xf3, 0x01, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x53, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+        test_struct.read_node_data(
+            &test_data,
+            &test_data_stream,
+            &mut logical_block_number,
+            &mut block_ranges,
+            6,
+        )?;
+        assert_eq!(block_ranges.len(), 1);
+
+        let block_range: &ExtBlockRange = &block_ranges[0];
+        assert_eq!(block_range.logical_block_number, 0);
+        assert_eq!(block_range.physical_block_number, 1363);
+        assert_eq!(block_range.number_of_blocks, 12);
+        assert!(block_range.range_type == ExtBlockRangeType::InFile);
+
+        Ok(())
+    }
+
+    // TODO: add tests for read_node_data with depth > 0
+    // TODO: add tests for read_node_at_position
+}

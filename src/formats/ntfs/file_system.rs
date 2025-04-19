@@ -128,7 +128,16 @@ impl NtfsFileSystem {
         if path.is_empty() || path.components[0].len() != 0 {
             return Ok(None);
         }
-        todo!();
+        let mut file_entry: NtfsFileEntry = self.get_root_directory()?;
+
+        // TODO: cache file entries.
+        for path_component in path.components[1..].iter() {
+            file_entry = match file_entry.get_sub_file_entry_by_name(path_component)? {
+                Some(file_entry) => file_entry,
+                None => return Ok(None),
+            }
+        }
+        Ok(Some(file_entry))
     }
 
     /// Retrieves the root directory (file entry).

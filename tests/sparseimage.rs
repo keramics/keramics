@@ -27,7 +27,7 @@ fn read_media_from_file_with_output_file(file: &mut SparseImageFile) -> io::Resu
     let mut data: Vec<u8> = vec![0; 512];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
-    let mut output_file = File::create("test.raw")?;
+    let mut output_file: File = File::create("test.raw")?;
 
     while let Ok(read_count) = file.read(&mut data) {
         if read_count == 0 {
@@ -63,16 +63,22 @@ fn read_media_from_file(file: &mut SparseImageFile) -> io::Result<(u64, String)>
     Ok((media_offset, hash_string))
 }
 
-#[test]
-fn read_media() -> io::Result<()> {
+fn open_file(location: &str) -> io::Result<SparseImageFile> {
     let mut vfs_context: VfsContext = VfsContext::new();
     let vfs_path: VfsPath = VfsPath::Os {
-        location: "./test_data/sparseimage/hfsplus.sparseimage".to_string(),
+        location: location.to_string(),
     };
     let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
 
-    let mut file = SparseImageFile::new();
+    let mut file: SparseImageFile = SparseImageFile::new();
     file.open(&vfs_file_system, &vfs_path)?;
+
+    Ok(file)
+}
+
+#[test]
+fn read_media() -> io::Result<()> {
+    let mut file: SparseImageFile = open_file("./test_data/sparseimage/hfsplus.sparseimage")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
