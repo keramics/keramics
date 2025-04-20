@@ -1,0 +1,24 @@
+[package]
+authors.workspace = true
+description = "Tools for analysis of data formats"
+edition.workspace = true
+license.workspace = true
+name = "tools"
+version.workspace = true
+
+[[bin]]
+name = "image_analyzer"
+path = "src/image_analyzer.rs"
+publish = false
+
+[[bin]]
+name = "keramicsinfo"
+path = "src/info_tool.rs"
+
+[[bin]]
+name = "keramicshash"
+path = "src/hash_tool.rs"
+
+[dependencies]
+clap = { version = "4.0", features = ["derive"] }
+keramics = { path = "../keramics" }
