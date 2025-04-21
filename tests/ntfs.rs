@@ -13,14 +13,14 @@
 
 use std::io;
 use std::io::Read;
-use std::sync::Arc;
 
-use keramics::formats::ntfs::{NtfsFileEntry, NtfsFileSystem, NtfsPath};
-use keramics::formatters::format_as_string;
-use keramics::hashes::{DigestHashContext, Md5Context};
-use keramics::vfs::{VfsContext, VfsDataStream, VfsDataStreamReference, VfsFileSystem, VfsPath};
+use core::{DataStream, DataStreamReference};
+use core::formatters::format_as_string;
+use formats::ntfs::{NtfsFileEntry, NtfsFileSystem, NtfsPath};
+use hashes::{DigestHashContext, Md5Context};
+use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
-fn read_data_stream(data_stream: &mut Box<dyn VfsDataStream>) -> io::Result<(u64, String)> {
+fn read_data_stream(data_stream: &mut Box<dyn DataStream>) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut offset: u64 = 0;
@@ -43,11 +43,11 @@ fn read_path(file_system: &NtfsFileSystem, location: &str) -> io::Result<(u64, S
     let path: NtfsPath = NtfsPath::from(location);
     let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-    let vfs_data_stream: VfsDataStreamReference = file_entry.get_data_stream()?.unwrap();
+    let data_stream: DataStreamReference = file_entry.get_data_stream()?.unwrap();
 
-    let (offset, hash_string): (u64, String) = match vfs_data_stream.with_write_lock() {
+    let (offset, hash_string): (u64, String) = match data_stream.with_write_lock() {
         Ok(mut data_stream) => read_data_stream(&mut data_stream)?,
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
+        Err(error) => return Err(core::error_to_io_error!(error)),
     };
     Ok((offset, hash_string))
 }
@@ -57,7 +57,7 @@ fn open_file_system(location: &str) -> io::Result<NtfsFileSystem> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: location.to_string(),
     };
-    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
     file_system.open(&vfs_file_system, &vfs_path)?;

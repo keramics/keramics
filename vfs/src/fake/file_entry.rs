@@ -1,0 +1,171 @@
+/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::io;
+
+use core::{DataStreamReference, FakeDataStream};
+use datetime::DateTime;
+
+use crate::enums::VfsFileType;
+
+/// Fake (or virtual) file entry.
+pub struct FakeFileEntry {
+    // TODO: add name
+    /// File type.
+    file_type: VfsFileType,
+
+    /// Data stream.
+    data_stream: DataStreamReference,
+
+    /// Access time.
+    access_time: Option<DateTime>,
+
+    /// Change time.
+    change_time: Option<DateTime>,
+
+    /// Creation time.
+    creation_time: Option<DateTime>,
+
+    /// Modification time.
+    modification_time: Option<DateTime>,
+}
+
+impl FakeFileEntry {
+    /// Creates a new file entry.
+    pub fn new() -> Self {
+        // TODO: test timestamps with current time
+        Self {
+            data_stream: DataStreamReference::none(),
+            file_type: VfsFileType::NotSet,
+            access_time: None,
+            change_time: None,
+            creation_time: None,
+            modification_time: None,
+        }
+    }
+
+    /// Creates a new file entry.
+    pub fn new_file(data: &[u8]) -> Self {
+        let data_size: u64 = data.len() as u64;
+        let data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
+
+        // TODO: test timestamps with current time
+        Self {
+            data_stream: DataStreamReference::new(Box::new(data_stream)),
+            file_type: VfsFileType::File,
+            access_time: None,
+            change_time: None,
+            creation_time: None,
+            modification_time: None,
+        }
+    }
+
+    /// Retrieves the access time.
+    pub fn get_access_time(&self) -> Option<&DateTime> {
+        self.access_time.as_ref()
+    }
+
+    /// Retrieves the change time.
+    pub fn get_change_time(&self) -> Option<&DateTime> {
+        self.change_time.as_ref()
+    }
+
+    /// Retrieves the creation time.
+    pub fn get_creation_time(&self) -> Option<&DateTime> {
+        self.creation_time.as_ref()
+    }
+
+    /// Retrieves the file type.
+    pub fn get_file_type(&self) -> VfsFileType {
+        self.file_type.clone()
+    }
+
+    /// Retrieves the modification time.
+    pub fn get_modification_time(&self) -> Option<&DateTime> {
+        self.modification_time.as_ref()
+    }
+
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+        if self.file_type != VfsFileType::File {
+            return Ok(None);
+        }
+        Ok(Some(self.data_stream.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_test_data() -> Vec<u8> {
+        return vec![
+            0x41, 0x20, 0x63, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x20, 0x69, 0x73, 0x20, 0x61,
+            0x6e, 0x79, 0x20, 0x6f, 0x66, 0x20, 0x74, 0x68, 0x65, 0x20, 0x76, 0x61, 0x72, 0x69,
+            0x6f, 0x75, 0x73, 0x20, 0x68, 0x61, 0x72, 0x64, 0x2c, 0x20, 0x62, 0x72, 0x69, 0x74,
+            0x74, 0x6c, 0x65, 0x2c, 0x20, 0x68, 0x65, 0x61, 0x74, 0x2d, 0x72, 0x65, 0x73, 0x69,
+            0x73, 0x74, 0x61, 0x6e, 0x74, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x63, 0x6f, 0x72,
+            0x72, 0x6f, 0x73, 0x69, 0x6f, 0x6e, 0x2d, 0x72, 0x65, 0x73, 0x69, 0x73, 0x74, 0x61,
+            0x6e, 0x74, 0x20, 0x6d, 0x61, 0x74, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x73, 0x20, 0x6d,
+            0x61, 0x64, 0x65, 0x20, 0x62, 0x79, 0x20, 0x73, 0x68, 0x61, 0x70, 0x69, 0x6e, 0x67,
+            0x20, 0x61, 0x6e, 0x64, 0x20, 0x74, 0x68, 0x65, 0x6e, 0x20, 0x66, 0x69, 0x72, 0x69,
+            0x6e, 0x67, 0x20, 0x61, 0x6e, 0x20, 0x69, 0x6e, 0x6f, 0x72, 0x67, 0x61, 0x6e, 0x69,
+            0x63, 0x2c, 0x20, 0x6e, 0x6f, 0x6e, 0x6d, 0x65, 0x74, 0x61, 0x6c, 0x6c, 0x69, 0x63,
+            0x20, 0x6d, 0x61, 0x74, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x2c, 0x20, 0x73, 0x75, 0x63,
+            0x68, 0x20, 0x61, 0x73, 0x20, 0x63, 0x6c, 0x61, 0x79, 0x2c, 0x20, 0x61, 0x74, 0x20,
+            0x61, 0x20, 0x68, 0x69, 0x67, 0x68, 0x20, 0x74, 0x65, 0x6d, 0x70, 0x65, 0x72, 0x61,
+            0x74, 0x75, 0x72, 0x65, 0x2e, 0x0a,
+        ];
+    }
+
+    // TODO: add tests for FakeFileEntry::get_access_time
+    // TODO: add tests for FakeFileEntry::get_change_time
+    // TODO: add tests for FakeFileEntry::get_creation_time
+    // TODO: add tests for FakeFileEntry::get_file_type
+    // TODO: add tests for FakeFileEntry::get_modification_time
+
+    #[test]
+    fn test_get_data_stream() -> io::Result<()> {
+        let test_data: Vec<u8> = get_test_data();
+        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
+
+        let result: Option<DataStreamReference> = fake_file_entry.get_data_stream()?;
+
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::NotFound,
+                    format!("Missing data stream"),
+                ))
+            }
+        };
+        let mut test_data: Vec<u8> = vec![];
+        let read_count: usize = match data_stream.with_write_lock() {
+            Ok(mut data_stream) => data_stream.read_to_end(&mut test_data)?,
+            Err(error) => return Err(core::error_to_io_error!(error)),
+        };
+        assert_eq!(read_count, 202);
+
+        let expected_data: String = [
+            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
+            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
+            "nonmetallic material, such as clay, at a high temperature.\n",
+        ]
+        .join("");
+
+        assert_eq!(test_data, expected_data.as_bytes());
+
+        Ok(())
+    }
+}

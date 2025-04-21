@@ -1,0 +1,12 @@
+[package]
+authors.workspace = true
+description = "Keramics data types"
+edition.workspace = true
+license.workspace = true
+name = "types"
+publish = false
+version.workspace = true
+
+[lib]
+name = "types"
+path = "src/lib.rs"

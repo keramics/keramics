@@ -14,16 +14,13 @@
 use std::collections::HashSet;
 use std::io;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use clap::{Args, Parser, Subcommand};
 
-use keramics::enums::FormatIdentifier;
-use keramics::format_scanner::FormatScanner;
-use keramics::mediator::Mediator;
-use keramics::vfs::{
-    VfsDataStreamReference, VfsFileSystem, VfsPath, VfsResolver, VfsResolverReference,
-};
+use core::mediator::Mediator;
+use core::DataStreamReference;
+use formats::{FormatIdentifier, FormatScanner};
+use vfs::{VfsFileSystemReference, VfsPath, VfsResolver, VfsResolverReference};
 
 mod formatters;
 mod info;
@@ -76,7 +73,7 @@ struct PathCommandArguments {
 }
 
 /// Scans a data stream for format signatures.
-fn scan_for_formats(data_stream: &VfsDataStreamReference) -> io::Result<Option<FormatIdentifier>> {
+fn scan_for_formats(data_stream: &DataStreamReference) -> io::Result<Option<FormatIdentifier>> {
     let mut format_scanner: FormatScanner = FormatScanner::new();
     format_scanner.add_apm_signatures();
     format_scanner.add_ext_signatures();
@@ -91,7 +88,7 @@ fn scan_for_formats(data_stream: &VfsDataStreamReference) -> io::Result<Option<F
 
     match format_scanner.build() {
         Ok(_) => {}
-        Err(error) => return Err(keramics::error_to_io_error!(error)),
+        Err(error) => return Err(core::error_to_io_error!(error)),
     };
     let mut scan_results: HashSet<FormatIdentifier> =
         format_scanner.scan_data_stream(data_stream)?;
@@ -109,7 +106,7 @@ fn scan_for_formats(data_stream: &VfsDataStreamReference) -> io::Result<Option<F
 
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics::error_to_io_error!(error)),
+            Err(error) => return Err(core::error_to_io_error!(error)),
         };
         let mut scan_results: HashSet<FormatIdentifier> =
             format_scanner.scan_data_stream(data_stream)?;
@@ -143,14 +140,14 @@ fn main() -> ExitCode {
 
     let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-    let vfs_file_system: Arc<VfsFileSystem> = match vfs_resolver.open_file_system(&vfs_path) {
+    let vfs_file_system: VfsFileSystemReference = match vfs_resolver.open_file_system(&vfs_path) {
         Ok(value) => value,
         Err(error) => {
             println!("Unable to open file system with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
-    let result: Option<VfsDataStreamReference> =
+    let result: Option<DataStreamReference> =
         match vfs_file_system.get_data_stream_by_path_and_name(&vfs_path, None) {
             Ok(result) => result,
             Err(error) => {
@@ -158,14 +155,14 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         };
-    let vfs_data_stream: VfsDataStreamReference = match result {
+    let data_stream: DataStreamReference = match result {
         Some(data_stream) => data_stream,
         None => {
             println!("No such file: {}", source);
             return ExitCode::FAILURE;
         }
     };
-    let result: Option<FormatIdentifier> = match scan_for_formats(&vfs_data_stream) {
+    let result: Option<FormatIdentifier> = match scan_for_formats(&data_stream) {
         Ok(result) => result,
         Err(error) => {
             println!(
@@ -189,67 +186,53 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => info::print_entry_ext_file_system(
-                &vfs_file_system,
-                &vfs_path,
-                command_arguments.entry,
-            ),
-            FormatIdentifier::Ntfs => info::print_entry_ntfs_file_system(
-                &vfs_file_system,
-                &vfs_path,
-                command_arguments.entry,
-            ),
+            FormatIdentifier::Ext => {
+                info::print_entry_ext_file_system(&data_stream, command_arguments.entry)
+            }
+            FormatIdentifier::Ntfs => {
+                info::print_entry_ntfs_file_system(&data_stream, command_arguments.entry)
+            }
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE
             }
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => info::print_hierarcy_ext_file_system(
-                &vfs_file_system,
-                &vfs_path,
-                command_arguments.bodyfile,
-            ),
-            FormatIdentifier::Ntfs => info::print_hierarcy_ntfs_file_system(
-                &vfs_file_system,
-                &vfs_path,
-                command_arguments.bodyfile,
-            ),
+            FormatIdentifier::Ext => {
+                info::print_hierarcy_ext_file_system(&data_stream, command_arguments.bodyfile)
+            }
+            FormatIdentifier::Ntfs => {
+                info::print_hierarcy_ntfs_file_system(&data_stream, command_arguments.bodyfile)
+            }
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE
             }
         },
         Some(Commands::Path(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => info::print_path_ext_file_system(
-                &vfs_file_system,
-                &vfs_path,
-                &command_arguments.path,
-            ),
-            FormatIdentifier::Ntfs => info::print_path_ntfs_file_system(
-                &vfs_file_system,
-                &vfs_path,
-                &command_arguments.path,
-            ),
+            FormatIdentifier::Ext => {
+                info::print_path_ext_file_system(&data_stream, &command_arguments.path)
+            }
+            FormatIdentifier::Ntfs => {
+                info::print_path_ntfs_file_system(&data_stream, &command_arguments.path)
+            }
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE
             }
         },
         None => match &format_identifier {
-            FormatIdentifier::Apm => info::print_apm_volume_system(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Ext => info::print_ext_file_system(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Gpt => info::print_gpt_volume_system(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Mbr => info::print_mbr_volume_system(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Ntfs => info::print_ntfs_file_system(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Qcow => info::print_qcow_file(&vfs_file_system, &vfs_path),
+            FormatIdentifier::Apm => info::print_apm_volume_system(&data_stream),
+            FormatIdentifier::Ext => info::print_ext_file_system(&data_stream),
+            FormatIdentifier::Gpt => info::print_gpt_volume_system(&data_stream),
+            FormatIdentifier::Mbr => info::print_mbr_volume_system(&data_stream),
+            FormatIdentifier::Ntfs => info::print_ntfs_file_system(&data_stream),
+            FormatIdentifier::Qcow => info::print_qcow_file(&data_stream),
             // TODO: add support for sparse bundle.
-            FormatIdentifier::SparseImage => {
-                info::print_sparseimage_file(&vfs_file_system, &vfs_path)
-            }
-            FormatIdentifier::Udif => info::print_udif_file(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Vhd => info::print_vhd_file(&vfs_file_system, &vfs_path),
-            FormatIdentifier::Vhdx => info::print_vhdx_file(&vfs_file_system, &vfs_path),
+            FormatIdentifier::SparseImage => info::print_sparseimage_file(&data_stream),
+            FormatIdentifier::Udif => info::print_udif_file(&data_stream),
+            FormatIdentifier::Vhd => info::print_vhd_file(&data_stream),
+            FormatIdentifier::Vhdx => info::print_vhdx_file(&data_stream),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE

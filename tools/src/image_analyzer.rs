@@ -15,7 +15,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use keramics::vfs::{VfsPath, VfsScanContext, VfsScanNode, VfsScanner};
+use vfs::{VfsPath, VfsScanContext, VfsScanNode, VfsScanner};
 
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]

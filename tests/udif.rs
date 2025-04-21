@@ -13,12 +13,11 @@
 
 use std::io;
 use std::io::Read;
-use std::sync::Arc;
 
-use keramics::formats::udif::UdifFile;
-use keramics::formatters::format_as_string;
-use keramics::hashes::{DigestHashContext, Md5Context};
-use keramics::vfs::{VfsContext, VfsFileSystem, VfsPath};
+use core::formatters::format_as_string;
+use formats::udif::UdifFile;
+use hashes::{DigestHashContext, Md5Context};
+use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
 fn read_media_from_file(file: &mut UdifFile) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
@@ -44,7 +43,7 @@ fn open_file(location: &str) -> io::Result<UdifFile> {
     let vfs_path: VfsPath = VfsPath::Os {
         location: location.to_string(),
     };
-    let vfs_file_system: Arc<VfsFileSystem> = vfs_context.open_file_system(&vfs_path)?;
+    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
 
     let mut file: UdifFile = UdifFile::new();
     file.open(&vfs_file_system, &vfs_path)?;

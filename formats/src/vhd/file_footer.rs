@@ -1,0 +1,248 @@
+/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use std::io;
+
+use layout_map::LayoutMap;
+use types::{bytes_to_u32_be, bytes_to_u64_be, Uuid};
+
+use super::constants::*;
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "big",
+        field(name = "signature", data_type = "ByteString<8>"),
+        field(name = "features", data_type = "u32"),
+        field(name = "format_version", data_type = "u32", format = "hex"),
+        field(name = "next_offset", data_type = "u64", format = "hex"),
+        field(name = "modification_time", data_type = "u32"),
+        field(name = "creator_application", data_type = "[u8; 4]", format = "char"),
+        field(name = "creator_version", data_type = "[u16; 2]"),
+        field(
+            name = "creator_operating_system",
+            data_type = "[u8; 4]",
+            format = "char"
+        ),
+        field(name = "disk_size", data_type = "u64"),
+        field(name = "data_size", data_type = "u64"),
+        field(name = "disk_geometry", data_type = "u32"),
+        field(name = "disk_type", data_type = "u32"),
+        field(name = "checksum", data_type = "u32", format = "hex"),
+        field(name = "identifier", data_type = "uuid"),
+        field(name = "saved_state", data_type = "u8"),
+        field(name = "unknown1", data_type = "[u8; 427]")
+    ),
+    method(name = "debug_read_data"),
+    method(name = "read_at_position")
+)]
+/// Virtual Hard Disk (VHD) file footer.
+pub struct VhdFileFooter {
+    /// Next metadata offset.
+    pub next_offset: u64,
+
+    /// Data size.
+    pub data_size: u64,
+
+    /// Disk type.
+    pub disk_type: u32,
+
+    /// Identifier.
+    pub identifier: Uuid,
+}
+
+impl VhdFileFooter {
+    /// Creates a new file footer.
+    pub fn new() -> Self {
+        Self {
+            next_offset: 0,
+            data_size: 0,
+            disk_type: 0,
+            identifier: Uuid::new(),
+        }
+    }
+
+    /// Reads the file footer from a buffer.
+    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+        if data.len() != 512 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Unsupported data size"),
+            ));
+        }
+        if data[0..8] != VHD_FILE_FOOTER_SIGNATURE {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unsupported signature"),
+            ));
+        }
+        let format_version: u32 = bytes_to_u32_be!(data, 12);
+
+        if format_version != 0x00010000 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unsupported format version: 0x{:08x}", format_version),
+            ));
+        }
+        self.next_offset = bytes_to_u64_be!(data, 16);
+        self.data_size = bytes_to_u64_be!(data, 40);
+        self.disk_type = bytes_to_u32_be!(data, 60);
+        self.identifier = Uuid::from_be_bytes(&data[68..84]);
+
+        // TODO: calculate and compare checksum.
+
+        if !VHD_DISK_TYPES.contains(&self.disk_type) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unsupported disk type: {}", self.disk_type),
+            ));
+        }
+        if self.disk_type == VHD_DISK_TYPE_FIXED {
+            if self.next_offset != 0xffffffffffffffff {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Unsupported next offset: 0x{:08x}", self.next_offset),
+                ));
+            }
+        } else if self.next_offset < 512 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Unsupported next offset: 0x{:08x}", self.next_offset),
+            ));
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use core::{open_fake_data_stream, DataStreamReference};
+
+    fn get_test_data() -> Vec<u8> {
+        return vec![
+            0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78, 0x00, 0x00, 0x00, 0x02, 0x00, 0x01,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x28, 0x8c, 0x38, 0x27,
+            0x71, 0x65, 0x6d, 0x75, 0x00, 0x05, 0x00, 0x03, 0x57, 0x69, 0x32, 0x6b, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x40, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x48, 0x00,
+            0x00, 0x79, 0x04, 0x11, 0x00, 0x00, 0x00, 0x03, 0xff, 0xff, 0xef, 0xc4, 0xb6, 0x1f,
+            0x53, 0xca, 0xa7, 0x86, 0x45, 0x28, 0x90, 0xe2, 0x55, 0xba, 0x79, 0x1a, 0x1c, 0x4c,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+    }
+
+    #[test]
+    fn test_read_data() -> io::Result<()> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = VhdFileFooter::new();
+        test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.next_offset, 512);
+        assert_eq!(test_struct.data_size, 4212736);
+        assert_eq!(test_struct.disk_type, 3);
+        assert_eq!(
+            test_struct.identifier.to_string(),
+            "b61f53ca-a786-4528-90e2-55ba791a1c4c"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_data_size() {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = VhdFileFooter::new();
+        let result = test_struct.read_data(&test_data[0..511]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_signature() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[0] = 0xff;
+
+        let mut test_struct = VhdFileFooter::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_format_version() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[12] = 0xff;
+
+        let mut test_struct = VhdFileFooter::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_disk_type() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[60] = 0xff;
+
+        let mut test_struct = VhdFileFooter::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_at_position() -> io::Result<()> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+
+        let mut test_struct = VhdFileFooter::new();
+        test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.next_offset, 512);
+        assert_eq!(test_struct.data_size, 4212736);
+        assert_eq!(test_struct.disk_type, 3);
+        assert_eq!(
+            test_struct.identifier.to_string(),
+            "b61f53ca-a786-4528-90e2-55ba791a1c4c"
+        );
+        Ok(())
+    }
+}

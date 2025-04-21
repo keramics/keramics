@@ -1,0 +1,23 @@
+[package]
+authors.workspace = true
+description = "Keramics data formats"
+edition.workspace = true
+license.workspace = true
+name = "formats"
+version.workspace = true
+
+[lib]
+name = "formats"
+path = "src/lib.rs"
+
+[dependencies]
+checksums = { path = "../checksums" }
+compression = { path = "../compression" }
+core = { path = "../core" }
+datetime = { path = "../datetime" }
+encoding = { path = "../encoding" }
+layout_map = { path = "../layout_map" }
+pest = { version = "2.7.14" }
+pest_derive = { version = "2.7.14" }
+sigscan = { path = "../sigscan" }
+types = { path = "../types" }

@@ -1,0 +1,15 @@
+[package]
+authors.workspace = true
+description = "Keramics date and time types"
+edition.workspace = true
+license.workspace = true
+name = "datetime"
+publish = false
+version.workspace = true
+
+[lib]
+name = "datetime"
+path = "src/lib.rs"
+
+[dependencies]
+types = { path = "../types" }

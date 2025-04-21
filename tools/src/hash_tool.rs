@@ -15,14 +15,14 @@ use std::io;
 use std::io::{BufReader, Stdin};
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::Arc;
 
 use clap::{Parser, ValueEnum};
 
-use keramics::formatters::format_as_string;
-use keramics::vfs::{
-    VfsDataFork, VfsDataStreamReference, VfsFileEntry, VfsFileSystem, VfsFileType, VfsFinder,
-    VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+use core::formatters::format_as_string;
+use core::DataStreamReference;
+use vfs::{
+    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsPath,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
 };
 
 mod hasher;
@@ -77,7 +77,7 @@ fn calculate_hash_from_file_entry(
                 if path == "/$BadClus" && name == Some("$Bad".to_string()) {
                     continue;
                 }
-                let data_stream: VfsDataStreamReference = data_fork.get_data_stream()?;
+                let data_stream: DataStreamReference = data_fork.get_data_stream()?;
                 let hash: Vec<u8> = digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
 
                 match name {
@@ -102,7 +102,8 @@ fn calculate_hash_from_scan_node(
     if vfs_scan_node.sub_nodes.is_empty() {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let file_system: Arc<VfsFileSystem> = vfs_resolver.open_file_system(&vfs_scan_node.path)?;
+        let file_system: VfsFileSystemReference =
+            vfs_resolver.open_file_system(&vfs_scan_node.path)?;
 
         for result in VfsFinder::new(&file_system) {
             match result {
@@ -180,7 +181,7 @@ fn main() -> ExitCode {
                 let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
                 // TODO: add support for non-default data stream.
-                let result: Option<VfsDataStreamReference> = match vfs_resolver
+                let result: Option<DataStreamReference> = match vfs_resolver
                     .get_data_stream_by_path_and_name(&root_scan_node.path, None)
                 {
                     Ok(result) => result,
@@ -189,7 +190,7 @@ fn main() -> ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
-                let vfs_data_stream: VfsDataStreamReference = match result {
+                let data_stream: DataStreamReference = match result {
                     Some(data_stream) => data_stream,
                     None => {
                         println!("No such file: {}", source);
@@ -197,7 +198,7 @@ fn main() -> ExitCode {
                     }
                 };
                 let hash: Vec<u8> =
-                    match digest_hasher.calculate_hash_from_data_stream(&vfs_data_stream) {
+                    match digest_hasher.calculate_hash_from_data_stream(&data_stream) {
                         Ok(hash) => hash,
                         Err(error) => {
                             println!(

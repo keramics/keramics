@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use keramics::hashes::{DigestHashContext, Sha256Context};
+use hashes::{DigestHashContext, Sha256Context};
 
 // SHA-256 hash fuzz target.
 fuzz_target!(|data: &[u8]| {

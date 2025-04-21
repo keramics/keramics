@@ -14,10 +14,10 @@
 use std::io;
 use std::io::Read;
 
-use keramics::hashes::{
+use core::DataStreamReference;
+use hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
-use keramics::vfs::VfsDataStreamReference;
 
 #[derive(Clone)]
 pub enum DigestHashType {
@@ -45,7 +45,7 @@ impl DigestHasher {
     /// Calculates a digest hash from a data stream.
     pub fn calculate_hash_from_data_stream(
         &self,
-        vfs_data_stream: &VfsDataStreamReference,
+        data_stream: &DataStreamReference,
     ) -> io::Result<Vec<u8>> {
         let mut hash_context: Box<dyn DigestHashContext> = match self.hash_type {
             DigestHashType::Md5 => Box::new(Md5Context::new()),
@@ -56,7 +56,7 @@ impl DigestHasher {
         };
         let mut data: [u8; 65536] = [0; 65536];
 
-        match vfs_data_stream.with_write_lock() {
+        match data_stream.with_write_lock() {
             Ok(mut data_stream) => {
                 while let Ok(read_count) = data_stream.read(&mut data) {
                     if read_count == 0 {
@@ -65,7 +65,7 @@ impl DigestHasher {
                     hash_context.update(&data[0..read_count]);
                 }
             }
-            Err(error) => return Err(keramics::error_to_io_error!(error)),
+            Err(error) => return Err(core::error_to_io_error!(error)),
         };
         Ok(hash_context.finalize())
     }

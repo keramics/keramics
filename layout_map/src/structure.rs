@@ -121,18 +121,18 @@ impl StructureLayoutBitFieldsGroup {
         match &self.data_type {
             DataType::BitField8 => quote!(data[#data_offset]),
             DataType::BitField16 => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_u16_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u16_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_u16_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_u16_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::BitField32 => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_u32_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u32_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_u32_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_u32_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::BitField64 => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_u64_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u64_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_u64_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_u64_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             _ => panic!("Unsupported data type"),
@@ -356,7 +356,7 @@ impl StructureLayoutField {
                         let #field_name: #field_type = #quote_from_bytes;
                         array_parts.push(#quote_format);
                     }
-                    string_parts.push(format!(#format_string, crate::formatters::debug_format_array(&array_parts)));
+                    string_parts.push(format!(#format_string, core::formatters::debug_format_array(&array_parts)));
                 )
             }
         }
@@ -370,14 +370,14 @@ impl StructureLayoutField {
     ) -> TokenStream {
         match &self.data_type {
             DataType::Filetime => {
-                quote!(crate::datetime::Filetime::from_bytes(&data[#data_offset..#data_offset + 8]))
+                quote!(datetime::Filetime::from_bytes(&data[#data_offset..#data_offset + 8]))
             }
             DataType::PosixTime32 => match byte_order {
                 &ByteOrder::BigEndian => {
-                    quote!(crate::datetime::PosixTime32::from_be_bytes(&data[#data_offset..#data_offset + 4]))
+                    quote!(datetime::PosixTime32::from_be_bytes(&data[#data_offset..#data_offset + 4]))
                 }
                 &ByteOrder::LittleEndian => {
-                    quote!(crate::datetime::PosixTime32::from_le_bytes(&data[#data_offset..#data_offset + 4]))
+                    quote!(datetime::PosixTime32::from_le_bytes(&data[#data_offset..#data_offset + 4]))
                 }
                 _ => panic!("Unsupported byte order"),
             },
@@ -385,41 +385,41 @@ impl StructureLayoutField {
                 quote!(data[#data_offset])
             }
             DataType::SignedInteger16Bit => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_i16_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_i16_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_i16_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_i16_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::SignedInteger32Bit => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_i32_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_i32_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_i32_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_i32_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::SignedInteger64Bit => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_i64_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_i64_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_i64_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_i64_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger16Bit => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_u16_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u16_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_u16_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_u16_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger32Bit => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_u32_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u32_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_u32_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_u32_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::UnsignedInteger64Bit => match byte_order {
-                &ByteOrder::BigEndian => quote!(crate::bytes_to_u64_be!(data, #data_offset)),
-                &ByteOrder::LittleEndian => quote!(crate::bytes_to_u64_le!(data, #data_offset)),
+                &ByteOrder::BigEndian => quote!(types::bytes_to_u64_be!(data, #data_offset)),
+                &ByteOrder::LittleEndian => quote!(types::bytes_to_u64_le!(data, #data_offset)),
                 _ => panic!("Unsupported byte order"),
             },
             DataType::Uuid => match byte_order {
                 &ByteOrder::BigEndian => {
-                    quote!(crate::types::Uuid::from_be_bytes(&data[#data_offset..#data_offset + 16]))
+                    quote!(types::Uuid::from_be_bytes(&data[#data_offset..#data_offset + 16]))
                 }
                 &ByteOrder::LittleEndian => {
-                    quote!(crate::types::Uuid::from_le_bytes(&data[#data_offset..#data_offset + 16]))
+                    quote!(types::Uuid::from_le_bytes(&data[#data_offset..#data_offset + 16]))
                 }
                 _ => panic!("Unsupported byte order"),
             },
@@ -441,9 +441,9 @@ impl StructureLayoutField {
     /// Retrieves a token stream of the type.
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
-            DataType::ByteString => quote!(crate::types::ByteString),
-            DataType::Filetime => quote!(crate::datetime::Filetime),
-            DataType::PosixTime32 => quote!(crate::datetime::PosixTime32),
+            DataType::ByteString => quote!(types::ByteString),
+            DataType::Filetime => quote!(datetime::Filetime),
+            DataType::PosixTime32 => quote!(datetime::PosixTime32),
             DataType::SignedInteger8Bit => quote!(i8),
             DataType::SignedInteger16Bit => quote!(i16),
             DataType::SignedInteger32Bit => quote!(i32),
@@ -452,13 +452,13 @@ impl StructureLayoutField {
                 let name_literal: Ident = format_ident!("{}", name);
                 quote!(#name_literal)
             }
-            DataType::Ucs2String => quote!(crate::types::Ucs2String),
-            DataType::Utf16String => quote!(crate::types::Utf16String),
+            DataType::Ucs2String => quote!(types::Ucs2String),
+            DataType::Utf16String => quote!(types::Utf16String),
             DataType::UnsignedInteger8Bit => quote!(u8),
             DataType::UnsignedInteger16Bit => quote!(u16),
             DataType::UnsignedInteger32Bit => quote!(u32),
             DataType::UnsignedInteger64Bit => quote!(u64),
-            DataType::Uuid => quote!(crate::types::Uuid),
+            DataType::Uuid => quote!(types::Uuid),
             _ => panic!("Unsupported data type"),
         }
     }
@@ -770,16 +770,16 @@ impl StructureLayout {
         quote! {
             pub(super) fn read_at_position(
                 &mut self,
-                data_stream: &crate::vfs::VfsDataStreamReference,
+                data_stream: &core::DataStreamReference,
                 position: std::io::SeekFrom,
             ) -> std::io::Result<()> {
                 let mut data: Vec<u8> = vec![0; #data_size_literal];
 
                 let offset: u64 = match data_stream.with_write_lock() {
                     Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-                    Err(error) => return Err(crate::error_to_io_error!(error)),
+                    Err(error) => return Err(core::error_to_io_error!(error)),
                 };
-                let mediator = crate::mediator::Mediator::current();
+                let mediator = core::mediator::Mediator::current();
                 if mediator.debug_output {
                     mediator.debug_print(format!(
                         #format_string,
@@ -867,7 +867,7 @@ mod tests {
                 let field1: u8 = data[0];
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: u16 = crate::bytes_to_u16_le!(data, 1) - 7;
+                let field2: u16 = types::bytes_to_u16_le!(data, 1) - 7;
                 string_parts.push(format!("    field2: {},\n", field2));
 
                 string_parts.push(format!("}}\n\n"));
@@ -915,7 +915,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u64 = crate::bytes_to_u64_be!(data, 0);
+                let field1: u64 = types::bytes_to_u64_be!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 let mut array_parts: Vec<String> = Vec::new();
@@ -923,7 +923,7 @@ mod tests {
                     let field2: u8 = data[data_offset];
                     array_parts.push(format!("{}", field2));
                 }
-                string_parts.push(format!("    field2: {},\n", crate::formatters::debug_format_array(&array_parts)));
+                string_parts.push(format!("    field2: {},\n", core::formatters::debug_format_array(&array_parts)));
 
                 string_parts.push(format!("}}\n\n"));
 
@@ -970,10 +970,10 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u64 = crate::bytes_to_u64_be!(data, 0);
+                let field1: u64 = types::bytes_to_u64_be!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: crate::types::ByteString = crate::types::ByteString::from_bytes(&data[8..40]);
+                let field2: types::ByteString = types::ByteString::from_bytes(&data[8..40]);
                 string_parts.push(format!("    field2: \"{}\",\n", field2.to_string()));
 
                 string_parts.push(format!("}}\n\n"));
@@ -1017,7 +1017,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let value_32bit: u32 = crate::bytes_to_u32_le!(data, 0);
+                let value_32bit: u32 = types::bytes_to_u32_le!(data, 0);
 
                 let field1: u32 = value_32bit & 511;
                 string_parts.push(format!("    field1: {},\n", field1));
@@ -1082,11 +1082,11 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u64 = crate::bytes_to_u64_be!(data, 0);
+                let field1: u64 = types::bytes_to_u64_be!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 if data.len() > 8 {
-                    let field2: u32 = crate::bytes_to_u32_be!(data, 8);
+                    let field2: u32 = types::bytes_to_u32_be!(data, 8);
                     string_parts.push(format!("    field2: {},\n", field2));
                 }
                 string_parts.push(format!("}}\n\n"));
@@ -1136,7 +1136,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: u32 = crate::bytes_to_u32_le!(data, 0);
+                let field1: u32 = types::bytes_to_u32_le!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 string_parts.push(format!("    field2: "));
@@ -1191,7 +1191,7 @@ mod tests {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
 
-                let field1: i32 = crate::bytes_to_i32_le!(data, 0);
+                let field1: i32 = types::bytes_to_i32_le!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 string_parts.push(format!("    field2: [\n"));
@@ -1235,16 +1235,16 @@ mod tests {
         let expected_token_stream = quote! {
             pub(super) fn read_at_position(
                 &mut self,
-                data_stream: &crate::vfs::VfsDataStreamReference,
+                data_stream: &core::DataStreamReference,
                 position: std::io::SeekFrom,
             ) -> std::io::Result<()> {
                 let mut data: Vec<u8> = vec![0; 16];
 
                 let offset: u64 = match data_stream.with_write_lock() {
                     Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-                    Err(error) => return Err(crate::error_to_io_error!(error)),
+                    Err(error) => return Err(core::error_to_io_error!(error)),
                 };
-                let mediator = crate::mediator::Mediator::current();
+                let mediator = core::mediator::Mediator::current();
                 if mediator.debug_output {
                     mediator.debug_print(format!(
                         "TestStruct data of size: {} at offset: {} (0x{:08x})\n",

@@ -14,15 +14,15 @@
 use std::io;
 use std::io::Read;
 
-use keramics::datetime::DateTime;
-use keramics::formatters::format_as_string;
-use keramics::hashes::{DigestHashContext, Md5Context};
-use keramics::vfs::VfsDataStream;
+use core::formatters::format_as_string;
+use core::DataStream;
+use datetime::DateTime;
+use hashes::{DigestHashContext, Md5Context};
 
 pub const BODYFILE_HEADER: &'static str = "# extended bodyfile 3 format";
 
 /// Calculates the MD5 of a data stream.
-pub fn calculate_md5(data_stream: &mut Box<dyn VfsDataStream>) -> io::Result<String> {
+pub fn calculate_md5(data_stream: &mut Box<dyn DataStream>) -> io::Result<String> {
     let mut data: Vec<u8> = vec![0; 65536];
     let mut md5_context: Md5Context = Md5Context::new();
 

@@ -13,22 +13,15 @@
 
 #![no_main]
 
-use std::sync::Arc;
-
 use libfuzzer_sys::fuzz_target;
 
-use keramics::formats::mbr::MbrVolumeSystem;
-use keramics::vfs::{FakeFileEntry, VfsFileSystem, VfsPath, VfsPathType};
+use core::{open_fake_data_stream, DataStreamReference};
+use formats::mbr::MbrVolumeSystem;
 
 // Master Boot Record (MBR) volume system fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut fake_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Fake);
-    if let VfsFileSystem::Fake(file_system) = &mut fake_file_system {
-        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
-        _ = file_system.add_file_entry("/input", fake_file_entry);
-    }
     let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-    let vfs_path: VfsPath = VfsPath::Fake { location: "/input".to_string() };
-    _ = mbr_volume_system.open(&Arc::new(fake_file_system), &vfs_path);
+    let data_stream: DataStreamReference = open_fake_data_stream(&data);
+    _ = mbr_volume_system.read_data_steam(&data_stream);
 });

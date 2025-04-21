@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use keramics::compression::AdcContext;
+use compression::AdcContext;
 
 // ADC decompression fuzz target.
 fuzz_target!(|data: &[u8]| {

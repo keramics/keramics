@@ -12,20 +12,18 @@
  */
 
 use std::collections::HashMap;
-use std::sync::Arc;
-
 use std::process::ExitCode;
 
-use crate::formatters;
+use core::DataStreamReference;
+use formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
 
-use keramics::formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
-use keramics::vfs::{VfsFileSystem, VfsPath};
+use crate::formatters::format_as_bytesize;
 
 /// Prints information about a QCOW file.
-pub fn print_qcow_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_qcow_file(data_stream: &DataStreamReference) -> ExitCode {
     let mut qcow_file: QcowFile = QcowFile::new();
 
-    match qcow_file.open(vfs_file_system, vfs_path) {
+    match qcow_file.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open QCOW file with error: {}", error);
@@ -49,7 +47,7 @@ pub fn print_qcow_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath)
     let encryption_method_string: &str = encryption_methods
         .get(&qcow_file.encryption_method)
         .unwrap();
-    let media_size_string: String = formatters::format_as_bytesize(qcow_file.media_size, 1024);
+    let media_size_string: String = format_as_bytesize(qcow_file.media_size, 1024);
 
     println!("QEMU Copy-On-Write (QCOW) information:");
     println!("    Format version\t\t\t: {}", qcow_file.format_version);

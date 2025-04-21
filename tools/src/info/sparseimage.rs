@@ -12,28 +12,25 @@
  */
 
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use crate::formatters;
+use core::DataStreamReference;
+use formats::sparseimage::SparseImageFile;
 
-use keramics::formats::sparseimage::SparseImageFile;
-use keramics::vfs::{VfsFileSystem, VfsPath};
+use crate::formatters::format_as_bytesize;
 
 /// Prints information about a sparse image file.
-pub fn print_sparseimage_file(file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_sparseimage_file(data_stream: &DataStreamReference) -> ExitCode {
     let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
-    match sparseimage_file.open(file_system, vfs_path) {
+    match sparseimage_file.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open sparse image file with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
-    let media_size_string: String =
-        formatters::format_as_bytesize(sparseimage_file.media_size, 1024);
-    let band_size_string: String =
-        formatters::format_as_bytesize(sparseimage_file.block_size as u64, 1024);
+    let media_size_string: String = format_as_bytesize(sparseimage_file.media_size, 1024);
+    let band_size_string: String = format_as_bytesize(sparseimage_file.block_size as u64, 1024);
 
     println!("Sparse image (.sparseimage) information:");
     println!(

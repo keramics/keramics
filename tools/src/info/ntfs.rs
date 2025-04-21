@@ -14,14 +14,11 @@
 use std::collections::HashMap;
 use std::io;
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use keramics::datetime::DateTime;
-use keramics::formats::ntfs::constants::*;
-use keramics::formats::ntfs::{
-    NtfsAttribute, NtfsDataFork, NtfsFileEntry, NtfsFileSystem, NtfsPath,
-};
-use keramics::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
+use core::DataStreamReference;
+use datetime::DateTime;
+use formats::ntfs::constants::*;
+use formats::ntfs::{NtfsAttribute, NtfsDataFork, NtfsFileEntry, NtfsFileSystem, NtfsPath};
 
 use super::bodyfile;
 
@@ -143,13 +140,10 @@ fn print_ntfs_volume_flags(flags: u16) {
 }
 
 /// Prints information about a New Technologies File System (NTFS).
-pub fn print_ntfs_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
-) -> ExitCode {
+pub fn print_ntfs_file_system(data_stream: &DataStreamReference) -> ExitCode {
     let mut ntfs_file_system = NtfsFileSystem::new();
 
-    match ntfs_file_system.open(vfs_file_system, vfs_path) {
+    match ntfs_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open NTFS file system with error: {}", error);
@@ -207,13 +201,12 @@ pub fn print_ntfs_file_system(
 
 /// Prints information about a specific entry of a New Technologies File System (NTFS).
 pub fn print_entry_ntfs_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
+    data_stream: &DataStreamReference,
     ntfs_entry_identifier: u64,
 ) -> ExitCode {
     let mut ntfs_file_system = NtfsFileSystem::new();
 
-    match ntfs_file_system.open(vfs_file_system, vfs_path) {
+    match ntfs_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open NTFS file system with error: {}", error);
@@ -454,13 +447,12 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
 
 /// Prints the hierarchy of a New Technologies File System (NTFS).
 pub fn print_hierarcy_ntfs_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
+    data_stream: &DataStreamReference,
     in_bodyfile_format: bool,
 ) -> ExitCode {
     let mut ntfs_file_system = NtfsFileSystem::new();
 
-    match ntfs_file_system.open(vfs_file_system, vfs_path) {
+    match ntfs_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open NTFS file system with error: {}", error);
@@ -606,11 +598,11 @@ fn print_ntfs_file_entry_bodyfile(
 
             // TODO: have flag control calculate md5
             // String::from("0")
-            let data_stream: VfsDataStreamReference = data_fork.get_data_stream()?;
+            let data_stream: DataStreamReference = data_fork.get_data_stream()?;
 
             let md5: String = match data_stream.with_write_lock() {
                 Ok(mut data_stream) => bodyfile::calculate_md5(&mut data_stream)?,
-                Err(error) => return Err(keramics::error_to_io_error!(error)),
+                Err(error) => return Err(core::error_to_io_error!(error)),
             };
             let data_fork_name: String = match data_fork.get_name() {
                 Some(name) => format!(":{}", name.to_string()),
@@ -694,23 +686,19 @@ fn print_hierarcy_ntfs_file_entry(
 }
 
 /// Prints information about a specific path of a New Technologies File System (NTFS).
-pub fn print_path_ntfs_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
-    path: &String,
-) -> ExitCode {
-    let mut ext_file_system = NtfsFileSystem::new();
+pub fn print_path_ntfs_file_system(data_stream: &DataStreamReference, path: &String) -> ExitCode {
+    let mut ntfs_file_system = NtfsFileSystem::new();
 
-    match ext_file_system.open(vfs_file_system, vfs_path) {
+    match ntfs_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open NTFS file system with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
-    let ext_path: NtfsPath = NtfsPath::from(path);
+    let ntfs_path: NtfsPath = NtfsPath::from(path);
     let mut file_entry: Option<NtfsFileEntry> =
-        match ext_file_system.get_file_entry_by_path(&ext_path) {
+        match ntfs_file_system.get_file_entry_by_path(&ntfs_path) {
             Ok(file_entry) => file_entry,
             Err(error) => {
                 println!(
