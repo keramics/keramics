@@ -13,21 +13,17 @@
 
 use std::collections::HashMap;
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use crate::formatters;
+use core::DataStreamReference;
+use formats::mbr::{MbrPartition, MbrVolumeSystem};
 
-use keramics::formats::mbr::{MbrPartition, MbrVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsPath};
+use crate::formatters::format_as_bytesize;
 
 /// Prints information about a MBR volume system.
-pub fn print_mbr_volume_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
-) -> ExitCode {
+pub fn print_mbr_volume_system(data_stream: &DataStreamReference) -> ExitCode {
     let mut mbr_volume_system = MbrVolumeSystem::new();
 
-    match mbr_volume_system.open(vfs_file_system, vfs_path) {
+    match mbr_volume_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open MBR volume system with error: {}", error);
@@ -154,7 +150,7 @@ pub fn print_mbr_volume_system(
                     return ExitCode::FAILURE;
                 }
             };
-        let size_string: String = formatters::format_as_bytesize(mbr_partition.size, 1024);
+        let size_string: String = format_as_bytesize(mbr_partition.size, 1024);
 
         println!("Partition: {}", partition_index + 1);
 

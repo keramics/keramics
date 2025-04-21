@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use keramics::compression::LzfseContext;
+use compression::LzfseContext;
 
 // LZFSE decompression fuzz target.
 fuzz_target!(|data: &[u8]| {

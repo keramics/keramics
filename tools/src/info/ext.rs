@@ -13,13 +13,12 @@
 
 use std::io;
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use keramics::datetime::DateTime;
-use keramics::formats::ext::constants::*;
-use keramics::formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
-use keramics::types::ByteString;
-use keramics::vfs::{VfsDataStreamReference, VfsFileSystem, VfsPath};
+use core::DataStreamReference;
+use datetime::DateTime;
+use formats::ext::constants::*;
+use formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
+use types::ByteString;
 
 use super::bodyfile;
 
@@ -233,10 +232,10 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
 }
 
 /// Prints information about an Extended File System (ext).
-pub fn print_ext_file_system(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_ext_file_system(data_stream: &DataStreamReference) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(vfs_file_system, vfs_path) {
+    match ext_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -398,12 +397,11 @@ fn print_ext_file_entry_bodyfile(
 
     // TODO: have flag control calculate md5
     // String::from("0")
-    let result: Option<VfsDataStreamReference> = file_entry.get_data_stream()?;
-    let md5: String = match result {
-        Some(vfs_data_stream) => {
-            let md5_string: String = match vfs_data_stream.with_write_lock() {
+    let md5: String = match file_entry.get_data_stream()? {
+        Some(data_stream) => {
+            let md5_string: String = match data_stream.with_write_lock() {
                 Ok(mut data_stream) => bodyfile::calculate_md5(&mut data_stream)?,
-                Err(error) => return Err(keramics::error_to_io_error!(error)),
+                Err(error) => return Err(core::error_to_io_error!(error)),
             };
             md5_string
         }
@@ -475,13 +473,12 @@ fn print_ext_file_entry_path(
 
 /// Prints information about a specific entry of an Extended File System (ext).
 pub fn print_entry_ext_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
+    data_stream: &DataStreamReference,
     ext_entry_identifier: u64,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(vfs_file_system, vfs_path) {
+    match ext_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -520,13 +517,12 @@ pub fn print_entry_ext_file_system(
 
 /// Prints the hierarchy of an Extended File System (ext).
 pub fn print_hierarcy_ext_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
+    data_stream: &DataStreamReference,
     in_bodyfile_format: bool,
 ) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(vfs_file_system, vfs_path) {
+    match ext_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);
@@ -584,14 +580,10 @@ fn print_hierarcy_ext_file_entry(
 }
 
 /// Prints information about a specific path of an Extended File System (ext).
-pub fn print_path_ext_file_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
-    path: &String,
-) -> ExitCode {
+pub fn print_path_ext_file_system(data_stream: &DataStreamReference, path: &String) -> ExitCode {
     let mut ext_file_system = ExtFileSystem::new();
 
-    match ext_file_system.open(vfs_file_system, vfs_path) {
+    match ext_file_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open ext file system with error: {}", error);

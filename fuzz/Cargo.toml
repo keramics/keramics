@@ -143,5 +143,8 @@ test = false
 doc = false
 
 [dependencies]
+compression = { path = "../compression" }
+core = { path = "../core" }
+formats = { path = "../formats" }
+hashes = { path = "../hashes" }
 libfuzzer-sys = { version = "0.4" }
-keramics = { path = ".." }

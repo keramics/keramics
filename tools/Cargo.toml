@@ -21,4 +21,9 @@ path = "src/hash_tool.rs"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
-keramics = { path = "../keramics" }
+core = { path = "../core" }
+datetime = { path = "../datetime" }
+formats = { path = "../formats" }
+hashes = { path = "../hashes" }
+types = { path = "../types" }
+vfs = { path = "../vfs" }

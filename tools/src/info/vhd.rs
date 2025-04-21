@@ -12,20 +12,18 @@
  */
 
 use std::collections::HashMap;
-use std::sync::Arc;
-
 use std::process::ExitCode;
 
-use crate::formatters;
+use core::DataStreamReference;
+use formats::vhd::{VhdDiskType, VhdFile};
 
-use keramics::formats::vhd::{VhdDiskType, VhdFile};
-use keramics::vfs::{VfsFileSystem, VfsPath};
+use crate::formatters::format_as_bytesize;
 
 /// Prints information about a VHD file.
-pub fn print_vhd_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_vhd_file(data_stream: &DataStreamReference) -> ExitCode {
     let mut vhd_file: VhdFile = VhdFile::new();
 
-    match vhd_file.open(vfs_file_system, vfs_path) {
+    match vhd_file.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open VHD file with error: {}", error);
@@ -39,7 +37,7 @@ pub fn print_vhd_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) 
         (VhdDiskType::Unknown, "Unknown"),
     ]);
     let disk_type_string: &str = disk_types.get(&vhd_file.disk_type).unwrap();
-    let media_size_string: String = formatters::format_as_bytesize(vhd_file.media_size, 1024);
+    let media_size_string: String = format_as_bytesize(vhd_file.media_size, 1024);
 
     println!("Virtual Hard Disk (VHD) information:");
     println!("    Format version\t\t\t: 1.0");

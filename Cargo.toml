@@ -1,8 +1,17 @@
 [workspace]
 members = [
+    "./checksums",
+    "./compression",
+    "./core",
+    "./datetime",
+    "./encoding",
+    "./formats",
+    "./hashes",
     "./layout_map",
-    "./keramics",
+    "./sigscan",
     "./tools",
+    "./types",
+    "./vfs",
 ]
 resolver = "2"
 

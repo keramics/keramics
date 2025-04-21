@@ -1,0 +1,12 @@
+[package]
+authors.workspace = true
+description = "Keramics core"
+edition.workspace = true
+license.workspace = true
+name = "core"
+publish = false
+version.workspace = true
+
+[lib]
+name = "core"
+path = "src/lib.rs"

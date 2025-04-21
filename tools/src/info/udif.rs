@@ -12,20 +12,18 @@
  */
 
 use std::collections::HashMap;
-use std::sync::Arc;
-
 use std::process::ExitCode;
 
-use crate::formatters;
+use core::DataStreamReference;
+use formats::udif::{UdifCompressionMethod, UdifFile};
 
-use keramics::formats::udif::{UdifCompressionMethod, UdifFile};
-use keramics::vfs::{VfsFileSystem, VfsPath};
+use crate::formatters::format_as_bytesize;
 
 /// Prints information about an UDIF file.
-pub fn print_udif_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath) -> ExitCode {
+pub fn print_udif_file(data_stream: &DataStreamReference) -> ExitCode {
     let mut udif_file: UdifFile = UdifFile::new();
 
-    match udif_file.open(vfs_file_system, vfs_path) {
+    match udif_file.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open UDIF file with error: {}", error);
@@ -44,7 +42,7 @@ pub fn print_udif_file(vfs_file_system: &Arc<VfsFileSystem>, vfs_path: &VfsPath)
     let compression_method_string: &str = compression_methods
         .get(&udif_file.compression_method)
         .unwrap();
-    let media_size_string: String = formatters::format_as_bytesize(udif_file.media_size, 1024);
+    let media_size_string: String = format_as_bytesize(udif_file.media_size, 1024);
 
     println!("Universal Disk Image Format (UDIF) information:");
     println!(

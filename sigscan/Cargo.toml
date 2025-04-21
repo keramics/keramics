@@ -1,0 +1,15 @@
+[package]
+authors.workspace = true
+description = "Keramics signature scanner"
+edition.workspace = true
+license.workspace = true
+name = "sigscan"
+publish = false
+version.workspace = true
+
+[lib]
+name = "sigscan"
+path = "src/lib.rs"
+
+[dependencies]
+core = { path = "../core" }

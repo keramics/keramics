@@ -12,12 +12,11 @@
  */
 
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use crate::formatters;
+use core::DataStreamReference;
+use formats::apm::{ApmPartition, ApmVolumeSystem};
 
-use keramics::formats::apm::{ApmPartition, ApmVolumeSystem};
-use keramics::vfs::{VfsFileSystem, VfsPath};
+use crate::formatters::format_as_bytesize;
 
 /// Prints the partition status flags.
 fn print_apm_partition_status_flags(flags: u32) {
@@ -62,13 +61,10 @@ fn print_apm_partition_status_flags(flags: u32) {
 }
 
 /// Prints information about an APM volume system.
-pub fn print_apm_volume_system(
-    vfs_file_system: &Arc<VfsFileSystem>,
-    vfs_path: &VfsPath,
-) -> ExitCode {
-    let mut apm_volume_system = ApmVolumeSystem::new();
+pub fn print_apm_volume_system(data_stream: &DataStreamReference) -> ExitCode {
+    let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-    match apm_volume_system.open(vfs_file_system, vfs_path) {
+    match apm_volume_system.read_data_stream(data_stream) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open APM volume system with error: {}", error);
@@ -97,7 +93,7 @@ pub fn print_apm_volume_system(
                     return ExitCode::FAILURE;
                 }
             };
-        let size_string: String = formatters::format_as_bytesize(apm_partition.size, 1024);
+        let size_string: String = format_as_bytesize(apm_partition.size, 1024);
 
         println!("Partition: {}", partition_index + 1);
         println!(
