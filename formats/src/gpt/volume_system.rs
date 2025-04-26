@@ -30,7 +30,7 @@ pub struct GptVolumeSystem {
     mediator: MediatorReference,
 
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Disk identifier.
     pub disk_identifier: Uuid,
@@ -43,13 +43,11 @@ pub struct GptVolumeSystem {
 }
 
 impl GptVolumeSystem {
-    pub const PATH_PREFIX: &'static str = "/gpt";
-
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             disk_identifier: Uuid::new(),
             bytes_per_sector: 0,
             partition_entries: Vec::new(),
@@ -65,6 +63,15 @@ impl GptVolumeSystem {
     pub fn get_partition_by_index(&self, partition_index: usize) -> io::Result<GptPartition> {
         match self.partition_entries.get(partition_index) {
             Some(partition_entry) => {
+                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                    Some(data_stream) => data_stream,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
+                };
                 let partition_offset: u64 =
                     partition_entry.start_block_number as u64 * self.bytes_per_sector as u64;
                 let partition_size: u64 = (partition_entry.end_block_number
@@ -79,7 +86,7 @@ impl GptVolumeSystem {
                     &partition_entry.type_identifier,
                     &partition_entry.identifier,
                 );
-                partition.open(&self.data_stream)?;
+                partition.open(data_stream)?;
 
                 Ok(partition)
             }
@@ -92,53 +99,13 @@ impl GptVolumeSystem {
         }
     }
 
-    /// Retrieves the partition index with the specific location.
-    pub fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
-        if !location.starts_with(GptVolumeSystem::PATH_PREFIX) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        // TODO: add support for identifier comparison /gpt{UUID}
-
-        let partition_index: usize = match location[4..].parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported path: {}", location),
-                ))
-            }
-        };
-        if partition_index == 0 || partition_index > self.partition_entries.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        Ok(partition_index - 1)
-    }
-
-    /// Retrieves the partition with the specific location.
-    pub fn get_partition_by_path(&self, location: &str) -> io::Result<Option<GptPartition>> {
-        if location == "/" {
-            return Ok(None);
-        }
-        let partition_index: usize = self.get_partition_index_by_path(location)?;
-
-        let partition: GptPartition = self.get_partition_by_index(partition_index)?;
-
-        Ok(Some(partition))
-    }
-
     // TODO: add get_partition_index_by_identifier
 
     /// Reads the volume system from a data stream.
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_partition_table(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -224,7 +191,7 @@ impl GptVolumeSystem {
         let entries_start_offset: u64 =
             partition_table_header.entries_start_block_number * self.bytes_per_sector as u64;
 
-        match data_stream.with_write_lock() {
+        match data_stream.write() {
             Ok(mut data_stream) => data_stream.seek(io::SeekFrom::Start(entries_start_offset))?,
             Err(error) => return Err(core::error_to_io_error!(error)),
         };
@@ -233,7 +200,7 @@ impl GptVolumeSystem {
         let mut entry_data: Vec<u8> = vec![0; partition_table_header.entry_data_size as usize];
 
         for entry_index in 0..partition_table_header.number_of_entries {
-            match data_stream.with_write_lock() {
+            match data_stream.write() {
                 Ok(mut data_stream) => data_stream.read_exact(&mut entry_data)?,
                 Err(error) => return Err(core::error_to_io_error!(error)),
             };
@@ -334,39 +301,6 @@ mod tests {
 
         assert_eq!(partition.offset, 1048576);
         assert_eq!(partition.size, 1048576);
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_partition_index_by_path() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let partition_index: usize = volume_system.get_partition_index_by_path("/gpt1")?;
-        assert_eq!(partition_index, 0);
-
-        let result = volume_system.get_partition_index_by_path("/bogus1");
-        assert!(result.is_err());
-
-        let result = volume_system.get_partition_index_by_path("/gpt99");
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_partition_by_path() -> io::Result<()> {
-        let volume_system: GptVolumeSystem = get_volume_system()?;
-
-        let result: Option<GptPartition> = volume_system.get_partition_by_path("/")?;
-        assert!(result.is_none());
-
-        let result: Option<GptPartition> = volume_system.get_partition_by_path("/gpt2")?;
-        assert!(result.is_some());
-
-        let partition: GptPartition = result.unwrap();
-        assert_eq!(partition.offset, 2097152);
-        assert_eq!(partition.size, 1572864);
 
         Ok(())
     }

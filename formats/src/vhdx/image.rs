@@ -27,8 +27,6 @@ pub struct VhdxImage {
 }
 
 impl VhdxImage {
-    pub const PATH_PREFIX: &'static str = "/vhdx";
-
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self { files: Vec::new() }
@@ -58,46 +56,6 @@ impl VhdxImage {
     }
 
     // TODO: add get_layer_index_by_identifier
-
-    /// Retrieves the layer index with the specific location.
-    pub fn get_layer_index_by_path(&self, location: &str) -> io::Result<usize> {
-        if !location.starts_with(VhdxImage::PATH_PREFIX) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        // TODO: add support for identifier comparison /vhdx{UUID}
-
-        let layer_index: usize = match location[5..].parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported path: {}", location),
-                ))
-            }
-        };
-        if layer_index == 0 || layer_index > self.files.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        Ok(layer_index - 1)
-    }
-
-    /// Retrieves the layer with the specific location.
-    pub fn get_layer_by_path(&self, location: &str) -> io::Result<Option<VhdxLayer>> {
-        if location == "/" {
-            return Ok(None);
-        }
-        let layer_index: usize = self.get_layer_index_by_path(location)?;
-
-        let layer: VhdxLayer = self.get_layer_by_index(layer_index)?;
-
-        Ok(Some(layer))
-    }
 
     /// Opens a storage media image.
     pub fn open(
@@ -178,42 +136,6 @@ mod tests {
         let image: VhdxImage = get_image()?;
 
         let layer: VhdxLayer = image.get_layer_by_index(0)?;
-
-        assert_eq!(layer.size, 4194304);
-        assert_eq!(
-            layer.identifier.to_string(),
-            "7584f8fb-36d3-4091-afb5-b1afe587bfa8"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn get_layer_index_by_path() -> io::Result<()> {
-        let image: VhdxImage = get_image()?;
-
-        let layer_index: usize = image.get_layer_index_by_path("/vhdx1")?;
-        assert_eq!(layer_index, 0);
-
-        let result = image.get_layer_index_by_path("/bogus1");
-        assert!(result.is_err());
-
-        let result = image.get_layer_index_by_path("/vhdx99");
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_layer_by_path() -> io::Result<()> {
-        let image: VhdxImage = get_image()?;
-
-        let result: Option<VhdxLayer> = image.get_layer_by_path("/")?;
-        assert!(result.is_none());
-
-        let result: Option<VhdxLayer> = image.get_layer_by_path("/vhdx1")?;
-        assert!(result.is_some());
-
-        let layer: VhdxLayer = result.unwrap();
 
         assert_eq!(layer.size, 4194304);
         assert_eq!(

@@ -32,7 +32,7 @@ use super::superblock::ExtSuperblock;
 /// Extended File System (ext).
 pub struct ExtFileSystem {
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Features.
     features: ExtFeatures,
@@ -69,7 +69,7 @@ impl ExtFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             volume_label: ByteString::new(),
             features: ExtFeatures::new(),
             number_of_inodes: 0,
@@ -110,6 +110,15 @@ impl ExtFileSystem {
 
     /// Retrieves the file entry for a specific identifier (inode number).
     pub fn get_file_entry_by_identifier(&self, inode_number: u32) -> io::Result<ExtFileEntry> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         if self.features.is_unsupported() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -122,17 +131,10 @@ impl ExtFileSystem {
                 format!("Invalid inode number: {} value out of bounds", inode_number),
             ));
         }
-        let inode: ExtInode = self
-            .inode_table
-            .get_inode(&self.data_stream, inode_number)?;
+        let inode: ExtInode = self.inode_table.get_inode(data_stream, inode_number)?;
 
-        let file_entry: ExtFileEntry = ExtFileEntry::new(
-            &self.data_stream,
-            &self.inode_table,
-            inode_number,
-            inode,
-            None,
-        );
+        let file_entry: ExtFileEntry =
+            ExtFileEntry::new(data_stream, &self.inode_table, inode_number, inode, None);
         Ok(file_entry)
     }
 
@@ -162,7 +164,7 @@ impl ExtFileSystem {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_block_groups(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }

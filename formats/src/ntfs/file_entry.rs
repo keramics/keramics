@@ -14,6 +14,7 @@
 use std::collections::BTreeMap;
 use std::io;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::{DataStreamReference, FakeDataStream};
 use datetime::DateTime;
@@ -220,28 +221,24 @@ impl NtfsFileEntry {
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
-        let data_stream: Option<DataStreamReference> = match self
+        let data_attribute: &NtfsMftAttribute = match self
             .mft_entry
             .get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA)
         {
-            Some(data_attribute) => {
-                if data_attribute.is_resident() {
-                    let inline_stream: FakeDataStream = FakeDataStream::new(
-                        &data_attribute.resident_data,
-                        data_attribute.data_size,
-                    );
-                    Some(DataStreamReference::new(Box::new(inline_stream)))
-                } else {
-                    let mut block_stream: NtfsBlockStream =
-                        NtfsBlockStream::new(self.mft.cluster_block_size);
-                    block_stream.open(&self.data_stream, data_attribute)?;
-
-                    Some(DataStreamReference::new(Box::new(block_stream)))
-                }
-            }
-            None => None,
+            Some(data_attribute) => data_attribute,
+            None => return Ok(None),
         };
-        Ok(data_stream)
+        if data_attribute.is_resident() {
+            let data_stream: FakeDataStream =
+                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
+            Ok(Some(Arc::new(RwLock::new(data_stream))))
+        } else {
+            let mut block_stream: NtfsBlockStream =
+                NtfsBlockStream::new(self.mft.cluster_block_size);
+            block_stream.open(&self.data_stream, data_attribute)?;
+
+            Ok(Some(Arc::new(RwLock::new(block_stream))))
+        }
     }
 
     /// Retrieves a data stream with the specified name.
@@ -249,26 +246,22 @@ impl NtfsFileEntry {
         &self,
         name: &Option<Ucs2String>,
     ) -> io::Result<Option<DataStreamReference>> {
-        let data_stream: Option<DataStreamReference> =
+        let data_attribute: &NtfsMftAttribute =
             match self.mft_entry.get_attribute(name, NTFS_ATTRIBUTE_TYPE_DATA) {
-                Some(data_attribute) => {
-                    if data_attribute.is_resident() {
-                        let inline_stream: FakeDataStream = FakeDataStream::new(
-                            &data_attribute.resident_data,
-                            data_attribute.data_size,
-                        );
-                        Some(DataStreamReference::new(Box::new(inline_stream)))
-                    } else {
-                        let mut block_stream: NtfsBlockStream =
-                            NtfsBlockStream::new(self.mft.cluster_block_size);
-                        block_stream.open(&self.data_stream, data_attribute)?;
-
-                        Some(DataStreamReference::new(Box::new(block_stream)))
-                    }
-                }
-                None => None,
+                Some(data_attribute) => data_attribute,
+                None => return Ok(None),
             };
-        Ok(data_stream)
+        if data_attribute.is_resident() {
+            let data_stream: FakeDataStream =
+                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
+            Ok(Some(Arc::new(RwLock::new(data_stream))))
+        } else {
+            let mut block_stream: NtfsBlockStream =
+                NtfsBlockStream::new(self.mft.cluster_block_size);
+            block_stream.open(&self.data_stream, data_attribute)?;
+
+            Ok(Some(Arc::new(RwLock::new(block_stream))))
+        }
     }
 
     /// Retrieves the number of data forks.

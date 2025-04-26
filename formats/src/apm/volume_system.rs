@@ -22,7 +22,7 @@ use super::partition_map_entry::ApmPartitionMapEntry;
 /// Apple Partition Map (APM) volume system.
 pub struct ApmVolumeSystem {
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -32,12 +32,10 @@ pub struct ApmVolumeSystem {
 }
 
 impl ApmVolumeSystem {
-    pub const PATH_PREFIX: &'static str = "/apm";
-
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             bytes_per_sector: 0,
             partition_map_entries: Vec::new(),
         }
@@ -52,6 +50,15 @@ impl ApmVolumeSystem {
     pub fn get_partition_by_index(&self, partition_index: usize) -> io::Result<ApmPartition> {
         match self.partition_map_entries.get(partition_index) {
             Some(partition_entry) => {
+                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                    Some(data_stream) => data_stream,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
+                };
                 let partition_offset: u64 =
                     partition_entry.start_sector as u64 * self.bytes_per_sector as u64;
                 let partition_size: u64 =
@@ -64,7 +71,7 @@ impl ApmVolumeSystem {
                     &partition_entry.name,
                     partition_entry.status_flags,
                 );
-                partition.open(&self.data_stream)?;
+                partition.open(data_stream)?;
 
                 Ok(partition)
             }
@@ -77,49 +84,11 @@ impl ApmVolumeSystem {
         }
     }
 
-    /// Retrieves the partition index with the specific location.
-    pub fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
-        if !location.starts_with(ApmVolumeSystem::PATH_PREFIX) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        let partition_index: usize = match location[4..].parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported path: {}", location),
-                ))
-            }
-        };
-        if partition_index == 0 || partition_index > self.partition_map_entries.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        Ok(partition_index - 1)
-    }
-
-    /// Retrieves the partition with the specific location.
-    pub fn get_partition_by_path(&self, location: &str) -> io::Result<Option<ApmPartition>> {
-        if location == "/" {
-            return Ok(None);
-        }
-        let partition_index: usize = self.get_partition_index_by_path(location)?;
-
-        let partition: ApmPartition = self.get_partition_by_index(partition_index)?;
-
-        Ok(Some(partition))
-    }
-
     /// Reads the volume system from a data stream.
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_partition_map(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -202,39 +171,6 @@ mod tests {
 
         assert_eq!(partition.offset, 32768);
         assert_eq!(partition.size, 4153344);
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_partition_index_by_path() -> io::Result<()> {
-        let volume_system: ApmVolumeSystem = get_volume_system()?;
-
-        let partition_index: usize = volume_system.get_partition_index_by_path("/apm1")?;
-        assert_eq!(partition_index, 0);
-
-        let result = volume_system.get_partition_index_by_path("/bogus1");
-        assert!(result.is_err());
-
-        let result = volume_system.get_partition_index_by_path("/apm99");
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_partition_by_path() -> io::Result<()> {
-        let volume_system: ApmVolumeSystem = get_volume_system()?;
-
-        let result: Option<ApmPartition> = volume_system.get_partition_by_path("/")?;
-        assert!(result.is_none());
-
-        let result: Option<ApmPartition> = volume_system.get_partition_by_path("/apm2")?;
-        assert!(result.is_some());
-
-        let partition: ApmPartition = result.unwrap();
-        assert_eq!(partition.offset, 4186112);
-        assert_eq!(partition.size, 8192);
 
         Ok(())
     }

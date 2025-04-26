@@ -12,27 +12,30 @@
  */
 
 use std::io;
-use std::io::Read;
 
-use core::{DataStream, DataStreamReference};
 use core::formatters::format_as_string;
+use core::{open_os_data_stream, DataStreamReference};
 use formats::ntfs::{NtfsFileEntry, NtfsFileSystem, NtfsPath};
 use hashes::{DigestHashContext, Md5Context};
-use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
-fn read_data_stream(data_stream: &mut Box<dyn DataStream>) -> io::Result<(u64, String)> {
+fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut offset: u64 = 0;
 
-    while let Ok(read_count) = data_stream.read(&mut data) {
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
+    match data_stream.write() {
+        Ok(mut data_stream) => {
+            while let Ok(read_count) = data_stream.read(&mut data) {
+                if read_count == 0 {
+                    break;
+                }
+                md5_context.update(&data[..read_count]);
 
-        offset += read_count as u64;
-    }
+                offset += read_count as u64;
+            }
+        }
+        Err(error) => return Err(core::error_to_io_error!(error)),
+    };
     let hash_value: Vec<u8> = md5_context.finalize();
     let hash_string: String = format_as_string(&hash_value);
 
@@ -45,29 +48,21 @@ fn read_path(file_system: &NtfsFileSystem, location: &str) -> io::Result<(u64, S
 
     let data_stream: DataStreamReference = file_entry.get_data_stream()?.unwrap();
 
-    let (offset, hash_string): (u64, String) = match data_stream.with_write_lock() {
-        Ok(mut data_stream) => read_data_stream(&mut data_stream)?,
-        Err(error) => return Err(core::error_to_io_error!(error)),
-    };
-    Ok((offset, hash_string))
+    read_data_stream(&data_stream)
 }
 
 fn open_file_system(location: &str) -> io::Result<NtfsFileSystem> {
-    let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: location.to_string(),
-    };
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
-
     let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
-    file_system.open(&vfs_file_system, &vfs_path)?;
+
+    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    file_system.read_data_stream(&data_stream)?;
 
     Ok(file_system)
 }
 
 #[test]
 fn read_ntfs_empty_file() -> io::Result<()> {
-    let file_system: NtfsFileSystem = open_file_system("./test_data/ntfs/ntfs.raw")?;
+    let file_system: NtfsFileSystem = open_file_system("../test_data/ntfs/ntfs.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
     assert_eq!(offset, 0);

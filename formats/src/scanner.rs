@@ -216,7 +216,7 @@ impl FormatScanner {
         &self,
         data_stream: &DataStreamReference,
     ) -> io::Result<HashSet<FormatIdentifier>> {
-        let data_size: u64 = match data_stream.with_write_lock() {
+        let data_size: u64 = match data_stream.write() {
             Ok(mut data_stream) => data_stream.get_size()?,
             Err(error) => return Err(core::error_to_io_error!(error)),
         };
@@ -225,7 +225,7 @@ impl FormatScanner {
         // The size of the header range can be larger than the size of the data stream.
         let mut data: Vec<u8> = vec![0; scan_context.header_range_size as usize];
 
-        match data_stream.with_write_lock() {
+        match data_stream.write() {
             Ok(mut data_stream) => data_stream.read_at_position(&mut data, SeekFrom::Start(0))?,
             Err(error) => return Err(core::error_to_io_error!(error)),
         };
@@ -245,7 +245,7 @@ impl FormatScanner {
         } else {
             0
         };
-        match data_stream.with_write_lock() {
+        match data_stream.write() {
             Ok(mut data_stream) => data_stream.read_at_position(
                 &mut data[data_offset..],
                 SeekFrom::Start(data_stream_offset),

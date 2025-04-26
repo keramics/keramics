@@ -775,7 +775,7 @@ impl StructureLayout {
             ) -> std::io::Result<()> {
                 let mut data: Vec<u8> = vec![0; #data_size_literal];
 
-                let offset: u64 = match data_stream.with_write_lock() {
+                let offset: u64 = match data_stream.write() {
                     Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
                 };
@@ -1240,7 +1240,7 @@ mod tests {
             ) -> std::io::Result<()> {
                 let mut data: Vec<u8> = vec![0; 16];
 
-                let offset: u64 = match data_stream.with_write_lock() {
+                let offset: u64 = match data_stream.write() {
                     Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
                 };

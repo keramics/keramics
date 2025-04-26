@@ -16,6 +16,7 @@ use std::collections::BTreeMap;
 use std::io;
 use std::io::Read;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::{DataStreamReference, FakeDataStream};
 use datetime::DateTime;
@@ -210,12 +211,10 @@ impl ExtFileEntry {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
             return Ok(None);
         }
-        let data_stream: DataStreamReference = if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0
-        {
-            let inline_stream: FakeDataStream =
+        if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
+            let data_stream: FakeDataStream =
                 FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
-
-            DataStreamReference::new(Box::new(inline_stream))
+            Ok(Some(Arc::new(RwLock::new(data_stream))))
         } else {
             let number_of_blocks: u64 = max(
                 self.inode
@@ -230,9 +229,8 @@ impl ExtFileEntry {
                 number_of_blocks,
                 &self.inode.block_ranges,
             )?;
-            DataStreamReference::new(Box::new(block_stream))
-        };
-        Ok(Some(data_stream))
+            Ok(Some(Arc::new(RwLock::new(block_stream))))
+        }
     }
 
     /// Retrieves the number of sub file entries.

@@ -21,3 +21,6 @@ pest = { version = "2.7.14" }
 pest_derive = { version = "2.7.14" }
 sigscan = { path = "../sigscan" }
 types = { path = "../types" }
+
+[dev-dependencies]
+hashes = { path = "../hashes" }

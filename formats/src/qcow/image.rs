@@ -27,8 +27,6 @@ pub struct QcowImage {
 }
 
 impl QcowImage {
-    pub const PATH_PREFIX: &'static str = "/qcow";
-
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self { files: Vec::new() }
@@ -51,44 +49,6 @@ impl QcowImage {
                 format!("No layer with index: {}", layer_index),
             )),
         }
-    }
-
-    /// Retrieves the layer index with the specific location.
-    pub fn get_layer_index_by_path(&self, location: &str) -> io::Result<usize> {
-        if !location.starts_with(QcowImage::PATH_PREFIX) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        let layer_index: usize = match location[5..].parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported path: {}", location),
-                ))
-            }
-        };
-        if layer_index == 0 || layer_index > self.files.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        Ok(layer_index - 1)
-    }
-
-    /// Retrieves the layer with the specific location.
-    pub fn get_layer_by_path(&self, location: &str) -> io::Result<Option<QcowLayer>> {
-        if location == "/" {
-            return Ok(None);
-        }
-        let layer_index: usize = self.get_layer_index_by_path(location)?;
-
-        let layer: QcowLayer = self.get_layer_by_index(layer_index)?;
-
-        Ok(Some(layer))
     }
 
     /// Opens a storage media image.
@@ -172,39 +132,6 @@ mod tests {
         let image: QcowImage = get_image()?;
 
         let layer: QcowLayer = image.get_layer_by_index(0)?;
-
-        assert_eq!(layer.size, 4194304);
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_layer_index_by_path() -> io::Result<()> {
-        let image: QcowImage = get_image()?;
-
-        let layer_index: usize = image.get_layer_index_by_path("/qcow1")?;
-        assert_eq!(layer_index, 0);
-
-        let result = image.get_layer_index_by_path("/bogus1");
-        assert!(result.is_err());
-
-        let result = image.get_layer_index_by_path("/qcow99");
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_layer_by_path() -> io::Result<()> {
-        let image: QcowImage = get_image()?;
-
-        let result: Option<QcowLayer> = image.get_layer_by_path("/")?;
-        assert!(result.is_none());
-
-        let result: Option<QcowLayer> = image.get_layer_by_path("/qcow1")?;
-        assert!(result.is_some());
-
-        let layer: QcowLayer = result.unwrap();
 
         assert_eq!(layer.size, 4194304);
 

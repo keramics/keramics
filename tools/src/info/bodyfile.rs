@@ -12,27 +12,29 @@
  */
 
 use std::io;
-use std::io::Read;
 
 use core::formatters::format_as_string;
-use core::DataStream;
+use core::DataStreamReference;
 use datetime::DateTime;
 use hashes::{DigestHashContext, Md5Context};
 
 pub const BODYFILE_HEADER: &'static str = "# extended bodyfile 3 format";
 
 /// Calculates the MD5 of a data stream.
-pub fn calculate_md5(data_stream: &mut Box<dyn DataStream>) -> io::Result<String> {
+pub fn calculate_md5(data_stream: &DataStreamReference) -> io::Result<String> {
     let mut data: Vec<u8> = vec![0; 65536];
     let mut md5_context: Md5Context = Md5Context::new();
 
-    loop {
-        let read_count: usize = data_stream.read(&mut data)?;
-        if read_count == 0 {
-            break;
-        }
-        md5_context.update(&data[..read_count]);
-    }
+    match data_stream.write() {
+        Ok(mut data_stream) => loop {
+            let read_count: usize = data_stream.read(&mut data)?;
+            if read_count == 0 {
+                break;
+            }
+            md5_context.update(&data[..read_count]);
+        },
+        Err(error) => return Err(core::error_to_io_error!(error)),
+    };
     let hash_value: Vec<u8> = md5_context.finalize();
 
     Ok(format_as_string(&hash_value))

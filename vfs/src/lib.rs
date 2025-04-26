@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod apm;
 mod context;
 mod data_fork;
 mod enums;
@@ -19,23 +20,26 @@ mod file_entry;
 mod file_resolver;
 mod file_system;
 mod finder;
+mod gpt;
 mod iterators;
+mod mbr;
 mod os;
 mod path;
+mod qcow;
 mod resolver;
 mod scanner;
 mod string;
 mod types;
+mod vhd;
+mod vhdx;
 
 pub use context::VfsContext;
 pub use data_fork::VfsDataFork;
 pub use enums::*;
-pub use fake::{FakeFileEntry, FakeFileSystem};
 pub use file_entry::VfsFileEntry;
 pub use file_resolver::{open_vfs_file_resolver, VfsFileResolver};
 pub use file_system::VfsFileSystem;
 pub use finder::VfsFinder;
-pub use os::OsFileEntry;
 pub use path::VfsPath;
 pub use resolver::VfsResolver;
 pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};

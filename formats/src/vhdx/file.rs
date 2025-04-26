@@ -40,7 +40,7 @@ pub struct VhdxFile {
     mediator: MediatorReference,
 
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Format version.
     pub format_version: u16,
@@ -90,7 +90,7 @@ impl VhdxFile {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             format_version: 0,
             block_allocation_table: None,
             block_tree: BlockTree::<VhdxBlockRange>::new(0, 0, 0),
@@ -133,7 +133,7 @@ impl VhdxFile {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_metadata(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -269,7 +269,7 @@ impl VhdxFile {
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.with_write_lock() {
+                match data_stream.write() {
                     Ok(mut data_stream) => data_stream
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
@@ -328,7 +328,7 @@ impl VhdxFile {
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.with_write_lock() {
+                match data_stream.write() {
                     Ok(mut data_stream) => data_stream
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
@@ -365,7 +365,7 @@ impl VhdxFile {
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.with_write_lock() {
+                match data_stream.write() {
                     Ok(mut data_stream) => data_stream
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
@@ -414,7 +414,7 @@ impl VhdxFile {
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.with_write_lock() {
+                match data_stream.write() {
                     Ok(mut data_stream) => data_stream
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
@@ -457,7 +457,7 @@ impl VhdxFile {
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.with_write_lock() {
+                match data_stream.write() {
                     Ok(mut data_stream) => data_stream
                         .read_at_position(&mut data, io::SeekFrom::Start(metadata_item_offset))?,
                     Err(error) => return Err(core::error_to_io_error!(error)),
@@ -539,6 +539,15 @@ impl VhdxFile {
 
     /// Reads a specific block allocation entry and fills the block tree.
     fn read_block_allocation_entry(&mut self, block_number: u64) -> io::Result<()> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         let table_entry: u64 = if self.disk_type == VhdxDiskType::Fixed {
             block_number
         } else {
@@ -548,7 +557,7 @@ impl VhdxFile {
         let block_allocation_table: &VhdxBlockAllocationTable =
             self.block_allocation_table.as_ref().unwrap();
         let entry: VhdxBlockAllocationTableEntry =
-            block_allocation_table.read_entry(&self.data_stream, table_entry as u32)?;
+            block_allocation_table.read_entry(data_stream, table_entry as u32)?;
 
         if self.disk_type == VhdxDiskType::Differential && entry.block_state != 6 {
             self.read_sector_bitmap(block_number, entry.block_offset)?;
@@ -584,21 +593,29 @@ impl VhdxFile {
 
     /// Reads a specific sector bitmap and fills the block tree.
     fn read_sector_bitmap(&mut self, block_number: u64, block_offset: u64) -> io::Result<()> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         let table_entry: u64 =
             (1 + (block_number / self.entries_per_chunk)) * (self.entries_per_chunk + 1) - 1;
 
         let block_allocation_table: &VhdxBlockAllocationTable =
             self.block_allocation_table.as_ref().unwrap();
         let entry: VhdxBlockAllocationTableEntry =
-            block_allocation_table.read_entry(&self.data_stream, table_entry as u32)?;
+            block_allocation_table.read_entry(data_stream, table_entry as u32)?;
 
         let sector_bitmap_offset: u64 = entry.block_offset
             + ((block_number % self.entries_per_chunk) * self.sector_bitmap_size as u64);
 
         let mut sector_bitmap: VhdxSectorBitmap =
             VhdxSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
-        sector_bitmap
-            .read_at_position(&self.data_stream, io::SeekFrom::Start(sector_bitmap_offset))?;
+        sector_bitmap.read_at_position(data_stream, io::SeekFrom::Start(sector_bitmap_offset))?;
 
         let mut range_media_offset: u64 = block_number * (self.block_size as u64);
         let mut range_data_offset: u64 = block_offset;
@@ -670,12 +687,20 @@ impl VhdxFile {
             }
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
-                VhdxBlockRangeType::InFile => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => data_stream.read_at_position(
-                        &mut data[data_offset..data_end_offset],
-                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                    )?,
-                    Err(error) => return Err(core::error_to_io_error!(error)),
+                VhdxBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.read_at_position(
+                            &mut data[data_offset..data_end_offset],
+                            io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                        )?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
                 },
                 VhdxBlockRangeType::InParent => match &self.parent_file {
                     Some(parent_file) => match parent_file.try_borrow_mut() {

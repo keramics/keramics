@@ -32,7 +32,7 @@ use super::sector_bitmap::VhdSectorBitmap;
 /// Virtual Hard Disk (VHD) file.
 pub struct VhdFile {
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Block allocation table.
     block_allocation_table: Option<VhdBlockAllocationTable>,
@@ -75,7 +75,7 @@ impl VhdFile {
     /// Creates a file.
     pub fn new() -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             block_allocation_table: None,
             block_tree: BlockTree::<VhdBlockRange>::new(0, 0, 0),
             disk_type: VhdDiskType::Fixed,
@@ -116,7 +116,7 @@ impl VhdFile {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_metadata(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -181,10 +181,19 @@ impl VhdFile {
 
     /// Reads a specific block allocation entry and fills the block tree.
     fn read_block_allocation_entry(&mut self, block_number: u64) -> io::Result<()> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         let block_allocation_table: &VhdBlockAllocationTable =
             self.block_allocation_table.as_ref().unwrap();
         let entry: VhdBlockAllocationTableEntry =
-            block_allocation_table.read_entry(&self.data_stream, block_number as u32)?;
+            block_allocation_table.read_entry(data_stream, block_number as u32)?;
 
         if entry.sector_number != 0xffffffff {
             self.read_sector_bitmap(block_number, entry.sector_number)?;
@@ -220,12 +229,20 @@ impl VhdFile {
 
     /// Reads a specific sector bitmap and fills the block tree.
     fn read_sector_bitmap(&mut self, block_number: u64, sector_number: u32) -> io::Result<()> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         let sector_bitmap_offset: u64 = (sector_number as u64) * (self.bytes_per_sector as u64);
 
         let mut sector_bitmap: VhdSectorBitmap =
             VhdSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
-        sector_bitmap
-            .read_at_position(&self.data_stream, io::SeekFrom::Start(sector_bitmap_offset))?;
+        sector_bitmap.read_at_position(data_stream, io::SeekFrom::Start(sector_bitmap_offset))?;
 
         let mut range_media_offset: u64 = block_number * (self.block_size as u64);
         let mut range_data_offset: u64 = sector_bitmap_offset + (self.sector_bitmap_size as u64);
@@ -304,12 +321,20 @@ impl VhdFile {
             }
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
-                VhdBlockRangeType::InFile => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => data_stream.read_at_position(
-                        &mut data[data_offset..data_end_offset],
-                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                    )?,
-                    Err(error) => return Err(core::error_to_io_error!(error)),
+                VhdBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.read_at_position(
+                            &mut data[data_offset..data_end_offset],
+                            io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                        )?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
                 },
                 VhdBlockRangeType::InParent => match &self.parent_file {
                     Some(parent_file) => match parent_file.try_borrow_mut() {
@@ -391,12 +416,20 @@ impl Read for VhdFile {
         let read_count: usize = if self.disk_type != VhdDiskType::Fixed {
             self.read_data_from_blocks(&mut buf[..read_size])?
         } else {
-            match self.data_stream.with_write_lock() {
-                Ok(mut data_stream) => data_stream.read_at_position(
-                    &mut buf[0..read_size],
-                    io::SeekFrom::Start(self.media_offset),
-                )?,
-                Err(error) => return Err(core::error_to_io_error!(error)),
+            match self.data_stream.as_ref() {
+                Some(data_stream) => match data_stream.write() {
+                    Ok(mut data_stream) => data_stream.read_at_position(
+                        &mut buf[0..read_size],
+                        io::SeekFrom::Start(self.media_offset),
+                    )?,
+                    Err(error) => return Err(core::error_to_io_error!(error)),
+                },
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "Missing data stream",
+                    ))
+                }
             }
         };
         self.media_offset += read_count as u64;

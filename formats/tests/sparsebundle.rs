@@ -15,9 +15,9 @@ use std::io;
 use std::io::Read;
 
 use core::formatters::format_as_string;
+use core::{open_os_file_resolver, FileResolverReference};
 use formats::sparsebundle::SparseBundleImage;
 use hashes::{DigestHashContext, Md5Context};
-use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
 fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
@@ -40,14 +40,11 @@ fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, Stri
 
 #[test]
 fn read_media() -> io::Result<()> {
-    let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: "./test_data/sparsebundle/hfsplus.sparsebundle/Info.plist".to_string(),
-    };
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
-
     let mut image = SparseBundleImage::new();
-    image.open(&vfs_file_system, &vfs_path)?;
+
+    let file_resolver: FileResolverReference =
+        open_os_file_resolver("../test_data/sparsebundle/hfsplus.sparsebundle")?;
+    image.open(&file_resolver)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
     assert_eq!(media_offset, image.media_size);

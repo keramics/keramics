@@ -322,16 +322,16 @@ impl VfsPath {
     /// Retrieves the filename.
     pub fn get_file_name(&self) -> &str {
         match self {
-            VfsPath::Apm { location, parent } => get_filename(location.as_str(), "/"),
-            VfsPath::Ext { ext_path, parent } => todo!(),
+            VfsPath::Apm { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::Ext { ext_path, .. } => todo!(),
             VfsPath::Fake { location } => get_filename(location.as_str(), "/"),
-            VfsPath::Gpt { location, parent } => get_filename(location.as_str(), "/"),
-            VfsPath::Mbr { location, parent } => get_filename(location.as_str(), "/"),
-            VfsPath::Ntfs { ntfs_path, parent } => todo!(),
+            VfsPath::Gpt { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::Mbr { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::Ntfs { ntfs_path, .. } => todo!(),
             VfsPath::Os { location } => get_filename(location.as_str(), MAIN_SEPARATOR_STR),
-            VfsPath::Qcow { location, parent } => get_filename(location.as_str(), "/"),
-            VfsPath::Vhd { location, parent } => get_filename(location.as_str(), "/"),
-            VfsPath::Vhdx { location, parent } => get_filename(location.as_str(), "/"),
+            VfsPath::Qcow { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::Vhd { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::Vhdx { location, .. } => get_filename(location.as_str(), "/"),
         }
     }
 

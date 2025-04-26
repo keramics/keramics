@@ -89,7 +89,7 @@ impl VhdBlockAllocationTable {
         let entry_offset: u64 = self.offset + (entry_index as u64 * 4);
         let mut data: [u8; 4] = [0; 4];
 
-        match data_stream.with_write_lock() {
+        match data_stream.write() {
             Ok(mut data_stream) => {
                 data_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(entry_offset))?
             }

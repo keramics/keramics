@@ -13,7 +13,8 @@
 
 use std::fs::File;
 use std::io;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::Seek;
+use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};
 
@@ -28,7 +29,7 @@ impl DataStream for File {
 pub fn open_os_data_stream(path: &str) -> io::Result<DataStreamReference> {
     let file: File = File::open(path)?;
 
-    Ok(DataStreamReference::new(Box::new(file)))
+    Ok(Arc::new(RwLock::new(file)))
 }
 
 #[cfg(test)]

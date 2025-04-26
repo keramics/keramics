@@ -13,6 +13,7 @@
 
 use std::io;
 use std::io::{Read, Seek};
+use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};
 
@@ -93,7 +94,7 @@ impl DataStream for FakeDataStream {
 pub fn open_fake_data_stream(data: Vec<u8>) -> DataStreamReference {
     let data_size: u64 = data.len() as u64;
     let fake_data_stream: FakeDataStream = FakeDataStream::new(&data, data_size);
-    DataStreamReference::new(Box::new(fake_data_stream))
+    Arc::new(RwLock::new(fake_data_stream))
 }
 
 #[cfg(test)]

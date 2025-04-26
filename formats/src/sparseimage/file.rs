@@ -29,7 +29,7 @@ pub struct SparseImageFile {
     mediator: MediatorReference,
 
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Block tree.
     block_tree: BlockTree<SparseImageBlockRange>,
@@ -52,7 +52,7 @@ impl SparseImageFile {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
             bytes_per_sector: 0,
             block_size: 0,
@@ -65,7 +65,7 @@ impl SparseImageFile {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_header_block(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -74,7 +74,7 @@ impl SparseImageFile {
     fn read_header_block(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         let mut data: [u8; 4096] = [0; 4096];
 
-        match data_stream.with_write_lock() {
+        match data_stream.write() {
             Ok(mut data_stream) => {
                 data_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(0))?
             }
@@ -208,12 +208,20 @@ impl SparseImageFile {
                 self.block_tree.get_value(media_offset);
 
             let range_read_count: usize = match block_tree_value {
-                Some(block_range) => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => data_stream.read_at_position(
-                        &mut data[data_offset..data_end_offset],
-                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                    )?,
-                    Err(error) => return Err(core::error_to_io_error!(error)),
+                Some(block_range) => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.read_at_position(
+                            &mut data[data_offset..data_end_offset],
+                            io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                        )?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
                 },
                 None => {
                     data[data_offset..data_end_offset].fill(0);

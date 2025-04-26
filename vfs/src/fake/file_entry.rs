@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::sync::{Arc, RwLock};
 
 use core::{DataStreamReference, FakeDataStream};
 use datetime::DateTime;
@@ -25,7 +26,7 @@ pub struct FakeFileEntry {
     file_type: VfsFileType,
 
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Access time.
     access_time: Option<DateTime>,
@@ -45,7 +46,7 @@ impl FakeFileEntry {
     pub fn new() -> Self {
         // TODO: test timestamps with current time
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             file_type: VfsFileType::NotSet,
             access_time: None,
             change_time: None,
@@ -61,7 +62,7 @@ impl FakeFileEntry {
 
         // TODO: test timestamps with current time
         Self {
-            data_stream: DataStreamReference::new(Box::new(data_stream)),
+            data_stream: Some(Arc::new(RwLock::new(data_stream))),
             file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
@@ -85,6 +86,20 @@ impl FakeFileEntry {
         self.creation_time.as_ref()
     }
 
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+        if self.file_type != VfsFileType::File {
+            return Ok(None);
+        }
+        match self.data_stream.as_ref() {
+            Some(data_stream) => Ok(Some(data_stream.clone())),
+            None => Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Missing data stream"),
+            )),
+        }
+    }
+
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         self.file_type.clone()
@@ -93,14 +108,6 @@ impl FakeFileEntry {
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         self.modification_time.as_ref()
-    }
-
-    /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
-        if self.file_type != VfsFileType::File {
-            return Ok(None);
-        }
-        Ok(Some(self.data_stream.clone()))
     }
 }
 
@@ -151,7 +158,7 @@ mod tests {
             }
         };
         let mut test_data: Vec<u8> = vec![];
-        let read_count: usize = match data_stream.with_write_lock() {
+        let read_count: usize = match data_stream.write() {
             Ok(mut data_stream) => data_stream.read_to_end(&mut test_data)?,
             Err(error) => return Err(core::error_to_io_error!(error)),
         };

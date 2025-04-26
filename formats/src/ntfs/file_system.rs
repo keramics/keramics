@@ -29,7 +29,7 @@ use super::volume_information_attribute::NtfsVolumeInformationAttribute;
 /// New Technologies File System (NTFS).
 pub struct NtfsFileSystem {
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -60,7 +60,7 @@ impl NtfsFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             bytes_per_sector: 0,
             cluster_block_size: 0,
             mft_entry_size: 0,
@@ -98,6 +98,15 @@ impl NtfsFileSystem {
 
     /// Retrieves the file entry for a specific identifier (MFT entry number).
     pub fn get_file_entry_by_identifier(&self, mft_entry_number: u64) -> io::Result<NtfsFileEntry> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         if mft_entry_number >= self.mft.number_of_entries {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
@@ -107,12 +116,11 @@ impl NtfsFileSystem {
                 ),
             ));
         }
-        let mut mft_entry: NtfsMftEntry =
-            self.mft.get_entry(&self.data_stream, mft_entry_number)?;
+        let mut mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, mft_entry_number)?;
         mft_entry.read_attributes()?;
 
         let file_entry: NtfsFileEntry = NtfsFileEntry::new(
-            &self.data_stream,
+            data_stream,
             &self.mft,
             mft_entry_number,
             mft_entry,
@@ -150,7 +158,7 @@ impl NtfsFileSystem {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_metadata(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }

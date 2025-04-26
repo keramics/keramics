@@ -344,6 +344,8 @@ impl NtfsDirectoryIndex {
 mod tests {
     use super::*;
 
+    use core::open_fake_data_stream;
+
     // TODO: add tests for read_mft_entry
 
     #[test]
@@ -649,7 +651,7 @@ mod tests {
 
         let mut test_struct = NtfsDirectoryIndex::new(4096);
         let index: NtfsIndex = NtfsIndex::new();
-        let data_stream: DataStreamReference = DataStreamReference::none();
+        let data_stream: DataStreamReference = open_fake_data_stream(vec![]);
 
         let mut entries: BTreeMap<Ucs2String, NtfsDirectoryEntry> = BTreeMap::new();
         test_struct.read_node_data(&test_data, 24, &index, &data_stream, &mut entries)?;
