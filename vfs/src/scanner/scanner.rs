@@ -21,6 +21,8 @@ use formats::apm::ApmVolumeSystem;
 use formats::gpt::GptVolumeSystem;
 use formats::mbr::MbrVolumeSystem;
 use formats::qcow::QcowImage;
+use formats::sparseimage::SparseImageFile;
+use formats::udif::UdifFile;
 use formats::vhd::VhdImage;
 use formats::vhdx::VhdxImage;
 use formats::{FormatIdentifier, FormatScanner};
@@ -35,7 +37,9 @@ use crate::mbr::MbrFileSystem;
 use crate::path::VfsPath;
 use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
+use crate::sparseimage::SparseImageFileSystem;
 use crate::types::{VfsFileSystemReference, VfsResolverReference};
+use crate::udif::UdifFileSystem;
 use crate::vhd::VhdFileSystem;
 use crate::vhdx::VhdxFileSystem;
 
@@ -247,19 +251,17 @@ impl VfsScanner {
             ));
         }
         match scan_results.iter().next() {
-            Some(format_identifier) => {
-                match format_identifier {
-                    FormatIdentifier::Qcow => Ok(Some(VfsPathType::Qcow)),
-                    // FormatIdentifier::SparseImage => Ok(Some(VfsPathType::SparseImage)),
-                    // FormatIdentifier::Udif => Ok(Some(VfsPathType::Udif)),
-                    FormatIdentifier::Vhd => Ok(Some(VfsPathType::Vhd)),
-                    FormatIdentifier::Vhdx => Ok(Some(VfsPathType::Vhdx)),
-                    _ => Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Found unsupported storage media image format signature"),
-                    )),
-                }
-            }
+            Some(format_identifier) => match format_identifier {
+                FormatIdentifier::Qcow => Ok(Some(VfsPathType::Qcow)),
+                FormatIdentifier::SparseImage => Ok(Some(VfsPathType::SparseImage)),
+                FormatIdentifier::Udif => Ok(Some(VfsPathType::Udif)),
+                FormatIdentifier::Vhd => Ok(Some(VfsPathType::Vhd)),
+                FormatIdentifier::Vhdx => Ok(Some(VfsPathType::Vhdx)),
+                _ => Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Found unsupported storage media image format signature"),
+                )),
+            },
             // TODO: handle (split) RAW images.
             None => Ok(None),
         }
@@ -398,6 +400,46 @@ impl VfsScanner {
                     scan_node,
                     QcowFileSystem::PATH_PREFIX,
                     number_of_layers,
+                )?;
+            }
+            VfsPath::SparseImage { .. } => {
+                let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
+
+                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                    Some(data_stream) => sparseimage_file.read_data_stream(&data_stream)?,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::NotFound,
+                            format!("No such file: {}", path.to_string()),
+                        ))
+                    }
+                };
+                self.scan_for_storage_media_image_sub_nodes(
+                    file_system,
+                    path,
+                    scan_node,
+                    SparseImageFileSystem::PATH_PREFIX,
+                    1,
+                )?;
+            }
+            VfsPath::Udif { .. } => {
+                let mut udif_file: UdifFile = UdifFile::new();
+
+                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                    Some(data_stream) => udif_file.read_data_stream(&data_stream)?,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::NotFound,
+                            format!("No such file: {}", path.to_string()),
+                        ))
+                    }
+                };
+                self.scan_for_storage_media_image_sub_nodes(
+                    file_system,
+                    path,
+                    scan_node,
+                    UdifFileSystem::PATH_PREFIX,
+                    1,
                 )?;
             }
             VfsPath::Vhd { .. } => {
@@ -743,6 +785,42 @@ mod tests {
             .unwrap();
 
         assert!(vfs_path_type == VfsPathType::Qcow);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_storage_media_image_format_with_sparseimage() -> io::Result<()> {
+        let mut format_scanner: VfsScanner = VfsScanner::new();
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => return Err(core::error_to_io_error!(error)),
+        }
+        let data_stream: DataStreamReference =
+            get_data_stream("../test_data/sparseimage/hfsplus.sparseimage")?;
+        let vfs_path_type: VfsPathType = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
+            .unwrap();
+
+        assert!(vfs_path_type == VfsPathType::SparseImage);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_storage_media_image_format_with_udif() -> io::Result<()> {
+        let mut format_scanner: VfsScanner = VfsScanner::new();
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => return Err(core::error_to_io_error!(error)),
+        }
+        let data_stream: DataStreamReference =
+            get_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
+        let vfs_path_type: VfsPathType = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
+            .unwrap();
+
+        assert!(vfs_path_type == VfsPathType::Udif);
 
         Ok(())
     }

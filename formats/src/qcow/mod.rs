@@ -21,9 +21,7 @@ mod file_header_v1;
 mod file_header_v2;
 mod file_header_v3;
 mod image;
-mod layer;
 
 pub use enums::{QcowCompressionMethod, QcowEncryptionMethod};
 pub use file::QcowFile;
-pub use image::QcowImage;
-pub use layer::QcowLayer;
+pub use image::{QcowImage, QcowImageLayer};

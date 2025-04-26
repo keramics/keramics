@@ -70,8 +70,7 @@ impl<'a> VfsFinder<'a> {
 }
 
 impl<'a> Iterator for VfsFinder<'a> {
-    // TODO: return VfsPath instead of String.
-    type Item = io::Result<(VfsFileEntry, String)>;
+    type Item = io::Result<(VfsFileEntry, Vec<VfsString>)>;
 
     /// Retrieves the next file entry.
     fn next(&mut self) -> Option<Self::Item> {
@@ -100,17 +99,11 @@ impl<'a> Iterator for VfsFinder<'a> {
         }
         while let Some(mut state) = self.states.pop() {
             if state.sub_file_entry_index >= state.number_of_sub_file_entries {
-                // TODO: make join file system specific.
-                let path: String = self
-                    .path_components
-                    .iter()
-                    .map(|component| component.to_string())
-                    .collect::<Vec<String>>()
-                    .join("/");
+                let path_components: Vec<VfsString> = self.path_components.clone();
+
                 self.path_components.pop();
 
-                // TODO: return VfsPath instead of String.
-                return Some(Ok((state.file_entry, path)));
+                return Some(Ok((state.file_entry, path_components)));
             }
             let result: io::Result<VfsFileEntry> = state
                 .file_entry

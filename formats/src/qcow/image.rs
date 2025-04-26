@@ -11,19 +11,19 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::FileResolverReference;
 
 use super::file::QcowFile;
-use super::layer::QcowLayer;
+
+pub type QcowImageLayer = Arc<RwLock<QcowFile>>;
 
 /// QEMU Copy-On-Write (QCOW) storage media image.
 pub struct QcowImage {
     /// Files.
-    files: Vec<Rc<RefCell<QcowFile>>>,
+    files: Vec<Arc<RwLock<QcowFile>>>,
 }
 
 impl QcowImage {
@@ -38,12 +38,9 @@ impl QcowImage {
     }
 
     /// Retrieves a layer by index.
-    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<QcowLayer> {
+    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<QcowImageLayer> {
         match self.files.get(layer_index) {
-            Some(file) => match file.try_borrow() {
-                Ok(qcow_file) => Ok(QcowLayer::new(file, qcow_file.media_size)),
-                Err(error) => return Err(core::error_to_io_error!(error)),
-            },
+            Some(file) => Ok(file.clone()),
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("No layer with index: {}", layer_index),
@@ -95,7 +92,7 @@ impl QcowImage {
             if file_index > 0 {
                 file.set_backing_file(&mut self.files[file_index - 1])?;
             }
-            self.files.push(Rc::new(RefCell::new(file)));
+            self.files.push(Arc::new(RwLock::new(file)));
 
             file_index += 1;
         }
@@ -131,10 +128,12 @@ mod tests {
     fn test_get_layer_by_index() -> io::Result<()> {
         let image: QcowImage = get_image()?;
 
-        let layer: QcowLayer = image.get_layer_by_index(0)?;
+        let layer: QcowImageLayer = image.get_layer_by_index(0)?;
 
-        assert_eq!(layer.size, 4194304);
-
+        match layer.read() {
+            Ok(file) => assert_eq!(file.media_size, 4194304),
+            Err(error) => return Err(core::error_to_io_error!(error)),
+        };
         Ok(())
     }
 

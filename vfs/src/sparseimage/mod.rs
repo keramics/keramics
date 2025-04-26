@@ -11,25 +11,8 @@
  * under the License.
  */
 
-mod block_allocation_table;
-mod block_range;
-mod constants;
-mod enums;
-mod file;
-mod file_header;
-mod image;
-mod image_header;
-mod metadata_table;
-mod metadata_table_entry;
-mod metadata_table_header;
-mod parent_locator;
-mod parent_locator_entry;
-mod parent_locator_header;
-mod region_table;
-mod region_table_entry;
-mod region_table_header;
-mod sector_bitmap;
+mod file_entry;
+mod file_system;
 
-pub use enums::VhdxDiskType;
-pub use file::VhdxFile;
-pub use image::{VhdxImage, VhdxImageLayer};
+pub use file_entry::SparseImageFileEntry;
+pub use file_system::SparseImageFileSystem;

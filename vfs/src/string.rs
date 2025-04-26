@@ -16,6 +16,7 @@ use std::ffi::OsString;
 use types::{ByteString, Ucs2String};
 
 /// Virtual File System (VFS) string.
+#[derive(Clone, PartialEq)]
 pub enum VfsString {
     Byte(ByteString),
     Empty,

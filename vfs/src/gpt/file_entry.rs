@@ -64,11 +64,10 @@ impl GptFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
-        let number_of_sub_file_entries: usize = match self {
-            GptFileEntry::Partition { .. } => 0,
-            GptFileEntry::Root { volume_system } => volume_system.get_number_of_partitions(),
-        };
-        Ok(number_of_sub_file_entries)
+        match self {
+            GptFileEntry::Partition { .. } => Ok(0),
+            GptFileEntry::Root { volume_system } => Ok(volume_system.get_number_of_partitions()),
+        }
     }
 
     /// Retrieves a specific sub file entry.
@@ -79,7 +78,7 @@ impl GptFileEntry {
         match self {
             GptFileEntry::Partition { .. } => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Missing partitions",
+                "No sub file entries",
             )),
             GptFileEntry::Root { volume_system } => {
                 let gpt_partition: GptPartition =

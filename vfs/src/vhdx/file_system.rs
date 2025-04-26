@@ -12,10 +12,10 @@
  */
 
 use std::io;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use core::FileResolverReference;
-use formats::vhdx::{VhdxImage, VhdxLayer};
+use formats::vhdx::{VhdxImage, VhdxImageLayer};
 
 use crate::file_resolver::open_vfs_file_resolver;
 use crate::path::VfsPath;
@@ -35,7 +35,7 @@ pub struct VhdxFileSystem {
 impl VhdxFileSystem {
     pub const PATH_PREFIX: &'static str = "/vhdx";
 
-    /// Creates a new file entry.
+    /// Creates a new file system.
     pub fn new() -> Self {
         Self {
             image: Arc::new(VhdxImage::new()),
@@ -81,11 +81,11 @@ impl VhdxFileSystem {
         }
         match self.get_layer_index_by_path(location) {
             Ok(layer_index) => {
-                let vhdx_layer: VhdxLayer = self.image.get_layer_by_index(layer_index)?;
+                let vhdx_layer: VhdxImageLayer = self.image.get_layer_by_index(layer_index)?;
 
                 Ok(Some(VhdxFileEntry::Layer {
                     index: layer_index,
-                    layer: Arc::new(RwLock::new(vhdx_layer)),
+                    layer: vhdx_layer.clone(),
                 }))
             }
             Err(_) => Ok(None),
@@ -177,11 +177,11 @@ mod tests {
     fn test_file_entry_exists() -> io::Result<()> {
         let (vhdx_file_system, parent_vfs_path): (VhdxFileSystem, VfsPath) = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx1");
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/");
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
@@ -196,18 +196,6 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let (vhdx_file_system, parent_vfs_path): (VhdxFileSystem, VfsPath) = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx1");
-        let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
-        assert!(result.is_some());
-
-        let vhdx_file_entry: VhdxFileEntry = result.unwrap();
-
-        let name: Option<String> = vhdx_file_entry.get_name();
-        assert_eq!(name, Some("vhdx1".to_string()));
-
-        let file_type: VfsFileType = vhdx_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
-
         let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -220,6 +208,18 @@ mod tests {
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx1");
+        let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
+        assert!(result.is_some());
+
+        let vhdx_file_entry: VhdxFileEntry = result.unwrap();
+
+        let name: Option<String> = vhdx_file_entry.get_name();
+        assert_eq!(name, Some("vhdx1".to_string()));
+
+        let file_type: VfsFileType = vhdx_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::File);
+
         let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/bogus1");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
@@ -231,13 +231,13 @@ mod tests {
     fn get_layer_index_by_path() -> io::Result<()> {
         let (vhdx_file_system, _): (VhdxFileSystem, VfsPath) = get_file_system()?;
 
-        let path: String = "/vhdx1".to_string();
-        let layer_index: usize = vhdx_file_system.get_layer_index_by_path(&path)?;
-        assert_eq!(layer_index, 0);
-
         let path: String = "/".to_string();
         let result = vhdx_file_system.get_layer_index_by_path(&path);
         assert!(result.is_err());
+
+        let path: String = "/vhdx1".to_string();
+        let layer_index: usize = vhdx_file_system.get_layer_index_by_path(&path)?;
+        assert_eq!(layer_index, 0);
 
         let path: String = "/vhdx99".to_string();
         let result = vhdx_file_system.get_layer_index_by_path(&path);

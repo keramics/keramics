@@ -15,7 +15,7 @@ use std::io;
 use std::io::{Read, Seek};
 
 use core::mediator::{Mediator, MediatorReference};
-use core::DataStreamReference;
+use core::{DataStream, DataStreamReference};
 use types::bytes_to_u32_be;
 
 use crate::block_tree::BlockTree;
@@ -282,6 +282,13 @@ impl Seek for SparseImageFile {
     }
 }
 
+impl DataStream for SparseImageFile {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -437,4 +444,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_size.
 }

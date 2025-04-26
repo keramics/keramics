@@ -33,7 +33,7 @@ pub struct GptFileSystem {
 impl GptFileSystem {
     pub const PATH_PREFIX: &'static str = "/gpt";
 
-    /// Creates a new file entry.
+    /// Creates a new file system.
     pub fn new() -> Self {
         Self {
             volume_system: Arc::new(GptVolumeSystem::new()),
@@ -189,11 +189,11 @@ mod tests {
     fn test_file_entry_exists() -> io::Result<()> {
         let (gpt_file_system, parent_vfs_path): (GptFileSystem, VfsPath) = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/");
         let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/");
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");
         let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
@@ -208,18 +208,6 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let (gpt_file_system, parent_vfs_path): (GptFileSystem, VfsPath) = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");
-        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
-        assert!(result.is_some());
-
-        let gpt_file_entry: GptFileEntry = result.unwrap();
-
-        let name: Option<String> = gpt_file_entry.get_name();
-        assert_eq!(name, Some("gpt1".to_string()));
-
-        let file_type: VfsFileType = gpt_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
-
         let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/");
         let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -232,6 +220,18 @@ mod tests {
         let file_type: VfsFileType = gpt_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");
+        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
+        assert!(result.is_some());
+
+        let gpt_file_entry: GptFileEntry = result.unwrap();
+
+        let name: Option<String> = gpt_file_entry.get_name();
+        assert_eq!(name, Some("gpt1".to_string()));
+
+        let file_type: VfsFileType = gpt_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::File);
+
         let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Gpt, "/bogus1");
         let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
@@ -243,13 +243,13 @@ mod tests {
     fn get_partition_index_by_path() -> io::Result<()> {
         let (gpt_file_system, _): (GptFileSystem, VfsPath) = get_file_system()?;
 
-        let path: String = "/gpt1".to_string();
-        let partition_index: usize = gpt_file_system.get_partition_index_by_path(&path)?;
-        assert_eq!(partition_index, 0);
-
         let path: String = "/".to_string();
         let result = gpt_file_system.get_partition_index_by_path(&path);
         assert!(result.is_err());
+
+        let path: String = "/gpt1".to_string();
+        let partition_index: usize = gpt_file_system.get_partition_index_by_path(&path)?;
+        assert_eq!(partition_index, 0);
 
         let path: String = "/gpt99".to_string();
         let result = gpt_file_system.get_partition_index_by_path(&path);

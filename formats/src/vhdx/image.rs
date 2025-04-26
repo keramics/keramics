@@ -11,19 +11,19 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::FileResolverReference;
 
 use super::file::VhdxFile;
-use super::layer::VhdxLayer;
+
+pub type VhdxImageLayer = Arc<RwLock<VhdxFile>>;
 
 /// Virtual Hard Disk version 2 (VHDX) storage media image.
 pub struct VhdxImage {
     /// Files.
-    files: Vec<Rc<RefCell<VhdxFile>>>,
+    files: Vec<Arc<RwLock<VhdxFile>>>,
 }
 
 impl VhdxImage {
@@ -38,16 +38,9 @@ impl VhdxImage {
     }
 
     /// Retrieves a layer by index.
-    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<VhdxLayer> {
+    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<VhdxImageLayer> {
         match self.files.get(layer_index) {
-            Some(file) => match file.try_borrow() {
-                Ok(vhdx_file) => Ok(VhdxLayer::new(
-                    file,
-                    &vhdx_file.identifier,
-                    vhdx_file.media_size,
-                )),
-                Err(error) => return Err(core::error_to_io_error!(error)),
-            },
+            Some(file) => Ok(file.clone()),
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("No layer with index: {}", layer_index),
@@ -108,7 +101,7 @@ impl VhdxImage {
             if file_index > 0 {
                 file.set_parent(&mut self.files[file_index - 1])?;
             }
-            self.files.push(Rc::new(RefCell::new(file)));
+            self.files.push(Arc::new(RwLock::new(file)));
 
             file_index += 1;
         }
@@ -135,13 +128,18 @@ mod tests {
     fn test_get_layer_by_index() -> io::Result<()> {
         let image: VhdxImage = get_image()?;
 
-        let layer: VhdxLayer = image.get_layer_by_index(0)?;
+        let layer: VhdxImageLayer = image.get_layer_by_index(0)?;
 
-        assert_eq!(layer.size, 4194304);
-        assert_eq!(
-            layer.identifier.to_string(),
-            "7584f8fb-36d3-4091-afb5-b1afe587bfa8"
-        );
+        match layer.read() {
+            Ok(file) => {
+                assert_eq!(file.media_size, 4194304);
+                assert_eq!(
+                    file.identifier.to_string(),
+                    "7584f8fb-36d3-4091-afb5-b1afe587bfa8"
+                );
+            }
+            Err(error) => return Err(core::error_to_io_error!(error)),
+        };
         Ok(())
     }
 

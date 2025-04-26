@@ -19,10 +19,8 @@ mod enums;
 mod file;
 mod file_footer;
 mod image;
-mod layer;
 mod sector_bitmap;
 
 pub use enums::VhdDiskType;
 pub use file::VhdFile;
-pub use image::VhdImage;
-pub use layer::VhdLayer;
+pub use image::{VhdImage, VhdImageLayer};

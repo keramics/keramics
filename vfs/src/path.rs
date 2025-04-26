@@ -79,6 +79,14 @@ pub enum VfsPath {
         location: String,
         parent: Arc<VfsPath>,
     },
+    SparseImage {
+        location: String,
+        parent: Arc<VfsPath>,
+    },
+    Udif {
+        location: String,
+        parent: Arc<VfsPath>,
+    },
     Vhd {
         location: String,
         parent: Arc<VfsPath>,
@@ -119,6 +127,14 @@ impl VfsPath {
             },
             VfsPathType::Os => panic!("Unsupported path_type: VfsPathType::Os"),
             VfsPathType::Qcow => VfsPath::Qcow {
+                location: location.to_string(),
+                parent: parent,
+            },
+            VfsPathType::SparseImage => VfsPath::SparseImage {
+                location: location.to_string(),
+                parent: parent,
+            },
+            VfsPathType::Udif => VfsPath::Udif {
                 location: location.to_string(),
                 parent: parent,
             },
@@ -163,6 +179,14 @@ impl VfsPath {
                 location: location.to_string(),
             },
             VfsPath::Qcow { parent, .. } => VfsPath::Qcow {
+                location: location.to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::SparseImage { parent, .. } => VfsPath::SparseImage {
+                location: location.to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Udif { parent, .. } => VfsPath::Udif {
                 location: location.to_string(),
                 parent: parent.clone(),
             },
@@ -252,6 +276,22 @@ impl VfsPath {
                     parent: parent.clone(),
                 }
             }
+            VfsPath::SparseImage { location, parent } => {
+                let mut location_components: Vec<&str> = vec![location.as_str()];
+                location_components.append(path_components);
+                VfsPath::SparseImage {
+                    location: location_components.join("/"),
+                    parent: parent.clone(),
+                }
+            }
+            VfsPath::Udif { location, parent } => {
+                let mut location_components: Vec<&str> = vec![location.as_str()];
+                location_components.append(path_components);
+                VfsPath::Udif {
+                    location: location_components.join("/"),
+                    parent: parent.clone(),
+                }
+            }
             VfsPath::Vhd { location, parent } => {
                 let mut location_components: Vec<&str> = vec![location.as_str()];
                 location_components.append(path_components);
@@ -282,6 +322,8 @@ impl VfsPath {
             VfsPath::Ntfs { ntfs_path, .. } => ntfs_path.to_string(),
             VfsPath::Os { location } => location.clone(),
             VfsPath::Qcow { location, .. } => location.clone(),
+            VfsPath::SparseImage { location, .. } => location.clone(),
+            VfsPath::Udif { location, .. } => location.clone(),
             VfsPath::Vhd { location, .. } => location.clone(),
             VfsPath::Vhdx { location, .. } => location.clone(),
         }
@@ -298,6 +340,8 @@ impl VfsPath {
             VfsPath::Ntfs { parent, .. } => Some(parent.as_ref()),
             VfsPath::Os { .. } => None,
             VfsPath::Qcow { parent, .. } => Some(parent.as_ref()),
+            VfsPath::SparseImage { parent, .. } => Some(parent.as_ref()),
+            VfsPath::Udif { parent, .. } => Some(parent.as_ref()),
             VfsPath::Vhd { parent, .. } => Some(parent.as_ref()),
             VfsPath::Vhdx { parent, .. } => Some(parent.as_ref()),
         }
@@ -314,6 +358,8 @@ impl VfsPath {
             VfsPath::Ntfs { .. } => VfsPathType::Ntfs,
             VfsPath::Os { .. } => VfsPathType::Os,
             VfsPath::Qcow { .. } => VfsPathType::Qcow,
+            VfsPath::SparseImage { .. } => VfsPathType::SparseImage,
+            VfsPath::Udif { .. } => VfsPathType::Udif,
             VfsPath::Vhd { .. } => VfsPathType::Vhd,
             VfsPath::Vhdx { .. } => VfsPathType::Vhdx,
         }
@@ -330,6 +376,8 @@ impl VfsPath {
             VfsPath::Ntfs { ntfs_path, .. } => todo!(),
             VfsPath::Os { location } => get_filename(location.as_str(), MAIN_SEPARATOR_STR),
             VfsPath::Qcow { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::SparseImage { location, .. } => get_filename(location.as_str(), "/"),
+            VfsPath::Udif { location, .. } => get_filename(location.as_str(), "/"),
             VfsPath::Vhd { location, .. } => get_filename(location.as_str(), "/"),
             VfsPath::Vhdx { location, .. } => get_filename(location.as_str(), "/"),
         }
@@ -365,6 +413,14 @@ impl VfsPath {
                 location: get_directory_name(location.as_str(), MAIN_SEPARATOR_STR).to_string(),
             },
             VfsPath::Qcow { location, parent } => VfsPath::Qcow {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::SparseImage { location, parent } => VfsPath::SparseImage {
+                location: get_directory_name(location.as_str(), "/").to_string(),
+                parent: parent.clone(),
+            },
+            VfsPath::Udif { location, parent } => VfsPath::Udif {
                 location: get_directory_name(location.as_str(), "/").to_string(),
                 parent: parent.clone(),
             },
@@ -411,6 +467,16 @@ impl VfsPath {
             VfsPath::Os { location } => format!("type: OS: location: {}\n", location),
             VfsPath::Qcow { location, parent } => format!(
                 "{}\ntype: QCOW: location: {}\n",
+                parent.to_string(),
+                location
+            ),
+            VfsPath::SparseImage { location, parent } => format!(
+                "{}\ntype: SPARSEIMAGE: location: {}\n",
+                parent.to_string(),
+                location
+            ),
+            VfsPath::Udif { location, parent } => format!(
+                "{}\ntype: UDIF: location: {}\n",
                 parent.to_string(),
                 location
             ),

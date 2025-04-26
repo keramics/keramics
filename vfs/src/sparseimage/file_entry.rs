@@ -12,61 +12,58 @@
  */
 
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use core::DataStreamReference;
-use formats::vhdx::{VhdxImage, VhdxImageLayer};
+use formats::sparseimage::SparseImageFile;
 
 use crate::enums::VfsFileType;
 
-/// Virtual Hard Disk version 2 (VHDX) storage media image file entry.
-pub enum VhdxFileEntry {
+/// Universal Disk Image Format (UDIF) storage media image file entry.
+pub enum SparseImageFileEntry {
     /// Layer file entry.
     Layer {
-        /// Layer index.
-        index: usize,
-
-        /// Layer.
-        layer: VhdxImageLayer,
+        /// File.
+        file: Arc<RwLock<SparseImageFile>>,
     },
 
     /// Root file entry.
     Root {
-        /// Storage media image.
-        image: Arc<VhdxImage>,
+        /// File.
+        file: Arc<RwLock<SparseImageFile>>,
     },
 }
 
-impl VhdxFileEntry {
+impl SparseImageFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
         match self {
-            VhdxFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
-            VhdxFileEntry::Root { .. } => Ok(None),
+            SparseImageFileEntry::Layer { file, .. } => Ok(Some(file.clone())),
+            SparseImageFileEntry::Root { .. } => Ok(None),
         }
     }
 
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         match self {
-            VhdxFileEntry::Layer { .. } => VfsFileType::File,
-            VhdxFileEntry::Root { .. } => VfsFileType::Directory,
+            SparseImageFileEntry::Layer { .. } => VfsFileType::File,
+            SparseImageFileEntry::Root { .. } => VfsFileType::Directory,
         }
     }
 
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<String> {
         match self {
-            VhdxFileEntry::Layer { index, .. } => Some(format!("vhdx{}", index + 1)),
-            VhdxFileEntry::Root { .. } => None,
+            SparseImageFileEntry::Layer { .. } => Some("sparseimage1".to_string()),
+            SparseImageFileEntry::Root { .. } => None,
         }
     }
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
         match self {
-            VhdxFileEntry::Layer { .. } => Ok(0),
-            VhdxFileEntry::Root { image } => Ok(image.get_number_of_layers()),
+            SparseImageFileEntry::Layer { .. } => Ok(0),
+            SparseImageFileEntry::Root { .. } => Ok(1),
         }
     }
 
@@ -74,19 +71,20 @@ impl VhdxFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<VhdxFileEntry> {
+    ) -> io::Result<SparseImageFileEntry> {
         match self {
-            VhdxFileEntry::Layer { .. } => Err(io::Error::new(
+            SparseImageFileEntry::Layer { .. } => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 "No sub file entries",
             )),
-            VhdxFileEntry::Root { image } => {
-                let vhdx_layer: VhdxImageLayer = image.get_layer_by_index(sub_file_entry_index)?;
-
-                Ok(VhdxFileEntry::Layer {
-                    index: sub_file_entry_index,
-                    layer: vhdx_layer.clone(),
-                })
+            SparseImageFileEntry::Root { file } => {
+                if sub_file_entry_index != 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("No sub file entry with index: {}", sub_file_entry_index),
+                    ));
+                }
+                Ok(SparseImageFileEntry::Layer { file: file.clone() })
             }
         }
     }
@@ -96,25 +94,26 @@ impl VhdxFileEntry {
 mod tests {
     use super::*;
 
-    use core::{open_os_file_resolver, FileResolverReference};
+    use core::open_os_data_stream;
 
-    fn get_image() -> io::Result<VhdxImage> {
-        let mut image: VhdxImage = VhdxImage::new();
+    fn get_file() -> io::Result<SparseImageFile> {
+        let mut file: SparseImageFile = SparseImageFile::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/vhdx")?;
-        image.open(&file_resolver, "ntfs-differential.vhdx")?;
+        let data_stream: DataStreamReference =
+            open_os_data_stream("../test_data/sparseimage/hfsplus.sparseimage")?;
+        file.read_data_stream(&data_stream)?;
 
-        Ok(image)
+        Ok(file)
     }
 
     // TODO: add tests for get_data_stream
 
     #[test]
     fn test_get_file_type() -> io::Result<()> {
-        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+        let sparseimage_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(get_file()?));
 
-        let file_entry = VhdxFileEntry::Root {
-            image: vhdx_image.clone(),
+        let file_entry = SparseImageFileEntry::Root {
+            file: sparseimage_file.clone(),
         };
 
         let file_type: VfsFileType = file_entry.get_file_type();
@@ -125,24 +124,21 @@ mod tests {
 
     #[test]
     fn test_name() -> io::Result<()> {
-        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+        let sparseimage_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(get_file()?));
 
-        let file_entry = VhdxFileEntry::Root {
-            image: vhdx_image.clone(),
+        let file_entry = SparseImageFileEntry::Root {
+            file: sparseimage_file.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();
         assert!(name.is_none());
 
-        let vhdx_layer: VhdxImageLayer = vhdx_image.get_layer_by_index(0)?;
-
-        let file_entry = VhdxFileEntry::Layer {
-            index: 0,
-            layer: vhdx_layer.clone(),
+        let file_entry = SparseImageFileEntry::Layer {
+            file: sparseimage_file.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("vhdx1".to_string()));
+        assert_eq!(name, Some("sparseimage1".to_string()));
 
         Ok(())
     }

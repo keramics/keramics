@@ -11,13 +11,12 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::mediator::{Mediator, MediatorReference};
-use core::DataStreamReference;
+use core::{DataStream, DataStreamReference};
 use types::{bytes_to_u32_le, bytes_to_u64_le, Ucs2String, Uuid};
 
 use crate::block_tree::BlockTree;
@@ -64,7 +63,7 @@ pub struct VhdxFile {
     pub parent_name: Option<Ucs2String>,
 
     /// Parent file.
-    parent_file: Option<Rc<RefCell<VhdxFile>>>,
+    parent_file: Option<Arc<RwLock<VhdxFile>>>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -703,7 +702,7 @@ impl VhdxFile {
                     }
                 },
                 VhdxBlockRangeType::InParent => match &self.parent_file {
-                    Some(parent_file) => match parent_file.try_borrow_mut() {
+                    Some(parent_file) => match parent_file.write() {
                         Ok(mut file) => {
                             file.seek(io::SeekFrom::Start(media_offset))?;
 
@@ -736,7 +735,7 @@ impl VhdxFile {
     }
 
     /// Sets the parent file.
-    pub fn set_parent(&mut self, parent_file: &Rc<RefCell<VhdxFile>>) -> io::Result<()> {
+    pub fn set_parent(&mut self, parent_file: &Arc<RwLock<VhdxFile>>) -> io::Result<()> {
         let parent_identifier: &Uuid = match &self.parent_identifier {
             Some(parent_identifier) => parent_identifier,
             None => {
@@ -746,7 +745,7 @@ impl VhdxFile {
                 ))
             }
         };
-        match parent_file.try_borrow() {
+        match parent_file.read() {
             Ok(file) => {
                 if *parent_identifier != file.identifier {
                     return Err(io::Error::new(
@@ -804,6 +803,13 @@ impl Seek for VhdxFile {
             io::SeekFrom::Start(offset) => offset,
         };
         Ok(self.media_offset)
+    }
+}
+
+impl DataStream for VhdxFile {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
     }
 }
 
@@ -999,4 +1005,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_size.
 }

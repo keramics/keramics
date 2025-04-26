@@ -16,7 +16,7 @@ use std::io::{Read, Seek};
 
 use compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
 use core::mediator::{Mediator, MediatorReference};
-use core::DataStreamReference;
+use core::{DataStream, DataStreamReference};
 
 use crate::block_tree::BlockTree;
 use crate::lru_cache::LruCache;
@@ -554,6 +554,13 @@ impl Seek for UdifFile {
             io::SeekFrom::Start(offset) => offset,
         };
         Ok(self.media_offset)
+    }
+}
+
+impl DataStream for UdifFile {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
     }
 }
 
