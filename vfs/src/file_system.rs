@@ -11,76 +11,62 @@
  * under the License.
  */
 
+use std::ffi::OsStr;
 use std::io;
 use std::path::Path;
 
-use core::{DataStreamReference, FileResolverReference};
-use formats::apm::ApmVolumeSystem;
+use core::DataStreamReference;
 use formats::ext::{ExtFileEntry, ExtFileSystem};
-use formats::gpt::GptVolumeSystem;
-use formats::mbr::MbrVolumeSystem;
 use formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
-use formats::qcow::QcowImage;
-use formats::vhd::VhdImage;
-use formats::vhdx::VhdxImage;
 
+use super::apm::{ApmFileEntry, ApmFileSystem};
 use super::enums::VfsPathType;
 use super::fake::FakeFileSystem;
 use super::file_entry::VfsFileEntry;
-use super::file_resolver::open_vfs_file_resolver;
+use super::gpt::{GptFileEntry, GptFileSystem};
+use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileEntry;
 use super::path::VfsPath;
+use super::qcow::{QcowFileEntry, QcowFileSystem};
 use super::types::VfsFileSystemReference;
+use super::vhd::{VhdFileEntry, VhdFileSystem};
+use super::vhdx::{VhdxFileEntry, VhdxFileSystem};
 
 /// Virtual File System (VFS) file system.
 pub enum VfsFileSystem {
-    Apm(ApmVolumeSystem),
+    Apm(ApmFileSystem),
     Ext(ExtFileSystem),
     Fake(FakeFileSystem),
-    Gpt(GptVolumeSystem),
-    Mbr(MbrVolumeSystem),
+    Gpt(GptFileSystem),
+    Mbr(MbrFileSystem),
     Ntfs(NtfsFileSystem),
     Os,
-    Qcow(QcowImage),
-    Vhd(VhdImage),
-    Vhdx(VhdxImage),
+    Qcow(QcowFileSystem),
+    Vhd(VhdFileSystem),
+    Vhdx(VhdxFileSystem),
 }
 
 impl VfsFileSystem {
     /// Creates a new file system.
     pub fn new(path_type: &VfsPathType) -> Self {
         match path_type {
-            VfsPathType::Apm => VfsFileSystem::Apm(ApmVolumeSystem::new()),
+            VfsPathType::Apm => VfsFileSystem::Apm(ApmFileSystem::new()),
             VfsPathType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
             VfsPathType::Fake => VfsFileSystem::Fake(FakeFileSystem::new()),
-            VfsPathType::Gpt => VfsFileSystem::Gpt(GptVolumeSystem::new()),
-            VfsPathType::Mbr => VfsFileSystem::Mbr(MbrVolumeSystem::new()),
+            VfsPathType::Gpt => VfsFileSystem::Gpt(GptFileSystem::new()),
+            VfsPathType::Mbr => VfsFileSystem::Mbr(MbrFileSystem::new()),
             VfsPathType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
             VfsPathType::Os => VfsFileSystem::Os,
-            VfsPathType::Qcow => VfsFileSystem::Qcow(QcowImage::new()),
-            VfsPathType::Vhd => VfsFileSystem::Vhd(VhdImage::new()),
-            VfsPathType::Vhdx => VfsFileSystem::Vhdx(VhdxImage::new()),
+            VfsPathType::Qcow => VfsFileSystem::Qcow(QcowFileSystem::new()),
+            VfsPathType::Vhd => VfsFileSystem::Vhd(VhdFileSystem::new()),
+            VfsPathType::Vhdx => VfsFileSystem::Vhdx(VhdxFileSystem::new()),
         }
     }
 
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, path: &VfsPath) -> io::Result<bool> {
         match self {
-            VfsFileSystem::Apm(apm_volume_system) => match path {
-                VfsPath::Apm { location, .. } => {
-                    if location == "/" {
-                        return Ok(true);
-                    }
-                    match apm_volume_system.get_partition_index_by_path(&location) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
+            VfsFileSystem::Apm(apm_file_system) => apm_file_system.file_entry_exists(path),
             VfsFileSystem::Ext(ext_file_system) => match path {
                 VfsPath::Ext { ext_path, .. } => {
                     match ext_file_system.get_file_entry_by_path(&ext_path)? {
@@ -100,36 +86,8 @@ impl VfsFileSystem {
                     "Unsupported path type",
                 )),
             },
-            VfsFileSystem::Gpt(gpt_volume_system) => match path {
-                VfsPath::Gpt { location, .. } => {
-                    if location == "/" {
-                        return Ok(true);
-                    }
-                    match gpt_volume_system.get_partition_index_by_path(&location) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
-            VfsFileSystem::Mbr(mbr_volume_system) => match path {
-                VfsPath::Mbr { location, .. } => {
-                    if location == "/" {
-                        return Ok(true);
-                    }
-                    match mbr_volume_system.get_partition_index_by_path(&location) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
+            VfsFileSystem::Gpt(gpt_file_system) => gpt_file_system.file_entry_exists(path),
+            VfsFileSystem::Mbr(mbr_file_system) => mbr_file_system.file_entry_exists(path),
             VfsFileSystem::Ntfs(ntfs_file_system) => match path {
                 VfsPath::Ntfs { ntfs_path, .. } => {
                     match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
@@ -153,51 +111,9 @@ impl VfsFileSystem {
                     "Unsupported path type",
                 )),
             },
-            VfsFileSystem::Qcow(qcow_image) => match path {
-                VfsPath::Qcow { location, .. } => {
-                    if location == "/" {
-                        return Ok(true);
-                    }
-                    match qcow_image.get_layer_index_by_path(&location) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
-            VfsFileSystem::Vhd(vhd_image) => match path {
-                VfsPath::Vhd { location, .. } => {
-                    if location == "/" {
-                        return Ok(true);
-                    }
-                    match vhd_image.get_layer_index_by_path(&location) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
-            VfsFileSystem::Vhdx(vhdx_image) => match path {
-                VfsPath::Vhdx { location, .. } => {
-                    if location == "/" {
-                        return Ok(true);
-                    }
-                    match vhdx_image.get_layer_index_by_path(&location) {
-                        Ok(_) => Ok(true),
-                        Err(_) => Ok(false),
-                    }
-                }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
+            VfsFileSystem::Qcow(qcow_file_system) => qcow_file_system.file_entry_exists(path),
+            VfsFileSystem::Vhd(vhd_file_system) => vhd_file_system.file_entry_exists(path),
+            VfsFileSystem::Vhdx(vhdx_file_system) => vhdx_file_system.file_entry_exists(path),
         }
     }
 
@@ -218,25 +134,12 @@ impl VfsFileSystem {
     /// Retrieves a file entry with the specified path.
     pub fn get_file_entry_by_path(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
         match self {
-            VfsFileSystem::Apm(apm_volume_system) => match path {
-                VfsPath::Apm { location, .. } => {
-                    let result: Option<VfsFileEntry> =
-                        match apm_volume_system.get_partition_by_path(&location) {
-                            Ok(result) => match result {
-                                Some(apm_partition) => Some(VfsFileEntry::Apm(Some(
-                                    DataStreamReference::new(Box::new(apm_partition)),
-                                ))),
-                                None => Some(VfsFileEntry::Apm(None)),
-                            },
-                            Err(_) => None,
-                        };
-                    Ok(result)
+            VfsFileSystem::Apm(apm_file_system) => {
+                match apm_file_system.get_file_entry_by_path(path)? {
+                    Some(apm_file_entry) => Ok(Some(VfsFileEntry::Apm(apm_file_entry))),
+                    None => Ok(None),
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
+            }
             VfsFileSystem::Ext(ext_file_system) => match path {
                 VfsPath::Ext { ext_path, .. } => {
                     let result: Option<VfsFileEntry> =
@@ -265,44 +168,18 @@ impl VfsFileSystem {
                     "Unsupported path type",
                 )),
             },
-            VfsFileSystem::Gpt(gpt_volume_system) => match path {
-                VfsPath::Gpt { location, .. } => {
-                    let result: Option<VfsFileEntry> =
-                        match gpt_volume_system.get_partition_by_path(&location) {
-                            Ok(result) => match result {
-                                Some(gpt_partition) => Some(VfsFileEntry::Gpt(Some(
-                                    DataStreamReference::new(Box::new(gpt_partition)),
-                                ))),
-                                None => Some(VfsFileEntry::Gpt(None)),
-                            },
-                            Err(_) => None,
-                        };
-                    Ok(result)
+            VfsFileSystem::Gpt(gpt_file_system) => {
+                match gpt_file_system.get_file_entry_by_path(path)? {
+                    Some(gpt_file_entry) => Ok(Some(VfsFileEntry::Gpt(gpt_file_entry))),
+                    None => Ok(None),
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
-            VfsFileSystem::Mbr(mbr_volume_system) => match path {
-                VfsPath::Mbr { location, .. } => {
-                    let result: Option<VfsFileEntry> =
-                        match mbr_volume_system.get_partition_by_path(&location) {
-                            Ok(result) => match result {
-                                Some(mbr_partition) => Some(VfsFileEntry::Mbr(Some(
-                                    DataStreamReference::new(Box::new(mbr_partition)),
-                                ))),
-                                None => Some(VfsFileEntry::Mbr(None)),
-                            },
-                            Err(_) => None,
-                        };
-                    Ok(result)
+            }
+            VfsFileSystem::Mbr(mbr_file_system) => {
+                match mbr_file_system.get_file_entry_by_path(path)? {
+                    Some(mbr_file_entry) => Ok(Some(VfsFileEntry::Mbr(mbr_file_entry))),
+                    None => Ok(None),
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
+            }
             VfsFileSystem::Ntfs(ntfs_file_system) => match path {
                 VfsPath::Ntfs { ntfs_path, .. } => {
                     let result: Option<VfsFileEntry> =
@@ -325,7 +202,7 @@ impl VfsFileSystem {
                         false => None,
                         true => {
                             let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-                            os_file_entry.initialize(&location)?;
+                            os_file_entry.open(OsStr::new(location.as_str()))?;
                             Some(VfsFileEntry::Os(os_file_entry))
                         }
                     };
@@ -336,85 +213,64 @@ impl VfsFileSystem {
                     "Unsupported path type",
                 )),
             },
-            VfsFileSystem::Qcow(qcow_image) => match path {
-                VfsPath::Qcow { location, .. } => {
-                    let result: Option<VfsFileEntry> = match qcow_image.get_layer_by_path(&location)
-                    {
-                        Ok(result) => match result {
-                            Some(qcow_layer) => Some(VfsFileEntry::Qcow(Some(
-                                DataStreamReference::new(Box::new(qcow_layer)),
-                            ))),
-                            None => Some(VfsFileEntry::Qcow(None)),
-                        },
-                        Err(_) => None,
-                    };
-                    Ok(result)
+            VfsFileSystem::Qcow(qcow_file_system) => {
+                match qcow_file_system.get_file_entry_by_path(path)? {
+                    Some(qcow_file_entry) => Ok(Some(VfsFileEntry::Qcow(qcow_file_entry))),
+                    None => Ok(None),
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
-            VfsFileSystem::Vhd(vhd_image) => match path {
-                VfsPath::Vhd { location, .. } => {
-                    let result: Option<VfsFileEntry> = match vhd_image.get_layer_by_path(&location)
-                    {
-                        Ok(result) => match result {
-                            Some(vhd_layer) => Some(VfsFileEntry::Vhd(Some(
-                                DataStreamReference::new(Box::new(vhd_layer)),
-                            ))),
-                            None => Some(VfsFileEntry::Vhd(None)),
-                        },
-                        Err(_) => None,
-                    };
-                    Ok(result)
+            }
+            VfsFileSystem::Vhd(vhd_file_system) => {
+                match vhd_file_system.get_file_entry_by_path(path)? {
+                    Some(vhd_file_entry) => Ok(Some(VfsFileEntry::Vhd(vhd_file_entry))),
+                    None => Ok(None),
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
-            VfsFileSystem::Vhdx(vhdx_image) => match path {
-                VfsPath::Vhdx { location, .. } => {
-                    let result: Option<VfsFileEntry> = match vhdx_image.get_layer_by_path(&location)
-                    {
-                        Ok(result) => match result {
-                            Some(vhdx_layer) => Some(VfsFileEntry::Vhdx(Some(
-                                DataStreamReference::new(Box::new(vhdx_layer)),
-                            ))),
-                            None => Some(VfsFileEntry::Vhdx(None)),
-                        },
-                        Err(_) => None,
-                    };
-                    Ok(result)
+            }
+            VfsFileSystem::Vhdx(vhdx_file_system) => {
+                match vhdx_file_system.get_file_entry_by_path(path)? {
+                    Some(vhdx_file_entry) => Ok(Some(VfsFileEntry::Vhdx(vhdx_file_entry))),
+                    None => Ok(None),
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                )),
-            },
+            }
         }
     }
 
     /// Retrieves the root file entry.
     pub fn get_root_file_entry(&self) -> io::Result<Option<VfsFileEntry>> {
         match self {
-            VfsFileSystem::Apm(_) => todo!(),
+            VfsFileSystem::Apm(apm_file_system) => {
+                let apm_file_entry: ApmFileEntry = apm_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Apm(apm_file_entry)))
+            }
             VfsFileSystem::Ext(ext_file_system) => {
                 let ext_file_entry: ExtFileEntry = ext_file_system.get_root_directory()?;
                 Ok(Some(VfsFileEntry::Ext(ext_file_entry)))
             }
             VfsFileSystem::Fake(_) => todo!(),
-            VfsFileSystem::Gpt(_) => todo!(),
-            VfsFileSystem::Mbr(_) => todo!(),
+            VfsFileSystem::Gpt(gpt_file_system) => {
+                let gpt_file_entry: GptFileEntry = gpt_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Gpt(gpt_file_entry)))
+            }
+            VfsFileSystem::Mbr(mbr_file_system) => {
+                let mbr_file_entry: MbrFileEntry = mbr_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Mbr(mbr_file_entry)))
+            }
             VfsFileSystem::Ntfs(ntfs_file_system) => {
                 let ntfs_file_entry: NtfsFileEntry = ntfs_file_system.get_root_directory()?;
                 Ok(Some(VfsFileEntry::Ntfs(ntfs_file_entry)))
             }
             VfsFileSystem::Os => todo!(),
-            VfsFileSystem::Qcow(_) => todo!(),
-            VfsFileSystem::Vhd(_) => todo!(),
-            VfsFileSystem::Vhdx(_) => todo!(),
+            VfsFileSystem::Qcow(qcow_file_system) => {
+                let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Qcow(qcow_file_entry)))
+            }
+            VfsFileSystem::Vhd(vhd_file_system) => {
+                let vhd_file_entry: VhdFileEntry = vhd_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Vhd(vhd_file_entry)))
+            }
+            VfsFileSystem::Vhdx(vhdx_file_system) => {
+                let vhdx_file_entry: VhdxFileEntry = vhdx_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Vhdx(vhdx_file_entry)))
+            }
         }
     }
 
@@ -441,26 +297,7 @@ impl VfsFileSystem {
         path: &VfsPath,
     ) -> io::Result<()> {
         match self {
-            VfsFileSystem::Apm(apm_volume_system) => {
-                let file_system: &VfsFileSystemReference = match parent_file_system {
-                    Some(file_system) => file_system,
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
-                        ))
-                    }
-                };
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
-                    Some(data_stream) => apm_volume_system.read_data_stream(&data_stream),
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
-                        ))
-                    }
-                }
-            }
+            VfsFileSystem::Apm(apm_file_system) => apm_file_system.open(parent_file_system, path),
             VfsFileSystem::Ext(ext_file_system) => {
                 let file_system: &VfsFileSystemReference = match parent_file_system {
                     Some(file_system) => file_system,
@@ -490,46 +327,8 @@ impl VfsFileSystem {
                 }
                 Ok(())
             }
-            VfsFileSystem::Gpt(gpt_volume_system) => {
-                let file_system: &VfsFileSystemReference = match parent_file_system {
-                    Some(file_system) => file_system,
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
-                        ))
-                    }
-                };
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
-                    Some(data_stream) => gpt_volume_system.read_data_stream(&data_stream),
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
-                        ))
-                    }
-                }
-            }
-            VfsFileSystem::Mbr(mbr_volume_system) => {
-                let file_system: &VfsFileSystemReference = match parent_file_system {
-                    Some(file_system) => file_system,
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
-                        ))
-                    }
-                };
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
-                    Some(data_stream) => mbr_volume_system.read_data_stream(&data_stream),
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
-                        ))
-                    }
-                }
-            }
+            VfsFileSystem::Gpt(gpt_file_system) => gpt_file_system.open(parent_file_system, path),
+            VfsFileSystem::Mbr(mbr_file_system) => mbr_file_system.open(parent_file_system, path),
             VfsFileSystem::Ntfs(ntfs_file_system) => {
                 let file_system: &VfsFileSystemReference = match parent_file_system {
                     Some(file_system) => file_system,
@@ -550,47 +349,12 @@ impl VfsFileSystem {
                     }
                 }
             }
-            VfsFileSystem::Qcow(qcow_image) => {
-                let file_resolver: FileResolverReference = match parent_file_system {
-                    Some(file_system) => {
-                        open_vfs_file_resolver(file_system, path.parent_directory())?
-                    }
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
-                        ))
-                    }
-                };
-                qcow_image.open(&file_resolver, path.get_file_name())
+            VfsFileSystem::Qcow(qcow_file_system) => {
+                qcow_file_system.open(parent_file_system, path)
             }
-            VfsFileSystem::Vhd(vhd_image) => {
-                let file_resolver: FileResolverReference = match parent_file_system {
-                    Some(file_system) => {
-                        open_vfs_file_resolver(file_system, path.parent_directory())?
-                    }
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
-                        ))
-                    }
-                };
-                vhd_image.open(&file_resolver, path.get_file_name())
-            }
-            VfsFileSystem::Vhdx(vhdx_image) => {
-                let file_resolver: FileResolverReference = match parent_file_system {
-                    Some(file_system) => {
-                        open_vfs_file_resolver(file_system, path.parent_directory())?
-                    }
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
-                        ))
-                    }
-                };
-                vhdx_image.open(&file_resolver, path.get_file_name())
+            VfsFileSystem::Vhd(vhd_file_system) => vhd_file_system.open(parent_file_system, path),
+            VfsFileSystem::Vhdx(vhdx_file_system) => {
+                vhdx_file_system.open(parent_file_system, path)
             }
         }
     }
@@ -604,14 +368,11 @@ mod tests {
     use crate::fake::FakeFileEntry;
     use crate::path::VfsPath;
 
-    fn get_parent_file_system() -> VfsFileSystemReference {
-        VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os))
-    }
-
     fn get_apm_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Apm);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/apm/apm.dmg".to_string(),
         };
@@ -623,7 +384,8 @@ mod tests {
     fn get_ext_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Ext);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/ext/ext2.raw".to_string(),
         };
@@ -649,7 +411,8 @@ mod tests {
     fn get_gpt_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Gpt);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/gpt/gpt.raw".to_string(),
         };
@@ -661,7 +424,8 @@ mod tests {
     fn get_mbr_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Mbr);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/mbr/mbr.raw".to_string(),
         };
@@ -673,7 +437,8 @@ mod tests {
     fn get_qcow_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Qcow);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/qcow/ext2.qcow2".to_string(),
         };
@@ -685,7 +450,8 @@ mod tests {
     fn get_vhd_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhd);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/vhd/ntfs-differential.vhd".to_string(),
         };
@@ -697,7 +463,8 @@ mod tests {
     fn get_vhdx_file_system() -> io::Result<VfsFileSystem> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Vhdx);
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/vhdx/ntfs-differential.vhdx".to_string(),
         };

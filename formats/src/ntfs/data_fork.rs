@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::sync::{Arc, RwLock};
 
 use core::{DataStreamReference, FakeDataStream};
 use types::Ucs2String;
@@ -48,17 +49,16 @@ impl<'a> NtfsDataFork<'a> {
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> io::Result<DataStreamReference> {
         if self.data_attribute.is_resident() {
-            let inline_stream: FakeDataStream = FakeDataStream::new(
+            let data_stream: FakeDataStream = FakeDataStream::new(
                 &self.data_attribute.resident_data,
                 self.data_attribute.data_size,
             );
-
-            Ok(DataStreamReference::new(Box::new(inline_stream)))
+            Ok(Arc::new(RwLock::new(data_stream)))
         } else {
             let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
             block_stream.open(&self.data_stream, self.data_attribute)?;
 
-            Ok(DataStreamReference::new(Box::new(block_stream)))
+            Ok(Arc::new(RwLock::new(block_stream)))
         }
     }
 

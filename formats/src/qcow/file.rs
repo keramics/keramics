@@ -36,7 +36,7 @@ pub struct QcowFile {
     mediator: MediatorReference,
 
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Format version.
     pub format_version: u32,
@@ -107,7 +107,7 @@ impl QcowFile {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             format_version: 0,
             file_header_size: 0,
             offset_bit_mask: 0,
@@ -141,7 +141,7 @@ impl QcowFile {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_file_header(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -150,7 +150,7 @@ impl QcowFile {
     fn read_file_header(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         let mut data: [u8; 112] = [0; 112];
 
-        let offset: u64 = match data_stream.with_write_lock() {
+        let offset: u64 = match data_stream.write() {
             Ok(mut data_stream) => {
                 data_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(0))?
             }
@@ -381,7 +381,7 @@ impl QcowFile {
         }
         let mut data: Vec<u8> = vec![0; backing_file_name_size as usize];
 
-        let offset: u64 = match data_stream.with_write_lock() {
+        let offset: u64 = match data_stream.write() {
             Ok(mut data_stream) => data_stream
                 .read_exact_at_position(&mut data, io::SeekFrom::Start(backing_file_name_offset))?,
             Err(error) => return Err(core::error_to_io_error!(error)),
@@ -402,11 +402,20 @@ impl QcowFile {
 
     /// Reads a specific cluster block entry and fills the block tree.
     fn read_cluster_block_entry(&mut self, media_offset: u64) -> io::Result<()> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         let level1_table_index: u64 = media_offset >> self.level1_index_bit_shift;
 
         let level1_entry: QcowClusterTableEntry = self
             .level1_cluster_table
-            .read_entry(&self.data_stream, level1_table_index as u32)?;
+            .read_entry(data_stream, level1_table_index as u32)?;
 
         let level1_media_offset: u64 = level1_table_index << self.level1_index_bit_shift;
         let level2_table_offset: u64 = level1_entry.reference & self.offset_bit_mask;
@@ -437,7 +446,7 @@ impl QcowFile {
 
             let level2_entry: QcowClusterTableEntry = self
                 .level2_cluster_table
-                .read_entry(&self.data_stream, level2_table_index as u32)?;
+                .read_entry(data_stream, level2_table_index as u32)?;
 
             let level2_media_offset: u64 =
                 level1_media_offset + (level2_table_index * self.cluster_block_size);
@@ -536,12 +545,20 @@ impl QcowFile {
                         ));
                     }
                 },
-                QcowBlockRangeType::InFile => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => data_stream.read_at_position(
-                        &mut data[data_offset..data_end_offset],
-                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                    )?,
-                    Err(error) => return Err(core::error_to_io_error!(error)),
+                QcowBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.read_at_position(
+                            &mut data[data_offset..data_end_offset],
+                            io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                        )?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
                 },
                 QcowBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);

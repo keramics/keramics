@@ -20,7 +20,7 @@ use types::Uuid;
 /// GUID Partition Table (GPT) partition.
 pub struct GptPartition {
     /// The data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// The current offset.
     current_offset: u64,
@@ -51,7 +51,7 @@ impl GptPartition {
         identifier: &Uuid,
     ) -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             current_offset: 0,
             entry_index: entry_index,
             offset: offset,
@@ -63,7 +63,7 @@ impl GptPartition {
 
     /// Opens a partition.
     pub(super) fn open(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -72,6 +72,15 @@ impl GptPartition {
 impl Read for GptPartition {
     /// Reads data.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
+        };
         if self.current_offset >= self.size {
             return Ok(0);
         }
@@ -81,7 +90,7 @@ impl Read for GptPartition {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = match self.data_stream.with_write_lock() {
+        let read_count: usize = match data_stream.write() {
             Ok(mut data_stream) => data_stream.read_at_position(
                 &mut buf[0..read_size],
                 io::SeekFrom::Start(self.offset + self.current_offset),

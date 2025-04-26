@@ -74,7 +74,7 @@ impl SparseBundleImage {
                     ))
                 }
             };
-        let string: String = match data_stream.with_write_lock() {
+        let string: String = match data_stream.write() {
             Ok(mut data_stream) => {
                 let data_stream_size: u64 = data_stream.get_size()?;
 
@@ -211,7 +211,7 @@ impl SparseBundleImage {
             }
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_read_count: usize = match data_stream.with_write_lock() {
+            let range_read_count: usize = match data_stream.write() {
                 Ok(mut data_stream) => data_stream.read_at_position(
                     &mut data[data_offset..data_end_offset],
                     io::SeekFrom::Start(range_relative_offset),

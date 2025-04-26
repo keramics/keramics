@@ -11,12 +11,16 @@
  * under the License.
  */
 
+use std::ffi::OsString;
+
 use types::{ByteString, Ucs2String};
 
 /// Virtual File System (VFS) string.
 pub enum VfsString {
     Byte(ByteString),
     Empty,
+    OsString(OsString),
+    String(String),
     Ucs2(Ucs2String),
 }
 
@@ -26,6 +30,9 @@ impl VfsString {
         match self {
             VfsString::Byte(byte_string) => byte_string.to_string(),
             VfsString::Empty => String::new(),
+            // TODO: change to_string_lossy to a non-lossy conversion
+            VfsString::OsString(os_string) => os_string.to_string_lossy().to_string(),
+            VfsString::String(string) => string.clone(),
             VfsString::Ucs2(ucs2_string) => ucs2_string.to_string(),
         }
     }

@@ -600,10 +600,8 @@ fn print_ntfs_file_entry_bodyfile(
             // String::from("0")
             let data_stream: DataStreamReference = data_fork.get_data_stream()?;
 
-            let md5: String = match data_stream.with_write_lock() {
-                Ok(mut data_stream) => bodyfile::calculate_md5(&mut data_stream)?,
-                Err(error) => return Err(core::error_to_io_error!(error)),
-            };
+            let md5: String = bodyfile::calculate_md5(&data_stream)?;
+
             let data_fork_name: String = match data_fork.get_name() {
                 Some(name) => format!(":{}", name.to_string()),
                 None => String::new(),

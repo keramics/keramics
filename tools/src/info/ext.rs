@@ -398,13 +398,7 @@ fn print_ext_file_entry_bodyfile(
     // TODO: have flag control calculate md5
     // String::from("0")
     let md5: String = match file_entry.get_data_stream()? {
-        Some(data_stream) => {
-            let md5_string: String = match data_stream.with_write_lock() {
-                Ok(mut data_stream) => bodyfile::calculate_md5(&mut data_stream)?,
-                Err(error) => return Err(core::error_to_io_error!(error)),
-            };
-            md5_string
-        }
+        Some(data_stream) => bodyfile::calculate_md5(&data_stream)?,
         None => String::from("00000000000000000000000000000000"),
     };
     let path: String = if file_entry.inode_number == 2 {

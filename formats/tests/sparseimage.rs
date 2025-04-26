@@ -15,9 +15,9 @@ use std::io;
 use std::io::Read;
 
 use core::formatters::format_as_string;
+use core::{open_os_data_stream, DataStreamReference};
 use formats::sparseimage::SparseImageFile;
 use hashes::{DigestHashContext, Md5Context};
-use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
 use std::fs::File;
 use std::io::Write;
@@ -63,21 +63,17 @@ fn read_media_from_file(file: &mut SparseImageFile) -> io::Result<(u64, String)>
 }
 
 fn open_file(location: &str) -> io::Result<SparseImageFile> {
-    let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: location.to_string(),
-    };
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
-
     let mut file: SparseImageFile = SparseImageFile::new();
-    file.open(&vfs_file_system, &vfs_path)?;
+
+    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    file.read_data_stream(&data_stream)?;
 
     Ok(file)
 }
 
 #[test]
 fn read_media() -> io::Result<()> {
-    let mut file: SparseImageFile = open_file("./test_data/sparseimage/hfsplus.sparseimage")?;
+    let mut file: SparseImageFile = open_file("../test_data/sparseimage/hfsplus.sparseimage")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

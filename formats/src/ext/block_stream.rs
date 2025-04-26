@@ -23,7 +23,7 @@ use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 /// Extended File System block stream.
 pub struct ExtBlockStream {
     /// The data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Block size.
     block_size: u32,
@@ -42,7 +42,7 @@ impl ExtBlockStream {
     /// Creates a new block stream.
     pub(super) fn new(block_size: u32, size: u64) -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             block_size: block_size,
             block_tree: BlockTree::<ExtBlockRange>::new(0, 0, 0),
             current_offset: 0,
@@ -71,7 +71,7 @@ impl ExtBlockStream {
                 Err(error) => return Err(core::error_to_io_error!(error)),
             };
         }
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -109,16 +109,24 @@ impl ExtBlockStream {
             }
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
-                ExtBlockRangeType::InFile => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => {
-                        let range_physical_offset: u64 =
-                            block_range.physical_block_number * (self.block_size as u64);
-                        data_stream.read_at_position(
-                            &mut data[data_offset..data_end_offset],
-                            io::SeekFrom::Start(range_physical_offset + range_relative_offset),
-                        )?
+                ExtBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => {
+                            let range_physical_offset: u64 =
+                                block_range.physical_block_number * (self.block_size as u64);
+                            data_stream.read_at_position(
+                                &mut data[data_offset..data_end_offset],
+                                io::SeekFrom::Start(range_physical_offset + range_relative_offset),
+                            )?
+                        }
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
                     }
-                    Err(error) => return Err(core::error_to_io_error!(error)),
                 },
                 ExtBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);

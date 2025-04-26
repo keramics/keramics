@@ -21,25 +21,31 @@ use formats::ext::ExtFileEntry;
 use formats::ntfs::{NtfsDataFork, NtfsFileEntry};
 use types::Ucs2String;
 
+use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
 use super::enums::VfsFileType;
 use super::fake::FakeFileEntry;
+use super::gpt::GptFileEntry;
 use super::iterators::VfsFileEntriesIterator;
+use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
+use super::qcow::QcowFileEntry;
 use super::string::VfsString;
+use super::vhd::VhdFileEntry;
+use super::vhdx::VhdxFileEntry;
 
 /// Virtual File System (VFS) file entry.
 pub enum VfsFileEntry {
-    Apm(Option<DataStreamReference>),
+    Apm(ApmFileEntry),
     Ext(ExtFileEntry),
     Fake(Rc<FakeFileEntry>),
-    Gpt(Option<DataStreamReference>),
-    Mbr(Option<DataStreamReference>),
+    Gpt(GptFileEntry),
+    Mbr(MbrFileEntry),
     Ntfs(NtfsFileEntry),
     Os(OsFileEntry),
-    Qcow(Option<DataStreamReference>),
-    Vhd(Option<DataStreamReference>),
-    Vhdx(Option<DataStreamReference>),
+    Qcow(QcowFileEntry),
+    Vhd(VhdFileEntry),
+    Vhdx(VhdxFileEntry),
 }
 
 impl VfsFileEntry {
@@ -94,10 +100,7 @@ impl VfsFileEntry {
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         match self {
-            VfsFileEntry::Apm(apm_partition) => match apm_partition {
-                Some(_) => VfsFileType::File,
-                None => VfsFileType::Directory,
-            },
+            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
                 match file_mode & 0xf000 {
@@ -112,14 +115,8 @@ impl VfsFileEntry {
                 }
             }
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_file_type(),
-            VfsFileEntry::Gpt(gpt_partition) => match gpt_partition {
-                Some(_) => VfsFileType::File,
-                None => VfsFileType::Directory,
-            },
-            VfsFileEntry::Mbr(mbr_partition) => match mbr_partition {
-                Some(_) => VfsFileType::File,
-                None => VfsFileType::Directory,
-            },
+            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_file_type(),
+            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_file_type(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 let file_attribute_flags: u32 = ntfs_file_entry.get_file_attribute_flags();
                 // FILE_ATTRIBUTE_DEVICE is not used by NTFS.
@@ -134,18 +131,9 @@ impl VfsFileEntry {
                 }
             }
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_type(),
-            VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
-                Some(_) => VfsFileType::File,
-                None => VfsFileType::Directory,
-            },
-            VfsFileEntry::Vhd(vhd_layer) => match vhd_layer {
-                Some(_) => VfsFileType::File,
-                None => VfsFileType::Directory,
-            },
-            VfsFileEntry::Vhdx(vhdx_layer) => match vhdx_layer {
-                Some(_) => VfsFileType::File,
-                None => VfsFileType::Directory,
-            },
+            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_file_type(),
+            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_file_type(),
+            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_file_type(),
         }
     }
 
@@ -168,31 +156,52 @@ impl VfsFileEntry {
     /// Retrieves the name.
     pub fn get_name(&mut self) -> Option<VfsString> {
         match self {
-            VfsFileEntry::Apm(_) => todo!(),
+            VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name)),
+                None => None,
+            },
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
                 Some(name) => Some(VfsString::Byte(name.clone())),
                 None => None,
             },
             VfsFileEntry::Fake(_) => todo!(),
-            VfsFileEntry::Gpt(_) => todo!(),
-            VfsFileEntry::Mbr(_) => todo!(),
+            VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name)),
+                None => None,
+            },
+            VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name.clone())),
+                None => None,
+            },
             VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_name() {
                 Some(name) => Some(VfsString::Ucs2(name.clone())),
                 None => None,
             },
-            VfsFileEntry::Os(_) => todo!(),
-            VfsFileEntry::Qcow(_) => todo!(),
-            VfsFileEntry::Vhd(_) => todo!(),
-            VfsFileEntry::Vhdx(_) => todo!(),
+            VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_name() {
+                Some(name) => Some(VfsString::OsString(name.to_os_string())),
+                None => None,
+            },
+            VfsFileEntry::Qcow(qcow_file_entry) => match qcow_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name)),
+                None => None,
+            },
+            VfsFileEntry::Vhd(vhd_file_entry) => match vhd_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name)),
+                None => None,
+            },
+            VfsFileEntry::Vhdx(vhdx_file_entry) => match vhdx_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name)),
+                None => None,
+            },
         }
     }
 
     /// Retrieves the number of data forks.
     pub fn get_number_of_data_forks(&self) -> io::Result<usize> {
         let result: usize = match self {
-            VfsFileEntry::Apm(apm_partition) => match apm_partition {
-                Some(_) => 1,
-                None => 0,
+            VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry {
+                ApmFileEntry::Partition { .. } => 1,
+                ApmFileEntry::Root { .. } => 0,
             },
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
@@ -206,30 +215,30 @@ impl VfsFileEntry {
                 VfsFileType::File => 1,
                 _ => 0,
             },
-            VfsFileEntry::Gpt(gpt_partition) => match gpt_partition {
-                Some(_) => 1,
-                None => 0,
+            VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry {
+                GptFileEntry::Partition { .. } => 1,
+                GptFileEntry::Root { .. } => 0,
             },
-            VfsFileEntry::Mbr(mbr_partition) => match mbr_partition {
-                Some(_) => 1,
-                None => 0,
+            VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry {
+                MbrFileEntry::Partition { .. } => 1,
+                MbrFileEntry::Root { .. } => 0,
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_number_of_data_forks()?,
             VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_file_type() {
                 VfsFileType::File => 1,
                 _ => 0,
             },
-            VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
-                Some(_) => 1,
-                None => 0,
+            VfsFileEntry::Qcow(qcow_file_entry) => match qcow_file_entry {
+                QcowFileEntry::Layer { .. } => 1,
+                QcowFileEntry::Root { .. } => 0,
             },
-            VfsFileEntry::Vhd(vhd_layer) => match vhd_layer {
-                Some(_) => 1,
-                None => 0,
+            VfsFileEntry::Vhd(vhd_file_entry) => match vhd_file_entry {
+                VhdFileEntry::Layer { .. } => 1,
+                VhdFileEntry::Root { .. } => 0,
             },
-            VfsFileEntry::Vhdx(vhdx_layer) => match vhdx_layer {
-                Some(_) => 1,
-                None => 0,
+            VfsFileEntry::Vhdx(vhdx_file_entry) => match vhdx_file_entry {
+                VhdxFileEntry::Layer { .. } => 1,
+                VhdxFileEntry::Root { .. } => 0,
             },
         };
         Ok(result)
@@ -275,34 +284,16 @@ impl VfsFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
         let result: Option<DataStreamReference> = match self {
-            VfsFileEntry::Apm(apm_partition) => match apm_partition {
-                Some(partition) => Some(partition.clone()),
-                None => None,
-            },
+            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream()?,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream()?,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream()?,
-            VfsFileEntry::Gpt(gpt_partition) => match gpt_partition {
-                Some(partition) => Some(partition.clone()),
-                None => None,
-            },
-            VfsFileEntry::Mbr(mbr_partition) => match mbr_partition {
-                Some(partition) => Some(partition.clone()),
-                None => None,
-            },
+            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_data_stream()?,
+            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_data_stream()?,
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_data_stream()?,
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream()?,
-            VfsFileEntry::Qcow(qcow_layer) => match qcow_layer {
-                Some(layer) => Some(layer.clone()),
-                None => None,
-            },
-            VfsFileEntry::Vhd(vhd_layer) => match vhd_layer {
-                Some(layer) => Some(layer.clone()),
-                None => None,
-            },
-            VfsFileEntry::Vhdx(vhdx_layer) => match vhdx_layer {
-                Some(layer) => Some(layer.clone()),
-                None => None,
-            },
+            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_data_stream()?,
+            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_data_stream()?,
+            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_data_stream()?,
         };
         Ok(result)
     }
@@ -339,18 +330,22 @@ impl VfsFileEntry {
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
         let number_of_sub_file_entries: usize = match self {
-            VfsFileEntry::Apm(_) => todo!(),
+            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_number_of_sub_file_entries()?,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries()?,
             VfsFileEntry::Fake(_) => todo!(),
-            VfsFileEntry::Gpt(_) => todo!(),
-            VfsFileEntry::Mbr(_) => todo!(),
+            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_number_of_sub_file_entries()?,
+            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_number_of_sub_file_entries()?,
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 ntfs_file_entry.get_number_of_sub_file_entries()?
             }
             VfsFileEntry::Os(_) => todo!(),
-            VfsFileEntry::Qcow(_) => todo!(),
-            VfsFileEntry::Vhd(_) => todo!(),
-            VfsFileEntry::Vhdx(_) => todo!(),
+            VfsFileEntry::Qcow(qcow_file_entry) => {
+                qcow_file_entry.get_number_of_sub_file_entries()?
+            }
+            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_number_of_sub_file_entries()?,
+            VfsFileEntry::Vhdx(vhdx_file_entry) => {
+                vhdx_file_entry.get_number_of_sub_file_entries()?
+            }
         };
         Ok(number_of_sub_file_entries)
     }
@@ -361,20 +356,32 @@ impl VfsFileEntry {
         sub_file_entry_index: usize,
     ) -> io::Result<VfsFileEntry> {
         let sub_file_entry: VfsFileEntry = match self {
-            VfsFileEntry::Apm(_) => todo!(),
+            VfsFileEntry::Apm(apm_file_entry) => {
+                VfsFileEntry::Apm(apm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 VfsFileEntry::Ext(ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
             }
             VfsFileEntry::Fake(_) => todo!(),
-            VfsFileEntry::Gpt(_) => todo!(),
-            VfsFileEntry::Mbr(_) => todo!(),
+            VfsFileEntry::Gpt(gpt_file_entry) => {
+                VfsFileEntry::Gpt(gpt_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
+            }
+            VfsFileEntry::Mbr(mbr_file_entry) => {
+                VfsFileEntry::Mbr(mbr_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
+            }
             VfsFileEntry::Ntfs(ntfs_file_entry) => VfsFileEntry::Ntfs(
                 ntfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             ),
             VfsFileEntry::Os(_) => todo!(),
-            VfsFileEntry::Qcow(_) => todo!(),
-            VfsFileEntry::Vhd(_) => todo!(),
-            VfsFileEntry::Vhdx(_) => todo!(),
+            VfsFileEntry::Qcow(qcow_file_entry) => VfsFileEntry::Qcow(
+                qcow_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            ),
+            VfsFileEntry::Vhd(vhd_file_entry) => {
+                VfsFileEntry::Vhd(vhd_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
+            }
+            VfsFileEntry::Vhdx(vhdx_file_entry) => VfsFileEntry::Vhdx(
+                vhdx_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            ),
         };
         Ok(sub_file_entry)
     }

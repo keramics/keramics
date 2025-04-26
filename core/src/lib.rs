@@ -20,7 +20,6 @@ pub mod macros;
 pub mod mediator;
 mod os_data_stream;
 mod os_file_resolver;
-mod shared_value;
 
 pub use data_stream::{DataStream, DataStreamReference};
 pub use fake_data_stream::{open_fake_data_stream, FakeDataStream};
@@ -28,4 +27,3 @@ pub use fake_file_resolver::{open_fake_file_resolver, FakeFileResolver};
 pub use file_resolver::{FileResolver, FileResolverReference};
 pub use os_data_stream::open_os_data_stream;
 pub use os_file_resolver::{open_os_file_resolver, OsFileResolver};
-pub use shared_value::{SharedValue, SharedValueLockError, SharedValueLockResult};

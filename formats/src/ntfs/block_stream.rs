@@ -26,7 +26,7 @@ use super::mft_attribute::NtfsMftAttribute;
 /// New Technologies File System (NTFS) (cluster) block stream.
 pub struct NtfsBlockStream {
     /// The data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Cluster block size.
     pub cluster_block_size: u32,
@@ -45,7 +45,7 @@ impl NtfsBlockStream {
     /// Creates a new block stream.
     pub(super) fn new(cluster_block_size: u32) -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             cluster_block_size: cluster_block_size,
             block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
             current_offset: 0,
@@ -143,7 +143,7 @@ impl NtfsBlockStream {
                 }
             }
         }
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
         self.size = data_attribute.valid_data_size;
 
         Ok(())
@@ -185,16 +185,24 @@ impl NtfsBlockStream {
                     // TODO: implement.
                     todo!();
                 }
-                NtfsBlockRangeType::InFile => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => {
-                        let range_physical_offset: u64 =
-                            block_range.cluster_block_number * (self.cluster_block_size as u64);
-                        data_stream.read_at_position(
-                            &mut data[data_offset..data_end_offset],
-                            io::SeekFrom::Start(range_physical_offset + range_relative_offset),
-                        )?
+                NtfsBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => {
+                            let range_physical_offset: u64 =
+                                block_range.cluster_block_number * (self.cluster_block_size as u64);
+                            data_stream.read_at_position(
+                                &mut data[data_offset..data_end_offset],
+                                io::SeekFrom::Start(range_physical_offset + range_relative_offset),
+                            )?
+                        }
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
                     }
-                    Err(error) => return Err(core::error_to_io_error!(error)),
                 },
                 NtfsBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);

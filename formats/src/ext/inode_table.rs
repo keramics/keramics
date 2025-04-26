@@ -123,7 +123,7 @@ impl ExtInodeTable {
         let inode_size: usize = self.inode_size as usize;
         let mut data: Vec<u8> = vec![0; inode_size];
 
-        match data_stream.with_write_lock() {
+        match data_stream.write() {
             Ok(mut data_stream) => data_stream
                 .read_exact_at_position(&mut data, io::SeekFrom::Start(inode_data_offset))?,
             Err(error) => return Err(core::error_to_io_error!(error)),

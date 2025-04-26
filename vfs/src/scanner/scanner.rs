@@ -25,13 +25,19 @@ use formats::vhd::VhdImage;
 use formats::vhdx::VhdxImage;
 use formats::{FormatIdentifier, FormatScanner};
 
+use crate::apm::ApmFileSystem;
 use crate::enums::{VfsFileType, VfsPathType};
 use crate::file_entry::VfsFileEntry;
 use crate::file_resolver::open_vfs_file_resolver;
 use crate::file_system::VfsFileSystem;
+use crate::gpt::GptFileSystem;
+use crate::mbr::MbrFileSystem;
 use crate::path::VfsPath;
+use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
 use crate::types::{VfsFileSystemReference, VfsResolverReference};
+use crate::vhd::VhdFileSystem;
+use crate::vhdx::VhdxFileSystem;
 
 use super::scan_context::VfsScanContext;
 use super::scan_node::VfsScanNode;
@@ -319,7 +325,7 @@ impl VfsScanner {
                     file_system,
                     path,
                     scan_node,
-                    ApmVolumeSystem::PATH_PREFIX,
+                    ApmFileSystem::PATH_PREFIX,
                     number_of_partitions,
                 )?;
             }
@@ -341,7 +347,7 @@ impl VfsScanner {
                     file_system,
                     path,
                     scan_node,
-                    GptVolumeSystem::PATH_PREFIX,
+                    GptFileSystem::PATH_PREFIX,
                     number_of_partitions,
                 )?;
             }
@@ -362,7 +368,7 @@ impl VfsScanner {
                     file_system,
                     path,
                     scan_node,
-                    MbrVolumeSystem::PATH_PREFIX,
+                    MbrFileSystem::PATH_PREFIX,
                     number_of_partitions,
                 )?;
             }
@@ -390,7 +396,7 @@ impl VfsScanner {
                     file_system,
                     path,
                     scan_node,
-                    QcowImage::PATH_PREFIX,
+                    QcowFileSystem::PATH_PREFIX,
                     number_of_layers,
                 )?;
             }
@@ -407,7 +413,7 @@ impl VfsScanner {
                     file_system,
                     path,
                     scan_node,
-                    VhdImage::PATH_PREFIX,
+                    VhdFileSystem::PATH_PREFIX,
                     number_of_layers,
                 )?;
             }
@@ -424,7 +430,7 @@ impl VfsScanner {
                     file_system,
                     path,
                     scan_node,
-                    VhdxImage::PATH_PREFIX,
+                    VhdxFileSystem::PATH_PREFIX,
                     number_of_layers,
                 )?;
             }

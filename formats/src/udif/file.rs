@@ -35,7 +35,7 @@ pub struct UdifFile {
     mediator: MediatorReference,
 
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Data fork offset.
     data_fork_offset: u64,
@@ -67,7 +67,7 @@ impl UdifFile {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             data_fork_offset: 0,
             has_block_ranges: false,
             block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
@@ -83,7 +83,7 @@ impl UdifFile {
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_metadata(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -103,7 +103,7 @@ impl UdifFile {
             self.has_block_ranges = false;
             self.media_size = file_footer.data_fork_size;
         } else {
-            let string: String = match data_stream.with_write_lock() {
+            let string: String = match data_stream.write() {
                 Ok(mut data_stream) => {
                     if file_footer.plist_size == 0 || file_footer.plist_size > 65536 {
                         return Err(io::Error::new(
@@ -404,12 +404,20 @@ impl UdifFile {
 
                     range_read_size
                 }
-                UdifBlockRangeType::InFile => match self.data_stream.with_write_lock() {
-                    Ok(mut data_stream) => data_stream.read_at_position(
-                        &mut data[data_offset..data_end_offset],
-                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                    )?,
-                    Err(error) => return Err(core::error_to_io_error!(error)),
+                UdifBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.read_at_position(
+                            &mut data[data_offset..data_end_offset],
+                            io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                        )?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
                 },
                 UdifBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
@@ -434,12 +442,20 @@ impl UdifFile {
     ) -> io::Result<()> {
         let mut compressed_data: Vec<u8> = vec![0; block_range.compressed_data_size as usize];
 
-        match self.data_stream.with_write_lock() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(
-                &mut compressed_data,
-                io::SeekFrom::Start(block_range.data_offset),
-            )?,
-            Err(error) => return Err(core::error_to_io_error!(error)),
+        match self.data_stream.as_ref() {
+            Some(data_stream) => match data_stream.write() {
+                Ok(mut data_stream) => data_stream.read_exact_at_position(
+                    &mut compressed_data,
+                    io::SeekFrom::Start(block_range.data_offset),
+                )?,
+                Err(error) => return Err(core::error_to_io_error!(error)),
+            },
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    "Missing data stream",
+                ))
+            }
         };
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
@@ -495,16 +511,24 @@ impl Read for UdifFile {
         let read_count: usize = if self.has_block_ranges {
             self.read_data_from_blocks(&mut buf[..read_size])?
         } else {
-            match self.data_stream.with_write_lock() {
-                Ok(mut data_stream) => {
-                    let data_fork_offset: u64 = self.data_fork_offset + self.media_offset;
+            match self.data_stream.as_ref() {
+                Some(data_stream) => match data_stream.write() {
+                    Ok(mut data_stream) => {
+                        let data_fork_offset: u64 = self.data_fork_offset + self.media_offset;
 
-                    data_stream.read_at_position(
-                        &mut buf[0..read_size],
-                        io::SeekFrom::Start(data_fork_offset),
-                    )?
+                        data_stream.read_at_position(
+                            &mut buf[0..read_size],
+                            io::SeekFrom::Start(data_fork_offset),
+                        )?
+                    }
+                    Err(error) => return Err(core::error_to_io_error!(error)),
+                },
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "Missing data stream",
+                    ))
                 }
-                Err(error) => return Err(core::error_to_io_error!(error)),
             }
         };
         self.media_offset += read_count as u64;

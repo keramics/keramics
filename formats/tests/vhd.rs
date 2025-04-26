@@ -11,15 +11,17 @@
  * under the License.
  */
 
+use std::cell::RefCell;
 use std::io;
 use std::io::Read;
+use std::rc::Rc;
 
 use core::formatters::format_as_string;
-use formats::udif::UdifFile;
+use core::{open_os_data_stream, DataStreamReference};
+use formats::vhd::VhdFile;
 use hashes::{DigestHashContext, Md5Context};
-use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
-fn read_media_from_file(file: &mut UdifFile) -> io::Result<(u64, String)> {
+fn read_media_from_file(file: &mut VhdFile) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
@@ -38,59 +40,68 @@ fn read_media_from_file(file: &mut UdifFile) -> io::Result<(u64, String)> {
     Ok((media_offset, hash_string))
 }
 
-fn open_file(location: &str) -> io::Result<UdifFile> {
-    let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: location.to_string(),
-    };
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+fn open_file(location: &str) -> io::Result<VhdFile> {
+    let mut file: VhdFile = VhdFile::new();
 
-    let mut file: UdifFile = UdifFile::new();
-    file.open(&vfs_file_system, &vfs_path)?;
+    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    file.read_data_stream(&data_stream)?;
 
     Ok(file)
 }
 
 #[test]
-fn read_media_adc_compressed() -> io::Result<()> {
-    let mut file: UdifFile = open_file("./test_data/udif/hfsplus_adc.dmg")?;
+fn read_media_fixed() -> io::Result<()> {
+    let mut file: VhdFile = open_file("../test_data/vhd/ntfs-parent.vhd")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "08c32fd5d0fc1c2274d1c2d34185312a");
+    assert_eq!(md5_hash.as_str(), "acb42a740c63c1f72e299463375751c8");
 
     Ok(())
 }
 
 #[test]
-fn read_media_bzip2_compressed() -> io::Result<()> {
-    let mut file: UdifFile = open_file("./test_data/udif/hfsplus_bzip2.dmg")?;
+fn read_media_dynamic() -> io::Result<()> {
+    let mut file: VhdFile = open_file("../test_data/vhd/ntfs-dynamic.vhd")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "7ec785450bbc17de417be373fd5d2159");
+    assert_eq!(md5_hash.as_str(), "4ce30a0c21dd037023a5692d85ade033");
 
     Ok(())
 }
 
 #[test]
-fn read_media_lzfse_compressed() -> io::Result<()> {
-    let mut file: UdifFile = open_file("./test_data/udif/hfsplus_lzfse.dmg")?;
+fn read_media_sparse_dynamic() -> io::Result<()> {
+    let mut file: VhdFile = open_file("../test_data/vhd/ext2.vhd")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "c2c160c788676641725fd1a4b8da733b");
+    // Note that the VHD has 18432 bytes of additional storage media data due to the image
+    // creation process.
+    assert_eq!(md5_hash.as_str(), "a30f111f411d3f3d567b13f0c909e58c");
 
     Ok(())
 }
 
 #[test]
-fn read_media_zlib_compressed() -> io::Result<()> {
-    let mut file: UdifFile = open_file("./test_data/udif/hfsplus_zlib.dmg")?;
+fn read_media_differential() -> io::Result<()> {
+    let mut parent_file: VhdFile = VhdFile::new();
+
+    let data_stream: DataStreamReference = open_os_data_stream("../test_data/vhd/ntfs-parent.vhd")?;
+    parent_file.read_data_stream(&data_stream)?;
+
+    let mut file: VhdFile = VhdFile::new();
+
+    let data_stream: DataStreamReference =
+        open_os_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
+    file.read_data_stream(&data_stream)?;
+
+    file.set_parent(&Rc::new(RefCell::new(parent_file)))?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
+    assert_eq!(md5_hash.as_str(), "4241cbc76e0e17517fb564238edbe415");
 
     Ok(())
 }

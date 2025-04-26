@@ -11,13 +11,11 @@
  * under the License.
  */
 
-use std::fs::File;
 use std::io;
 use std::io::{Read, Seek, SeekFrom};
+use std::sync::{Arc, RwLock};
 
-use super::shared_value::SharedValue;
-
-pub type DataStreamReference = SharedValue<Box<dyn DataStream>>;
+pub type DataStreamReference = Arc<RwLock<dyn DataStream>>;
 
 /// Data stream trait.
 pub trait DataStream: Read + Seek {
@@ -35,7 +33,9 @@ pub trait DataStream: Read + Seek {
     #[inline(always)]
     fn read_exact_at_position(&mut self, data: &mut [u8], position: SeekFrom) -> io::Result<u64> {
         let offset: u64 = self.seek(position)?;
+
         self.read_exact(data)?;
+
         Ok(offset)
     }
 }

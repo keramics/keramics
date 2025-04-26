@@ -17,11 +17,11 @@ use std::io::Read;
 use std::rc::Rc;
 
 use core::formatters::format_as_string;
-use formats::vhd::VhdFile;
+use core::{open_os_data_stream, DataStreamReference};
+use formats::vhdx::VhdxFile;
 use hashes::{DigestHashContext, Md5Context};
-use vfs::{VfsContext, VfsFileSystemReference, VfsPath};
 
-fn read_media_from_file(file: &mut VhdFile) -> io::Result<(u64, String)> {
+fn read_media_from_file(file: &mut VhdxFile) -> io::Result<(u64, String)> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
@@ -40,76 +40,67 @@ fn read_media_from_file(file: &mut VhdFile) -> io::Result<(u64, String)> {
     Ok((media_offset, hash_string))
 }
 
-fn open_file(location: &str) -> io::Result<VhdFile> {
-    let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: location.to_string(),
-    };
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+fn open_file(location: &str) -> io::Result<VhdxFile> {
+    let mut file: VhdxFile = VhdxFile::new();
 
-    let mut file: VhdFile = VhdFile::new();
-    file.open(&vfs_file_system, &vfs_path)?;
+    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    file.read_data_stream(&data_stream)?;
 
     Ok(file)
 }
 
 #[test]
 fn read_media_fixed() -> io::Result<()> {
-    let mut file: VhdFile = open_file("./test_data/vhd/ntfs-parent.vhd")?;
+    let mut file: VhdxFile = open_file("../test_data/vhdx/ntfs-parent.vhdx")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "acb42a740c63c1f72e299463375751c8");
+    assert_eq!(md5_hash.as_str(), "75537374a81c40e51e6a4b812b36ce89");
 
     Ok(())
 }
 
 #[test]
 fn read_media_dynamic() -> io::Result<()> {
-    let mut file: VhdFile = open_file("./test_data/vhd/ntfs-dynamic.vhd")?;
+    let mut file: VhdxFile = open_file("../test_data/vhdx/ntfs-dynamic.vhdx")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "4ce30a0c21dd037023a5692d85ade033");
+    assert_eq!(md5_hash.as_str(), "20158534070142d63ee02c9ad1a9d87e");
 
     Ok(())
 }
 
 #[test]
 fn read_media_sparse_dynamic() -> io::Result<()> {
-    let mut file: VhdFile = open_file("./test_data/vhd/ext2.vhd")?;
+    let mut file: VhdxFile = open_file("../test_data/vhdx/ext2.vhdx")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    // Note that the VHD has 18432 bytes of additional storage media data due to the image
-    // creation process.
-    assert_eq!(md5_hash.as_str(), "a30f111f411d3f3d567b13f0c909e58c");
+    assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
 
     Ok(())
 }
 
 #[test]
 fn read_media_differential() -> io::Result<()> {
-    let mut vfs_context: VfsContext = VfsContext::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: "./test_data/vhd/ntfs-parent.vhd".to_string(),
-    };
-    let vfs_file_system: VfsFileSystemReference = vfs_context.open_file_system(&vfs_path)?;
+    let mut parent_file: VhdxFile = VhdxFile::new();
 
-    let mut parent_file: VhdFile = VhdFile::new();
-    parent_file.open(&vfs_file_system, &vfs_path)?;
+    let data_stream: DataStreamReference =
+        open_os_data_stream("../test_data/vhdx/ntfs-parent.vhdx")?;
+    parent_file.read_data_stream(&data_stream)?;
 
-    let mut file: VhdFile = VhdFile::new();
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: "./test_data/vhd/ntfs-differential.vhd".to_string(),
-    };
-    file.open(&vfs_file_system, &vfs_path)?;
+    let mut file: VhdxFile = VhdxFile::new();
+
+    let data_stream: DataStreamReference =
+        open_os_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
+    file.read_data_stream(&data_stream)?;
 
     file.set_parent(&Rc::new(RefCell::new(parent_file)))?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
-    assert_eq!(md5_hash.as_str(), "4241cbc76e0e17517fb564238edbe415");
+    assert_eq!(md5_hash.as_str(), "a25df0058eecd8aa1975a68eeaa0e178");
 
     Ok(())
 }

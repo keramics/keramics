@@ -11,9 +11,11 @@
  * under the License.
  */
 
+use std::ffi::{OsStr, OsString};
 use std::fs::{metadata, File, Metadata};
 use std::io;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 use std::time::UNIX_EPOCH;
 
 #[cfg(unix)]
@@ -41,7 +43,7 @@ fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
 /// Operating system file entry.
 pub struct OsFileEntry {
     /// Path.
-    path: String,
+    path: OsString,
 
     /// File type.
     file_type: VfsFileType,
@@ -63,7 +65,7 @@ impl OsFileEntry {
     /// Creates a new file entry.
     pub fn new() -> Self {
         Self {
-            path: String::new(),
+            path: OsString::new(),
             file_type: VfsFileType::NotSet,
             access_time: None,
             change_time: None,
@@ -71,6 +73,7 @@ impl OsFileEntry {
             modification_time: None,
         }
     }
+
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         self.access_time.as_ref()
@@ -86,9 +89,26 @@ impl OsFileEntry {
         self.creation_time.as_ref()
     }
 
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+        if self.file_type != VfsFileType::File {
+            return Ok(None);
+        }
+        let file: File = File::open(self.path.as_os_str())?;
+
+        Ok(Some(Arc::new(RwLock::new(file))))
+    }
+
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         self.file_type.clone()
+    }
+
+    /// Retrieves the name.
+    pub fn get_name(&self) -> Option<&OsStr> {
+        let os_path: &Path = Path::new(self.path.as_os_str());
+
+        os_path.file_name()
     }
 
     /// Retrieves the modification time.
@@ -96,9 +116,9 @@ impl OsFileEntry {
         self.modification_time.as_ref()
     }
 
-    /// Initializes the file entry.
+    /// Opens the file entry.
     #[cfg(unix)]
-    pub(crate) fn initialize(&mut self, path: &str) -> io::Result<()> {
+    pub(crate) fn open(&mut self, path: &OsStr) -> io::Result<()> {
         let os_path: &Path = Path::new(path);
 
         let file_metadata: Metadata = metadata(os_path)?;
@@ -123,12 +143,10 @@ impl OsFileEntry {
             file_metadata.mtime(),
             file_metadata.mtime_nsec(),
         ));
-
         self.access_time = Some(get_posix_datetime_value(
             file_metadata.atime(),
             file_metadata.atime_nsec(),
         ));
-
         self.change_time = Some(get_posix_datetime_value(
             file_metadata.ctime(),
             file_metadata.ctime_nsec(),
@@ -145,27 +163,16 @@ impl OsFileEntry {
             },
             Err(_) => None,
         };
-        self.path = path.to_string();
+        self.path = path.to_os_string();
 
         Ok(())
     }
 
-    /// Initializes the file entry.
+    /// Opens the file entry.
     #[cfg(windows)]
-    pub(crate) fn initialize(&mut self, path: &str) -> io::Result<()> {
+    pub(crate) fn open(&mut self, path: &str) -> io::Result<()> {
         // TODO: add Windows support.
         todo!();
-    }
-
-    /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
-        if self.file_type != VfsFileType::File {
-            return Ok(None);
-        }
-        let os_path: &Path = Path::new(self.path.as_str());
-        let file: File = File::open(os_path)?;
-
-        Ok(Some(DataStreamReference::new(Box::new(file))))
     }
 }
 
@@ -174,34 +181,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_initialize() -> io::Result<()> {
+    fn test_get_access_time() -> io::Result<()> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
-        os_file_entry.initialize("../test_data/file.txt")?;
-
-        assert!(os_file_entry.file_type == VfsFileType::File);
+        let result: Option<&DateTime> = os_file_entry.get_access_time();
+        // Note that the actual date and time can vary.
+        assert!(result.is_some());
 
         Ok(())
     }
 
-    // TODO: add tests for OsFileEntry::get_access_time
-    // TODO: add tests for OsFileEntry::get_change_time
-    // TODO: add tests for OsFileEntry::get_creation_time
-    // TODO: add tests for OsFileEntry::get_file_type
-    // TODO: add tests for OsFileEntry::get_modification_time
+    #[test]
+    #[cfg(unix)]
+    fn test_get_change_time() -> io::Result<()> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let result: Option<&DateTime> = os_file_entry.get_change_time();
+        // Note that the actual date and time can vary.
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_get_creation_time() -> io::Result<()> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let result: Option<&DateTime> = os_file_entry.get_creation_time();
+        // Note that the actual date and time can vary.
+        assert!(result.is_some());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream() -> io::Result<()> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-
-        os_file_entry.initialize("../test_data/file.txt")?;
-
-        let expected_data: String = [
-            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
-            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
-            "nonmetallic material, such as clay, at a high temperature.\n",
-        ]
-        .join("");
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
         let result: Option<DataStreamReference> = os_file_entry.get_data_stream()?;
 
@@ -215,12 +235,57 @@ mod tests {
             }
         };
         let mut test_data: Vec<u8> = vec![];
-        let read_count: usize = match data_stream.with_write_lock() {
+        let read_count: usize = match data_stream.write() {
             Ok(mut data_stream) => data_stream.read_to_end(&mut test_data)?,
             Err(error) => return Err(core::error_to_io_error!(error)),
         };
         assert_eq!(read_count, 202);
+
+        let expected_data: String = [
+            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
+            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
+            "nonmetallic material, such as clay, at a high temperature.\n",
+        ]
+        .join("");
+
         assert_eq!(test_data, expected_data.as_bytes());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type() -> io::Result<()> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let file_type: VfsFileType = os_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_get_modification_time() -> io::Result<()> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let result: Option<&DateTime> = os_file_entry.get_modification_time();
+        // Note that the actual date and time can vary.
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_name
+
+    #[test]
+    fn test_open() -> io::Result<()> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        assert!(os_file_entry.file_type == VfsFileType::File);
 
         Ok(())
     }

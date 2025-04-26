@@ -26,7 +26,7 @@ const SUPPORTED_BYTES_PER_SECTOR: [u16; 4] = [512, 1024, 2048, 4096];
 /// Master Boot Record (MBR) volume system.
 pub struct MbrVolumeSystem {
     /// Data stream.
-    data_stream: DataStreamReference,
+    data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -42,12 +42,10 @@ pub struct MbrVolumeSystem {
 }
 
 impl MbrVolumeSystem {
-    pub const PATH_PREFIX: &'static str = "/mbr";
-
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
-            data_stream: DataStreamReference::none(),
+            data_stream: None,
             bytes_per_sector: 0,
             first_extended_boot_record_offset: 0,
             disk_identity: 0,
@@ -64,6 +62,15 @@ impl MbrVolumeSystem {
     pub fn get_partition_by_index(&self, partition_index: usize) -> io::Result<MbrPartition> {
         match self.partition_entries.get(partition_index) {
             Some(partition_entry) => {
+                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                    Some(data_stream) => data_stream,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
+                };
                 let mut partition_offset: u64 =
                     partition_entry.start_address_lba as u64 * self.bytes_per_sector as u64;
                 let partition_size: u64 =
@@ -79,7 +86,7 @@ impl MbrVolumeSystem {
                     partition_entry.partition_type,
                     partition_entry.flags,
                 );
-                partition.open(&self.data_stream)?;
+                partition.open(data_stream)?;
 
                 Ok(partition)
             }
@@ -92,49 +99,11 @@ impl MbrVolumeSystem {
         }
     }
 
-    /// Retrieves the partition index with the specific location.
-    pub fn get_partition_index_by_path(&self, location: &str) -> io::Result<usize> {
-        if !location.starts_with(MbrVolumeSystem::PATH_PREFIX) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        let partition_index: usize = match location[4..].parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported path: {}", location),
-                ))
-            }
-        };
-        if partition_index == 0 || partition_index > self.partition_entries.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        }
-        Ok(partition_index - 1)
-    }
-
-    /// Retrieves the partition with the specific location.
-    pub fn get_partition_by_path(&self, location: &str) -> io::Result<Option<MbrPartition>> {
-        if location == "/" {
-            return Ok(None);
-        }
-        let partition_index: usize = self.get_partition_index_by_path(location)?;
-
-        let partition: MbrPartition = self.get_partition_by_index(partition_index)?;
-
-        Ok(Some(partition))
-    }
-
     /// Reads the volume system from a data stream.
     pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         self.read_master_boot_record(data_stream)?;
 
-        self.data_stream = data_stream.clone();
+        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -153,7 +122,7 @@ impl MbrVolumeSystem {
                         let offset: u64 =
                             partition_entry.start_address_lba as u64 * *bytes_per_sector as u64;
 
-                        match data_stream.with_write_lock() {
+                        match data_stream.write() {
                             Ok(mut data_stream) => data_stream.read_at_position(
                                 &mut boot_signature,
                                 io::SeekFrom::Start(offset + 510),
@@ -298,39 +267,6 @@ mod tests {
 
         assert_eq!(partition.offset, 512);
         assert_eq!(partition.size, 1049088);
-
-        Ok(())
-    }
-
-    #[test]
-    fn get_partition_index_by_path() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let partition_index: usize = volume_system.get_partition_index_by_path("/mbr1")?;
-        assert_eq!(partition_index, 0);
-
-        let result = volume_system.get_partition_index_by_path("/bogus1");
-        assert!(result.is_err());
-
-        let result = volume_system.get_partition_index_by_path("/mbr99");
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_partition_by_path() -> io::Result<()> {
-        let volume_system: MbrVolumeSystem = get_volume_system()?;
-
-        let result: Option<MbrPartition> = volume_system.get_partition_by_path("/")?;
-        assert!(result.is_none());
-
-        let result: Option<MbrPartition> = volume_system.get_partition_by_path("/mbr2")?;
-        assert!(result.is_some());
-
-        let partition: MbrPartition = result.unwrap();
-        assert_eq!(partition.offset, 1050112);
-        assert_eq!(partition.size, 1573376);
 
         Ok(())
     }
