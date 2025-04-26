@@ -12,10 +12,10 @@
  */
 
 use std::io;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use core::DataStreamReference;
-use formats::vhd::{VhdImage, VhdLayer};
+use formats::vhd::{VhdImage, VhdImageLayer};
 
 use crate::enums::VfsFileType;
 
@@ -27,7 +27,7 @@ pub enum VhdFileEntry {
         index: usize,
 
         /// Layer.
-        layer: Arc<RwLock<VhdLayer>>,
+        layer: VhdImageLayer,
     },
 
     /// Root file entry.
@@ -64,11 +64,10 @@ impl VhdFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
-        let number_of_sub_file_entries: usize = match self {
-            VhdFileEntry::Layer { .. } => 0,
-            VhdFileEntry::Root { image } => image.get_number_of_layers(),
-        };
-        Ok(number_of_sub_file_entries)
+        match self {
+            VhdFileEntry::Layer { .. } => Ok(0),
+            VhdFileEntry::Root { image } => Ok(image.get_number_of_layers()),
+        }
     }
 
     /// Retrieves a specific sub file entry.
@@ -79,14 +78,14 @@ impl VhdFileEntry {
         match self {
             VhdFileEntry::Layer { .. } => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Missing layers",
+                "No sub file entries",
             )),
             VhdFileEntry::Root { image } => {
-                let vhd_layer: VhdLayer = image.get_layer_by_index(sub_file_entry_index)?;
+                let vhd_layer: VhdImageLayer = image.get_layer_by_index(sub_file_entry_index)?;
 
                 Ok(VhdFileEntry::Layer {
                     index: sub_file_entry_index,
-                    layer: Arc::new(RwLock::new(vhd_layer)),
+                    layer: vhd_layer.clone(),
                 })
             }
         }
@@ -135,11 +134,11 @@ mod tests {
         let name: Option<String> = file_entry.get_name();
         assert!(name.is_none());
 
-        let vhd_layer: VhdLayer = vhd_image.get_layer_by_index(0)?;
+        let vhd_layer: VhdImageLayer = vhd_image.get_layer_by_index(0)?;
 
         let file_entry = VhdFileEntry::Layer {
             index: 0,
-            layer: Arc::new(RwLock::new(vhd_layer)),
+            layer: vhd_layer.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();

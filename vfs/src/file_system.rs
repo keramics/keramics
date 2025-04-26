@@ -28,7 +28,9 @@ use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileEntry;
 use super::path::VfsPath;
 use super::qcow::{QcowFileEntry, QcowFileSystem};
+use super::sparseimage::{SparseImageFileEntry, SparseImageFileSystem};
 use super::types::VfsFileSystemReference;
+use super::udif::{UdifFileEntry, UdifFileSystem};
 use super::vhd::{VhdFileEntry, VhdFileSystem};
 use super::vhdx::{VhdxFileEntry, VhdxFileSystem};
 
@@ -42,6 +44,8 @@ pub enum VfsFileSystem {
     Ntfs(NtfsFileSystem),
     Os,
     Qcow(QcowFileSystem),
+    SparseImage(SparseImageFileSystem),
+    Udif(UdifFileSystem),
     Vhd(VhdFileSystem),
     Vhdx(VhdxFileSystem),
 }
@@ -58,6 +62,8 @@ impl VfsFileSystem {
             VfsPathType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
             VfsPathType::Os => VfsFileSystem::Os,
             VfsPathType::Qcow => VfsFileSystem::Qcow(QcowFileSystem::new()),
+            VfsPathType::SparseImage => VfsFileSystem::SparseImage(SparseImageFileSystem::new()),
+            VfsPathType::Udif => VfsFileSystem::Udif(UdifFileSystem::new()),
             VfsPathType::Vhd => VfsFileSystem::Vhd(VhdFileSystem::new()),
             VfsPathType::Vhdx => VfsFileSystem::Vhdx(VhdxFileSystem::new()),
         }
@@ -112,6 +118,10 @@ impl VfsFileSystem {
                 )),
             },
             VfsFileSystem::Qcow(qcow_file_system) => qcow_file_system.file_entry_exists(path),
+            VfsFileSystem::SparseImage(sparseimage_file_system) => {
+                sparseimage_file_system.file_entry_exists(path)
+            }
+            VfsFileSystem::Udif(udif_file_system) => udif_file_system.file_entry_exists(path),
             VfsFileSystem::Vhd(vhd_file_system) => vhd_file_system.file_entry_exists(path),
             VfsFileSystem::Vhdx(vhdx_file_system) => vhdx_file_system.file_entry_exists(path),
         }
@@ -219,6 +229,20 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::SparseImage(sparseimage_file_system) => {
+                match sparseimage_file_system.get_file_entry_by_path(path)? {
+                    Some(sparseimage_file_entry) => {
+                        Ok(Some(VfsFileEntry::SparseImage(sparseimage_file_entry)))
+                    }
+                    None => Ok(None),
+                }
+            }
+            VfsFileSystem::Udif(udif_file_system) => {
+                match udif_file_system.get_file_entry_by_path(path)? {
+                    Some(udif_file_entry) => Ok(Some(VfsFileEntry::Udif(udif_file_entry))),
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Vhd(vhd_file_system) => {
                 match vhd_file_system.get_file_entry_by_path(path)? {
                     Some(vhd_file_entry) => Ok(Some(VfsFileEntry::Vhd(vhd_file_entry))),
@@ -263,6 +287,15 @@ impl VfsFileSystem {
                 let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry()?;
                 Ok(Some(VfsFileEntry::Qcow(qcow_file_entry)))
             }
+            VfsFileSystem::SparseImage(sparseimage_file_system) => {
+                let sparseimage_file_entry: SparseImageFileEntry =
+                    sparseimage_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::SparseImage(sparseimage_file_entry)))
+            }
+            VfsFileSystem::Udif(udif_file_system) => {
+                let udif_file_entry: UdifFileEntry = udif_file_system.get_root_file_entry()?;
+                Ok(Some(VfsFileEntry::Udif(udif_file_entry)))
+            }
             VfsFileSystem::Vhd(vhd_file_system) => {
                 let vhd_file_entry: VhdFileEntry = vhd_file_system.get_root_file_entry()?;
                 Ok(Some(VfsFileEntry::Vhd(vhd_file_entry)))
@@ -285,6 +318,8 @@ impl VfsFileSystem {
             VfsFileSystem::Ntfs(_) => VfsPathType::Ntfs,
             VfsFileSystem::Os => VfsPathType::Os,
             VfsFileSystem::Qcow(_) => VfsPathType::Qcow,
+            VfsFileSystem::SparseImage(_) => VfsPathType::SparseImage,
+            VfsFileSystem::Udif(_) => VfsPathType::Udif,
             VfsFileSystem::Vhd(_) => VfsPathType::Vhd,
             VfsFileSystem::Vhdx(_) => VfsPathType::Vhdx,
         }
@@ -351,6 +386,12 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 qcow_file_system.open(parent_file_system, path)
+            }
+            VfsFileSystem::SparseImage(sparseimage_file_system) => {
+                sparseimage_file_system.open(parent_file_system, path)
+            }
+            VfsFileSystem::Udif(udif_file_system) => {
+                udif_file_system.open(parent_file_system, path)
             }
             VfsFileSystem::Vhd(vhd_file_system) => vhd_file_system.open(parent_file_system, path),
             VfsFileSystem::Vhdx(vhdx_file_system) => {
@@ -441,6 +482,32 @@ mod tests {
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
         let vfs_path: VfsPath = VfsPath::Os {
             location: "../test_data/qcow/ext2.qcow2".to_string(),
+        };
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_sparseimage_file_system() -> io::Result<VfsFileSystem> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::SparseImage);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
+        };
+        vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_udif_file_system() -> io::Result<VfsFileSystem> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsPathType::Udif);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
+        let vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/udif/hfsplus_zlib.dmg".to_string(),
         };
         vfs_file_system.open(Some(&parent_file_system), &vfs_path)?;
 
@@ -582,6 +649,38 @@ mod tests {
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
         let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "./bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_sparseimage() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
+        };
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::SparseImage, "/sparseimage1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::SparseImage, "./bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_udif() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/udif/hfsplus_zlib.dmg".to_string(),
+        };
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Udif, "/udif1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Udif, "./bogus");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -893,6 +992,107 @@ mod tests {
             location: "../test_data/qcow/ext2.qcow2".to_string(),
         };
         let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system
+            .get_file_entry_by_path(&test_vfs_path)?
+            .unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_sparseimage_non_existing() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::SparseImage, "/bogus");
+        let result: Option<VfsFileEntry> =
+            vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_sparseimage_layer() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
+        };
+        let test_vfs_path: VfsPath =
+            os_vfs_path.new_child(VfsPathType::SparseImage, "/sparseimage1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system
+            .get_file_entry_by_path(&test_vfs_path)?
+            .unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_sparseimage_root() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::SparseImage, "/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system
+            .get_file_entry_by_path(&test_vfs_path)?
+            .unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_udif_non_existing() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/udif/hfsplus_zlib.dmg".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Udif, "/bogus");
+        let result: Option<VfsFileEntry> =
+            vfs_file_system.get_file_entry_by_path(&test_vfs_path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_udif_layer() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/udif/hfsplus_zlib.dmg".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Udif, "/udif1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system
+            .get_file_entry_by_path(&test_vfs_path)?
+            .unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_udif_root() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let os_vfs_path: VfsPath = VfsPath::Os {
+            location: "../test_data/udif/hfsplus_zlib.dmg".to_string(),
+        };
+        let test_vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Udif, "/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system
             .get_file_entry_by_path(&test_vfs_path)?
             .unwrap();

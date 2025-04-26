@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
 use std::io::Read;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::formatters::format_as_string;
 use core::{open_os_data_stream, DataStreamReference};
@@ -97,7 +96,7 @@ fn read_media_differential() -> io::Result<()> {
         open_os_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
     file.read_data_stream(&data_stream)?;
 
-    file.set_parent(&Rc::new(RefCell::new(parent_file)))?;
+    file.set_parent(&Arc::new(RwLock::new(parent_file)))?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

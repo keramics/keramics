@@ -38,6 +38,8 @@ pub enum VfsPathType {
     Ntfs,
     Os,
     Qcow,
+    SparseImage,
+    Udif,
     Vhd,
     Vhdx,
 }

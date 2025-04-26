@@ -11,27 +11,33 @@
  * under the License.
  */
 
-mod apm;
 mod context;
 mod data_fork;
 mod enums;
-mod fake;
 mod file_entry;
 mod file_resolver;
 mod file_system;
-mod finder;
-mod gpt;
 mod iterators;
-mod mbr;
-mod os;
 mod path;
-mod qcow;
-mod resolver;
-mod scanner;
 mod string;
 mod types;
+
+// Format specific back-ends.
+mod apm;
+mod fake;
+mod gpt;
+mod mbr;
+mod os;
+mod qcow;
+mod sparseimage;
+mod udif;
 mod vhd;
 mod vhdx;
+
+// Helpers.
+mod finder;
+mod resolver;
+mod scanner;
 
 pub use context::VfsContext;
 pub use data_fork::VfsDataFork;

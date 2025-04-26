@@ -20,9 +20,10 @@ use clap::{Parser, ValueEnum};
 
 use core::formatters::format_as_string;
 use core::DataStreamReference;
+use types::Ucs2String;
 use vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsPath,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString,
 };
 
 mod hasher;
@@ -56,11 +57,63 @@ struct CommandLineArguments {
     source: Option<PathBuf>,
 }
 
+/// Returns a string representation of the path.
+fn get_display_path(path: &VfsPath) -> String {
+    // TODO: add support for aliases
+    match path {
+        VfsPath::Apm { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location.replace("apm", "p"))
+        }
+        VfsPath::Ext { ext_path, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            let location: String = ext_path.to_string();
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::Fake { .. } => String::new(),
+        VfsPath::Gpt { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::Mbr { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location.replace("mbr", "p"))
+        }
+        VfsPath::Ntfs { ntfs_path, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            let location: String = ntfs_path.to_string();
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::Os { .. } => String::new(),
+        VfsPath::Qcow { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::SparseImage { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::Udif { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::Vhd { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location)
+        }
+        VfsPath::Vhdx { location, parent } => {
+            let parent_display_path: String = get_display_path(parent);
+            format!("{}{}", parent_display_path, location)
+        }
+    }
+}
+
 /// Calculates a digest hash from a file entry.
 fn calculate_hash_from_file_entry(
     digest_hasher: &hasher::DigestHasher,
     file_entry: &VfsFileEntry,
-    path: &String,
+    file_system_display_path: &String,
+    path_components: &Vec<VfsString>,
 ) -> io::Result<()> {
     match file_entry.get_file_type() {
         VfsFileType::File => {
@@ -74,15 +127,29 @@ fn calculate_hash_from_file_entry(
                     None => None,
                 };
                 // TODO: create skip list
-                if path == "/$BadClus" && name == Some("$Bad".to_string()) {
-                    continue;
-                }
-                let data_stream: DataStreamReference = data_fork.get_data_stream()?;
-                let hash: Vec<u8> = digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
+                let hash_string: String = if path_components.len() > 1
+                    && path_components[1] == VfsString::Ucs2(Ucs2String::from_string("$BadClus"))
+                    && name == Some("$Bad".to_string())
+                {
+                    String::from("N/A")
+                } else {
+                    let data_stream: DataStreamReference = data_fork.get_data_stream()?;
+                    let hash: Vec<u8> =
+                        digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
 
+                    format_as_string(&hash)
+                };
+                let path: String = path_components
+                    .iter()
+                    .map(|component| component.to_string())
+                    .collect::<Vec<String>>()
+                    .join("/");
                 match name {
-                    Some(name) => println!("{}  {}:{}", format_as_string(&hash), path, name),
-                    None => println!("{}  {}", format_as_string(&hash), path),
+                    Some(name) => println!(
+                        "{}\t{}{}:{}",
+                        hash_string, file_system_display_path, path, name
+                    ),
+                    None => println!("{}\t{}{}", hash_string, file_system_display_path, path),
                 };
             }
         }
@@ -97,8 +164,6 @@ fn calculate_hash_from_scan_node(
     digest_hasher: &hasher::DigestHasher,
     vfs_scan_node: &VfsScanNode,
 ) -> io::Result<()> {
-    // TODO: add paths to ignore e.g. NTFS: "$BadClus:$Bad"
-
     if vfs_scan_node.sub_nodes.is_empty() {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
@@ -107,8 +172,17 @@ fn calculate_hash_from_scan_node(
 
         for result in VfsFinder::new(&file_system) {
             match result {
-                Ok((file_entry, path)) => {
-                    calculate_hash_from_file_entry(digest_hasher, &file_entry, &path)?
+                Ok((file_entry, path_components)) => {
+                    let display_path: String = match vfs_scan_node.path.get_parent() {
+                        Some(parent_path) => get_display_path(parent_path),
+                        None => String::new(),
+                    };
+                    calculate_hash_from_file_entry(
+                        digest_hasher,
+                        &file_entry,
+                        &display_path,
+                        &path_components,
+                    )?
                 }
                 Err(error) => return Err(error),
             };

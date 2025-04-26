@@ -144,4 +144,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read.
+    // TODO: add tests for seek.
+    // TODO: add tests for get_size.
 }

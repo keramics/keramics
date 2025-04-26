@@ -39,6 +39,7 @@ pub struct GptVolumeSystem {
     pub bytes_per_sector: u16,
 
     /// Partition entries.
+    // TODO: use a HashMap for lookup by identifier.
     partition_entries: Vec<GptPartitionEntry>,
 }
 

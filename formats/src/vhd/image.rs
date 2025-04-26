@@ -11,19 +11,19 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::FileResolverReference;
 
 use super::file::VhdFile;
-use super::layer::VhdLayer;
+
+pub type VhdImageLayer = Arc<RwLock<VhdFile>>;
 
 /// Virtual Hard Disk (VHD) storage media image.
 pub struct VhdImage {
     /// Files.
-    files: Vec<Rc<RefCell<VhdFile>>>,
+    files: Vec<Arc<RwLock<VhdFile>>>,
 }
 
 impl VhdImage {
@@ -38,16 +38,9 @@ impl VhdImage {
     }
 
     /// Retrieves a layer by index.
-    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<VhdLayer> {
+    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<VhdImageLayer> {
         match self.files.get(layer_index) {
-            Some(file) => match file.try_borrow() {
-                Ok(vhd_file) => Ok(VhdLayer::new(
-                    file,
-                    &vhd_file.identifier,
-                    vhd_file.media_size,
-                )),
-                Err(error) => return Err(core::error_to_io_error!(error)),
-            },
+            Some(file) => Ok(file.clone()),
             None => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("No layer with index: {}", layer_index),
@@ -108,7 +101,7 @@ impl VhdImage {
             if file_index > 0 {
                 file.set_parent(&mut self.files[file_index - 1])?;
             }
-            self.files.push(Rc::new(RefCell::new(file)));
+            self.files.push(Arc::new(RwLock::new(file)));
 
             file_index += 1;
         }
@@ -135,13 +128,18 @@ mod tests {
     fn test_get_layer_by_index() -> io::Result<()> {
         let image: VhdImage = get_image()?;
 
-        let layer: VhdLayer = image.get_layer_by_index(0)?;
+        let layer: VhdImageLayer = image.get_layer_by_index(0)?;
 
-        assert_eq!(layer.size, 4194304);
-        assert_eq!(
-            layer.identifier.to_string(),
-            "e7ea9200-8493-954e-a816-9572339be931"
-        );
+        match layer.read() {
+            Ok(file) => {
+                assert_eq!(file.media_size, 4194304);
+                assert_eq!(
+                    file.identifier.to_string(),
+                    "e7ea9200-8493-954e-a816-9572339be931"
+                );
+            }
+            Err(error) => return Err(core::error_to_io_error!(error)),
+        };
         Ok(())
     }
 

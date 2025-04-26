@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
-use core::DataStreamReference;
+use core::{DataStream, DataStreamReference};
 use types::{Ucs2String, Uuid};
 
 use crate::block_tree::BlockTree;
@@ -53,7 +52,7 @@ pub struct VhdFile {
     pub parent_name: Option<Ucs2String>,
 
     /// Parent file.
-    parent_file: Option<Rc<RefCell<VhdFile>>>,
+    parent_file: Option<Arc<RwLock<VhdFile>>>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -337,7 +336,7 @@ impl VhdFile {
                     }
                 },
                 VhdBlockRangeType::InParent => match &self.parent_file {
-                    Some(parent_file) => match parent_file.try_borrow_mut() {
+                    Some(parent_file) => match parent_file.write() {
                         Ok(mut file) => {
                             file.seek(io::SeekFrom::Start(media_offset))?;
 
@@ -370,7 +369,7 @@ impl VhdFile {
     }
 
     /// Sets the parent file.
-    pub fn set_parent(&mut self, parent_file: &Rc<RefCell<VhdFile>>) -> io::Result<()> {
+    pub fn set_parent(&mut self, parent_file: &Arc<RwLock<VhdFile>>) -> io::Result<()> {
         let parent_identifier: &Uuid = match &self.parent_identifier {
             Some(parent_identifier) => parent_identifier,
             None => {
@@ -380,7 +379,7 @@ impl VhdFile {
                 ))
             }
         };
-        match parent_file.try_borrow() {
+        match parent_file.read() {
             Ok(file) => {
                 if *parent_identifier != file.identifier {
                     return Err(io::Error::new(
@@ -455,6 +454,13 @@ impl Seek for VhdFile {
             io::SeekFrom::Start(offset) => offset,
         };
         Ok(self.media_offset)
+    }
+}
+
+impl DataStream for VhdFile {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
     }
 }
 
@@ -647,4 +653,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_size.
 }

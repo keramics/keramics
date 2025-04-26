@@ -33,7 +33,7 @@ pub struct MbrFileSystem {
 impl MbrFileSystem {
     pub const PATH_PREFIX: &'static str = "/mbr";
 
-    /// Creates a new file entry.
+    /// Creates a new file system.
     pub fn new() -> Self {
         Self {
             volume_system: Arc::new(MbrVolumeSystem::new()),
@@ -189,11 +189,11 @@ mod tests {
     fn test_file_entry_exists() -> io::Result<()> {
         let (mbr_file_system, parent_vfs_path): (MbrFileSystem, VfsPath) = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/mbr1");
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/");
         let result: bool = mbr_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/");
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/mbr1");
         let result: bool = mbr_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
@@ -208,18 +208,6 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let (mbr_file_system, parent_vfs_path): (MbrFileSystem, VfsPath) = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/mbr1");
-        let result: Option<MbrFileEntry> = mbr_file_system.get_file_entry_by_path(&vfs_path)?;
-        assert!(result.is_some());
-
-        let mbr_file_entry: MbrFileEntry = result.unwrap();
-
-        let name: Option<String> = mbr_file_entry.get_name();
-        assert_eq!(name, Some("mbr1".to_string()));
-
-        let file_type: VfsFileType = mbr_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
-
         let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/");
         let result: Option<MbrFileEntry> = mbr_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -232,6 +220,18 @@ mod tests {
         let file_type: VfsFileType = mbr_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
+        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/mbr1");
+        let result: Option<MbrFileEntry> = mbr_file_system.get_file_entry_by_path(&vfs_path)?;
+        assert!(result.is_some());
+
+        let mbr_file_entry: MbrFileEntry = result.unwrap();
+
+        let name: Option<String> = mbr_file_entry.get_name();
+        assert_eq!(name, Some("mbr1".to_string()));
+
+        let file_type: VfsFileType = mbr_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::File);
+
         let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Mbr, "/bogus1");
         let result: Option<MbrFileEntry> = mbr_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
@@ -243,13 +243,13 @@ mod tests {
     fn get_partition_index_by_path() -> io::Result<()> {
         let (mbr_file_system, _): (MbrFileSystem, VfsPath) = get_file_system()?;
 
-        let path: String = "/mbr1".to_string();
-        let partition_index: usize = mbr_file_system.get_partition_index_by_path(&path)?;
-        assert_eq!(partition_index, 0);
-
         let path: String = "/".to_string();
         let result = mbr_file_system.get_partition_index_by_path(&path);
         assert!(result.is_err());
+
+        let path: String = "/mbr1".to_string();
+        let partition_index: usize = mbr_file_system.get_partition_index_by_path(&path)?;
+        assert_eq!(partition_index, 0);
 
         let path: String = "/mbr99".to_string();
         let result = mbr_file_system.get_partition_index_by_path(&path);

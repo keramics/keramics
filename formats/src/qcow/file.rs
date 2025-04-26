@@ -11,13 +11,12 @@
  * under the License.
  */
 
-use std::cell::RefCell;
 use std::io;
 use std::io::{Read, Seek};
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use core::mediator::{Mediator, MediatorReference};
-use core::DataStreamReference;
+use core::{DataStream, DataStreamReference};
 use types::ByteString;
 
 use crate::block_tree::BlockTree;
@@ -93,7 +92,7 @@ pub struct QcowFile {
     backing_file_name: Option<ByteString>,
 
     /// Backing file.
-    backing_file: Option<Rc<RefCell<QcowFile>>>,
+    backing_file: Option<Arc<RwLock<QcowFile>>>,
 
     /// Media size.
     pub media_size: u64,
@@ -530,7 +529,7 @@ impl QcowFile {
                     todo!();
                 }
                 QcowBlockRangeType::InBackingFile => match &self.backing_file {
-                    Some(backing_file) => match backing_file.try_borrow_mut() {
+                    Some(backing_file) => match backing_file.write() {
                         Ok(mut file) => {
                             file.seek(io::SeekFrom::Start(media_offset))?;
 
@@ -576,7 +575,7 @@ impl QcowFile {
     }
 
     /// Sets the backing file.
-    pub fn set_backing_file(&mut self, backing_file: &Rc<RefCell<QcowFile>>) -> io::Result<()> {
+    pub fn set_backing_file(&mut self, backing_file: &Arc<RwLock<QcowFile>>) -> io::Result<()> {
         self.backing_file = Some(backing_file.clone());
 
         Ok(())
@@ -620,6 +619,13 @@ impl Seek for QcowFile {
             io::SeekFrom::Start(offset) => offset,
         };
         Ok(self.media_offset)
+    }
+}
+
+impl DataStream for QcowFile {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
     }
 }
 
@@ -776,4 +782,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_size.
 }

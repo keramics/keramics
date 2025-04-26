@@ -71,6 +71,12 @@ impl MbrVolumeSystem {
                         ))
                     }
                 };
+                if self.bytes_per_sector == 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("Unsupported bytes per sector: 0"),
+                    ));
+                }
                 let mut partition_offset: u64 =
                     partition_entry.start_address_lba as u64 * self.bytes_per_sector as u64;
                 let partition_size: u64 =
@@ -138,17 +144,17 @@ impl MbrVolumeSystem {
                 }
             }
         }
-        if self.bytes_per_sector == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported bytes per sector: 0"),
-            ));
-        }
         let mut entry_index: usize = 0;
         let mut extended_boot_record_offset: u64 = 0;
 
         while let Some(mut partition_entry) = master_boot_record.partition_entries.pop_front() {
             if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
+                if self.bytes_per_sector == 0 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!("Unsupported bytes per sector: 0"),
+                    ));
+                }
                 if extended_boot_record_offset != 0 {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
@@ -167,6 +173,30 @@ impl MbrVolumeSystem {
             self.first_extended_boot_record_offset = extended_boot_record_offset;
 
             self.read_extended_boot_record(data_stream, extended_boot_record_offset, 4)?;
+        }
+        if self.bytes_per_sector == 0 {
+            match self
+                .partition_entries
+                .iter()
+                .max_by_key(|element| element.start_address_lba)
+            {
+                Some(last_partition_entry) => {
+                    let data_stream_size: u64 = match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.get_size()?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    };
+                    let end_address_lba: u64 = (last_partition_entry.start_address_lba as u64)
+                        + (last_partition_entry.number_of_sectors as u64);
+
+                    for bytes_per_sector in SUPPORTED_BYTES_PER_SECTOR.iter() {
+                        if end_address_lba > data_stream_size / (*bytes_per_sector as u64) {
+                            break;
+                        }
+                        self.bytes_per_sector = *bytes_per_sector;
+                    }
+                }
+                None => {}
+            }
         }
         self.disk_identity = master_boot_record.disk_identity;
 

@@ -36,6 +36,8 @@ fn print_scan_node(scan_node: &VfsScanNode, depth: usize) {
         VfsPath::Ntfs { .. } => "NTFS",
         VfsPath::Os { .. } => "OS",
         VfsPath::Qcow { .. } => "QCOW",
+        VfsPath::SparseImage { .. } => "SPARSEIMAGE",
+        VfsPath::Udif { .. } => "UDIF",
         VfsPath::Vhd { .. } => "VHD",
         VfsPath::Vhdx { .. } => "VHDX",
     };

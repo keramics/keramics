@@ -12,10 +12,10 @@
  */
 
 use std::io;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use core::DataStreamReference;
-use formats::qcow::{QcowImage, QcowLayer};
+use formats::qcow::{QcowImage, QcowImageLayer};
 
 use crate::enums::VfsFileType;
 
@@ -27,7 +27,7 @@ pub enum QcowFileEntry {
         index: usize,
 
         /// Layer.
-        layer: Arc<RwLock<QcowLayer>>,
+        layer: QcowImageLayer,
     },
 
     /// Root file entry.
@@ -64,11 +64,10 @@ impl QcowFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
-        let number_of_sub_file_entries: usize = match self {
-            QcowFileEntry::Layer { .. } => 0,
-            QcowFileEntry::Root { image } => image.get_number_of_layers(),
-        };
-        Ok(number_of_sub_file_entries)
+        match self {
+            QcowFileEntry::Layer { .. } => Ok(0),
+            QcowFileEntry::Root { image } => Ok(image.get_number_of_layers()),
+        }
     }
 
     /// Retrieves a specific sub file entry.
@@ -79,14 +78,14 @@ impl QcowFileEntry {
         match self {
             QcowFileEntry::Layer { .. } => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Missing layers",
+                "No sub file entries",
             )),
             QcowFileEntry::Root { image } => {
-                let qcow_layer: QcowLayer = image.get_layer_by_index(sub_file_entry_index)?;
+                let qcow_layer: QcowImageLayer = image.get_layer_by_index(sub_file_entry_index)?;
 
                 Ok(QcowFileEntry::Layer {
                     index: sub_file_entry_index,
-                    layer: Arc::new(RwLock::new(qcow_layer)),
+                    layer: qcow_layer.clone(),
                 })
             }
         }
@@ -135,11 +134,11 @@ mod tests {
         let name: Option<String> = file_entry.get_name();
         assert!(name.is_none());
 
-        let qcow_layer: QcowLayer = qcow_image.get_layer_by_index(0)?;
+        let qcow_layer: QcowImageLayer = qcow_image.get_layer_by_index(0)?;
 
         let file_entry = QcowFileEntry::Layer {
             index: 0,
-            layer: Arc::new(RwLock::new(qcow_layer)),
+            layer: qcow_layer.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();
