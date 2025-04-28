@@ -114,7 +114,9 @@ impl NtfsDataRun {
                 block_number <<= 8;
                 block_number |= *byte_value as i64;
             }
-            self.block_number = last_block_number + (block_number as u64);
+            block_number += last_block_number as i64;
+
+            self.block_number = block_number as u64;
         }
         data_offset += block_number_size;
 

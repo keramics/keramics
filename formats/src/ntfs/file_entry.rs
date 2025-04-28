@@ -53,8 +53,14 @@ pub struct NtfsFileEntry {
     /// The directory entry.
     directory_entry: Option<NtfsDirectoryEntry>,
 
+    /// The directory index.
+    directory_index: NtfsDirectoryIndex,
+
     /// Directory entries.
-    directory_entries: BTreeMap<Ucs2String, NtfsDirectoryEntry>,
+    directory_entries: BTreeMap<u64, NtfsDirectoryEntry>,
+
+    /// Value to indicate the file entry has directory entries.
+    has_directory_entries: bool,
 
     /// Value to indicate the directory entries were read.
     read_directory_entries: bool,
@@ -65,12 +71,18 @@ impl NtfsFileEntry {
     pub(super) fn new(
         data_stream: &DataStreamReference,
         mft: &Rc<NtfsMasterFileTable>,
+        case_folding_mappings: &Rc<Vec<u16>>,
         mft_entry_number: u64,
         mft_entry: NtfsMftEntry,
         name: Option<Ucs2String>,
         directory_entry: Option<NtfsDirectoryEntry>,
     ) -> Self {
         let sequence_number: u16 = mft_entry.sequence_number;
+
+        let cluster_block_size: u32 = mft.cluster_block_size;
+
+        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
+        let has_directory_entries: bool = mft_entry.has_attribute_group(&i30_index_name);
 
         Self {
             data_stream: data_stream.clone(),
@@ -80,7 +92,9 @@ impl NtfsFileEntry {
             sequence_number: sequence_number,
             name: name,
             directory_entry: directory_entry,
+            directory_index: NtfsDirectoryIndex::new(cluster_block_size, case_folding_mappings),
             directory_entries: BTreeMap::new(),
+            has_directory_entries: has_directory_entries,
             read_directory_entries: false,
         }
     }
@@ -88,7 +102,7 @@ impl NtfsFileEntry {
     /// Retrieves the access time from the directory entry $FILE_NAME attribute.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.access_time),
+            Some(directory_entry) => Some(&directory_entry.file_name_attribute.access_time),
             None => None,
         }
     }
@@ -104,7 +118,9 @@ impl NtfsFileEntry {
     /// Retrieves the change time from the directory entry $FILE_NAME attribute.
     pub fn get_change_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.entry_modification_time),
+            Some(directory_entry) => {
+                Some(&directory_entry.file_name_attribute.entry_modification_time)
+            }
             None => None,
         }
     }
@@ -112,7 +128,7 @@ impl NtfsFileEntry {
     /// Retrieves the creation time from the directory entry $FILE_NAME attribute.
     pub fn get_creation_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.creation_time),
+            Some(directory_entry) => Some(&directory_entry.file_name_attribute.creation_time),
             None => None,
         }
     }
@@ -120,7 +136,7 @@ impl NtfsFileEntry {
     /// Retrieves the file attribute flags.
     pub fn get_file_attribute_flags(&self) -> u32 {
         match &self.directory_entry {
-            Some(directory_entry) => directory_entry.file_attribute_flags,
+            Some(directory_entry) => directory_entry.file_name_attribute.file_attribute_flags,
             None => 0,
         }
     }
@@ -132,7 +148,7 @@ impl NtfsFileEntry {
     /// Retrieves the modification time from the directory entry $FILE_NAME attribute.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.modification_time),
+            Some(directory_entry) => Some(&directory_entry.file_name_attribute.modification_time),
             None => None,
         }
     }
@@ -145,7 +161,7 @@ impl NtfsFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match &self.directory_entry {
-            Some(directory_entry) => directory_entry.data_size,
+            Some(directory_entry) => directory_entry.file_name_attribute.data_size,
             None => 0,
         }
     }
@@ -221,24 +237,7 @@ impl NtfsFileEntry {
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
-        let data_attribute: &NtfsMftAttribute = match self
-            .mft_entry
-            .get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA)
-        {
-            Some(data_attribute) => data_attribute,
-            None => return Ok(None),
-        };
-        if data_attribute.is_resident() {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
-            Ok(Some(Arc::new(RwLock::new(data_stream))))
-        } else {
-            let mut block_stream: NtfsBlockStream =
-                NtfsBlockStream::new(self.mft.cluster_block_size);
-            block_stream.open(&self.data_stream, data_attribute)?;
-
-            Ok(Some(Arc::new(RwLock::new(block_stream))))
-        }
+        self.get_data_stream_by_name(&None)
     }
 
     /// Retrieves a data stream with the specified name.
@@ -286,6 +285,9 @@ impl NtfsFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+        if !self.has_directory_entries {
+            return Ok(0);
+        }
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
@@ -300,7 +302,7 @@ impl NtfsFileEntry {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
-        let (name, directory_entry): (&Ucs2String, &NtfsDirectoryEntry) =
+        let (file_reference, directory_entry): (&u64, &NtfsDirectoryEntry) =
             match self.directory_entries.iter().nth(sub_file_entry_index) {
                 Some(key_and_value) => key_and_value,
                 None => {
@@ -310,14 +312,17 @@ impl NtfsFileEntry {
                     ));
                 }
             };
-        let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
+        let mft_entry_number: u64 = file_reference & 0x0000ffffffffffff;
         let mut mft_entry: NtfsMftEntry =
             self.mft.get_entry(&self.data_stream, mft_entry_number)?;
         mft_entry.read_attributes()?;
 
+        let name: &Ucs2String = directory_entry.get_name();
+
         let file_entry: NtfsFileEntry = NtfsFileEntry::new(
             &self.data_stream,
             &self.mft,
+            &self.directory_index.case_folding_mappings,
             mft_entry_number,
             mft_entry,
             Some(name.clone()),
@@ -331,36 +336,44 @@ impl NtfsFileEntry {
         &mut self,
         sub_file_entry_name: &Ucs2String,
     ) -> io::Result<Option<NtfsFileEntry>> {
-        if !self.read_directory_entries {
-            self.read_directory_entries()?;
+        println!("Y: {}", sub_file_entry_name.to_string());
+        if !self.has_directory_entries {
+            return Ok(None);
         }
-        // TODO: case insensitive search
-        let (name, directory_entry): (&Ucs2String, &NtfsDirectoryEntry) =
-            match self.directory_entries.get_key_value(sub_file_entry_name) {
-                Some(key_and_value) => key_and_value,
-                None => return Ok(None),
-            };
+        if !self.directory_index.is_initialized {
+            self.directory_index.initialize(&self.mft_entry)?;
+        }
+        match self
+            .directory_index
+            .get_directory_entry_by_name(&self.data_stream, sub_file_entry_name)?
+        {
+            Some(directory_entry) => {
+                let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
 
-        let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
-        let mut mft_entry: NtfsMftEntry =
-            self.mft.get_entry(&self.data_stream, mft_entry_number)?;
-        mft_entry.read_attributes()?;
+                let mut mft_entry: NtfsMftEntry =
+                    self.mft.get_entry(&self.data_stream, mft_entry_number)?;
+                mft_entry.read_attributes()?;
 
-        let file_entry: NtfsFileEntry = NtfsFileEntry::new(
-            &self.data_stream,
-            &self.mft,
-            mft_entry_number,
-            mft_entry,
-            Some(name.clone()),
-            Some(directory_entry.clone()),
-        );
-        Ok(Some(file_entry))
+                let name: &Ucs2String = directory_entry.get_name();
+
+                let file_entry: NtfsFileEntry = NtfsFileEntry::new(
+                    &self.data_stream,
+                    &self.mft,
+                    &self.directory_index.case_folding_mappings,
+                    mft_entry_number,
+                    mft_entry,
+                    Some(name.clone()),
+                    Some(directory_entry),
+                );
+                Ok(Some(file_entry))
+            }
+            None => Ok(None),
+        }
     }
 
     /// Determines if the file entry has directory entries.
     pub fn has_directory_entries(&self) -> bool {
-        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
-        self.mft_entry.has_attribute_group(&i30_index_name)
+        self.has_directory_entries
     }
 
     /// Determines if the file entry is allocated (used).
@@ -380,15 +393,17 @@ impl NtfsFileEntry {
 
     /// Reads the directory entries.
     fn read_directory_entries(&mut self) -> io::Result<()> {
-        let mut directory_index: NtfsDirectoryIndex =
-            NtfsDirectoryIndex::new(self.mft.cluster_block_size);
-
-        // TODO: fill directory_entries
-        directory_index.read_mft_entry(
-            &self.mft_entry,
-            &self.data_stream,
-            &mut self.directory_entries,
-        )?;
+        if !self.has_directory_entries {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("Missing directory entries"),
+            ));
+        }
+        if !self.directory_index.is_initialized {
+            self.directory_index.initialize(&self.mft_entry)?;
+        }
+        self.directory_index
+            .get_directory_entries(&self.data_stream, &mut self.directory_entries)?;
         self.read_directory_entries = true;
 
         Ok(())

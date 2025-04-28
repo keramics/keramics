@@ -78,6 +78,9 @@ pub(super) const NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER: u64 = 3;
 /// NTFS root directory (".") identifier (MFT entry number).
 pub(super) const NTFS_ROOT_DIRECTORY_IDENTIFIER: u64 = 5;
 
+/// NTFS case folding mappings file ("$UpCase") identifier (MFT entry number).
+pub(super) const NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER: u64 = 10;
+
 /// NTFS index value flag to indicate the node is a branch node.
 pub(super) const NTFS_INDEX_VALUE_FLAG_IS_BRANCH: u32 = 0x00000001;
 

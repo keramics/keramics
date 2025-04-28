@@ -30,11 +30,11 @@ impl Utf16String {
 
     /// Reads a big-endian UTF-16 string from a byte sequence.
     pub fn from_be_bytes(data: &[u8]) -> Self {
-        let data_size: usize = data.len() / 2;
+        let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
 
-        for data_offset in 0..data_size {
-            let value_16bit = bytes_to_u16_be!(data, data_offset * 2);
+        for data_offset in (0..data_size).step_by(2) {
+            let value_16bit = bytes_to_u16_be!(data, data_offset);
             if value_16bit == 0 {
                 break;
             }
@@ -45,11 +45,11 @@ impl Utf16String {
 
     /// Reads a little-endian UTF-16 string from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
-        let data_size: usize = data.len() / 2;
+        let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
 
-        for data_offset in 0..data_size {
-            let value_16bit = bytes_to_u16_le!(data, data_offset * 2);
+        for data_offset in (0..data_size).step_by(2) {
+            let value_16bit = bytes_to_u16_le!(data, data_offset);
             if value_16bit == 0 {
                 break;
             }
