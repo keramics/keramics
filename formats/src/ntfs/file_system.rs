@@ -14,9 +14,10 @@
 use std::io;
 use std::rc::Rc;
 
-use core::DataStreamReference;
-use types::Ucs2String;
+use core::{DataStream, DataStreamReference};
+use types::{bytes_to_u16_le, Ucs2String};
 
+use super::block_stream::NtfsBlockStream;
 use super::boot_record::NtfsBootRecord;
 use super::constants::*;
 use super::file_entry::NtfsFileEntry;
@@ -46,6 +47,9 @@ pub struct NtfsFileSystem {
     /// Master File Table (MFT).
     mft: Rc<NtfsMasterFileTable>,
 
+    /// Case folding mappings.
+    case_folding_mappings: Rc<Vec<u16>>,
+
     /// $VOLUME_INFORMATION attribute of the "$Volume" metadata file.
     volume_information_attribute: Option<NtfsVolumeInformationAttribute>,
 
@@ -66,6 +70,7 @@ impl NtfsFileSystem {
             mft_entry_size: 0,
             index_entry_size: 0,
             mft: Rc::new(NtfsMasterFileTable::new()),
+            case_folding_mappings: Rc::new(Vec::with_capacity(65536)),
             volume_information_attribute: None,
             volume_label: None,
             volume_serial_number: 0,
@@ -122,6 +127,7 @@ impl NtfsFileSystem {
         let file_entry: NtfsFileEntry = NtfsFileEntry::new(
             data_stream,
             &self.mft,
+            &self.case_folding_mappings,
             mft_entry_number,
             mft_entry,
             None,
@@ -176,10 +182,71 @@ impl NtfsFileSystem {
 
         self.read_master_file_table(data_stream, boot_record.mft_block_number)?;
         self.read_volume_information(data_stream)?;
+        self.read_case_folding_mappings(data_stream)?;
 
         // TODO: read security descriptors, MFT entry 9 ($Secure)
         // let mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, 9)?;
 
+        Ok(())
+    }
+
+    /// Reads the case folding mappings from the $UpCase metadata file.
+    fn read_case_folding_mappings(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+        let mut mft_entry: NtfsMftEntry = self
+            .mft
+            .get_entry(data_stream, NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER)?;
+
+        if mft_entry.is_bad {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported marked bad MFT entry.",
+            ));
+        }
+        if !mft_entry.is_allocated {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported unallocated MFT entry.",
+            ));
+        }
+        mft_entry.read_attributes()?;
+
+        let data_attribute: &NtfsMftAttribute =
+            match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+                Some(data_attribute) => data_attribute,
+                None => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unsupported MFT missing $Data attribute.",
+                    ))
+                }
+            };
+        if data_attribute.is_resident() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported resident $Data attribute.",
+            ));
+        }
+        let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.mft.cluster_block_size);
+        block_stream.open(data_stream, data_attribute)?;
+
+        let mut data: Vec<u8> = vec![0; 131072];
+
+        block_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(0))?;
+
+        match Rc::get_mut(&mut self.case_folding_mappings) {
+            Some(case_folding_mappings) => {
+                for data_offset in (0..131072).step_by(2) {
+                    let value_16bit = bytes_to_u16_le!(data, data_offset);
+                    case_folding_mappings.push(value_16bit);
+                }
+            }
+            None => {
+                return Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    format!("Unable to initialize case folding mappings"),
+                ));
+            }
+        };
         Ok(())
     }
 
@@ -252,53 +319,64 @@ impl NtfsFileSystem {
         let mut mft_entry: NtfsMftEntry = self
             .mft
             .get_entry(data_stream, NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER)?;
-        if mft_entry.is_allocated {
-            mft_entry.read_attributes()?;
 
-            match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
-                Some(mft_attribute) => {
-                    if !mft_attribute.is_resident() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported non-resident $VOLUME_NAME attribute.",
-                        ));
-                    }
-                    if mft_attribute.is_compressed() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported compressed $VOLUME_NAME attribute.",
-                        ));
-                    }
-                    let volume_label: Ucs2String =
-                        Ucs2String::from_le_bytes(&mft_attribute.resident_data);
-
-                    self.volume_label = Some(volume_label);
-                }
-                None => {}
-            };
-            match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
-                Some(mft_attribute) => {
-                    if !mft_attribute.is_resident() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported non-resident $VOLUME_INFORMATION attribute.",
-                        ));
-                    }
-                    if mft_attribute.is_compressed() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported compressed $VOLUME_INFORMATION attribute.",
-                        ));
-                    }
-                    let mut volume_information_attribute: NtfsVolumeInformationAttribute =
-                        NtfsVolumeInformationAttribute::new();
-                    volume_information_attribute.read_data(&mft_attribute.resident_data)?;
-
-                    self.volume_information_attribute = Some(volume_information_attribute);
-                }
-                None => {}
-            };
+        if mft_entry.is_bad {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported marked bad MFT entry.",
+            ));
         }
+        if !mft_entry.is_allocated {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported unallocated MFT entry.",
+            ));
+        }
+        mft_entry.read_attributes()?;
+
+        match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
+            Some(mft_attribute) => {
+                if !mft_attribute.is_resident() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unsupported non-resident $VOLUME_NAME attribute.",
+                    ));
+                }
+                if mft_attribute.is_compressed() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unsupported compressed $VOLUME_NAME attribute.",
+                    ));
+                }
+                let volume_label: Ucs2String =
+                    Ucs2String::from_le_bytes(&mft_attribute.resident_data);
+
+                self.volume_label = Some(volume_label);
+            }
+            None => {}
+        };
+        match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
+            Some(mft_attribute) => {
+                if !mft_attribute.is_resident() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unsupported non-resident $VOLUME_INFORMATION attribute.",
+                    ));
+                }
+                if mft_attribute.is_compressed() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unsupported compressed $VOLUME_INFORMATION attribute.",
+                    ));
+                }
+                let mut volume_information_attribute: NtfsVolumeInformationAttribute =
+                    NtfsVolumeInformationAttribute::new();
+                volume_information_attribute.read_data(&mft_attribute.resident_data)?;
+
+                self.volume_information_attribute = Some(volume_information_attribute);
+            }
+            None => {}
+        };
         Ok(())
     }
 }
@@ -318,12 +396,52 @@ mod tests {
         Ok(file_system)
     }
 
-    // TODO: add tests for get_format_version
-    // TODO: add tests for get_volume_flags
-    // TODO: add tests for get_volume_label
+    #[test]
+    fn test_get_format_version() -> io::Result<()> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let format_version: Option<(u8, u8)> = file_system.get_format_version();
+        assert_eq!(format_version, Some((3, 1)));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_volume_flags() -> io::Result<()> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let volume_flags: Option<u16> = file_system.get_volume_flags();
+        assert_eq!(volume_flags, Some(0x0000));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_volume_label() -> io::Result<()> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let volume_label: Option<&Ucs2String> = file_system.get_volume_label();
+        let expected_label: Ucs2String = Ucs2String::from_string("ntfs_test");
+        assert_eq!(volume_label, Some(&expected_label));
+
+        Ok(())
+    }
+
     // TODO: add tests for get_file_entry_by_identifier
     // TODO: add tests for get_file_entry_by_path
-    // TODO: add tests for get_root_directory
+
+    #[test]
+    fn test_get_root_directory() -> io::Result<()> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let root_directory: NtfsFileEntry = file_system.get_root_directory()?;
+        assert_eq!(
+            root_directory.mft_entry_number,
+            NTFS_ROOT_DIRECTORY_IDENTIFIER
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn test_read_data_stream() -> io::Result<()> {
@@ -341,7 +459,23 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for read_metadata
+    #[test]
+    fn test_read_metadata() -> io::Result<()> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        file_system.read_metadata(&data_stream)?;
+
+        assert_eq!(file_system.bytes_per_sector, 512);
+        assert_eq!(file_system.cluster_block_size, 4096);
+        assert_eq!(file_system.mft_entry_size, 1024);
+        assert_eq!(file_system.index_entry_size, 4096);
+        assert_eq!(file_system.volume_serial_number, 0x39fc0da25d085bcb);
+
+        Ok(())
+    }
+
+    // TODO: add tests for read_case_folding_mappings
     // TODO: add tests for read_master_file_table
     // TODO: add tests for read_volume_information
 }

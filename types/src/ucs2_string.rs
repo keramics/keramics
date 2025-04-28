@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::cmp::Ordering;
+
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
 /// 16-bit Universal Coded Character Set (UCS-2) string.
@@ -30,11 +32,11 @@ impl Ucs2String {
 
     /// Reads a big-endian UCS-2 string from a byte sequence.
     pub fn from_be_bytes(data: &[u8]) -> Self {
-        let data_size: usize = data.len() / 2;
+        let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
 
-        for data_offset in 0..data_size {
-            let value_16bit = bytes_to_u16_be!(data, data_offset * 2);
+        for data_offset in (0..data_size).step_by(2) {
+            let value_16bit = bytes_to_u16_be!(data, data_offset);
             if value_16bit == 0 {
                 break;
             }
@@ -73,15 +75,47 @@ impl Ucs2String {
 
     /// Reads a little-endian UCS-2 string from a byte sequence.
     pub fn read_elements_le(elements: &mut Vec<u16>, data: &[u8]) {
-        let data_size: usize = data.len() / 2;
+        let data_size: usize = data.len();
 
-        for data_offset in 0..data_size {
-            let value_16bit = bytes_to_u16_le!(data, data_offset * 2);
+        for data_offset in (0..data_size).step_by(2) {
+            let value_16bit = bytes_to_u16_le!(data, data_offset);
             if value_16bit == 0 {
                 break;
             }
             elements.push(value_16bit);
         }
+    }
+
+    /// Compares two UCS-2 strings.
+    pub fn compare(&self, other: &Self) -> Ordering {
+        let self_size: usize = self.elements.len();
+        let other_size: usize = other.len();
+
+        let mut element_index: usize = 0;
+        while element_index < self_size && element_index < other_size {
+            let self_element: u16 = self.elements[element_index];
+            let other_element: u16 = other.elements[element_index];
+
+            if self_element < other_element {
+                return Ordering::Less;
+            }
+            if self_element > other_element {
+                return Ordering::Greater;
+            }
+            element_index += 1;
+        }
+        if element_index < other_size {
+            return Ordering::Less;
+        }
+        if element_index < self_size {
+            return Ordering::Greater;
+        }
+        Ordering::Equal
+    }
+
+    /// Compares two UCS-2 strings with case folding.
+    pub fn compare_with_case_folding(&self, other: &Self) -> Ordering {
+        todo!();
     }
 
     /// Retrieves the string representation of an UCS-2 string.
@@ -133,6 +167,17 @@ mod tests {
     }
 
     #[test]
+    fn test_from_string() {
+        let ucs2_string: Ucs2String = Ucs2String::from_string("UCS-2 string");
+
+        let expected_elements: Vec<u16> = vec![
+            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
+            0x0067,
+        ];
+        assert_eq!(&ucs2_string.elements, &expected_elements);
+    }
+
+    #[test]
     fn test_is_empty() {
         let ucs2_string: Ucs2String = Ucs2String::new();
         assert!(ucs2_string.is_empty());
@@ -160,6 +205,29 @@ mod tests {
 
     // TODO: add tests for read_elements_be
     // TODO: add tests for read_elements_le
+
+    #[test]
+    fn test_compare() {
+        let ucs2_string: Ucs2String = Ucs2String::from_string("string1");
+
+        let compare_ucs2_string: Ucs2String = Ucs2String::from_string("STRING1");
+        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Greater);
+
+        let compare_ucs2_string: Ucs2String = Ucs2String::from_string("string0");
+        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Greater);
+
+        let compare_ucs2_string: Ucs2String = Ucs2String::from_string("string1");
+        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Equal);
+
+        let compare_ucs2_string: Ucs2String = Ucs2String::from_string("string2");
+        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Less);
+
+        let compare_ucs2_string: Ucs2String = Ucs2String::from_string("string");
+        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Greater);
+
+        let compare_ucs2_string: Ucs2String = Ucs2String::from_string("string10");
+        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Less);
+    }
 
     #[test]
     fn test_to_string() {

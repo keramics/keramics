@@ -11,7 +11,9 @@
  * under the License.
  */
 
-use datetime::DateTime;
+use types::Ucs2String;
+
+use super::file_name_attribute::NtfsFileNameAttribute;
 
 #[derive(Clone)]
 /// New Technologies File System (NTFS) directory entry.
@@ -19,44 +21,25 @@ pub struct NtfsDirectoryEntry {
     /// File reference.
     pub file_reference: u64,
 
-    /// Creation time.
-    pub creation_time: DateTime,
+    /// File name attribute.
+    pub file_name_attribute: NtfsFileNameAttribute,
 
-    /// Modification time.
-    pub modification_time: DateTime,
-
-    /// Entry modification time.
-    pub entry_modification_time: DateTime,
-
-    /// Access time.
-    pub access_time: DateTime,
-
-    /// Data size.
-    pub data_size: u64,
-
-    /// File attribute flags.
-    pub file_attribute_flags: u32,
+    /// Short file name attribute.
+    pub short_file_name_attribute: Option<NtfsFileNameAttribute>,
 }
 
 impl NtfsDirectoryEntry {
     /// Creates a new directory entry.
-    pub fn new(
-        file_reference: u64,
-        creation_time: DateTime,
-        modification_time: DateTime,
-        entry_modification_time: DateTime,
-        access_time: DateTime,
-        data_size: u64,
-        file_attribute_flags: u32,
-    ) -> Self {
+    pub fn new(file_reference: u64, file_name_attribute: NtfsFileNameAttribute) -> Self {
         Self {
             file_reference: file_reference,
-            creation_time: creation_time,
-            modification_time: modification_time,
-            entry_modification_time: entry_modification_time,
-            access_time: access_time,
-            data_size: data_size,
-            file_attribute_flags: file_attribute_flags,
+            file_name_attribute: file_name_attribute,
+            short_file_name_attribute: None,
         }
+    }
+
+    /// Rerieves the name.
+    pub fn get_name(&self) -> &Ucs2String {
+        &self.file_name_attribute.name
     }
 }

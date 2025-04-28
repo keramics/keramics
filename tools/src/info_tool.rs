@@ -28,7 +28,7 @@ mod info;
 #[derive(Parser)]
 #[command(version, about = "Provides information about a supported file format", long_about = None)]
 struct CommandLineArguments {
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
 

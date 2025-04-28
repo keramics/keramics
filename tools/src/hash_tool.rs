@@ -19,6 +19,7 @@ use std::process::ExitCode;
 use clap::{Parser, ValueEnum};
 
 use core::formatters::format_as_string;
+use core::mediator::Mediator;
 use core::DataStreamReference;
 use types::Ucs2String;
 use vfs::{
@@ -49,6 +50,10 @@ enum HashType {
 #[derive(Parser)]
 #[command(version, about = "Calculate a digest hash of data", long_about = None)]
 struct CommandLineArguments {
+    #[arg(long, default_value_t = false)]
+    /// Enable debug output
+    debug: bool,
+
     /// Digest hash type
     #[arg(short, long, default_value_t = HashType::Md5, value_enum)]
     digest_hash_type: HashType,
@@ -57,54 +62,24 @@ struct CommandLineArguments {
     source: Option<PathBuf>,
 }
 
-/// Returns a string representation of the path.
+/// Returns a string representation of a path.
 fn get_display_path(path: &VfsPath) -> String {
     // TODO: add support for aliases
     match path {
-        VfsPath::Apm { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location.replace("apm", "p"))
-        }
+        VfsPath::Apm { location, .. } => location.replace("apm", "p"),
         VfsPath::Ext { ext_path, parent } => {
             let parent_display_path: String = get_display_path(parent);
             let location: String = ext_path.to_string();
             format!("{}{}", parent_display_path, location)
         }
-        VfsPath::Fake { .. } => String::new(),
-        VfsPath::Gpt { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location)
-        }
-        VfsPath::Mbr { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location.replace("mbr", "p"))
-        }
+        VfsPath::Gpt { location, .. } => location.clone(),
+        VfsPath::Mbr { location, .. } => location.replace("mbr", "p"),
         VfsPath::Ntfs { ntfs_path, parent } => {
             let parent_display_path: String = get_display_path(parent);
             let location: String = ntfs_path.to_string();
             format!("{}{}", parent_display_path, location)
         }
-        VfsPath::Os { .. } => String::new(),
-        VfsPath::Qcow { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location)
-        }
-        VfsPath::SparseImage { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location)
-        }
-        VfsPath::Udif { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location)
-        }
-        VfsPath::Vhd { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location)
-        }
-        VfsPath::Vhdx { location, parent } => {
-            let parent_display_path: String = get_display_path(parent);
-            format!("{}{}", parent_display_path, location)
-        }
+        _ => String::new(),
     }
 }
 
@@ -197,6 +172,11 @@ fn calculate_hash_from_scan_node(
 
 fn main() -> ExitCode {
     let arguments = CommandLineArguments::parse();
+
+    Mediator {
+        debug_output: arguments.debug,
+    }
+    .make_current();
 
     let digest_hash_type: hasher::DigestHashType = match &arguments.digest_hash_type {
         HashType::Md5 => hasher::DigestHashType::Md5,

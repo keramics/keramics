@@ -114,7 +114,7 @@ impl NtfsIndex {
                 "Unsupported compressed $INDEX_ALLOCATION attribute.",
             ));
         }
-        let block_tree_size: u64 = (index_allocation_attribute.data_size
+        let block_tree_size: u64 = (index_allocation_attribute.allocated_data_size
             / (index_entry_size as u64))
             * (cluster_block_size as u64);
         self.block_tree =
@@ -175,4 +175,9 @@ impl NtfsIndex {
     }
 }
 
-// TODO: add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests.
+}

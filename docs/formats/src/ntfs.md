@@ -87,7 +87,8 @@ The following metadata files are predefined and use a fixed MFT entry number.
 | 9 | "$Quota" | Quota information
 | <td colspan="3"> *Used in NTFS version 3.0 and later*
 | 9 | "$Secure" | Security and access control information
-| 10 | "$UpCase" | Table of uppercase characters used for ensuring case insensitivity in Windows and DOS name spaces.
+| <td colspan="3"> *Common*
+| 10 | "$UpCase" | Case folding mappings
 | 11 | "$Extend" | A directory containing extended metadata files
 | 12-15 | | Unknown (Reserved), which are marked as in-use but are empty
 | 16-23 | | Unused, which are marked as unused
@@ -453,6 +454,10 @@ consists of:
 | 0x4000 | ATTRIBUTE_FLAG_ENCRYPTED | Is encrypted
 | 0x8000 | ATTRIBUTE_FLAG_SPARSE | Is sparse
 
+TODO: determine the meaning of compression flag in the context of resident
+$INDEX_ROOT. Do the data flags have a different meaning for different
+attributes?
+
 #### Resident MFT attribute
 
 The resident MFT attribute data is present when the non-resident flag is not
@@ -466,7 +471,6 @@ set (0). The resident data is 8 bytes in size and consists of:
 | 7 | 1 | 0x00 | Unknown (Padding)
 
 TODO: determine the meaning of indexed flag bits, other than the LSB
-TODO: determine the meaning of compression flag in the context of resident $INDEX_ROOT
 
 #### Non-resident MFT attribute
 
@@ -734,8 +738,8 @@ attributes with the parent file reference of each hard link.
 | Value | Identifier | Description
 | --- | --- | ---
 | 0 | POSIX | Case sensitive character set that consists of all Unicode characters except for: "\0" (zero character), "/" (forward slash). The ":" (colon) is valid for NTFS but not for Windows.
-| 1 | FILE_NAME_NTFS, WINDOWS | A case insensitive sub set of the POSIX character set that consists of all Unicode characters except for: `" * / : < > ? \ \| +`. Note that names cannot end with a "." (dot) or " " (space).
-| 2 | FILE_NAME_DOS, DOS | A case insensitive sub set of the WINDOWS character set that consists of all upper case ASCII characters except for: `" * + , / : ; < = > ? \`. Note that the name must follow the 8.3 format.
+| 1 | FILE_NAME_NTFS, WINDOWS | Case insensitive sub set of the POSIX character set that consists of all Unicode characters except for: `" * / : < > ? \ \| +`. Note that names cannot end with a "." (dot) or " " (space).
+| 2 | FILE_NAME_DOS, DOS | Case insensitive sub set of the WINDOWS character set that consists of all upper case ASCII characters except for: `" * + , / : ; < = > ? \`. Note that the name must follow the 8.3 format.
 | 3 | DOS_WINDOWS | Both the DOS and WINDOWS names are identical, which is the same as the DOS character set, with the exception that lower case is used as well.
 
 > Note that the Windows API function CreateFile allows to create case sensitive
@@ -1056,7 +1060,7 @@ The index root header is 16 bytes in size and consists of:
 | Value | Identifier | Description
 | --- | --- | ---
 | 0x00000000 | COLLATION_BINARY | Binary, where the first byte is most significant
-| 0x00000001 | COLLATION_FILENAME | UCS-2 strings case-insensitive
+| 0x00000001 | COLLATION_FILENAME | UCS-2 strings case-insensitive, where the case folding is stored in $UpCase
 | 0x00000002 | COLLATION_UNICODE_STRING | UCS-2 strings case-sensitive, where upper case letters should come first
 | | |
 | 0x00000010 | COLLATION_NTOFS_ULONG | Unsigned 32-bit little-endian integer
@@ -1127,7 +1131,7 @@ The index value is of variable size and consists of:
 | <td colspan="4"> *If index value flag 0x00000001 (is branch node) is set*
 | ... | 8 | | Sub node Virtual Cluster Number (VCN)
 
-The index values ared stored 8 byte aligned.
+The index values are stored 8 byte aligned.
 
 > Note that some other sources define the index value flags as a 16-bit value
 > followed by 2 bytes of padding.

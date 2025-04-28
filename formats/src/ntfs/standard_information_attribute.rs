@@ -52,6 +52,12 @@ pub struct NtfsStandardInformationAttribute {
 
     /// File attribute flags.
     pub file_attribute_flags: u32,
+
+    /// Maximum number of versions.
+    pub maximum_number_of_versions: u32,
+
+    /// Version number.
+    pub version_number: u32,
 }
 
 impl NtfsStandardInformationAttribute {
@@ -63,6 +69,8 @@ impl NtfsStandardInformationAttribute {
             entry_modification_time: DateTime::NotSet,
             access_time: DateTime::NotSet,
             file_attribute_flags: 0,
+            maximum_number_of_versions: 0,
+            version_number: 0,
         }
     }
 
@@ -103,6 +111,8 @@ impl NtfsStandardInformationAttribute {
             DateTime::Filetime(filetime)
         };
         self.file_attribute_flags = bytes_to_u32_le!(data, 32);
+        self.maximum_number_of_versions = bytes_to_u32_le!(data, 36);
+        self.version_number = bytes_to_u32_le!(data, 40);
 
         Ok(())
     }
@@ -155,6 +165,8 @@ mod tests {
             })
         );
         assert_eq!(test_struct.file_attribute_flags, 0x00000006);
+        assert_eq!(test_struct.maximum_number_of_versions, 0);
+        assert_eq!(test_struct.version_number, 0);
 
         Ok(())
     }

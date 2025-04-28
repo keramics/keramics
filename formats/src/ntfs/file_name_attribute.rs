@@ -17,7 +17,7 @@ use datetime::{DateTime, Filetime};
 use layout_map::LayoutMap;
 use types::{bytes_to_u32_le, bytes_to_u64_le, Ucs2String};
 
-#[derive(LayoutMap)]
+#[derive(Clone, LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
