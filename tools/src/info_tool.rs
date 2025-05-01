@@ -14,16 +14,19 @@
 use std::collections::HashSet;
 use std::io;
 use std::process::ExitCode;
+use std::sync::{Arc, RwLock};
 
 use clap::{Args, Parser, Subcommand};
 
 use core::mediator::Mediator;
 use core::DataStreamReference;
 use formats::{FormatIdentifier, FormatScanner};
-use vfs::{VfsFileSystemReference, VfsPath, VfsResolver, VfsResolverReference};
 
 mod formatters;
 mod info;
+mod range_stream;
+
+use range_stream::FileRangeDataStream;
 
 #[derive(Parser)]
 #[command(version, about = "Provides information about a supported file format", long_about = None)]
@@ -31,6 +34,10 @@ struct CommandLineArguments {
     #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
+
+    #[arg(short, long, default_value_t = 0)]
+    /// Offset within the source file.
+    offset: u64,
 
     /// Path of the source file
     source: std::path::PathBuf,
@@ -94,10 +101,15 @@ fn scan_for_formats(data_stream: &DataStreamReference) -> io::Result<Option<Form
         format_scanner.scan_data_stream(data_stream)?;
 
     if scan_results.len() > 1 {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            format!("Found multiple known format signatures"),
-        ));
+        // Ignore VHD footer if additional format was detected.
+        scan_results.remove(&FormatIdentifier::Vhd);
+
+        if scan_results.len() > 1 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Found multiple known format signatures"),
+            ));
+        }
     }
     let mut result: Option<FormatIdentifier> = scan_results.drain().next();
     if result.is_none() {
@@ -134,34 +146,17 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: source.to_string(),
-    };
+    let mut file_range_stream: FileRangeDataStream = FileRangeDataStream::new(arguments.offset);
 
-    let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-    let vfs_file_system: VfsFileSystemReference = match vfs_resolver.open_file_system(&vfs_path) {
-        Ok(value) => value,
+    match file_range_stream.open(source) {
+        Ok(_) => {}
         Err(error) => {
-            println!("Unable to open file system with error: {}", error);
+            println!("Unable to open file with error: {}", error);
             return ExitCode::FAILURE;
         }
     };
-    let result: Option<DataStreamReference> =
-        match vfs_file_system.get_data_stream_by_path_and_name(&vfs_path, None) {
-            Ok(result) => result,
-            Err(error) => {
-                println!("Unable to open data stream with error: {}", error);
-                return ExitCode::FAILURE;
-            }
-        };
-    let data_stream: DataStreamReference = match result {
-        Some(data_stream) => data_stream,
-        None => {
-            println!("No such file: {}", source);
-            return ExitCode::FAILURE;
-        }
-    };
+    let data_stream: DataStreamReference = Arc::new(RwLock::new(file_range_stream));
+
     let result: Option<FormatIdentifier> = match scan_for_formats(&data_stream) {
         Ok(result) => result,
         Err(error) => {

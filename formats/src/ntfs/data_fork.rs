@@ -18,6 +18,7 @@ use core::{DataStreamReference, FakeDataStream};
 use types::Ucs2String;
 
 use super::block_stream::NtfsBlockStream;
+use super::compressed_stream::NtfsCompressedStream;
 use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) data fork.
@@ -54,6 +55,12 @@ impl<'a> NtfsDataFork<'a> {
                 self.data_attribute.data_size,
             );
             Ok(Arc::new(RwLock::new(data_stream)))
+        } else if self.data_attribute.is_compressed() {
+            let mut compressed_stream: NtfsCompressedStream =
+                NtfsCompressedStream::new(self.cluster_block_size);
+            compressed_stream.open(&self.data_stream, self.data_attribute)?;
+
+            Ok(Arc::new(RwLock::new(compressed_stream)))
         } else {
             let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
             block_stream.open(&self.data_stream, self.data_attribute)?;

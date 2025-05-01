@@ -44,6 +44,12 @@ pub struct NtfsMftAttribute {
     /// Valid data size.
     pub valid_data_size: u64,
 
+    /// Compression unit size.
+    pub compression_unit_size: u32,
+
+    /// Compressed data size.
+    pub compressed_data_size: u64,
+
     /// Resident data.
     pub resident_data: Vec<u8>,
 
@@ -68,6 +74,8 @@ impl NtfsMftAttribute {
             allocated_data_size: 0,
             data_size: 0,
             valid_data_size: 0,
+            compression_unit_size: 0,
+            compressed_data_size: 0,
             resident_data: Vec::new(),
             data_cluster_groups: Vec::new(),
             non_resident_flag: 0,
@@ -245,6 +253,8 @@ impl NtfsMftAttribute {
             self.allocated_data_size = non_resident_attribute.allocated_data_size;
             self.data_size = non_resident_attribute.data_size;
             self.valid_data_size = non_resident_attribute.valid_data_size;
+            self.compression_unit_size = non_resident_attribute.compression_unit_size;
+            self.compressed_data_size = non_resident_attribute.compressed_data_size;
         }
         // TODO: debug print unknown data
 

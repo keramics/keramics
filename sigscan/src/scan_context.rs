@@ -42,7 +42,7 @@ pub struct ScanContext<'a> {
     unbound_range_size: usize,
 
     /// Results.
-    pub results: HashMap<usize, SignatureReference>,
+    pub results: HashMap<u64, SignatureReference>,
 }
 
 impl<'a> ScanContext<'a> {
@@ -98,7 +98,12 @@ impl<'a> ScanContext<'a> {
                     continue;
                 }
                 ScanResult::Signature(signature) => {
-                    self.results.insert(buffer_offset, Rc::clone(&signature));
+                    let pattern_offset: u64 = match signature.pattern_type {
+                        PatternType::BoundToEnd => self.data_size - signature.pattern_offset as u64,
+                        PatternType::BoundToStart => signature.pattern_offset as u64,
+                        PatternType::Unbound => self.data_offset,
+                    };
+                    self.results.insert(pattern_offset, Rc::clone(&signature));
 
                     skip_value = signature.pattern_size;
                 }

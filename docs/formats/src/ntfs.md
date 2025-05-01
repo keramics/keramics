@@ -488,7 +488,7 @@ set (1). The non-resident data is 48 or 56 bytes in size and consists of:
 | 32 | 8 | | Data size (or file size), which contains the data size in number of bytes. This value is not valid if the first VCN is nonzero.
 | 40 | 8 | | Valid data size (or valid data length), which contains the valid data size in number of bytes. This value is not valid if the first VCN is nonzero.
 | <td colspan="4"> *If compression unit size > 0*
-| 48 | 8 | | Total allocated size, which contains the total allocated size in number of cluster blocks.
+| 48 | 8 | | Compressed data size.
 
 > Note that the total size of the data runs should be larger or equal to the
 > data size.
@@ -500,9 +500,7 @@ set (1). The non-resident data is 48 or 56 bytes in size and consists of:
 
 TODO: determine the meaning of a VCN of -1
 
-##### Compression unit size
-
-TODO: complete section
+For more information about compressed MFT attributes see [compression](#compression).
 
 #### <a name="attribute_name"></a>Attribute name
 

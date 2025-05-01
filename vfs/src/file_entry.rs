@@ -128,9 +128,8 @@ impl VfsFileEntry {
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_file_type(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_file_type(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                let file_attribute_flags: u32 = ntfs_file_entry.get_file_attribute_flags();
                 // FILE_ATTRIBUTE_DEVICE is not used by NTFS.
-                if file_attribute_flags & 0x00000400 != 0 {
+                if ntfs_file_entry.is_symbolic_link() {
                     VfsFileType::SymbolicLink
                 }
                 // FILE_ATTRIBUTE_DIRECTORY is not used by NTFS.

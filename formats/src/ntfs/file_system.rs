@@ -226,6 +226,12 @@ impl NtfsFileSystem {
                 "Unsupported resident $Data attribute.",
             ));
         }
+        if data_attribute.is_compressed() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported compressed $Data attribute.",
+            ));
+        }
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.mft.cluster_block_size);
         block_stream.open(data_stream, data_attribute)?;
 

@@ -132,6 +132,7 @@ impl NtfsMftEntry {
                         ),
                     ));
                 }
+                // TODO: check for overlapping clusters
                 for cluster_group in attribute.data_cluster_groups.drain(..) {
                     existing_attribute.append_data_cluster_group(cluster_group);
                 }

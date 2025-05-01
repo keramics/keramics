@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::fs::File;
+use std::fs::{File, Metadata};
 use std::io;
 use std::io::Seek;
 use std::sync::{Arc, RwLock};
@@ -21,7 +21,9 @@ use super::data_stream::{DataStream, DataStreamReference};
 impl DataStream for File {
     /// Retrieves the size of the data stream.
     fn get_size(&mut self) -> io::Result<u64> {
-        self.seek(io::SeekFrom::End(0))
+        let metadata: Metadata = self.metadata()?;
+
+        Ok(metadata.len())
     }
 }
 
