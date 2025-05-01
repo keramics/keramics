@@ -29,7 +29,7 @@ pub struct NtfsBlockStream {
     data_stream: Option<DataStreamReference>,
 
     /// Cluster block size.
-    pub cluster_block_size: u32,
+    cluster_block_size: u32,
 
     /// Block tree.
     block_tree: BlockTree<NtfsBlockRange>,
@@ -38,7 +38,7 @@ pub struct NtfsBlockStream {
     current_offset: u64,
 
     /// The size.
-    pub size: u64,
+    size: u64,
 }
 
 impl NtfsBlockStream {
@@ -64,9 +64,6 @@ impl NtfsBlockStream {
                 io::ErrorKind::InvalidData,
                 "Unsupported resident $DATA attribute.",
             ));
-        }
-        if data_attribute.is_compressed() {
-            todo!();
         }
         let block_tree_size: u64 = data_attribute
             .allocated_data_size
@@ -96,17 +93,16 @@ impl NtfsBlockStream {
                     let range_type: NtfsBlockRangeType = match &data_run.run_type {
                         NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
                         NtfsDataRunType::Sparse => {
-                            if data_attribute.is_compressed() {
-                                NtfsBlockRangeType::Compressed
-                            } else {
-                                let mediator = Mediator::current();
-                                if mediator.debug_output && data_attribute.is_sparse() {
-                                    // Observed in $BadClus:$Bad
-                                    mediator.debug_print(format!(
-                                    "Data run is sparse but no compressed or sparse attribute data flags set."));
-                                }
-                                NtfsBlockRangeType::Sparse
+                            let mediator = Mediator::current();
+                            if mediator.debug_output
+                                && !data_attribute.is_compressed()
+                                && !data_attribute.is_sparse()
+                            {
+                                // Observed in $BadClus:$Bad
+                                mediator.debug_print(format!(
+                                "Data run is sparse but no compressed or sparse attribute data flags set.\n"));
                             }
+                            NtfsBlockRangeType::Sparse
                         }
                         _ => {
                             return Err(io::Error::new(
@@ -149,7 +145,7 @@ impl NtfsBlockStream {
         Ok(())
     }
 
-    /// Reads media data based on the block ranges.
+    /// Reads data based on the block ranges.
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -181,10 +177,6 @@ impl NtfsBlockStream {
             }
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
-                NtfsBlockRangeType::Compressed => {
-                    // TODO: implement.
-                    todo!();
-                }
                 NtfsBlockRangeType::InFile => match self.data_stream.as_ref() {
                     Some(data_stream) => match data_stream.write() {
                         Ok(mut data_stream) => {
@@ -208,6 +200,12 @@ impl NtfsBlockStream {
                     data[data_offset..data_end_offset].fill(0);
 
                     range_read_size
+                }
+                _ => {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "Unsupported block range type.",
+                    ))
                 }
             };
             if range_read_count == 0 {
@@ -434,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_size() -> io::Result<()> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();

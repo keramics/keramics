@@ -23,8 +23,8 @@ use core::mediator::Mediator;
 use core::DataStreamReference;
 use types::Ucs2String;
 use vfs::{
-    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsPath,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString,
+    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsPath, VfsResolver,
+    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString,
 };
 
 mod hasher;
@@ -90,47 +90,40 @@ fn calculate_hash_from_file_entry(
     file_system_display_path: &String,
     path_components: &Vec<VfsString>,
 ) -> io::Result<()> {
-    match file_entry.get_file_type() {
-        VfsFileType::File => {
-            let number_of_data_forks: usize = file_entry.get_number_of_data_forks()?;
+    let number_of_data_forks: usize = file_entry.get_number_of_data_forks()?;
 
-            for data_fork_index in 0..number_of_data_forks {
-                let data_fork: VfsDataFork = file_entry.get_data_fork_by_index(data_fork_index)?;
+    for data_fork_index in 0..number_of_data_forks {
+        let data_fork: VfsDataFork = file_entry.get_data_fork_by_index(data_fork_index)?;
 
-                let name: Option<String> = match data_fork.get_name() {
-                    Some(name) => Some(name.to_string()),
-                    None => None,
-                };
-                // TODO: create skip list
-                let hash_string: String = if path_components.len() > 1
-                    && path_components[1] == VfsString::Ucs2(Ucs2String::from_string("$BadClus"))
-                    && name == Some("$Bad".to_string())
-                {
-                    String::from("N/A")
-                } else {
-                    let data_stream: DataStreamReference = data_fork.get_data_stream()?;
-                    let hash: Vec<u8> =
-                        digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
+        let name: Option<String> = match data_fork.get_name() {
+            Some(name) => Some(name.to_string()),
+            None => None,
+        };
+        // TODO: create skip list
+        let hash_string: String = if path_components.len() > 1
+            && path_components[1] == VfsString::Ucs2(Ucs2String::from_string("$BadClus"))
+            && name == Some("$Bad".to_string())
+        {
+            String::from("N/A")
+        } else {
+            let data_stream: DataStreamReference = data_fork.get_data_stream()?;
+            let hash: Vec<u8> = digest_hasher.calculate_hash_from_data_stream(&data_stream)?;
 
-                    format_as_string(&hash)
-                };
-                let path: String = path_components
-                    .iter()
-                    .map(|component| component.to_string())
-                    .collect::<Vec<String>>()
-                    .join("/");
-                match name {
-                    Some(name) => println!(
-                        "{}\t{}{}:{}",
-                        hash_string, file_system_display_path, path, name
-                    ),
-                    None => println!("{}\t{}{}", hash_string, file_system_display_path, path),
-                };
-            }
-        }
-        // TODO: add support for other file types.
-        _ => {}
-    };
+            format_as_string(&hash)
+        };
+        let path: String = path_components
+            .iter()
+            .map(|component| component.to_string())
+            .collect::<Vec<String>>()
+            .join("/");
+        match name {
+            Some(name) => println!(
+                "{}\t{}{}:{}",
+                hash_string, file_system_display_path, path, name
+            ),
+            None => println!("{}\t{}{}", hash_string, file_system_display_path, path),
+        };
+    }
     Ok(())
 }
 

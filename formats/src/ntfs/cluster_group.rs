@@ -13,6 +13,8 @@
 
 use std::io;
 
+use core::mediator::Mediator;
+
 use super::data_run::{NtfsDataRun, NtfsDataRunType};
 
 /// New Technologies File System (NTFS) cluster group.
@@ -49,6 +51,18 @@ impl NtfsClusterGroup {
             let read_count: usize = data_run.read_data(&data[data_offset..], last_block_number)?;
             data_offset += read_count;
 
+            // TODO: move into NtfsDataRun
+            let mediator = Mediator::current();
+            if mediator.debug_output {
+                mediator.debug_print(format!("NtfsDataRun {{\n",));
+                mediator.debug_print(format!("    block_number: {},\n", data_run.block_number));
+                mediator.debug_print(format!(
+                    "    number_of_blocks: {},\n",
+                    data_run.number_of_blocks
+                ));
+                mediator.debug_print(format!("    run_type: {:#?},\n", data_run.run_type));
+                mediator.debug_print(format!("}}\n\n",));
+            }
             match &data_run.run_type {
                 NtfsDataRunType::EndOfList => break,
                 NtfsDataRunType::InFile => {

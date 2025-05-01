@@ -22,6 +22,7 @@ use types::Ucs2String;
 
 use super::attribute::NtfsAttribute;
 use super::block_stream::NtfsBlockStream;
+use super::compressed_stream::NtfsCompressedStream;
 use super::constants::*;
 use super::data_fork::NtfsDataFork;
 use super::directory_entry::NtfsDirectoryEntry;
@@ -140,6 +141,7 @@ impl NtfsFileEntry {
             None => 0,
         }
     }
+
     /// Retrieves the journal sequence number.
     pub fn get_journal_sequence_number(&self) -> u64 {
         self.mft_entry.journal_sequence_number
@@ -254,6 +256,12 @@ impl NtfsFileEntry {
             let data_stream: FakeDataStream =
                 FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
             Ok(Some(Arc::new(RwLock::new(data_stream))))
+        } else if data_attribute.is_compressed() {
+            let mut compressed_stream: NtfsCompressedStream =
+                NtfsCompressedStream::new(self.mft.cluster_block_size);
+            compressed_stream.open(&self.data_stream, data_attribute)?;
+
+            Ok(Some(Arc::new(RwLock::new(compressed_stream))))
         } else {
             let mut block_stream: NtfsBlockStream =
                 NtfsBlockStream::new(self.mft.cluster_block_size);
@@ -336,7 +344,6 @@ impl NtfsFileEntry {
         &mut self,
         sub_file_entry_name: &Ucs2String,
     ) -> io::Result<Option<NtfsFileEntry>> {
-        println!("Y: {}", sub_file_entry_name.to_string());
         if !self.has_directory_entries {
             return Ok(None);
         }
@@ -391,6 +398,17 @@ impl NtfsFileEntry {
         self.mft_entry.is_empty
     }
 
+    /// Determines if the file entry is a symbolic link.
+    pub fn is_symbolic_link(&self) -> bool {
+        match &self.directory_entry {
+            Some(directory_entry) => match directory_entry.file_name_attribute.reparse_point_tag {
+                Some(0xa000000c) => true,
+                _ => false,
+            },
+            None => false,
+        }
+    }
+
     /// Reads the directory entries.
     fn read_directory_entries(&mut self) -> io::Result<()> {
         if !self.has_directory_entries {
@@ -435,5 +453,6 @@ mod tests {
     // TODO: add tests for is_allocated
     // TODO: add tests for is_bad
     // TODO: add tests for is_empty
+    // TODO: add tests for is_symbolic_link
     // TODO: add tests for read_directory_entries
 }

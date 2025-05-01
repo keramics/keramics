@@ -515,14 +515,14 @@ fn print_ntfs_file_entry(file_entry: &mut NtfsFileEntry) -> io::Result<()> {
     match file_entry.get_access_time() {
         Some(date_time) => {
             let date_time_string: String = get_date_time_string(date_time)?;
-            println!("    Access time\t\t\t: {}", date_time_string);
+            println!("    Access time\t\t\t\t: {}", date_time_string);
         }
         None => {}
     };
     match file_entry.get_change_time() {
         Some(date_time) => {
             let date_time_string: String = get_date_time_string(date_time)?;
-            println!("    Entry modification time\t\t\t: {}", date_time_string);
+            println!("    Entry modification time\t\t: {}", date_time_string);
         }
         None => {}
     };

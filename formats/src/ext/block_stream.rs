@@ -35,7 +35,7 @@ pub struct ExtBlockStream {
     current_offset: u64,
 
     /// The size.
-    pub size: u64,
+    size: u64,
 }
 
 impl ExtBlockStream {

@@ -29,6 +29,10 @@ use types::{bytes_to_u16_le, bytes_to_u64_le};
         member(field(name = "allocated_data_size", data_type = "u64")),
         member(field(name = "data_size", data_type = "u64")),
         member(field(name = "valid_data_size", data_type = "u64")),
+        member(group(
+            size_condition = "> 48",
+            field(name = "compressed_data_size", data_type = "u64"),
+        )),
     ),
     method(name = "debug_read_data")
 )]
@@ -54,6 +58,9 @@ pub struct NtfsMftAttributeNonResident {
 
     /// Valid data size.
     pub valid_data_size: u64,
+
+    /// Compressed data size.
+    pub compressed_data_size: u64,
 }
 
 impl NtfsMftAttributeNonResident {
@@ -67,6 +74,7 @@ impl NtfsMftAttributeNonResident {
             allocated_data_size: 0,
             data_size: 0,
             valid_data_size: 0,
+            compressed_data_size: 0,
         }
     }
 
@@ -107,6 +115,9 @@ impl NtfsMftAttributeNonResident {
         self.data_size = bytes_to_u64_le!(data, 32);
         self.valid_data_size = bytes_to_u64_le!(data, 40);
 
+        if compression_unit_size > 0 {
+            self.compressed_data_size = bytes_to_u64_le!(data, 48);
+        }
         Ok(())
     }
 }

@@ -66,6 +66,9 @@ pub struct NtfsFileNameAttribute {
 
     /// Name.
     pub name: Ucs2String,
+
+    /// Reparse point tag.
+    pub reparse_point_tag: Option<u32>,
 }
 
 impl NtfsFileNameAttribute {
@@ -82,6 +85,7 @@ impl NtfsFileNameAttribute {
             name_size: 0,
             name_space: 0,
             name: Ucs2String::new(),
+            reparse_point_tag: None,
         }
     }
 
@@ -126,6 +130,10 @@ impl NtfsFileNameAttribute {
         };
         self.data_size = bytes_to_u64_le!(data, 48);
         self.file_attribute_flags = bytes_to_u32_le!(data, 56);
+
+        if self.file_attribute_flags & 0x00000400 != 0 {
+            self.reparse_point_tag = Some(bytes_to_u32_le!(data, 60));
+        }
         self.name_size = data[64];
         self.name_space = data[65];
 
@@ -194,6 +202,7 @@ mod tests {
         assert_eq!(test_struct.name_size, 4);
         assert_eq!(test_struct.name_space, 3);
         assert_eq!(test_struct.name.to_string(), "$MFT");
+        assert!(test_struct.reparse_point_tag.is_none());
 
         Ok(())
     }
