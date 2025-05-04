@@ -113,11 +113,6 @@ impl Ucs2String {
         Ordering::Equal
     }
 
-    /// Compares two UCS-2 strings with case folding.
-    pub fn compare_with_case_folding(&self, other: &Self) -> Ordering {
-        todo!();
-    }
-
     /// Retrieves the string representation of an UCS-2 string.
     pub fn to_string(&self) -> String {
         // TODO: escape the escape character (\)

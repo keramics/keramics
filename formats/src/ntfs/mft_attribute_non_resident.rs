@@ -16,7 +16,7 @@ use std::io;
 use layout_map::LayoutMap;
 use types::{bytes_to_u16_le, bytes_to_u64_le};
 
-// TODO: add value_condition for total_data_size
+// TODO: add value_condition for compressed_data_size
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -29,10 +29,6 @@ use types::{bytes_to_u16_le, bytes_to_u64_le};
         member(field(name = "allocated_data_size", data_type = "u64")),
         member(field(name = "data_size", data_type = "u64")),
         member(field(name = "valid_data_size", data_type = "u64")),
-        member(group(
-            size_condition = "> 48",
-            field(name = "compressed_data_size", data_type = "u64"),
-        )),
     ),
     method(name = "debug_read_data")
 )]

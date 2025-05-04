@@ -13,7 +13,6 @@
 
 use std::fs::{File, Metadata};
 use std::io;
-use std::io::Seek;
 use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};

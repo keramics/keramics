@@ -397,7 +397,13 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
         // TODO: add support for $LOGGED_UTILITY_STREAM
         // TODO: add support for $OBJECT_ID
         // TODO: add support for $PROPERTY_SET
-        // TODO: add support for $REPARSE_POINT
+        NtfsAttribute::ReparsePoint { reparse_point } => {
+            let reparse_tag: u32 = reparse_point.get_reparse_tag();
+            println!("    Reparse tag\t\t\t\t: 0x{:08x}", reparse_tag);
+            // TODO: print tag name
+
+            println!("");
+        }
         // TODO: add support for $SECURITY_DESCRIPTOR
         NtfsAttribute::StandardInformation {
             standard_information,
@@ -534,6 +540,8 @@ fn print_ntfs_file_entry(file_entry: &mut NtfsFileEntry) -> io::Result<()> {
     print_attribute_flags(file_attribute_flags);
 
     println!("");
+
+    // TODO: print information about reparse point
 
     Ok(())
 }

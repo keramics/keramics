@@ -57,14 +57,13 @@ impl DigestHasher {
         let mut data: [u8; 65536] = [0; 65536];
 
         match data_stream.write() {
-            Ok(mut data_stream) => {
-                while let Ok(read_count) = data_stream.read(&mut data) {
-                    if read_count == 0 {
-                        break;
-                    }
-                    hash_context.update(&data[0..read_count]);
+            Ok(mut data_stream) => loop {
+                let read_count = data_stream.read(&mut data)?;
+                if read_count == 0 {
+                    break;
                 }
-            }
+                hash_context.update(&data[0..read_count]);
+            },
             Err(error) => return Err(core::error_to_io_error!(error)),
         };
         Ok(hash_context.finalize())

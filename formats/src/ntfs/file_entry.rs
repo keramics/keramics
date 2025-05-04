@@ -14,22 +14,23 @@
 use std::collections::BTreeMap;
 use std::io;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
 
-use core::{DataStreamReference, FakeDataStream};
+use core::DataStreamReference;
 use datetime::DateTime;
 use types::Ucs2String;
 
 use super::attribute::NtfsAttribute;
-use super::block_stream::NtfsBlockStream;
-use super::compressed_stream::NtfsCompressedStream;
 use super::constants::*;
 use super::data_fork::NtfsDataFork;
 use super::directory_entry::NtfsDirectoryEntry;
 use super::directory_index::NtfsDirectoryIndex;
+use super::file_name::NtfsFileName;
 use super::master_file_table::NtfsMasterFileTable;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_entry::NtfsMftEntry;
+use super::reparse_point::NtfsReparsePoint;
+use super::standard_information::NtfsStandardInformation;
+use super::volume_information::NtfsVolumeInformation;
 
 /// New Technologies File System (NTFS) file entry.
 pub struct NtfsFileEntry {
@@ -103,7 +104,7 @@ impl NtfsFileEntry {
     /// Retrieves the access time from the directory entry $FILE_NAME attribute.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name_attribute.access_time),
+            Some(directory_entry) => Some(&directory_entry.file_name.access_time),
             None => None,
         }
     }
@@ -119,9 +120,7 @@ impl NtfsFileEntry {
     /// Retrieves the change time from the directory entry $FILE_NAME attribute.
     pub fn get_change_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => {
-                Some(&directory_entry.file_name_attribute.entry_modification_time)
-            }
+            Some(directory_entry) => Some(&directory_entry.file_name.entry_modification_time),
             None => None,
         }
     }
@@ -129,7 +128,7 @@ impl NtfsFileEntry {
     /// Retrieves the creation time from the directory entry $FILE_NAME attribute.
     pub fn get_creation_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name_attribute.creation_time),
+            Some(directory_entry) => Some(&directory_entry.file_name.creation_time),
             None => None,
         }
     }
@@ -137,7 +136,7 @@ impl NtfsFileEntry {
     /// Retrieves the file attribute flags.
     pub fn get_file_attribute_flags(&self) -> u32 {
         match &self.directory_entry {
-            Some(directory_entry) => directory_entry.file_name_attribute.file_attribute_flags,
+            Some(directory_entry) => directory_entry.file_name.file_attribute_flags,
             None => 0,
         }
     }
@@ -150,7 +149,7 @@ impl NtfsFileEntry {
     /// Retrieves the modification time from the directory entry $FILE_NAME attribute.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name_attribute.modification_time),
+            Some(directory_entry) => Some(&directory_entry.file_name.modification_time),
             None => None,
         }
     }
@@ -163,10 +162,22 @@ impl NtfsFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match &self.directory_entry {
-            Some(directory_entry) => directory_entry.file_name_attribute.data_size,
+            Some(directory_entry) => directory_entry.file_name.data_size,
             None => 0,
         }
     }
+
+    /// Retrieves the symbolic link target.
+    pub fn get_symbolic_link_target(&mut self) -> io::Result<Option<&Ucs2String>> {
+        match &self.mft_entry.reparse_point {
+            Some(NtfsReparsePoint::SymbolicLink { .. }) => {
+                // TODO: implement
+                todo!();
+            }
+            _ => Ok(None),
+        }
+    }
+
     /// Retrieves the number of attributes.
     pub fn get_number_of_attributes(&self) -> io::Result<usize> {
         Ok(self.mft_entry.attributes.len())
@@ -184,62 +195,61 @@ impl NtfsFileEntry {
                 ));
             }
         };
-        let mut attribute: NtfsAttribute = NtfsAttribute::new(mft_attribute.attribute_type);
-
-        match attribute {
-            NtfsAttribute::FileName { ref mut file_name } => {
-                if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $FILE_NAME attribute.",
-                    ));
+        let attribute: NtfsAttribute = match mft_attribute.attribute_type {
+            NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION => {
+                let standard_information: NtfsStandardInformation =
+                    NtfsStandardInformation::from_attribute(mft_attribute)?;
+                NtfsAttribute::StandardInformation {
+                    standard_information: standard_information,
                 }
-                file_name.read_data(&mft_attribute.resident_data)?;
             }
-            NtfsAttribute::StandardInformation {
-                ref mut standard_information,
-            } => {
-                if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $STANDARD_INFORMATION attribute.",
-                    ));
+            NTFS_ATTRIBUTE_TYPE_FILE_NAME => {
+                let file_name: NtfsFileName = NtfsFileName::from_attribute(mft_attribute)?;
+                NtfsAttribute::FileName {
+                    file_name: file_name,
                 }
-                standard_information.read_data(&mft_attribute.resident_data)?;
             }
-            NtfsAttribute::Undefined { .. } => {}
-            NtfsAttribute::VolumeInformation {
-                ref mut volume_information,
-            } => {
-                if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $VOLUME_INFORMATION attribute.",
-                    ));
+            NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION => {
+                let volume_information: NtfsVolumeInformation =
+                    NtfsVolumeInformation::from_attribute(mft_attribute)?;
+                NtfsAttribute::VolumeInformation {
+                    volume_information: volume_information,
                 }
-                volume_information.read_data(&mft_attribute.resident_data)?;
             }
-            NtfsAttribute::VolumeName {
-                ref mut volume_name,
-            } => {
+            NTFS_ATTRIBUTE_TYPE_VOLUME_NAME => {
                 if !mft_attribute.is_resident() {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Unsupported non-resident $VOLUME_NAME attribute.",
                     ));
                 }
-                Ucs2String::read_elements_le(
-                    &mut volume_name.elements,
-                    &mft_attribute.resident_data,
-                );
+                let volume_name: Ucs2String =
+                    Ucs2String::from_le_bytes(&mft_attribute.resident_data);
+                NtfsAttribute::VolumeName {
+                    volume_name: volume_name,
+                }
             }
+            NTFS_ATTRIBUTE_TYPE_REPARSE_POINT => {
+                let reparse_point: NtfsReparsePoint =
+                    NtfsReparsePoint::from_attribute(mft_attribute)?;
+                NtfsAttribute::ReparsePoint {
+                    reparse_point: reparse_point,
+                }
+            }
+            _ => NtfsAttribute::Undefined {
+                attribute_type: mft_attribute.attribute_type,
+            },
         };
         Ok(attribute)
     }
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
-        self.get_data_stream_by_name(&None)
+        self.mft_entry.get_data_stream_by_name(
+            &None,
+            &self.data_stream,
+            self.mft.cluster_block_size,
+        )
     }
 
     /// Retrieves a data stream with the specified name.
@@ -247,28 +257,8 @@ impl NtfsFileEntry {
         &self,
         name: &Option<Ucs2String>,
     ) -> io::Result<Option<DataStreamReference>> {
-        let data_attribute: &NtfsMftAttribute =
-            match self.mft_entry.get_attribute(name, NTFS_ATTRIBUTE_TYPE_DATA) {
-                Some(data_attribute) => data_attribute,
-                None => return Ok(None),
-            };
-        if data_attribute.is_resident() {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
-            Ok(Some(Arc::new(RwLock::new(data_stream))))
-        } else if data_attribute.is_compressed() {
-            let mut compressed_stream: NtfsCompressedStream =
-                NtfsCompressedStream::new(self.mft.cluster_block_size);
-            compressed_stream.open(&self.data_stream, data_attribute)?;
-
-            Ok(Some(Arc::new(RwLock::new(compressed_stream))))
-        } else {
-            let mut block_stream: NtfsBlockStream =
-                NtfsBlockStream::new(self.mft.cluster_block_size);
-            block_stream.open(&self.data_stream, data_attribute)?;
-
-            Ok(Some(Arc::new(RwLock::new(block_stream))))
-        }
+        self.mft_entry
+            .get_data_stream_by_name(name, &self.data_stream, self.mft.cluster_block_size)
     }
 
     /// Retrieves the number of data forks.
@@ -282,6 +272,7 @@ impl NtfsFileEntry {
             Some(data_attribute) => Ok(NtfsDataFork::new(
                 &self.data_stream,
                 self.mft.cluster_block_size,
+                &self.mft_entry,
                 data_attribute,
             )),
             None => Err(io::Error::new(
@@ -400,12 +391,9 @@ impl NtfsFileEntry {
 
     /// Determines if the file entry is a symbolic link.
     pub fn is_symbolic_link(&self) -> bool {
-        match &self.directory_entry {
-            Some(directory_entry) => match directory_entry.file_name_attribute.reparse_point_tag {
-                Some(0xa000000c) => true,
-                _ => false,
-            },
-            None => false,
+        match &self.mft_entry.reparse_point {
+            Some(NtfsReparsePoint::SymbolicLink { .. }) => true,
+            _ => false,
         }
     }
 

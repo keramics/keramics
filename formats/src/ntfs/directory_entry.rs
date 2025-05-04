@@ -13,7 +13,7 @@
 
 use types::Ucs2String;
 
-use super::file_name_attribute::NtfsFileNameAttribute;
+use super::file_name::NtfsFileName;
 
 #[derive(Clone)]
 /// New Technologies File System (NTFS) directory entry.
@@ -21,25 +21,25 @@ pub struct NtfsDirectoryEntry {
     /// File reference.
     pub file_reference: u64,
 
-    /// File name attribute.
-    pub file_name_attribute: NtfsFileNameAttribute,
+    /// File name.
+    pub file_name: NtfsFileName,
 
-    /// Short file name attribute.
-    pub short_file_name_attribute: Option<NtfsFileNameAttribute>,
+    /// Short file name.
+    pub short_file_name: Option<NtfsFileName>,
 }
 
 impl NtfsDirectoryEntry {
     /// Creates a new directory entry.
-    pub fn new(file_reference: u64, file_name_attribute: NtfsFileNameAttribute) -> Self {
+    pub fn new(file_reference: u64, file_name: NtfsFileName) -> Self {
         Self {
             file_reference: file_reference,
-            file_name_attribute: file_name_attribute,
-            short_file_name_attribute: None,
+            file_name: file_name,
+            short_file_name: None,
         }
     }
 
     /// Rerieves the name.
     pub fn get_name(&self) -> &Ucs2String {
-        &self.file_name_attribute.name
+        &self.file_name.name
     }
 }

@@ -25,7 +25,7 @@ use super::master_file_table::NtfsMasterFileTable;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_entry::NtfsMftEntry;
 use super::path::NtfsPath;
-use super::volume_information_attribute::NtfsVolumeInformationAttribute;
+use super::volume_information::NtfsVolumeInformation;
 
 /// New Technologies File System (NTFS).
 pub struct NtfsFileSystem {
@@ -50,8 +50,8 @@ pub struct NtfsFileSystem {
     /// Case folding mappings.
     case_folding_mappings: Rc<Vec<u16>>,
 
-    /// $VOLUME_INFORMATION attribute of the "$Volume" metadata file.
-    volume_information_attribute: Option<NtfsVolumeInformationAttribute>,
+    /// Volume information from the $VOLUME_INFORMATION attribute of the "$Volume" metadata file.
+    volume_information: Option<NtfsVolumeInformation>,
 
     /// Volume label from the $VOLUME_NAME attribute of the "$Volume" metadata file.
     volume_label: Option<Ucs2String>,
@@ -71,7 +71,7 @@ impl NtfsFileSystem {
             index_entry_size: 0,
             mft: Rc::new(NtfsMasterFileTable::new()),
             case_folding_mappings: Rc::new(Vec::with_capacity(65536)),
-            volume_information_attribute: None,
+            volume_information: None,
             volume_label: None,
             volume_serial_number: 0,
         }
@@ -79,10 +79,10 @@ impl NtfsFileSystem {
 
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> Option<(u8, u8)> {
-        match &self.volume_information_attribute {
-            Some(volume_information_attribute) => Some((
-                volume_information_attribute.major_format_version,
-                volume_information_attribute.minor_format_version,
+        match &self.volume_information {
+            Some(volume_information) => Some((
+                volume_information.major_format_version,
+                volume_information.minor_format_version,
             )),
             None => None,
         }
@@ -90,8 +90,8 @@ impl NtfsFileSystem {
 
     /// Retrieves the volume flags.
     pub fn get_volume_flags(&self) -> Option<u16> {
-        match &self.volume_information_attribute {
-            Some(volume_information_attribute) => Some(volume_information_attribute.volume_flags),
+        match &self.volume_information {
+            Some(volume_information) => Some(volume_information.volume_flags),
             None => None,
         }
     }
@@ -363,23 +363,10 @@ impl NtfsFileSystem {
         };
         match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
             Some(mft_attribute) => {
-                if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $VOLUME_INFORMATION attribute.",
-                    ));
-                }
-                if mft_attribute.is_compressed() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported compressed $VOLUME_INFORMATION attribute.",
-                    ));
-                }
-                let mut volume_information_attribute: NtfsVolumeInformationAttribute =
-                    NtfsVolumeInformationAttribute::new();
-                volume_information_attribute.read_data(&mft_attribute.resident_data)?;
+                let volume_information: NtfsVolumeInformation =
+                    NtfsVolumeInformation::from_attribute(mft_attribute)?;
 
-                self.volume_information_attribute = Some(volume_information_attribute);
+                self.volume_information = Some(volume_information);
             }
             None => {}
         };

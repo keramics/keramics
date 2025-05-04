@@ -24,16 +24,15 @@ fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, Strin
     let mut offset: u64 = 0;
 
     match data_stream.write() {
-        Ok(mut data_stream) => {
-            while let Ok(read_count) = data_stream.read(&mut data) {
-                if read_count == 0 {
-                    break;
-                }
-                md5_context.update(&data[..read_count]);
-
-                offset += read_count as u64;
+        Ok(mut data_stream) => loop {
+            let read_count = data_stream.read(&mut data)?;
+            if read_count == 0 {
+                break;
             }
-        }
+            md5_context.update(&data[..read_count]);
+
+            offset += read_count as u64;
+        },
         Err(error) => return Err(core::error_to_io_error!(error)),
     };
     let hash_value: Vec<u8> = md5_context.finalize();

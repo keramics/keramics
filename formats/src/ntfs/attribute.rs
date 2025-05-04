@@ -14,23 +14,27 @@
 use types::Ucs2String;
 
 use super::constants::*;
-use super::file_name_attribute::NtfsFileNameAttribute;
-use super::standard_information_attribute::NtfsStandardInformationAttribute;
-use super::volume_information_attribute::NtfsVolumeInformationAttribute;
+use super::file_name::NtfsFileName;
+use super::reparse_point::NtfsReparsePoint;
+use super::standard_information::NtfsStandardInformation;
+use super::volume_information::NtfsVolumeInformation;
 
 /// New Technologies File System (NTFS) attribute.
 pub enum NtfsAttribute {
     FileName {
-        file_name: NtfsFileNameAttribute,
+        file_name: NtfsFileName,
+    },
+    ReparsePoint {
+        reparse_point: NtfsReparsePoint,
     },
     StandardInformation {
-        standard_information: NtfsStandardInformationAttribute,
+        standard_information: NtfsStandardInformation,
     },
     Undefined {
         attribute_type: u32,
     },
     VolumeInformation {
-        volume_information: NtfsVolumeInformationAttribute,
+        volume_information: NtfsVolumeInformation,
     },
     VolumeName {
         volume_name: Ucs2String,
@@ -38,31 +42,11 @@ pub enum NtfsAttribute {
 }
 
 impl NtfsAttribute {
-    /// Creates a new attribute.
-    pub(super) fn new(attribute_type: u32) -> Self {
-        match attribute_type {
-            NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION => NtfsAttribute::StandardInformation {
-                standard_information: NtfsStandardInformationAttribute::new(),
-            },
-            NTFS_ATTRIBUTE_TYPE_FILE_NAME => NtfsAttribute::FileName {
-                file_name: NtfsFileNameAttribute::new(),
-            },
-            NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION => NtfsAttribute::VolumeInformation {
-                volume_information: NtfsVolumeInformationAttribute::new(),
-            },
-            NTFS_ATTRIBUTE_TYPE_VOLUME_NAME => NtfsAttribute::VolumeName {
-                volume_name: Ucs2String::new(),
-            },
-            _ => NtfsAttribute::Undefined {
-                attribute_type: attribute_type,
-            },
-        }
-    }
-
     /// Retrieves the attribute type.
     pub fn get_attribute_type(&self) -> u32 {
         match self {
             NtfsAttribute::FileName { .. } => NTFS_ATTRIBUTE_TYPE_FILE_NAME,
+            NtfsAttribute::ReparsePoint { .. } => NTFS_ATTRIBUTE_TYPE_REPARSE_POINT,
             NtfsAttribute::StandardInformation { .. } => NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION,
             NtfsAttribute::Undefined { attribute_type } => *attribute_type,
             NtfsAttribute::VolumeInformation { .. } => NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION,
