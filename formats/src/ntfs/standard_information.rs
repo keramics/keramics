@@ -15,31 +15,32 @@ use std::io;
 
 use datetime::{DateTime, Filetime};
 use layout_map::LayoutMap;
-use types::{bytes_to_u32_le, bytes_to_u64_le, Ucs2String};
+use types::bytes_to_u32_le;
 
-#[derive(Clone, LayoutMap)]
+use super::constants::*;
+use super::mft_attribute::NtfsMftAttribute;
+
+#[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "parent_file_reference", data_type = "u64", format = "hex")),
         member(field(name = "creation_time", data_type = "Filetime")),
         member(field(name = "modification_time", data_type = "Filetime")),
         member(field(name = "entry_modification_time", data_type = "Filetime")),
         member(field(name = "access_time", data_type = "Filetime")),
-        member(field(name = "allocated_data_size", data_type = "u64")),
-        member(field(name = "data_size", data_type = "u64")),
         member(field(name = "file_attribute_flags", data_type = "u32", format = "hex")),
-        member(field(name = "extended_data", data_type = "[u8; 4]")),
-        member(field(name = "name_size", data_type = "u8")),
-        member(field(name = "name_space", data_type = "u8")),
+        member(field(name = "maximum_number_of_versions", data_type = "u32")),
+        member(field(name = "version_number", data_type = "u32")),
+        member(field(name = "class_identifier", data_type = "u32")),
+        member(field(name = "owner_identifier", data_type = "u32")),
+        member(field(name = "security_descriptor_identifier", data_type = "u32")),
+        member(field(name = "quota_charged", data_type = "[u8; 8]")),
+        member(field(name = "update_sequence_number", data_type = "u64")),
     ),
     method(name = "debug_read_data")
 )]
-/// New Technologies File System (NTFS) file name attribute ($FILE_NAME).
-pub struct NtfsFileNameAttribute {
-    /// Parent file reference.
-    pub parent_file_reference: u64,
-
+/// New Technologies File System (NTFS) standard information ($STANDARD_INFORMATION).
+pub struct NtfsStandardInformation {
     /// Creation time.
     pub creation_time: DateTime,
 
@@ -52,103 +53,94 @@ pub struct NtfsFileNameAttribute {
     /// Access time.
     pub access_time: DateTime,
 
-    /// Data size.
-    pub data_size: u64,
-
     /// File attribute flags.
     pub file_attribute_flags: u32,
 
-    /// Name size.
-    pub name_size: u8,
+    /// Maximum number of versions.
+    pub maximum_number_of_versions: u32,
 
-    /// Name space.
-    pub name_space: u8,
-
-    /// Name.
-    pub name: Ucs2String,
-
-    /// Reparse point tag.
-    pub reparse_point_tag: Option<u32>,
+    /// Version number.
+    pub version_number: u32,
 }
 
-impl NtfsFileNameAttribute {
-    /// Creates a new attribute.
+impl NtfsStandardInformation {
+    /// Creates new standard information.
     pub fn new() -> Self {
         Self {
-            parent_file_reference: 0,
             creation_time: DateTime::NotSet,
             modification_time: DateTime::NotSet,
             entry_modification_time: DateTime::NotSet,
             access_time: DateTime::NotSet,
-            data_size: 0,
             file_attribute_flags: 0,
-            name_size: 0,
-            name_space: 0,
-            name: Ucs2String::new(),
-            reparse_point_tag: None,
+            maximum_number_of_versions: 0,
+            version_number: 0,
         }
     }
 
-    /// Reads the attribute from a buffer.
+    /// Reads the standard information from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
-        let data_size: usize = data.len();
-        if data_size < 66 {
+        if data.len() < 48 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!("Unsupported data size"),
             ));
         }
-        self.parent_file_reference = bytes_to_u64_le!(data, 0);
-
-        let filetime: Filetime = Filetime::from_bytes(&data[8..]);
+        let filetime: Filetime = Filetime::from_bytes(&data);
 
         self.creation_time = if filetime.timestamp == 0 {
             DateTime::NotSet
         } else {
             DateTime::Filetime(filetime)
         };
-        let filetime: Filetime = Filetime::from_bytes(&data[16..]);
+        let filetime: Filetime = Filetime::from_bytes(&data[8..]);
 
         self.modification_time = if filetime.timestamp == 0 {
             DateTime::NotSet
         } else {
             DateTime::Filetime(filetime)
         };
-        let filetime: Filetime = Filetime::from_bytes(&data[24..]);
+        let filetime: Filetime = Filetime::from_bytes(&data[16..]);
 
         self.entry_modification_time = if filetime.timestamp == 0 {
             DateTime::NotSet
         } else {
             DateTime::Filetime(filetime)
         };
-        let filetime: Filetime = Filetime::from_bytes(&data[32..]);
+        let filetime: Filetime = Filetime::from_bytes(&data[24..]);
 
         self.access_time = if filetime.timestamp == 0 {
             DateTime::NotSet
         } else {
             DateTime::Filetime(filetime)
         };
-        self.data_size = bytes_to_u64_le!(data, 48);
-        self.file_attribute_flags = bytes_to_u32_le!(data, 56);
+        self.file_attribute_flags = bytes_to_u32_le!(data, 32);
+        self.maximum_number_of_versions = bytes_to_u32_le!(data, 36);
+        self.version_number = bytes_to_u32_le!(data, 40);
 
-        if self.file_attribute_flags & 0x00000400 != 0 {
-            self.reparse_point_tag = Some(bytes_to_u32_le!(data, 60));
-        }
-        self.name_size = data[64];
-        self.name_space = data[65];
-
-        if data_size > 66 {
-            let data_end_offset: usize = 66 + (self.name_size as usize) * 2;
-
-            if data_end_offset > data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported data size"),
-                ));
-            }
-            Ucs2String::read_elements_le(&mut self.name.elements, &data[66..data_end_offset]);
-        }
         Ok(())
+    }
+
+    /// Reads the standard information from a MFT attribute.
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> io::Result<Self> {
+        if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Unsupported attribute type: 0x{:08x}.",
+                    mft_attribute.attribute_type
+                ),
+            ));
+        }
+        if !mft_attribute.is_resident() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported non-resident $STANDARD_INFORMATION attribute.",
+            ));
+        }
+        let mut standard_information: NtfsStandardInformation = NtfsStandardInformation::new();
+        standard_information.read_data(&mft_attribute.resident_data)?;
+
+        Ok(standard_information)
     }
 }
 
@@ -158,51 +150,49 @@ mod tests {
 
     fn get_test_data() -> Vec<u8> {
         return vec![
-            0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e,
+            0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e,
             0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c,
-            0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0x00, 0x40,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x24, 0x00, 0x4d, 0x00,
-            0x46, 0x00, 0x54, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xdc, 0x8e, 0xd0, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
         ];
     }
 
     #[test]
     fn test_read_data() -> io::Result<()> {
-        let mut test_struct = NtfsFileNameAttribute::new();
+        let mut test_struct = NtfsStandardInformation::new();
 
         let test_data: Vec<u8> = get_test_data();
         test_struct.read_data(&test_data)?;
 
-        assert_eq!(test_struct.parent_file_reference, 0x0005000000000005);
         assert_eq!(
             test_struct.creation_time,
             DateTime::Filetime(Filetime {
-                timestamp: 0x01d08edc0cbccaad,
+                timestamp: 0x01d08edc0cbccaad
             })
         );
         assert_eq!(
             test_struct.modification_time,
             DateTime::Filetime(Filetime {
-                timestamp: 0x01d08edc0cbccaad,
+                timestamp: 0x01d08edc0cbccaad
             })
         );
         assert_eq!(
             test_struct.entry_modification_time,
             DateTime::Filetime(Filetime {
-                timestamp: 0x01d08edc0cbccaad,
+                timestamp: 0x01d08edc0cbccaad
             })
         );
         assert_eq!(
             test_struct.access_time,
             DateTime::Filetime(Filetime {
-                timestamp: 0x01d08edc0cbccaad,
+                timestamp: 0x01d08edc0cbccaad
             })
         );
-        assert_eq!(test_struct.name_size, 4);
-        assert_eq!(test_struct.name_space, 3);
-        assert_eq!(test_struct.name.to_string(), "$MFT");
-        assert!(test_struct.reparse_point_tag.is_none());
+        assert_eq!(test_struct.file_attribute_flags, 0x00000006);
+        assert_eq!(test_struct.maximum_number_of_versions, 0);
+        assert_eq!(test_struct.version_number, 0);
 
         Ok(())
     }
@@ -211,8 +201,10 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = NtfsFileNameAttribute::new();
-        let result = test_struct.read_data(&test_data[0..65]);
+        let mut test_struct = NtfsStandardInformation::new();
+        let result = test_struct.read_data(&test_data[0..47]);
         assert!(result.is_err());
     }
+
+    // TODO: add tests for from_attribute
 }

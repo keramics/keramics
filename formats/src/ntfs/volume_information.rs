@@ -16,6 +16,9 @@ use std::io;
 use layout_map::LayoutMap;
 use types::bytes_to_u16_le;
 
+use super::constants::*;
+use super::mft_attribute::NtfsMftAttribute;
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -27,8 +30,8 @@ use types::bytes_to_u16_le;
     ),
     method(name = "debug_read_data")
 )]
-/// New Technologies File System (NTFS) volume information attribute ($VOLUME_INFORMATION).
-pub struct NtfsVolumeInformationAttribute {
+/// New Technologies File System (NTFS) volume information ($VOLUME_INFORMATION).
+pub struct NtfsVolumeInformation {
     /// Major format version
     pub major_format_version: u8,
 
@@ -39,8 +42,8 @@ pub struct NtfsVolumeInformationAttribute {
     pub volume_flags: u16,
 }
 
-impl NtfsVolumeInformationAttribute {
-    /// Creates a new attribute.
+impl NtfsVolumeInformation {
+    /// Creates new volume information.
     pub fn new() -> Self {
         Self {
             major_format_version: 0,
@@ -49,7 +52,7 @@ impl NtfsVolumeInformationAttribute {
         }
     }
 
-    /// Reads the attribute from a buffer.
+    /// Reads the volume information from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         if data.len() < 12 {
             return Err(io::Error::new(
@@ -62,6 +65,35 @@ impl NtfsVolumeInformationAttribute {
         self.volume_flags = bytes_to_u16_le!(data, 10);
 
         Ok(())
+    }
+
+    /// Reads the volume information from a MFT attribute.
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> io::Result<Self> {
+        if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Unsupported attribute type: 0x{:08x}.",
+                    mft_attribute.attribute_type
+                ),
+            ));
+        }
+        if mft_attribute.is_compressed() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported compressed $VOLUME_INFORMATION attribute.",
+            ));
+        }
+        if !mft_attribute.is_resident() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported non-resident $VOLUME_INFORMATION attribute.",
+            ));
+        }
+        let mut volume_information: NtfsVolumeInformation = NtfsVolumeInformation::new();
+        volume_information.read_data(&mft_attribute.resident_data)?;
+
+        Ok(volume_information)
     }
 }
 
@@ -77,7 +109,7 @@ mod tests {
 
     #[test]
     fn test_read_data() -> io::Result<()> {
-        let mut test_struct = NtfsVolumeInformationAttribute::new();
+        let mut test_struct = NtfsVolumeInformation::new();
 
         let test_data: Vec<u8> = get_test_data();
         test_struct.read_data(&test_data)?;
@@ -93,8 +125,10 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = NtfsVolumeInformationAttribute::new();
+        let mut test_struct = NtfsVolumeInformation::new();
         let result = test_struct.read_data(&test_data[0..11]);
         assert!(result.is_err());
     }
+
+    // TODO: add tests for from_attribute
 }

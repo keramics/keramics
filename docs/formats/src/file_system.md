@@ -18,3 +18,10 @@ TODO
 ### Extended attribute
 
 TODO
+
+### Reparse point
+
+NTFS and ReFS use reparse points to extend the file system.
+
+* https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-points
+* https://en.wikipedia.org/wiki/NTFS_reparse_point

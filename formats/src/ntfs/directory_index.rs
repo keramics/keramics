@@ -22,7 +22,7 @@ use types::{bytes_to_u64_le, Ucs2String};
 
 use super::constants::*;
 use super::directory_entry::NtfsDirectoryEntry;
-use super::file_name_attribute::NtfsFileNameAttribute;
+use super::file_name::NtfsFileName;
 use super::index::NtfsIndex;
 use super::index_entry::NtfsIndexEntry;
 use super::index_node_header::NtfsIndexNodeHeader;
@@ -31,7 +31,7 @@ use super::index_value::NtfsIndexValue;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_attribute_group::NtfsMftAttributeGroup;
 use super::mft_entry::NtfsMftEntry;
-use super::standard_information_attribute::NtfsStandardInformationAttribute;
+use super::standard_information::NtfsStandardInformation;
 
 /// New Technologies File System (NTFS) directory index.
 pub struct NtfsDirectoryIndex {
@@ -142,15 +142,8 @@ impl NtfsDirectoryIndex {
         }
         match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
             Some(mft_attribute) => {
-                if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $STANDARD_INFORMATION attribute.",
-                    ));
-                }
-                let mut standard_information: NtfsStandardInformationAttribute =
-                    NtfsStandardInformationAttribute::new();
-                standard_information.read_data(&mft_attribute.resident_data)?;
+                let standard_information: NtfsStandardInformation =
+                    NtfsStandardInformation::from_attribute(mft_attribute)?;
 
                 if standard_information.maximum_number_of_versions == 0
                     && standard_information.version_number == 1
@@ -254,13 +247,13 @@ impl NtfsDirectoryIndex {
                 index_value_offset = key_data_end_offset;
             }
             if key_data_size > 0 {
-                let file_name_attribute: NtfsFileNameAttribute =
+                let file_name: NtfsFileName =
                     self.read_index_key(data, key_data_offset, key_data_size)?;
 
                 let result: Ordering = if self.use_case_folding {
                     let mut case_folded_name: Ucs2String = Ucs2String::new();
 
-                    for element in file_name_attribute.name.elements.iter() {
+                    for element in file_name.name.elements.iter() {
                         case_folded_name
                             .elements
                             .push(self.case_folding_mappings[*element as usize]);
@@ -268,11 +261,11 @@ impl NtfsDirectoryIndex {
                     // TODO: add a compare_with_case_folding
                     case_folded_name.compare(name)
                 } else {
-                    file_name_attribute.name.compare(name)
+                    file_name.name.compare(name)
                 };
                 if result == Ordering::Equal {
                     let directory_entry: NtfsDirectoryEntry =
-                        NtfsDirectoryEntry::new(index_value.file_reference, file_name_attribute);
+                        NtfsDirectoryEntry::new(index_value.file_reference, file_name);
                     return Ok(Some(directory_entry));
                 }
                 if result == Ordering::Less
@@ -398,58 +391,50 @@ impl NtfsDirectoryIndex {
             if index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_LAST != 0 {
                 break;
             }
-            let file_name_attribute: NtfsFileNameAttribute =
+            let file_name: NtfsFileName =
                 self.read_index_key(data, key_data_offset, key_data_size)?;
 
-            if file_name_attribute.name_size == 1 && file_name_attribute.name.elements[0] == 0x002e
-            {
+            if file_name.name_size == 1 && file_name.name.elements[0] == 0x002e {
                 // Ignore "."
             } else {
                 match entries.remove(&index_value.file_reference) {
                     Some(mut existing_directory_entry) => {
-                        if existing_directory_entry.file_name_attribute.name_space
-                            == NTFS_NAME_SPACE_DOS
-                        {
-                            if file_name_attribute.name_space == NTFS_NAME_SPACE_DOS {
+                        if existing_directory_entry.file_name.name_space == NTFS_NAME_SPACE_DOS {
+                            if file_name.name_space == NTFS_NAME_SPACE_DOS {
                                 return Err(io::Error::new(
                                         io::ErrorKind::InvalidData,
                                         format!(
-                                            "Invalid directory entry: {}-{} - short file name attribute already set",
+                                            "Invalid directory entry: {}-{} - short file name already set",
                                             index_value.file_reference & 0x0000ffffffffffff,
                                             index_value.file_reference >> 48,
                                         ),
                                     ));
                             }
-                            let mut directory_entry: NtfsDirectoryEntry = NtfsDirectoryEntry::new(
-                                index_value.file_reference,
-                                file_name_attribute,
-                            );
-                            directory_entry.short_file_name_attribute =
-                                Some(existing_directory_entry.file_name_attribute);
+                            let mut directory_entry: NtfsDirectoryEntry =
+                                NtfsDirectoryEntry::new(index_value.file_reference, file_name);
+                            directory_entry.short_file_name =
+                                Some(existing_directory_entry.file_name);
 
                             entries.insert(index_value.file_reference, directory_entry);
                         } else {
-                            if file_name_attribute.name_space != NTFS_NAME_SPACE_DOS {
+                            if file_name.name_space != NTFS_NAME_SPACE_DOS {
                                 return Err(io::Error::new(
-                                        io::ErrorKind::InvalidData,
-                                        format!(
-                                            "Invalid directory entry: {}-{} - file name attribute already set",
-                                            index_value.file_reference & 0x0000ffffffffffff,
-                                            index_value.file_reference >> 48,
-                                        ),
-                                    ));
+                                    io::ErrorKind::InvalidData,
+                                    format!(
+                                        "Invalid directory entry: {}-{} - file name already set",
+                                        index_value.file_reference & 0x0000ffffffffffff,
+                                        index_value.file_reference >> 48,
+                                    ),
+                                ));
                             }
-                            existing_directory_entry.short_file_name_attribute =
-                                Some(file_name_attribute);
+                            existing_directory_entry.short_file_name = Some(file_name);
 
                             entries.insert(index_value.file_reference, existing_directory_entry);
                         }
                     }
                     None => {
-                        let directory_entry: NtfsDirectoryEntry = NtfsDirectoryEntry::new(
-                            index_value.file_reference,
-                            file_name_attribute,
-                        );
+                        let directory_entry: NtfsDirectoryEntry =
+                            NtfsDirectoryEntry::new(index_value.file_reference, file_name);
                         entries.insert(index_value.file_reference, directory_entry);
                     }
                 }
@@ -503,7 +488,7 @@ impl NtfsDirectoryIndex {
         data: &[u8],
         key_data_offset: usize,
         key_data_size: usize,
-    ) -> io::Result<NtfsFileNameAttribute> {
+    ) -> io::Result<NtfsFileName> {
         let key_data_end_offset: usize = key_data_offset + key_data_size;
 
         if self.mediator.debug_output {
@@ -515,15 +500,14 @@ impl NtfsDirectoryIndex {
                 .debug_print_data(&data[key_data_offset..key_data_end_offset], true);
         }
         if self.mediator.debug_output {
-            self.mediator
-                .debug_print(NtfsFileNameAttribute::debug_read_data(
-                    &data[key_data_offset..key_data_end_offset],
-                ));
+            self.mediator.debug_print(NtfsFileName::debug_read_data(
+                &data[key_data_offset..key_data_end_offset],
+            ));
         }
-        let mut file_name_attribute: NtfsFileNameAttribute = NtfsFileNameAttribute::new();
-        file_name_attribute.read_data(&data[key_data_offset..key_data_end_offset])?;
+        let mut file_name: NtfsFileName = NtfsFileName::new();
+        file_name.read_data(&data[key_data_offset..key_data_end_offset])?;
 
-        Ok(file_name_attribute)
+        Ok(file_name)
     }
 
     /// Reads an index node header.

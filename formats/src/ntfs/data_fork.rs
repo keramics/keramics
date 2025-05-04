@@ -12,14 +12,12 @@
  */
 
 use std::io;
-use std::sync::{Arc, RwLock};
 
-use core::{DataStreamReference, FakeDataStream};
+use core::DataStreamReference;
 use types::Ucs2String;
 
-use super::block_stream::NtfsBlockStream;
-use super::compressed_stream::NtfsCompressedStream;
 use super::mft_attribute::NtfsMftAttribute;
+use super::mft_entry::NtfsMftEntry;
 
 /// New Technologies File System (NTFS) data fork.
 pub struct NtfsDataFork<'a> {
@@ -28,6 +26,9 @@ pub struct NtfsDataFork<'a> {
 
     /// Cluster block size.
     cluster_block_size: u32,
+
+    /// The MFT entry.
+    mft_entry: &'a NtfsMftEntry,
 
     /// The $DATA attribute.
     data_attribute: &'a NtfsMftAttribute,
@@ -38,34 +39,29 @@ impl<'a> NtfsDataFork<'a> {
     pub fn new(
         data_stream: &DataStreamReference,
         cluster_block_size: u32,
+        mft_entry: &'a NtfsMftEntry,
         data_attribute: &'a NtfsMftAttribute,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             cluster_block_size: cluster_block_size,
+            mft_entry: mft_entry,
             data_attribute: data_attribute,
         }
     }
 
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> io::Result<DataStreamReference> {
-        if self.data_attribute.is_resident() {
-            let data_stream: FakeDataStream = FakeDataStream::new(
-                &self.data_attribute.resident_data,
-                self.data_attribute.data_size,
-            );
-            Ok(Arc::new(RwLock::new(data_stream)))
-        } else if self.data_attribute.is_compressed() {
-            let mut compressed_stream: NtfsCompressedStream =
-                NtfsCompressedStream::new(self.cluster_block_size);
-            compressed_stream.open(&self.data_stream, self.data_attribute)?;
-
-            Ok(Arc::new(RwLock::new(compressed_stream)))
-        } else {
-            let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
-            block_stream.open(&self.data_stream, self.data_attribute)?;
-
-            Ok(Arc::new(RwLock::new(block_stream)))
+        match self.mft_entry.get_data_stream_by_name(
+            &self.data_attribute.name,
+            &self.data_stream,
+            self.cluster_block_size,
+        )? {
+            Some(data_stream) => Ok(data_stream),
+            None => Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                "Missing data stream",
+            )),
         }
     }
 

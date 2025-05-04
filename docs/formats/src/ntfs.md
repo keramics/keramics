@@ -1413,11 +1413,11 @@ is of variable size and consists of:
 | --- | --- | --- | ---
 | 0 | 2 | | Substitute name offset, where the offset is relative from the start of the reparse name data
 | 2 | 2 | | Substitute name size in bytes, where the size of the end-of-string character is not included
-| 4 | 2 | | Print name offset, where the offset is relative from the start of the reparse name data
-| 6 | 2 | | Print name size in bytes, where the size of the end-of-string character is not included
+| 4 | 2 | | Display name offset, where the offset is relative from the start of the reparse name data
+| 6 | 2 | | Display name size in bytes, where the size of the end-of-string character is not included
 | <td colspan="4"> *Reparse name data*
 | 8 | ... | | Substitute name, which contains an UCS-2 little-endian string without end-of-string character
-| ... | ... | | Print name, which contains an UCS-2 little-endian string without end-of-string character
+| ... | ... | | Display name, which contains an UCS-2 little-endian string without end-of-string character
 
 > Note that it is currently unclear if the names contain an end-of-string
 > character or if they are followed by alignment padding.
@@ -1433,7 +1433,7 @@ TODO: determine what character values like 0x0002 represent in the substitute na
 
 ### <a name="symbolic_link_reparse_data"></a>Symbolic link reparse data
 
-A reparse point with tag IO_REPARSE_TAG_SYMLINK (0xa000000c0) contains symbolic
+A reparse point with tag IO_REPARSE_TAG_SYMLINK (0xa000000c) contains symbolic
 link reparse data. The symbolic link reparse data is of variable size and
 consists of:
 
@@ -1441,12 +1441,12 @@ consists of:
 | --- | --- | --- | ---
 | 0 | 2 | | Substitute name offset, where the offset is relative from the start of the reparse name data
 | 2 | 2 | | Substitute name size in bytes
-| 4 | 2 | | Print name offset, where the offset is relative from the start of the reparse name data
-| 6 | 2 | | Print name size, in bytes
+| 4 | 2 | | Display name offset, where the offset is relative from the start of the reparse name data
+| 6 | 2 | | Display name size, in bytes
 | 8 | 4 | | Symbolic link flags
 | <td colspan="4"> *Reparse name data*
 | 12 | ... | | Substitute name, which contains an UCS-2 little-endian string without end-of-string character
-| ... | ... | | Print name, which contains an UCS-2 little-endian string without end-of-string character
+| ... | ... | | Display name, which contains an UCS-2 little-endian string without end-of-string character
 
 #### Symbolic link flags
 

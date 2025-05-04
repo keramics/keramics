@@ -13,16 +13,21 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::sync::{Arc, RwLock};
 
 use core::mediator::{Mediator, MediatorReference};
-use core::DataStreamReference;
+use core::{DataStreamReference, FakeDataStream};
 use types::Ucs2String;
 
+use super::block_stream::NtfsBlockStream;
+use super::compressed_stream::NtfsCompressedStream;
 use super::constants::*;
 use super::fixup_values::apply_fixup_values;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_attribute_group::NtfsMftAttributeGroup;
 use super::mft_entry_header::NtfsMftEntryHeader;
+use super::reparse_point::NtfsReparsePoint;
+use super::wof_compressed_stream::NtfsWofCompressedStream;
 
 const END_OF_ATTRIBUTES_MARKER: [u8; 4] = [0xff; 4];
 
@@ -64,6 +69,9 @@ pub struct NtfsMftEntry {
     /// Indexes of data attributes in the attributes vector.
     data_attributes: Vec<usize>,
 
+    /// Reparse point.
+    pub reparse_point: Option<NtfsReparsePoint>,
+
     /// Value to indicate the attributes were read.
     read_attributes: bool,
 }
@@ -84,6 +92,7 @@ impl NtfsMftEntry {
             attributes: Vec::new(),
             attribute_groups: HashMap::new(),
             data_attributes: Vec::new(),
+            reparse_point: None,
             read_attributes: false,
         }
     }
@@ -190,6 +199,71 @@ impl NtfsMftEntry {
         }
     }
 
+    /// Retrieves a data stream with the specified name.
+    pub fn get_data_stream_by_name(
+        &self,
+        name: &Option<Ucs2String>,
+        data_stream: &DataStreamReference,
+        cluster_block_size: u32,
+    ) -> io::Result<Option<DataStreamReference>> {
+        let data_attribute: &NtfsMftAttribute =
+            match self.get_attribute(name, NTFS_ATTRIBUTE_TYPE_DATA) {
+                Some(data_attribute) => data_attribute,
+                None => return Ok(None),
+            };
+
+        let wof_compression_method: Option<u32> = match &self.reparse_point {
+            Some(NtfsReparsePoint::WindowsOverlayFilter { reparse_data }) => match name {
+                None => Some(reparse_data.compression_method),
+                _ => None,
+            },
+            _ => None,
+        };
+        if let Some(compression_method) = wof_compression_method {
+            if data_attribute.is_resident() {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Unsupported resident $DATA attribute.",
+                ));
+            }
+            let attribute_name: Ucs2String = Ucs2String::from_string("WofCompressedData");
+            let wof_data_attribute: &NtfsMftAttribute =
+                match self.get_attribute(&Some(attribute_name), NTFS_ATTRIBUTE_TYPE_DATA) {
+                    Some(mft_attribute) => mft_attribute,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing WofCompressedData $DATA attribute",
+                        ))
+                    }
+                };
+            let mut wof_compressed_stream: NtfsWofCompressedStream =
+                NtfsWofCompressedStream::new(cluster_block_size, compression_method);
+            wof_compressed_stream.open(
+                data_stream,
+                wof_data_attribute,
+                data_attribute.valid_data_size,
+            )?;
+
+            Ok(Some(Arc::new(RwLock::new(wof_compressed_stream))))
+        } else if data_attribute.is_compressed() {
+            let mut compressed_stream: NtfsCompressedStream =
+                NtfsCompressedStream::new(cluster_block_size);
+            compressed_stream.open(data_stream, data_attribute)?;
+
+            Ok(Some(Arc::new(RwLock::new(compressed_stream))))
+        } else if data_attribute.is_resident() {
+            let data_stream: FakeDataStream =
+                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
+            Ok(Some(Arc::new(RwLock::new(data_stream))))
+        } else {
+            let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
+            block_stream.open(data_stream, data_attribute)?;
+
+            Ok(Some(Arc::new(RwLock::new(block_stream))))
+        }
+    }
+
     /// Retrieves the number of data attributes.
     pub fn get_number_of_data_attributes(&self) -> usize {
         self.data_attributes.len()
@@ -224,6 +298,13 @@ impl NtfsMftEntry {
 
                 // TODO: handle attributes list
 
+                if mft_attribute.attribute_type == NTFS_ATTRIBUTE_TYPE_REPARSE_POINT
+                    && mft_attribute.name.is_none()
+                {
+                    let reparse_point: NtfsReparsePoint =
+                        NtfsReparsePoint::from_attribute(&mft_attribute)?;
+                    self.reparse_point = Some(reparse_point);
+                }
                 self.add_attribute(mft_attribute)?;
             }
             self.read_attributes = true;
@@ -442,6 +523,7 @@ mod tests {
     // TODO: add tests for get_attribute_for_group
     // TODO: add tests for get_attribute_group
     // TODO: add tests for get_data_attribute_by_index
+    // TODO: add tests for get_data_stream_by_name
     // TODO: add tests for get_number_of_data_attributes
     // TODO: add tests for has_attribute_group
 
@@ -518,4 +600,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read_reparse_point_attribute
 }
