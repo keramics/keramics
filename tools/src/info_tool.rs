@@ -13,6 +13,7 @@
 
 use std::collections::HashSet;
 use std::io;
+use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, RwLock};
 
@@ -29,7 +30,7 @@ mod range_stream;
 use range_stream::FileRangeDataStream;
 
 #[derive(Parser)]
-#[command(version, about = "Provides information about a supported file format", long_about = None)]
+#[command(version, about = "Provides information about file formats", long_about = None)]
 struct CommandLineArguments {
     #[arg(long, default_value_t = false)]
     /// Enable debug output
@@ -40,7 +41,7 @@ struct CommandLineArguments {
     offset: u64,
 
     /// Path of the source file
-    source: std::path::PathBuf,
+    source: PathBuf,
 
     #[command(subcommand)]
     command: Option<Commands>,
@@ -205,6 +206,8 @@ fn main() -> ExitCode {
             }
         },
         Some(Commands::Path(command_arguments)) => match &format_identifier {
+            // TODO: detect leading partion path component and suggest/check path exists without
+            // it.
             FormatIdentifier::Ext => {
                 info::print_path_ext_file_system(&data_stream, &command_arguments.path)
             }

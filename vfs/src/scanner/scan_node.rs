@@ -30,4 +30,9 @@ impl VfsScanNode {
             sub_nodes: Vec::new(),
         }
     }
+
+    /// Determines if the scan node is empty.
+    pub fn is_empty(&self) -> bool {
+        self.sub_nodes.is_empty()
+    }
 }

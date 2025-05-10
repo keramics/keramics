@@ -597,7 +597,7 @@ pub fn print_path_ext_file_system(data_stream: &DataStreamReference, path: &Stri
             }
         };
     if file_entry.is_none() {
-        println!("No such to ext file entry: {}", path);
+        println!("No such ext file entry: {}", path);
         return ExitCode::FAILURE;
     }
     println!("Extended File System (ext) file entry information:");

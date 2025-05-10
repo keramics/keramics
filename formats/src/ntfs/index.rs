@@ -13,7 +13,6 @@
 
 use std::io;
 
-use core::mediator::{Mediator, MediatorReference};
 use core::DataStreamReference;
 
 use crate::block_tree::BlockTree;
@@ -25,9 +24,6 @@ use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) index.
 pub struct NtfsIndex {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Cluster block size.
     cluster_block_size: u32,
 
@@ -42,7 +38,6 @@ impl NtfsIndex {
     /// Creates a new index.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             cluster_block_size: 0,
             index_entry_size: 0,
             block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),

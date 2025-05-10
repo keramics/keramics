@@ -14,7 +14,6 @@
 /// New Technologies File System (NTFS) block range type.
 #[derive(Clone, Debug, PartialEq)]
 pub enum NtfsBlockRangeType {
-    Compressed,
     InFile,
     Sparse,
 }

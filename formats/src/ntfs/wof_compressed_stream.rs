@@ -16,8 +16,7 @@ use std::io;
 use std::io::{Read, Seek};
 use std::sync::{Arc, RwLock};
 
-// TODO: add LZX support.
-use compression::LzxpressHuffmanContext;
+use compression::{LzxContext, LzxpressHuffmanContext};
 use core::mediator::{Mediator, MediatorReference};
 use core::{DataStream, DataStreamReference};
 use types::{bytes_to_u32_le, bytes_to_u64_le};
@@ -136,51 +135,67 @@ impl NtfsWofCompressedStream {
             let block_index: u64 = self.current_offset / (self.compression_unit_size as u64);
             let block_offset: u64 = self.block_offsets[block_index as usize];
 
-            let block_relative_offset: u64 =
-                self.current_offset - (block_index * self.compression_unit_size as u64);
-            let block_remainder_size: u64 =
-                (self.compression_unit_size as u64) - block_relative_offset;
+            let next_block_index: usize = (block_index as usize) + 1;
+            let next_block_offset: u64 = if next_block_index < self.block_offsets.len() {
+                self.block_offsets[next_block_index]
+            } else {
+                self.compressed_size
+            };
+            let block_size: usize = (next_block_offset - block_offset) as usize;
 
-            let mut block_read_size: usize = read_size - data_offset;
+            let range_offset: u64 = block_index * (self.compression_unit_size as u64);
+            let range_size: u64 = min(self.compression_unit_size as u64, self.size - range_offset);
+            let block_relative_offset: u64 = self.current_offset - range_offset;
+            let block_remainder_size: u64 = range_size - block_relative_offset;
 
-            if (block_read_size as u64) > block_remainder_size {
-                block_read_size = block_remainder_size as usize;
-            }
+            let block_read_size: usize =
+                min(read_size - data_offset, block_remainder_size as usize);
             if block_read_size == 0 {
                 break;
             }
-            if !self.block_cache.contains(&block_offset) {
-                let next_block_index: usize = (block_index as usize) + 1;
-                let next_block_offset: u64 = if next_block_index < self.block_offsets.len() {
-                    self.block_offsets[next_block_index]
-                } else {
-                    self.compressed_size
-                };
-                let block_size: usize = (next_block_offset - block_offset) as usize;
-
-                let mut data: Vec<u8> = vec![0; self.compression_unit_size];
-
-                self.read_compressed_block(block_offset, block_size, &mut data)?;
-
-                self.block_cache.insert(block_offset, data);
-            }
-            let block_data: &Vec<u8> = match self.block_cache.get(&block_offset) {
-                Some(data) => data,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Unable to retrieve data from cache."),
-                    ));
-                }
-            };
             let data_end_offset: usize = data_offset + block_read_size;
 
-            let block_data_offset: usize = block_relative_offset as usize;
-            let block_data_end_offset: usize = block_data_offset + block_read_size;
+            if range_size == (block_size as u64) {
+                match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => {
+                            data_stream.read_exact_at_position(
+                                &mut data[data_offset..data_end_offset],
+                                io::SeekFrom::Start(block_offset + block_relative_offset),
+                            )?;
+                        }
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
+                };
+            } else {
+                if !self.block_cache.contains(&block_offset) {
+                    let mut data: Vec<u8> = vec![0; self.compression_unit_size];
 
-            data[data_offset..data_end_offset]
-                .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+                    self.read_compressed_block(block_offset, block_size, &mut data)?;
 
+                    self.block_cache.insert(block_offset, data);
+                }
+                let block_data: &Vec<u8> = match self.block_cache.get(&block_offset) {
+                    Some(data) => data,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Unable to retrieve data from cache."),
+                        ));
+                    }
+                };
+                let block_data_offset: usize = block_relative_offset as usize;
+                let block_data_end_offset: usize = block_data_offset + block_read_size;
+
+                data[data_offset..data_end_offset]
+                    .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+            }
             data_offset += block_read_size;
             self.current_offset += block_read_size as u64;
         }
@@ -223,8 +238,10 @@ impl NtfsWofCompressedStream {
                 let mut lzxpress_context: LzxpressHuffmanContext = LzxpressHuffmanContext::new();
                 lzxpress_context.decompress(&compressed_data, data)?;
             }
-            // TODO: add LZX support.
-            1 => todo!(),
+            1 => {
+                let mut lzx_context: LzxContext = LzxContext::new();
+                lzx_context.decompress(&compressed_data, data)?;
+            }
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,

@@ -20,7 +20,7 @@ use clap::{Parser, ValueEnum};
 
 use core::formatters::format_as_string;
 use core::mediator::Mediator;
-use core::DataStreamReference;
+use core::{open_os_data_stream, DataStreamReference};
 use types::Ucs2String;
 use vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsPath, VfsResolver,
@@ -48,7 +48,7 @@ enum HashType {
 }
 
 #[derive(Parser)]
-#[command(version, about = "Calculate a digest hash of data", long_about = None)]
+#[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
 struct CommandLineArguments {
     #[arg(long, default_value_t = false)]
     /// Enable debug output
@@ -132,7 +132,7 @@ fn calculate_hash_from_scan_node(
     digest_hasher: &hasher::DigestHasher,
     vfs_scan_node: &VfsScanNode,
 ) -> io::Result<()> {
-    if vfs_scan_node.sub_nodes.is_empty() {
+    if vfs_scan_node.is_empty() {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let file_system: VfsFileSystemReference =
@@ -224,23 +224,11 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            if root_scan_node.sub_nodes.is_empty() {
-                let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-                // TODO: add support for non-default data stream.
-                let result: Option<DataStreamReference> = match vfs_resolver
-                    .get_data_stream_by_path_and_name(&root_scan_node.path, None)
-                {
-                    Ok(result) => result,
+            if root_scan_node.is_empty() {
+                let data_stream: DataStreamReference = match open_os_data_stream(source) {
+                    Ok(data_stream) => data_stream,
                     Err(error) => {
-                        println!("Unable to open data stream with error: {}", error);
-                        return ExitCode::FAILURE;
-                    }
-                };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        println!("No such file: {}", source);
+                        println!("Unable to open file: {} with error: {}", source, error);
                         return ExitCode::FAILURE;
                     }
                 };

@@ -1276,6 +1276,9 @@ number of chunk offsets = uncompressed size / compression unit size
 The offset of the first compressed data chunk is at the end of the chunk offset
 table and is not stored in the chunk offset table.
 
+If the uncompressed size of a chunk is smaller than the compression unit size
+the chunk is stored uncompressed.
+
 Also see [Windows Overlay Filter (WOF) compression method](#wof_compression_method).
 
 ## <a name="reparse_point"></a>The reparse point

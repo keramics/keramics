@@ -19,6 +19,7 @@ use std::cmp;
 use std::io;
 
 use checksums::Crc32Context;
+use core::formatters::debug_format_array;
 use core::mediator::{Mediator, MediatorReference};
 use layout_map::LayoutMap;
 
@@ -627,13 +628,15 @@ impl Bzip2Context {
         }
         if self.mediator.debug_output {
             self.mediator.debug_print(format!("Bzip2Selectors {{\n",));
-            // TODO: move to a debug_format_array like function.
-            self.mediator
-                .debug_print(format!("    selectors: [{}", selectors[0]));
-            for selector in &selectors[1..selector_index] {
-                self.mediator.debug_print(format!(", {}", selector));
-            }
-            self.mediator.debug_print(format!("],\n",));
+
+            let array_parts: Vec<String> = selectors
+                .iter()
+                .map(|&element| element.to_string())
+                .collect();
+            self.mediator.debug_print(format!(
+                "    selectors: {},",
+                debug_format_array(&array_parts),
+            ));
             self.mediator.debug_print(format!("}}\n\n",));
         }
         Ok(())

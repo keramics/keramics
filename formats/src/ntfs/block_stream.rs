@@ -201,12 +201,6 @@ impl NtfsBlockStream {
 
                     range_read_size
                 }
-                _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported block range type.",
-                    ))
-                }
             };
             if range_read_count == 0 {
                 break;
