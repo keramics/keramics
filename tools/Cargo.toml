@@ -12,12 +12,17 @@ path = "src/image_analyzer.rs"
 publish = false
 
 [[bin]]
-name = "keramicsinfo"
-path = "src/info_tool.rs"
+name = "keramicsexport"
+path = "src/export_tool.rs"
+publish = false
 
 [[bin]]
 name = "keramicshash"
 path = "src/hash_tool.rs"
+
+[[bin]]
+name = "keramicsinfo"
+path = "src/info_tool.rs"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }

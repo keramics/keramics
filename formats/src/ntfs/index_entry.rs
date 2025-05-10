@@ -26,9 +26,6 @@ pub struct NtfsIndexEntry {
 
     /// Data.
     pub data: Vec<u8>,
-
-    /// Index node offset.
-    pub index_node_offset: usize,
 }
 
 impl NtfsIndexEntry {
@@ -37,7 +34,6 @@ impl NtfsIndexEntry {
         Self {
             mediator: Mediator::current(),
             data: Vec::new(),
-            index_node_offset: 0,
         }
     }
 

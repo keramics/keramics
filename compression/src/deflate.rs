@@ -920,7 +920,7 @@ mod tests {
         assert_eq!(output_data, [0xda, 0xbd, 0x59, 0x6d, 0x8f, 0x00]);
 
         let test_value: u32 = test_bitstream.get_value(16);
-        assert_eq!(test_value, 0xb8db);
+        assert_eq!(test_value, 0x0000b8db);
 
         Ok(())
     }

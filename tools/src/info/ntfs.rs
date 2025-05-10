@@ -715,7 +715,7 @@ pub fn print_path_ntfs_file_system(data_stream: &DataStreamReference, path: &Str
             }
         };
     if file_entry.is_none() {
-        println!("No such to NTFS file entry: {}", path);
+        println!("No such NTFS file entry: {}", path);
         return ExitCode::FAILURE;
     }
     println!("New Technologies File System (NTFS) file entry information:");

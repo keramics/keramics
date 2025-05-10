@@ -13,7 +13,6 @@
 
 use std::io;
 
-use core::mediator::{Mediator, MediatorReference};
 use core::DataStreamReference;
 
 use crate::block_tree::BlockTree;
@@ -25,9 +24,6 @@ use super::mft_entry::NtfsMftEntry;
 
 /// New Technologies File System (NTFS) Master File Table (MFT).
 pub struct NtfsMasterFileTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Cluster block size.
     pub cluster_block_size: u32,
 
@@ -45,7 +41,6 @@ impl NtfsMasterFileTable {
     /// Creates a new master file table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             cluster_block_size: 0,
             mft_entry_size: 0,
             number_of_entries: 0,

@@ -18,11 +18,6 @@ use types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
 use super::constants::*;
 
-const SUPPORTED_BYTES_PER_SECTOR: [u16; 5] = [256, 512, 1024, 2048, 4096];
-const SUPPORTED_CLUSTER_BLOCK_SIZE: [u32; 14] = [
-    256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152,
-];
-
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
