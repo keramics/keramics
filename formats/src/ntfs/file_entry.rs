@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::collections::BTreeMap;
+use std::collections::HashSet;
 use std::io;
 use std::rc::Rc;
 
@@ -20,13 +20,16 @@ use datetime::DateTime;
 use types::Ucs2String;
 
 use super::attribute::NtfsAttribute;
+use super::attribute_list::NtfsAttributeList;
 use super::constants::*;
 use super::data_fork::NtfsDataFork;
+use super::directory_entries::NtfsDirectoryEntries;
 use super::directory_entry::NtfsDirectoryEntry;
 use super::directory_index::NtfsDirectoryIndex;
 use super::file_name::NtfsFileName;
 use super::master_file_table::NtfsMasterFileTable;
 use super::mft_attribute::NtfsMftAttribute;
+use super::mft_attributes::NtfsMftAttributes;
 use super::mft_entry::NtfsMftEntry;
 use super::reparse_point::NtfsReparsePoint;
 use super::standard_information::NtfsStandardInformation;
@@ -52,6 +55,9 @@ pub struct NtfsFileEntry {
     /// The name.
     name: Option<Ucs2String>,
 
+    /// MFT attributes.
+    mft_attributes: NtfsMftAttributes,
+
     /// The directory entry.
     directory_entry: Option<NtfsDirectoryEntry>,
 
@@ -59,7 +65,7 @@ pub struct NtfsFileEntry {
     directory_index: NtfsDirectoryIndex,
 
     /// Directory entries.
-    directory_entries: BTreeMap<u64, NtfsDirectoryEntry>,
+    directory_entries: NtfsDirectoryEntries,
 
     /// Value to indicate the file entry has directory entries.
     has_directory_entries: bool,
@@ -80,11 +86,7 @@ impl NtfsFileEntry {
         directory_entry: Option<NtfsDirectoryEntry>,
     ) -> Self {
         let sequence_number: u16 = mft_entry.sequence_number;
-
         let cluster_block_size: u32 = mft.cluster_block_size;
-
-        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
-        let has_directory_entries: bool = mft_entry.has_attribute_group(&i30_index_name);
 
         Self {
             data_stream: data_stream.clone(),
@@ -93,10 +95,11 @@ impl NtfsFileEntry {
             mft_entry: mft_entry,
             sequence_number: sequence_number,
             name: name,
+            mft_attributes: NtfsMftAttributes::new(),
             directory_entry: directory_entry,
             directory_index: NtfsDirectoryIndex::new(cluster_block_size, case_folding_mappings),
-            directory_entries: BTreeMap::new(),
-            has_directory_entries: has_directory_entries,
+            directory_entries: NtfsDirectoryEntries::new(),
+            has_directory_entries: false,
             read_directory_entries: false,
         }
     }
@@ -169,7 +172,7 @@ impl NtfsFileEntry {
 
     /// Retrieves the symbolic link target.
     pub fn get_symbolic_link_target(&mut self) -> io::Result<Option<&Ucs2String>> {
-        match &self.mft_entry.reparse_point {
+        match &self.mft_attributes.reparse_point {
             Some(NtfsReparsePoint::SymbolicLink { .. }) => {
                 // TODO: implement
                 todo!();
@@ -180,27 +183,33 @@ impl NtfsFileEntry {
 
     /// Retrieves the number of attributes.
     pub fn get_number_of_attributes(&self) -> io::Result<usize> {
-        Ok(self.mft_entry.attributes.len())
+        self.mft_attributes.get_number_of_attributes()
     }
 
     /// Retrieves a specific attribute.
     pub fn get_attribute_by_index(&self, attribute_index: usize) -> io::Result<NtfsAttribute> {
-        let mft_attribute: &NtfsMftAttribute = match self.mft_entry.attributes.get(attribute_index)
-        {
-            Some(mft_attribute) => mft_attribute,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Missing attribute: {}", attribute_index),
-                ));
-            }
-        };
+        let mft_attribute: &NtfsMftAttribute = self
+            .mft_attributes
+            .get_attribute_by_index(attribute_index)?;
+
         let attribute: NtfsAttribute = match mft_attribute.attribute_type {
             NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION => {
                 let standard_information: NtfsStandardInformation =
                     NtfsStandardInformation::from_attribute(mft_attribute)?;
                 NtfsAttribute::StandardInformation {
                     standard_information: standard_information,
+                }
+            }
+            NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST => {
+                let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
+                attribute_list.read_attribute(
+                    mft_attribute,
+                    &self.data_stream,
+                    self.mft.cluster_block_size,
+                )?;
+
+                NtfsAttribute::AttributeList {
+                    attribute_list: attribute_list,
                 }
             }
             NTFS_ATTRIBUTE_TYPE_FILE_NAME => {
@@ -245,7 +254,7 @@ impl NtfsFileEntry {
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
-        self.mft_entry.get_data_stream_by_name(
+        self.mft_attributes.get_data_stream_by_name(
             &None,
             &self.data_stream,
             self.mft.cluster_block_size,
@@ -257,22 +266,28 @@ impl NtfsFileEntry {
         &self,
         name: &Option<Ucs2String>,
     ) -> io::Result<Option<DataStreamReference>> {
-        self.mft_entry
-            .get_data_stream_by_name(name, &self.data_stream, self.mft.cluster_block_size)
+        self.mft_attributes.get_data_stream_by_name(
+            name,
+            &self.data_stream,
+            self.mft.cluster_block_size,
+        )
     }
 
     /// Retrieves the number of data forks.
     pub fn get_number_of_data_forks(&self) -> io::Result<usize> {
-        Ok(self.mft_entry.get_number_of_data_attributes())
+        Ok(self.mft_attributes.get_number_of_data_attributes())
     }
 
     /// Retrieves a specific data fork.
     pub fn get_data_fork_by_index(&self, data_fork_index: usize) -> io::Result<NtfsDataFork> {
-        match self.mft_entry.get_data_attribute_by_index(data_fork_index) {
+        match self
+            .mft_attributes
+            .get_data_attribute_by_index(data_fork_index)
+        {
             Some(data_attribute) => Ok(NtfsDataFork::new(
                 &self.data_stream,
                 self.mft.cluster_block_size,
-                &self.mft_entry,
+                &self.mft_attributes,
                 data_attribute,
             )),
             None => Err(io::Error::new(
@@ -290,7 +305,7 @@ impl NtfsFileEntry {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
-        Ok(self.directory_entries.len())
+        Ok(self.directory_entries.get_number_of_entries())
     }
 
     /// Retrieves a specific sub file entry.
@@ -301,24 +316,16 @@ impl NtfsFileEntry {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
-        let (file_reference, directory_entry): (&u64, &NtfsDirectoryEntry) =
-            match self.directory_entries.iter().nth(sub_file_entry_index) {
-                Some(key_and_value) => key_and_value,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Missing directory entry: {}", sub_file_entry_index),
-                    ));
-                }
-            };
-        let mft_entry_number: u64 = file_reference & 0x0000ffffffffffff;
-        let mut mft_entry: NtfsMftEntry =
-            self.mft.get_entry(&self.data_stream, mft_entry_number)?;
-        mft_entry.read_attributes()?;
+        let directory_entry: &NtfsDirectoryEntry = self
+            .directory_entries
+            .get_entry_by_index(sub_file_entry_index)?;
+
+        let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
+        let mft_entry: NtfsMftEntry = self.mft.get_entry(&self.data_stream, mft_entry_number)?;
 
         let name: &Ucs2String = directory_entry.get_name();
 
-        let file_entry: NtfsFileEntry = NtfsFileEntry::new(
+        let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
             &self.data_stream,
             &self.mft,
             &self.directory_index.case_folding_mappings,
@@ -327,7 +334,46 @@ impl NtfsFileEntry {
             Some(name.clone()),
             Some(directory_entry.clone()),
         );
+        file_entry.read_attributes()?;
+
         Ok(file_entry)
+    }
+
+    /// Reads the attributes.
+    pub(super) fn read_attributes(&mut self) -> io::Result<()> {
+        self.mft_entry.read_attributes(&mut self.mft_attributes)?;
+
+        match self.mft_attributes.attribute_list {
+            Some(attribute_index) => {
+                let mft_attribute: &NtfsMftAttribute = self
+                    .mft_attributes
+                    .get_attribute_by_index(attribute_index)?;
+
+                let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
+                attribute_list.read_attribute(
+                    &mft_attribute,
+                    &self.data_stream,
+                    self.mft.cluster_block_size,
+                )?;
+                let mut attribute_list_mft_entries: HashSet<u64> = HashSet::new();
+                for entry in attribute_list.entries.iter() {
+                    let mft_entry_number: u64 = entry.file_reference & 0x0000ffffffffffff;
+                    if mft_entry_number != self.mft_entry_number {
+                        attribute_list_mft_entries.insert(mft_entry_number);
+                    }
+                }
+                for mft_entry_number in attribute_list_mft_entries.iter() {
+                    let mft_entry: NtfsMftEntry =
+                        self.mft.get_entry(&self.data_stream, *mft_entry_number)?;
+                    mft_entry.read_attributes(&mut self.mft_attributes)?;
+                }
+            }
+            None => {}
+        };
+        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
+        self.has_directory_entries = self.mft_attributes.has_attribute_group(&i30_index_name);
+
+        Ok(())
     }
 
     /// Retrieves a specific sub file entry.
@@ -339,7 +385,7 @@ impl NtfsFileEntry {
             return Ok(None);
         }
         if !self.directory_index.is_initialized {
-            self.directory_index.initialize(&self.mft_entry)?;
+            self.directory_index.initialize(&self.mft_attributes)?;
         }
         match self
             .directory_index
@@ -347,14 +393,12 @@ impl NtfsFileEntry {
         {
             Some(directory_entry) => {
                 let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
-
-                let mut mft_entry: NtfsMftEntry =
+                let mft_entry: NtfsMftEntry =
                     self.mft.get_entry(&self.data_stream, mft_entry_number)?;
-                mft_entry.read_attributes()?;
 
                 let name: &Ucs2String = directory_entry.get_name();
 
-                let file_entry: NtfsFileEntry = NtfsFileEntry::new(
+                let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
                     &self.data_stream,
                     &self.mft,
                     &self.directory_index.case_folding_mappings,
@@ -363,6 +407,8 @@ impl NtfsFileEntry {
                     Some(name.clone()),
                     Some(directory_entry),
                 );
+                file_entry.read_attributes()?;
+
                 Ok(Some(file_entry))
             }
             None => Ok(None),
@@ -391,7 +437,7 @@ impl NtfsFileEntry {
 
     /// Determines if the file entry is a symbolic link.
     pub fn is_symbolic_link(&self) -> bool {
-        match &self.mft_entry.reparse_point {
+        match &self.mft_attributes.reparse_point {
             Some(NtfsReparsePoint::SymbolicLink { .. }) => true,
             _ => false,
         }
@@ -406,7 +452,7 @@ impl NtfsFileEntry {
             ));
         }
         if !self.directory_index.is_initialized {
-            self.directory_index.initialize(&self.mft_entry)?;
+            self.directory_index.initialize(&self.mft_attributes)?;
         }
         self.directory_index
             .get_directory_entries(&self.data_stream, &mut self.directory_entries)?;

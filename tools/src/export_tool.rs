@@ -20,7 +20,6 @@ use std::process::ExitCode;
 use clap::{Args, Parser, Subcommand};
 
 use core::mediator::Mediator;
-use core::DataStreamReference;
 use vfs::{VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner};
 
 #[derive(Parser)]

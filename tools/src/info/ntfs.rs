@@ -18,7 +18,9 @@ use std::process::ExitCode;
 use core::DataStreamReference;
 use datetime::DateTime;
 use formats::ntfs::constants::*;
-use formats::ntfs::{NtfsAttribute, NtfsDataFork, NtfsFileEntry, NtfsFileSystem, NtfsPath};
+use formats::ntfs::{
+    NtfsAttribute, NtfsAttributeListEntry, NtfsDataFork, NtfsFileEntry, NtfsFileSystem, NtfsPath,
+};
 
 use super::bodyfile;
 
@@ -343,7 +345,36 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
         None => println!("    Attribute type\t\t\t: 0x{:08x}", attribute_type),
     };
     match attribute {
-        // TODO: add support for $ATTRIBUTE_LIST
+        NtfsAttribute::AttributeList { attribute_list } => {
+            let number_of_entries: usize = attribute_list.entries.len();
+            println!("    Number of entries\t\t\t: {}", number_of_entries);
+
+            for entry_index in 0..number_of_entries {
+                let entry: &NtfsAttributeListEntry = &attribute_list.entries[entry_index];
+                match attribute_types.get(&entry.attribute_type) {
+                    Some(attribute_type_string) => {
+                        println!(
+                            "    Entry: {}\t\t\t\t: {} (0x{:08x}) with file reference: {}-{}",
+                            entry_index + 1,
+                            attribute_type_string,
+                            entry.attribute_type,
+                            entry.file_reference >> 48,
+                            entry.file_reference & 0x0000ffffffffffff,
+                        );
+                    }
+                    None => {
+                        println!(
+                            "    Entry: {}\t\t\t\t: 0x{:08x} with file reference: {}-{}",
+                            entry_index + 1,
+                            entry.attribute_type,
+                            entry.file_reference >> 48,
+                            entry.file_reference & 0x0000ffffffffffff,
+                        );
+                    }
+                };
+            }
+            println!("");
+        }
         // TODO: add support for $DATA
         // TODO: add support for $BITMAP
         // TODO: add support for $EA

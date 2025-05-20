@@ -101,7 +101,7 @@ impl TablesPreprocessor {
                                         in_colspan = true;
                                     }
                                     table_html.push(inline_html_string);
-                                },
+                                }
                                 _ => {
                                     if !in_colspan {
                                         if in_table_head {
@@ -110,9 +110,9 @@ impl TablesPreprocessor {
                                             table_html.push("<td>".to_string());
                                         }
                                     }
-                                },
+                                }
                             };
-                        },
+                        }
                         None => return Err(Error::msg("Missing next event")),
                     }
                     continue;
