@@ -4,6 +4,7 @@ members = [
     "./compression",
     "./core",
     "./datetime",
+    "./docs/mdbook-tables",
     "./encoding",
     "./formats",
     "./hashes",

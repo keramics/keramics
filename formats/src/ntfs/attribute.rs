@@ -13,6 +13,7 @@
 
 use types::Ucs2String;
 
+use super::attribute_list::NtfsAttributeList;
 use super::constants::*;
 use super::file_name::NtfsFileName;
 use super::reparse_point::NtfsReparsePoint;
@@ -21,6 +22,9 @@ use super::volume_information::NtfsVolumeInformation;
 
 /// New Technologies File System (NTFS) attribute.
 pub enum NtfsAttribute {
+    AttributeList {
+        attribute_list: NtfsAttributeList,
+    },
     FileName {
         file_name: NtfsFileName,
     },
@@ -45,6 +49,7 @@ impl NtfsAttribute {
     /// Retrieves the attribute type.
     pub fn get_attribute_type(&self) -> u32 {
         match self {
+            NtfsAttribute::AttributeList { .. } => NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST,
             NtfsAttribute::FileName { .. } => NTFS_ATTRIBUTE_TYPE_FILE_NAME,
             NtfsAttribute::ReparsePoint { .. } => NTFS_ATTRIBUTE_TYPE_REPARSE_POINT,
             NtfsAttribute::StandardInformation { .. } => NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION,

@@ -1,11 +1,11 @@
 [package]
-name = "mdbook-tables"
+authors.workspace = true
 description = "mdbook preprocessor for extended Markdown tables"
-version = "0.0.0"
-edition = "2021"
-authors = ["Joachim Metz <joachim.metz@gmail.com>"]
-license = "Apache-2.0"
+edition.workspace = true
+license.workspace = true
+name = "mdbook-tables"
 publish = false
+version.workspace = true
 
 [dependencies]
 mdbook = { version = "0.4.42" }

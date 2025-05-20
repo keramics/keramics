@@ -123,8 +123,8 @@ impl NtfsIndex {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!(
-                        "Cluster group first VNC: {} does not match expected value.",
-                        cluster_group.first_vcn
+                        "$INDEX_ALLOCATION attribute cluster group first VNC: {} does not match expected value: {}.",
+                        cluster_group.first_vcn, virtual_cluster_number
                     ),
                 ));
             }

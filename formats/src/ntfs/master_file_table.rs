@@ -126,8 +126,8 @@ impl NtfsMasterFileTable {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!(
-                        "Cluster group first VNC: {} does not match expected value.",
-                        cluster_group.first_vcn
+                        "$DATA attribute cluster group first VNC: {} does not match expected value: {}.",
+                        cluster_group.first_vcn, virtual_cluster_number
                     ),
                 ));
             }
@@ -175,4 +175,33 @@ impl NtfsMasterFileTable {
     }
 }
 
-// TODO: add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_test_mft_attribute_data() -> Vec<u8> {
+        return vec![
+            0x80, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x01, 0x00, 0x40, 0x00, 0x00, 0x00,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30,
+            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x14, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x14, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x11, 0x13, 0x04, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
+    }
+
+    // TODO: add tests for get_entry
+
+    #[test]
+    fn test_initialize() -> io::Result<()> {
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        data_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut test_struct: NtfsMasterFileTable = NtfsMasterFileTable::new();
+
+        test_struct.initialize(4096, 1024, &data_attribute)?;
+
+        Ok(())
+    }
+}

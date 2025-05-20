@@ -23,6 +23,7 @@ use super::constants::*;
 use super::file_entry::NtfsFileEntry;
 use super::master_file_table::NtfsMasterFileTable;
 use super::mft_attribute::NtfsMftAttribute;
+use super::mft_attributes::NtfsMftAttributes;
 use super::mft_entry::NtfsMftEntry;
 use super::path::NtfsPath;
 use super::volume_information::NtfsVolumeInformation;
@@ -121,10 +122,9 @@ impl NtfsFileSystem {
                 ),
             ));
         }
-        let mut mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, mft_entry_number)?;
-        mft_entry.read_attributes()?;
+        let mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, mft_entry_number)?;
 
-        let file_entry: NtfsFileEntry = NtfsFileEntry::new(
+        let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
             data_stream,
             &self.mft,
             &self.case_folding_mappings,
@@ -133,6 +133,8 @@ impl NtfsFileSystem {
             None,
             None,
         );
+        file_entry.read_attributes()?;
+
         Ok(file_entry)
     }
 
@@ -192,7 +194,7 @@ impl NtfsFileSystem {
 
     /// Reads the case folding mappings from the $UpCase metadata file.
     fn read_case_folding_mappings(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
-        let mut mft_entry: NtfsMftEntry = self
+        let mft_entry: NtfsMftEntry = self
             .mft
             .get_entry(data_stream, NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER)?;
 
@@ -208,15 +210,22 @@ impl NtfsFileSystem {
                 "Unsupported unallocated MFT entry.",
             ));
         }
-        mft_entry.read_attributes()?;
+        let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
+        mft_entry.read_attributes(&mut mft_attributes)?;
 
+        if mft_attributes.attribute_list.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported MFT entry with attribute list.",
+            ));
+        }
         let data_attribute: &NtfsMftAttribute =
-            match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+            match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(data_attribute) => data_attribute,
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        "Unsupported MFT missing $Data attribute.",
+                        "Missing $Data attribute.",
                     ))
                 }
             };
@@ -292,15 +301,16 @@ impl NtfsFileSystem {
                 "Unsupported unallocated MFT entry.",
             ));
         }
-        mft_entry.read_attributes()?;
+        let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
+        mft_entry.read_attributes(&mut mft_attributes)?;
 
         let data_attribute: &NtfsMftAttribute =
-            match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+            match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => mft_attribute,
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        "Unsupported MFT missing $Data attribute.",
+                        "Missing $Data attribute.",
                     ))
                 }
             };
@@ -315,14 +325,14 @@ impl NtfsFileSystem {
                 ));
             }
         };
-        // TODO: read for attribute list if appropriate
+        // TODO: handle attribute list.
 
         Ok(())
     }
 
     /// Reads the volume information from the $Volume metadata file.
     fn read_volume_information(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
-        let mut mft_entry: NtfsMftEntry = self
+        let mft_entry: NtfsMftEntry = self
             .mft
             .get_entry(data_stream, NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER)?;
 
@@ -338,9 +348,16 @@ impl NtfsFileSystem {
                 "Unsupported unallocated MFT entry.",
             ));
         }
-        mft_entry.read_attributes()?;
+        let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
+        mft_entry.read_attributes(&mut mft_attributes)?;
 
-        match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
+        if mft_attributes.attribute_list.is_some() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported MFT entry with attribute list.",
+            ));
+        }
+        match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
             Some(mft_attribute) => {
                 if !mft_attribute.is_resident() {
                     return Err(io::Error::new(
@@ -361,7 +378,7 @@ impl NtfsFileSystem {
             }
             None => {}
         };
-        match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
+        match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
             Some(mft_attribute) => {
                 let volume_information: NtfsVolumeInformation =
                     NtfsVolumeInformation::from_attribute(mft_attribute)?;

@@ -17,7 +17,7 @@ use core::DataStreamReference;
 use types::Ucs2String;
 
 use super::mft_attribute::NtfsMftAttribute;
-use super::mft_entry::NtfsMftEntry;
+use super::mft_attributes::NtfsMftAttributes;
 
 /// New Technologies File System (NTFS) data fork.
 pub struct NtfsDataFork<'a> {
@@ -27,8 +27,8 @@ pub struct NtfsDataFork<'a> {
     /// Cluster block size.
     cluster_block_size: u32,
 
-    /// The MFT entry.
-    mft_entry: &'a NtfsMftEntry,
+    /// The MFT attributes.
+    mft_attributes: &'a NtfsMftAttributes,
 
     /// The $DATA attribute.
     data_attribute: &'a NtfsMftAttribute,
@@ -39,20 +39,20 @@ impl<'a> NtfsDataFork<'a> {
     pub fn new(
         data_stream: &DataStreamReference,
         cluster_block_size: u32,
-        mft_entry: &'a NtfsMftEntry,
+        mft_attributes: &'a NtfsMftAttributes,
         data_attribute: &'a NtfsMftAttribute,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             cluster_block_size: cluster_block_size,
-            mft_entry: mft_entry,
+            mft_attributes: mft_attributes,
             data_attribute: data_attribute,
         }
     }
 
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> io::Result<DataStreamReference> {
-        match self.mft_entry.get_data_stream_by_name(
+        match self.mft_attributes.get_data_stream_by_name(
             &self.data_attribute.name,
             &self.data_stream,
             self.cluster_block_size,

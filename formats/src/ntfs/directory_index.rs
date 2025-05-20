@@ -12,7 +12,6 @@
  */
 
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
 use std::io;
 use std::rc::Rc;
 
@@ -21,6 +20,7 @@ use core::DataStreamReference;
 use types::{bytes_to_u64_le, Ucs2String};
 
 use super::constants::*;
+use super::directory_entries::NtfsDirectoryEntries;
 use super::directory_entry::NtfsDirectoryEntry;
 use super::file_name::NtfsFileName;
 use super::index::NtfsIndex;
@@ -30,7 +30,7 @@ use super::index_root_header::NtfsIndexRootHeader;
 use super::index_value::NtfsIndexValue;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_attribute_group::NtfsMftAttributeGroup;
-use super::mft_entry::NtfsMftEntry;
+use super::mft_attributes::NtfsMftAttributes;
 use super::standard_information::NtfsStandardInformation;
 
 /// New Technologies File System (NTFS) directory index.
@@ -72,10 +72,10 @@ impl NtfsDirectoryIndex {
     }
 
     /// Initializes the directory index.
-    pub fn initialize(&mut self, mft_entry: &NtfsMftEntry) -> io::Result<()> {
+    pub fn initialize(&mut self, mft_attributes: &NtfsMftAttributes) -> io::Result<()> {
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
         let i30_attribute_group: &NtfsMftAttributeGroup =
-            match mft_entry.get_attribute_group(&i30_index_name) {
+            match mft_attributes.get_attribute_group(&i30_index_name) {
                 Some(attribute_group) => attribute_group,
                 None => {
                     return Err(io::Error::new(
@@ -84,7 +84,7 @@ impl NtfsDirectoryIndex {
                     ))
                 }
             };
-        let i30_index_root_attribute: &NtfsMftAttribute = match mft_entry
+        let i30_index_root_attribute: &NtfsMftAttribute = match mft_attributes
             .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ROOT)
         {
             Some(mft_attribute) => mft_attribute,
@@ -140,7 +140,7 @@ impl NtfsDirectoryIndex {
                 ),
             ));
         }
-        match mft_entry.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
+        match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
             Some(mft_attribute) => {
                 let standard_information: NtfsStandardInformation =
                     NtfsStandardInformation::from_attribute(mft_attribute)?;
@@ -154,7 +154,7 @@ impl NtfsDirectoryIndex {
             None => {}
         }
         // Note that the $INDEX_ALLOCATION attribute is optional.
-        match mft_entry
+        match mft_attributes
             .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION)
         {
             Some(mft_attribute) => self.index.initialize(
@@ -314,7 +314,7 @@ impl NtfsDirectoryIndex {
     pub fn get_directory_entries(
         &self,
         data_stream: &DataStreamReference,
-        entries: &mut BTreeMap<u64, NtfsDirectoryEntry>,
+        entries: &mut NtfsDirectoryEntries,
     ) -> io::Result<()> {
         if !self.is_initialized {
             return Err(io::Error::new(
@@ -331,7 +331,7 @@ impl NtfsDirectoryIndex {
         data: &[u8],
         index_node_offset: usize,
         data_stream: &DataStreamReference,
-        entries: &mut BTreeMap<u64, NtfsDirectoryEntry>,
+        entries: &mut NtfsDirectoryEntries,
     ) -> io::Result<()> {
         let (index_node_size, index_values_offset): (usize, usize) =
             self.read_index_node_header(data, index_node_offset)?;
@@ -393,52 +393,8 @@ impl NtfsDirectoryIndex {
             }
             let file_name: NtfsFileName =
                 self.read_index_key(data, key_data_offset, key_data_size)?;
+            entries.add(index_value.file_reference, file_name)?;
 
-            if file_name.name_size == 1 && file_name.name.elements[0] == 0x002e {
-                // Ignore "."
-            } else {
-                match entries.remove(&index_value.file_reference) {
-                    Some(mut existing_directory_entry) => {
-                        if existing_directory_entry.file_name.name_space == NTFS_NAME_SPACE_DOS {
-                            if file_name.name_space == NTFS_NAME_SPACE_DOS {
-                                return Err(io::Error::new(
-                                        io::ErrorKind::InvalidData,
-                                        format!(
-                                            "Invalid directory entry: {}-{} - short file name already set",
-                                            index_value.file_reference & 0x0000ffffffffffff,
-                                            index_value.file_reference >> 48,
-                                        ),
-                                    ));
-                            }
-                            let mut directory_entry: NtfsDirectoryEntry =
-                                NtfsDirectoryEntry::new(index_value.file_reference, file_name);
-                            directory_entry.short_file_name =
-                                Some(existing_directory_entry.file_name);
-
-                            entries.insert(index_value.file_reference, directory_entry);
-                        } else {
-                            if file_name.name_space != NTFS_NAME_SPACE_DOS {
-                                return Err(io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    format!(
-                                        "Invalid directory entry: {}-{} - file name already set",
-                                        index_value.file_reference & 0x0000ffffffffffff,
-                                        index_value.file_reference >> 48,
-                                    ),
-                                ));
-                            }
-                            existing_directory_entry.short_file_name = Some(file_name);
-
-                            entries.insert(index_value.file_reference, existing_directory_entry);
-                        }
-                    }
-                    None => {
-                        let directory_entry: NtfsDirectoryEntry =
-                            NtfsDirectoryEntry::new(index_value.file_reference, file_name);
-                        entries.insert(index_value.file_reference, directory_entry);
-                    }
-                }
-            }
             index_value_offset += value_data_size;
 
             let alignment_padding: usize = index_value_offset % 8;
@@ -6874,10 +6830,10 @@ mod tests {
         let test_struct = NtfsDirectoryIndex::new(4096, &case_folding_mappings);
         let data_stream: DataStreamReference = open_fake_data_stream(vec![]);
 
-        let mut entries: BTreeMap<u64, NtfsDirectoryEntry> = BTreeMap::new();
+        let mut entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();
         test_struct.get_directory_entries_from_node(&test_data, 24, &data_stream, &mut entries)?;
 
-        assert_eq!(entries.len(), 13);
+        assert_eq!(entries.get_number_of_entries(), 13);
 
         Ok(())
     }

@@ -81,8 +81,8 @@ impl NtfsBlockStream {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(
-                            "Cluster group first VNC: {} does not match expected value.",
-                            cluster_group.first_vcn
+                            "$DATA attribute cluster group first VNC: {} does not match expected value: {}.",
+                            cluster_group.first_vcn, virtual_cluster_number
                         ),
                     ));
                 }
@@ -140,8 +140,12 @@ impl NtfsBlockStream {
             }
         }
         self.data_stream = Some(data_stream.clone());
-        self.size = data_attribute.valid_data_size;
 
+        if data_attribute.is_compressed() {
+            self.size = data_attribute.compressed_data_size;
+        } else {
+            self.size = data_attribute.valid_data_size;
+        }
         Ok(())
     }
 

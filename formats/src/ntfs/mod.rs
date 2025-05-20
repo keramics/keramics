@@ -12,6 +12,8 @@
  */
 
 mod attribute;
+mod attribute_list;
+mod attribute_list_entry;
 mod block_range;
 mod block_stream;
 mod boot_record;
@@ -20,6 +22,7 @@ mod compressed_stream;
 pub mod constants;
 mod data_fork;
 mod data_run;
+mod directory_entries;
 mod directory_entry;
 mod directory_index;
 mod file_entry;
@@ -38,6 +41,7 @@ mod mft_attribute_group;
 mod mft_attribute_header;
 mod mft_attribute_non_resident;
 mod mft_attribute_resident;
+mod mft_attributes;
 mod mft_entry;
 mod mft_entry_header;
 mod path;
@@ -50,6 +54,7 @@ mod wof_compressed_stream;
 mod wof_reparse_data;
 
 pub use attribute::NtfsAttribute;
+pub use attribute_list_entry::NtfsAttributeListEntry;
 pub use data_fork::NtfsDataFork;
 pub use file_entry::NtfsFileEntry;
 pub use file_system::NtfsFileSystem;

@@ -11,23 +11,16 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::io;
-use std::sync::{Arc, RwLock};
 
 use core::mediator::{Mediator, MediatorReference};
-use core::{DataStreamReference, FakeDataStream};
-use types::Ucs2String;
+use core::DataStreamReference;
 
-use super::block_stream::NtfsBlockStream;
-use super::compressed_stream::NtfsCompressedStream;
 use super::constants::*;
 use super::fixup_values::apply_fixup_values;
 use super::mft_attribute::NtfsMftAttribute;
-use super::mft_attribute_group::NtfsMftAttributeGroup;
+use super::mft_attributes::NtfsMftAttributes;
 use super::mft_entry_header::NtfsMftEntryHeader;
-use super::reparse_point::NtfsReparsePoint;
-use super::wof_compressed_stream::NtfsWofCompressedStream;
 
 const END_OF_ATTRIBUTES_MARKER: [u8; 4] = [0xff; 4];
 
@@ -59,21 +52,6 @@ pub struct NtfsMftEntry {
 
     /// Value to indicate the MFT entry is allocated (used).
     pub is_allocated: bool,
-
-    /// Attributes.
-    pub attributes: Vec<NtfsMftAttribute>,
-
-    /// Attribute groups per name.
-    attribute_groups: HashMap<Option<Ucs2String>, NtfsMftAttributeGroup>,
-
-    /// Indexes of data attributes in the attributes vector.
-    data_attributes: Vec<usize>,
-
-    /// Reparse point.
-    pub reparse_point: Option<NtfsReparsePoint>,
-
-    /// Value to indicate the attributes were read.
-    read_attributes: bool,
 }
 
 impl NtfsMftEntry {
@@ -89,225 +67,31 @@ impl NtfsMftEntry {
             is_empty: false,
             is_bad: false,
             is_allocated: false,
-            attributes: Vec::new(),
-            attribute_groups: HashMap::new(),
-            data_attributes: Vec::new(),
-            reparse_point: None,
-            read_attributes: false,
         }
-    }
-
-    /// Adds an attribute.
-    fn add_attribute(&mut self, mut attribute: NtfsMftAttribute) -> io::Result<()> {
-        if !self.attribute_groups.contains_key(&attribute.name) {
-            let attribute_name: Option<Ucs2String> = match &attribute.name {
-                Some(name) => Some(name.clone()),
-                None => None,
-            };
-            let attribute_group: NtfsMftAttributeGroup = NtfsMftAttributeGroup::new();
-            self.attribute_groups
-                .insert(attribute_name, attribute_group);
-        }
-        let attribute_group: &mut NtfsMftAttributeGroup =
-            match self.attribute_groups.get_mut(&attribute.name) {
-                Some(attribute_group) => attribute_group,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Missing attribute group"),
-                    ));
-                }
-            };
-        match attribute_group.get_attribute_index(attribute.attribute_type) {
-            Some(existing_attribute_index) => {
-                let existing_attribute: &mut NtfsMftAttribute =
-                    match self.attributes.get_mut(*existing_attribute_index) {
-                        Some(existing_attribute) => existing_attribute,
-                        None => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidInput,
-                                format!("Missing attribute: {}", existing_attribute_index),
-                            ));
-                        }
-                    };
-                // TODO: check attribute.data_size
-
-                if attribute.data_flags != existing_attribute.data_flags {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported data flags: 0x{:04x} expected: 0x{:04x}",
-                            attribute.data_flags, existing_attribute.data_flags
-                        ),
-                    ));
-                }
-                // TODO: check for overlapping clusters
-                for cluster_group in attribute.data_cluster_groups.drain(..) {
-                    existing_attribute.append_data_cluster_group(cluster_group);
-                }
-                existing_attribute.sort_data_cluster_groups();
-            }
-            None => {
-                let attribute_index: usize = self.attributes.len();
-                let attribute_type: u32 = attribute.attribute_type;
-
-                if attribute_type == NTFS_ATTRIBUTE_TYPE_DATA {
-                    self.data_attributes.push(attribute_index);
-                }
-                attribute_group.add_attribute_index(attribute_type, attribute_index);
-
-                self.attributes.push(attribute);
-            }
-        };
-        Ok(())
-    }
-
-    /// Retrieves a specific attribute.
-    pub fn get_attribute(
-        &self,
-        name: &Option<Ucs2String>,
-        attribute_type: u32,
-    ) -> Option<&NtfsMftAttribute> {
-        match self.attribute_groups.get(name) {
-            Some(attribute_group) => self.get_attribute_for_group(attribute_group, attribute_type),
-            None => None,
-        }
-    }
-
-    /// Retrieves a specific attribute for a specific attribute group.
-    pub fn get_attribute_for_group(
-        &self,
-        attribute_group: &NtfsMftAttributeGroup,
-        attribute_type: u32,
-    ) -> Option<&NtfsMftAttribute> {
-        match attribute_group.get_attribute_index(attribute_type) {
-            Some(attribute_index) => self.attributes.get(*attribute_index),
-            None => None,
-        }
-    }
-
-    /// Retrieves a specific attribute group.
-    pub fn get_attribute_group(&self, name: &Option<Ucs2String>) -> Option<&NtfsMftAttributeGroup> {
-        self.attribute_groups.get(name)
-    }
-
-    /// Retrieves a specific data attribute.
-    pub fn get_data_attribute_by_index(&self, attribute_index: usize) -> Option<&NtfsMftAttribute> {
-        match self.data_attributes.get(attribute_index) {
-            Some(attribute_index) => self.attributes.get(*attribute_index),
-            None => None,
-        }
-    }
-
-    /// Retrieves a data stream with the specified name.
-    pub fn get_data_stream_by_name(
-        &self,
-        name: &Option<Ucs2String>,
-        data_stream: &DataStreamReference,
-        cluster_block_size: u32,
-    ) -> io::Result<Option<DataStreamReference>> {
-        let data_attribute: &NtfsMftAttribute =
-            match self.get_attribute(name, NTFS_ATTRIBUTE_TYPE_DATA) {
-                Some(data_attribute) => data_attribute,
-                None => return Ok(None),
-            };
-
-        let wof_compression_method: Option<u32> = match &self.reparse_point {
-            Some(NtfsReparsePoint::WindowsOverlayFilter { reparse_data }) => match name {
-                None => Some(reparse_data.compression_method),
-                _ => None,
-            },
-            _ => None,
-        };
-        if let Some(compression_method) = wof_compression_method {
-            if data_attribute.is_resident() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unsupported resident $DATA attribute.",
-                ));
-            }
-            let attribute_name: Ucs2String = Ucs2String::from_string("WofCompressedData");
-            let wof_data_attribute: &NtfsMftAttribute =
-                match self.get_attribute(&Some(attribute_name), NTFS_ATTRIBUTE_TYPE_DATA) {
-                    Some(mft_attribute) => mft_attribute,
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing WofCompressedData $DATA attribute",
-                        ))
-                    }
-                };
-            let mut wof_compressed_stream: NtfsWofCompressedStream =
-                NtfsWofCompressedStream::new(cluster_block_size, compression_method);
-            wof_compressed_stream.open(
-                data_stream,
-                wof_data_attribute,
-                data_attribute.valid_data_size,
-            )?;
-
-            Ok(Some(Arc::new(RwLock::new(wof_compressed_stream))))
-        } else if data_attribute.is_compressed() {
-            let mut compressed_stream: NtfsCompressedStream =
-                NtfsCompressedStream::new(cluster_block_size);
-            compressed_stream.open(data_stream, data_attribute)?;
-
-            Ok(Some(Arc::new(RwLock::new(compressed_stream))))
-        } else if data_attribute.is_resident() {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
-            Ok(Some(Arc::new(RwLock::new(data_stream))))
-        } else {
-            let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
-            block_stream.open(data_stream, data_attribute)?;
-
-            Ok(Some(Arc::new(RwLock::new(block_stream))))
-        }
-    }
-
-    /// Retrieves the number of data attributes.
-    pub fn get_number_of_data_attributes(&self) -> usize {
-        self.data_attributes.len()
-    }
-
-    /// Determines if the MFT entry has a specific attribute group.
-    pub fn has_attribute_group(&self, name: &Option<Ucs2String>) -> bool {
-        self.attribute_groups.contains_key(name)
     }
 
     /// Reads the attributes.
-    pub fn read_attributes(&mut self) -> io::Result<()> {
-        if !self.read_attributes {
-            let mut data_offset: usize = self.attributes_offset as usize;
-            let data_size: usize = self.data.len();
+    pub fn read_attributes(&self, mft_attributes: &mut NtfsMftAttributes) -> io::Result<()> {
+        let mut data_offset: usize = self.attributes_offset as usize;
+        let data_size: usize = self.data.len();
 
-            loop {
-                if data_offset > data_size - 4 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid data offset: {} value out of bounds", data_offset,),
-                    ));
-                }
-                let data_end_offset: usize = data_offset + 4;
-                if self.data[data_offset..data_end_offset] == END_OF_ATTRIBUTES_MARKER {
-                    break;
-                }
-                let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-
-                mft_attribute.read_data(&self.data[data_offset..])?;
-                data_offset += mft_attribute.attribute_size as usize;
-
-                // TODO: handle attributes list
-
-                if mft_attribute.attribute_type == NTFS_ATTRIBUTE_TYPE_REPARSE_POINT
-                    && mft_attribute.name.is_none()
-                {
-                    let reparse_point: NtfsReparsePoint =
-                        NtfsReparsePoint::from_attribute(&mft_attribute)?;
-                    self.reparse_point = Some(reparse_point);
-                }
-                self.add_attribute(mft_attribute)?;
+        loop {
+            if data_offset > data_size - 4 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid data offset: {} value out of bounds", data_offset,),
+                ));
             }
-            self.read_attributes = true;
+            let data_end_offset: usize = data_offset + 4;
+            if self.data[data_offset..data_end_offset] == END_OF_ATTRIBUTES_MARKER {
+                break;
+            }
+            let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+
+            mft_attribute.read_data(&self.data[data_offset..])?;
+            data_offset += mft_attribute.attribute_size as usize;
+
+            mft_attributes.add_attribute(mft_attribute)?;
         }
         Ok(())
     }
@@ -438,6 +222,9 @@ mod tests {
     use super::*;
 
     use core::open_fake_data_stream;
+    use types::Ucs2String;
+
+    use crate::ntfs::mft_attribute_group::NtfsMftAttributeGroup;
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -518,15 +305,6 @@ mod tests {
         ];
     }
 
-    // TODO: add tests for add_attribute
-    // TODO: add tests for get_attribute
-    // TODO: add tests for get_attribute_for_group
-    // TODO: add tests for get_attribute_group
-    // TODO: add tests for get_data_attribute_by_index
-    // TODO: add tests for get_data_stream_by_name
-    // TODO: add tests for get_number_of_data_attributes
-    // TODO: add tests for has_attribute_group
-
     #[test]
     fn test_read_attributes() -> io::Result<()> {
         let mut test_data: Vec<u8> = get_test_data();
@@ -535,13 +313,17 @@ mod tests {
         test_struct.read_data(&mut test_data)?;
 
         test_struct.data = test_data;
-        test_struct.read_attributes()?;
 
-        assert_eq!(test_struct.attribute_groups.len(), 1);
+        let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
+        test_struct.read_attributes(&mut mft_attributes)?;
+
+        assert_eq!(mft_attributes.attribute_groups.len(), 1);
 
         let attribute_name: Option<Ucs2String> = None;
-        let attribute_group: &NtfsMftAttributeGroup =
-            test_struct.attribute_groups.get(&attribute_name).unwrap();
+        let attribute_group: &NtfsMftAttributeGroup = mft_attributes
+            .attribute_groups
+            .get(&attribute_name)
+            .unwrap();
         assert_eq!(attribute_group.attributes.len(), 4);
 
         Ok(())
@@ -566,7 +348,6 @@ mod tests {
         assert_eq!(test_struct.is_empty, false);
         assert_eq!(test_struct.is_bad, false);
         assert_eq!(test_struct.is_allocated, true);
-        assert_eq!(test_struct.attribute_groups.len(), 0);
 
         Ok(())
     }
@@ -596,10 +377,7 @@ mod tests {
         assert_eq!(test_struct.is_empty, false);
         assert_eq!(test_struct.is_bad, false);
         assert_eq!(test_struct.is_allocated, true);
-        assert_eq!(test_struct.attribute_groups.len(), 0);
 
         Ok(())
     }
-
-    // TODO: add tests for read_reparse_point_attribute
 }

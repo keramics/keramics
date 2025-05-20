@@ -663,21 +663,26 @@ in size and consists of:
 
 ### The attribute list attribute
 
-The attribute list attribute ($ATTRIBUTE_LIST) is a list of attributes in an
-MFT entry. The attributes stored in the list are placeholders for other
-attributes. Some of these attributes could not be stored in the MFT entry due
-to space limitations. The attribute list attribute can be stored as either a
-resident (for a small amount of data) and non-resident MFT attribute.
+The attribute list attribute ($ATTRIBUTE_LIST) is used to store MFT attributes
+outside the MFT entry, e.g. when the MFT entry is too small to store all the
+attributes.
 
-The attribute list contains an attribute list entry for every cluster block of
-attribute data.
+The entries in the list reference the location of MFT attributes. The attribute
+list attribute can be stored as either a resident (for a small amount of data)
+or non-resident MFT attribute.
 
 > Note that MFT entry 0 also can contain an attribute list and allows to store
 > listed attributes beyond the first data run.
 
+#### The attribute list
+
+An attribute list consists of:
+
+* one or more attribute list entries
+
 #### The attribute list entry
 
-The attribute list entry (ATTRIBUTE_LIST_ENTRY) is of variable size and
+An attribute list entry (ATTRIBUTE_LIST_ENTRY) is of variable size and
 consists of:
 
 | Offset | Size | Value | Description

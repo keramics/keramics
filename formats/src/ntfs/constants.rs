@@ -87,6 +87,9 @@ pub(super) const NTFS_INDEX_VALUE_FLAG_IS_BRANCH: u32 = 0x00000001;
 /// NTFS index value flag to indicate the value is the last value in node.
 pub(super) const NTFS_INDEX_VALUE_FLAG_IS_LAST: u32 = 0x00000002;
 
+/// NTFS WINDOWS name space.
+pub(super) const NTFS_NAME_SPACE_WINDOWS: u8 = 0x01;
+
 /// NTFS DOS name space.
 pub(super) const NTFS_NAME_SPACE_DOS: u8 = 0x02;
 
