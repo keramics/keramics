@@ -37,15 +37,20 @@ pub fn print_vhd_file(data_stream: &DataStreamReference) -> ExitCode {
         (VhdDiskType::Unknown, "Unknown"),
     ]);
     let disk_type_string: &str = disk_types.get(&vhd_file.disk_type).unwrap();
-    let media_size_string: String = format_as_bytesize(vhd_file.media_size, 1024);
 
     println!("Virtual Hard Disk (VHD) information:");
     println!("    Format version\t\t\t: 1.0");
     println!("    Disk type\t\t\t\t: {}", disk_type_string);
-    println!(
-        "    Media size\t\t\t\t: {} ({} bytes)",
-        media_size_string, vhd_file.media_size
-    );
+
+    if vhd_file.media_size < 1024 {
+        println!("    Media size\t\t\t\t: {} bytes", vhd_file.media_size);
+    } else {
+        let media_size_string: String = format_as_bytesize(vhd_file.media_size, 1024);
+        println!(
+            "    Media size\t\t\t\t: {} ({} bytes)",
+            media_size_string, vhd_file.media_size
+        );
+    }
     println!(
         "    Bytes per sector\t\t\t: {} bytes",
         vhd_file.bytes_per_sector

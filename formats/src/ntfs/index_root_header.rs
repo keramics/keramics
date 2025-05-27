@@ -23,7 +23,7 @@ use types::bytes_to_u32_le;
         member(field(name = "attribute_type", data_type = "u32", format = "hex")),
         member(field(name = "collation_type", data_type = "u32")),
         member(field(name = "index_entry_size", data_type = "u32")),
-        member(field(name = "index_entry_number_of_cluster_blocks", data_type = "u32")),
+        member(field(name = "number_of_cluster_blocks_per_index_entry", data_type = "u32")),
     ),
     method(name = "debug_read_data")
 )]

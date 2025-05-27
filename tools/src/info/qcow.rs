@@ -47,14 +47,19 @@ pub fn print_qcow_file(data_stream: &DataStreamReference) -> ExitCode {
     let encryption_method_string: &str = encryption_methods
         .get(&qcow_file.encryption_method)
         .unwrap();
-    let media_size_string: String = format_as_bytesize(qcow_file.media_size, 1024);
 
     println!("QEMU Copy-On-Write (QCOW) information:");
     println!("    Format version\t\t\t: {}", qcow_file.format_version);
-    println!(
-        "    Media size\t\t\t\t: {} ({} bytes)",
-        media_size_string, qcow_file.media_size
-    );
+
+    if qcow_file.media_size < 1024 {
+        println!("    Media size\t\t\t\t: {} bytes", qcow_file.media_size);
+    } else {
+        let media_size_string: String = format_as_bytesize(qcow_file.media_size, 1024);
+        println!(
+            "    Media size\t\t\t\t: {} ({} bytes)",
+            media_size_string, qcow_file.media_size
+        );
+    }
     println!(
         "    Compression method\t\t\t: {}",
         compression_method_string

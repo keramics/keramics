@@ -93,8 +93,6 @@ pub fn print_apm_volume_system(data_stream: &DataStreamReference) -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-        let size_string: String = format_as_bytesize(apm_partition.size, 1024);
-
         println!("Partition: {}", partition_index + 1);
         println!(
             "    Type identifier\t\t\t: {}",
@@ -107,10 +105,15 @@ pub fn print_apm_volume_system(data_stream: &DataStreamReference) -> ExitCode {
             "    Offset\t\t\t\t: {} (0x{:08x})",
             apm_partition.offset, apm_partition.offset
         );
-        println!(
-            "    Size\t\t\t\t: {} ({} bytes)",
-            size_string, apm_partition.size
-        );
+        if apm_partition.size < 1024 {
+            println!("    Size\t\t\t\t: {}", apm_partition.size);
+        } else {
+            let size_string: String = format_as_bytesize(apm_partition.size, 1024);
+            println!(
+                "    Size\t\t\t\t: {} ({} bytes)",
+                size_string, apm_partition.size
+            );
+        }
         println!(
             "    Status flags\t\t\t: 0x{:08x}",
             apm_partition.status_flags

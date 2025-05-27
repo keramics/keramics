@@ -29,22 +29,36 @@ pub fn print_sparseimage_file(data_stream: &DataStreamReference) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let media_size_string: String = format_as_bytesize(sparseimage_file.media_size, 1024);
-    let band_size_string: String = format_as_bytesize(sparseimage_file.block_size as u64, 1024);
-
     println!("Sparse image (.sparseimage) information:");
-    println!(
-        "    Media size\t\t\t\t: {} ({} bytes)",
-        media_size_string, sparseimage_file.media_size
-    );
+
+    if sparseimage_file.media_size < 1024 {
+        println!(
+            "    Media size\t\t\t\t: {} bytes",
+            sparseimage_file.media_size
+        );
+    } else {
+        let media_size_string: String = format_as_bytesize(sparseimage_file.media_size, 1024);
+        println!(
+            "    Media size\t\t\t\t: {} ({} bytes)",
+            media_size_string, sparseimage_file.media_size
+        );
+    }
     println!(
         "    Bytes per sector\t\t\t: {} bytes",
         sparseimage_file.bytes_per_sector
     );
-    println!(
-        "    Band size\t\t\t\t: {} ({} bytes)",
-        band_size_string, sparseimage_file.block_size,
-    );
+    if sparseimage_file.block_size < 1024 {
+        println!(
+            "    Band size\t\t\t\t: {} bytes",
+            sparseimage_file.block_size,
+        );
+    } else {
+        let band_size_string: String = format_as_bytesize(sparseimage_file.block_size as u64, 1024);
+        println!(
+            "    Band size\t\t\t\t: {} ({} bytes)",
+            band_size_string, sparseimage_file.block_size,
+        );
+    }
     println!("");
 
     ExitCode::SUCCESS

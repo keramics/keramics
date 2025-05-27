@@ -61,7 +61,7 @@ impl VhdxSectorBitmap {
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         let mut offset: u64 = 0;
         let mut range_offset: u64 = 0;
-        let mut range_bit_value: u8 = data[0] >> 7;
+        let mut range_bit_value: u8 = data[0] & 0x01;
 
         for data_offset in 0..data.len() {
             let mut byte_value: u8 = data[data_offset];

@@ -42,13 +42,18 @@ pub fn print_udif_file(data_stream: &DataStreamReference) -> ExitCode {
     let compression_method_string: &str = compression_methods
         .get(&udif_file.compression_method)
         .unwrap();
-    let media_size_string: String = format_as_bytesize(udif_file.media_size, 1024);
 
     println!("Universal Disk Image Format (UDIF) information:");
-    println!(
-        "    Media size\t\t\t\t: {} ({} bytes)",
-        media_size_string, udif_file.media_size
-    );
+
+    if udif_file.media_size < 1024 {
+        println!("    Media size\t\t\t\t: {} bytes", udif_file.media_size);
+    } else {
+        let media_size_string: String = format_as_bytesize(udif_file.media_size, 1024);
+        println!(
+            "    Media size\t\t\t\t: {} ({} bytes)",
+            media_size_string, udif_file.media_size
+        );
+    }
     println!(
         "    Bytes per sector\t\t\t: {} bytes",
         udif_file.bytes_per_sector

@@ -317,6 +317,7 @@ mod tests {
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
         test_struct.read_attributes(&mut mft_attributes)?;
 
+        assert_eq!(mft_attributes.attributes.len(), 4);
         assert_eq!(mft_attributes.attribute_groups.len(), 1);
 
         let attribute_name: Option<Ucs2String> = None;
@@ -324,7 +325,8 @@ mod tests {
             .attribute_groups
             .get(&attribute_name)
             .unwrap();
-        assert_eq!(attribute_group.attributes.len(), 4);
+        // Note that the $FILE_NAME attribute is not grouped.
+        assert_eq!(attribute_group.attributes.len(), 3);
 
         Ok(())
     }

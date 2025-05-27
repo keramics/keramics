@@ -22,6 +22,8 @@ use formats::ntfs::{
     NtfsAttribute, NtfsAttributeListEntry, NtfsDataFork, NtfsFileEntry, NtfsFileSystem, NtfsPath,
 };
 
+use crate::formatters::format_as_bytesize;
+
 use super::bodyfile;
 
 pub const FILE_ATTRIBUTE_FLAG_READ_ONLY: u32 = 0x00000001;
@@ -272,26 +274,22 @@ pub fn print_entry_ntfs_file_system(
                 return ExitCode::FAILURE;
             }
         };
-        println!("    Number of attributes\t\t: {}", number_of_attributes);
-
         // TODO: print is corrupted.
         println!("");
 
         for attribute_index in 0..number_of_attributes {
-            let mut attribute: NtfsAttribute =
-                match file_entry.get_attribute_by_index(attribute_index) {
-                    Ok(attribute) => attribute,
-                    Err(error) => {
-                        println!(
-                            "Unable to retrive NTFS MFT entry: {} attribute: {} with error: {}",
-                            ntfs_entry_identifier, attribute_index, error
-                        );
-                        return ExitCode::FAILURE;
-                    }
-                };
-            println!("Attribute: {}", attribute_index + 1);
-
-            match print_ntfs_attribute(&mut attribute) {
+            let attribute: NtfsAttribute = match file_entry.get_attribute_by_index(attribute_index)
+            {
+                Ok(attribute) => attribute,
+                Err(error) => {
+                    println!(
+                        "Unable to retrive NTFS MFT entry: {} attribute: {} with error: {}",
+                        ntfs_entry_identifier, attribute_index, error
+                    );
+                    return ExitCode::FAILURE;
+                }
+            };
+            match print_ntfs_attribute(&attribute) {
                 Ok(_) => {}
                 Err(error) => {
                     println!("{}", error);
@@ -304,7 +302,7 @@ pub fn print_entry_ntfs_file_system(
 }
 
 /// Prints information about a New Technologies File System (NTFS) attribute.
-fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
+fn print_ntfs_attribute(attribute: &NtfsAttribute) -> io::Result<()> {
     let attribute_types = HashMap::<u32, &'static str>::from([
         (
             NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION,
@@ -335,14 +333,13 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
             "$LOGGED_UTILITY_STREAM",
         ),
     ]);
-
     let attribute_type: u32 = attribute.get_attribute_type();
     match attribute_types.get(&attribute_type) {
         Some(attribute_type_string) => println!(
-            "    Attribute type\t\t\t: {} (0x{:08x})",
+            "Attribute: {} (0x{:08x})",
             attribute_type_string, attribute_type
         ),
-        None => println!("    Attribute type\t\t\t: 0x{:08x}", attribute_type),
+        None => println!("Attribute: 0x{:08x}", attribute_type),
     };
     match attribute {
         NtfsAttribute::AttributeList { attribute_list } => {
@@ -375,8 +372,6 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
             }
             println!("");
         }
-        // TODO: add support for $DATA
-        // TODO: add support for $BITMAP
         // TODO: add support for $EA
         // TODO: add support for $EA_INFORMATION
         NtfsAttribute::FileName { file_name } => {
@@ -423,8 +418,36 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
             );
             print_attribute_flags(file_name.file_attribute_flags);
         }
-        // TODO: add support for $INDEX_ALLOCATION
-        // TODO: add support for $INDEX_ROOT
+        // $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
+        NtfsAttribute::Generic { mft_attribute } => {
+            match &mft_attribute.name {
+                Some(name) => println!("    Attribute name\t\t\t: {}", name.to_string()),
+                None => {}
+            };
+            if mft_attribute.data_size < 1024 {
+                println!("    Data size\t\t\t\t: {} bytes", mft_attribute.data_size);
+            } else {
+                let data_size_string: String = format_as_bytesize(mft_attribute.data_size, 1024);
+                println!(
+                    "    Data size\t\t\t\t: {} ({} bytes)",
+                    data_size_string, mft_attribute.data_size
+                );
+            }
+            if attribute_type == NTFS_ATTRIBUTE_TYPE_DATA {
+                println!("    Data flags\t\t\t\t: 0x{:04x}", mft_attribute.data_flags);
+            }
+            if mft_attribute.data_cluster_groups.len() > 0 {
+                let string_parts: Vec<String> = mft_attribute
+                    .data_cluster_groups
+                    .iter()
+                    .map(|cluster_group| {
+                        format!("{}-{}", cluster_group.first_vcn, cluster_group.last_vcn)
+                    })
+                    .collect::<Vec<String>>();
+                println!("    VCNs\t\t\t\t: [{}]", string_parts.join(", "));
+            }
+            println!("");
+        }
         // TODO: add support for $LOGGED_UTILITY_STREAM
         // TODO: add support for $OBJECT_ID
         // TODO: add support for $PROPERTY_SET
@@ -473,9 +496,6 @@ fn print_ntfs_attribute(attribute: &mut NtfsAttribute) -> io::Result<()> {
         }
         NtfsAttribute::VolumeName { volume_name } => {
             println!("    Volume name\t\t\t\t: {}", volume_name.to_string());
-            println!("");
-        }
-        _ => {
             println!("");
         }
     };
