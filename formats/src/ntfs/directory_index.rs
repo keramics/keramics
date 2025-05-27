@@ -12,6 +12,7 @@
  */
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::io;
 use std::rc::Rc;
 
@@ -38,11 +39,8 @@ pub struct NtfsDirectoryIndex {
     /// Mediator.
     mediator: MediatorReference,
 
-    /// Cluster block size.
-    cluster_block_size: u32,
-
     /// Case folding mappings.
-    pub case_folding_mappings: Rc<Vec<u16>>,
+    pub case_folding_mappings: Rc<HashMap<u16, u16>>,
 
     /// Index.
     index: NtfsIndex,
@@ -59,12 +57,11 @@ pub struct NtfsDirectoryIndex {
 
 impl NtfsDirectoryIndex {
     /// Creates a new directory index.
-    pub fn new(cluster_block_size: u32, case_folding_mappings: &Rc<Vec<u16>>) -> Self {
+    pub fn new(cluster_block_size: u32, case_folding_mappings: &Rc<HashMap<u16, u16>>) -> Self {
         Self {
             mediator: Mediator::current(),
-            cluster_block_size: cluster_block_size,
             case_folding_mappings: case_folding_mappings.clone(),
-            index: NtfsIndex::new(),
+            index: NtfsIndex::new(cluster_block_size),
             root_node_data: Vec::new(),
             is_initialized: false,
             use_case_folding: true,
@@ -157,11 +154,9 @@ impl NtfsDirectoryIndex {
         match mft_attributes
             .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION)
         {
-            Some(mft_attribute) => self.index.initialize(
-                self.cluster_block_size,
-                index_root_header.index_entry_size,
-                mft_attribute,
-            )?,
+            Some(mft_attribute) => self
+                .index
+                .initialize(index_root_header.index_entry_size, mft_attribute)?,
             None => {}
         };
 
@@ -190,9 +185,11 @@ impl NtfsDirectoryIndex {
             let mut case_folded_name: Ucs2String = Ucs2String::new();
 
             for element in name.elements.iter() {
-                case_folded_name
-                    .elements
-                    .push(self.case_folding_mappings[*element as usize]);
+                let folded_element: u16 = match self.case_folding_mappings.get(element) {
+                    Some(&value) => value,
+                    None => *element,
+                };
+                case_folded_name.elements.push(folded_element);
             }
             self.get_directory_entry_by_name_from_node(
                 &self.root_node_data,
@@ -224,6 +221,9 @@ impl NtfsDirectoryIndex {
 
         // Fix-up values can be stored between the index node and values.
 
+        let mut is_branch: bool = false;
+        let mut value_data_size: usize = 0;
+
         while index_value_offset < index_values_end_offset {
             let index_value: NtfsIndexValue =
                 self.read_index_value(data, index_value_offset, index_values_end_offset)?;
@@ -246,56 +246,42 @@ impl NtfsDirectoryIndex {
                 }
                 index_value_offset = key_data_end_offset;
             }
-            if key_data_size > 0 {
-                let file_name: NtfsFileName =
-                    self.read_index_key(data, key_data_offset, key_data_size)?;
+            is_branch = index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_BRANCH != 0;
+            value_data_size = (index_value.size as usize) - 16 - key_data_size;
 
-                let result: Ordering = if self.use_case_folding {
-                    let mut case_folded_name: Ucs2String = Ucs2String::new();
-
-                    for element in file_name.name.elements.iter() {
-                        case_folded_name
-                            .elements
-                            .push(self.case_folding_mappings[*element as usize]);
-                    }
-                    // TODO: add a compare_with_case_folding
-                    case_folded_name.compare(name)
-                } else {
-                    file_name.name.compare(name)
-                };
-                if result == Ordering::Equal {
-                    let directory_entry: NtfsDirectoryEntry =
-                        NtfsDirectoryEntry::new(index_value.file_reference, file_name);
-                    return Ok(Some(directory_entry));
-                }
-                if result == Ordering::Less
-                    && index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_BRANCH != 0
-                {
-                    break;
-                }
-            }
-            let value_data_size: usize = (index_value.size as usize) - 16 - key_data_size;
-
-            if index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_BRANCH != 0 {
-                let sub_node_vcn: u64 =
-                    self.read_index_branch_value(data, index_value_offset, value_data_size)?;
-
-                // TODO: skip if sub node is not allocated.
-
-                let index_entry: NtfsIndexEntry =
-                    self.index.get_entry(data_stream, sub_node_vcn)?;
-
-                match self.get_directory_entry_by_name_from_node(
-                    &index_entry.data,
-                    24,
-                    data_stream,
-                    name,
-                )? {
-                    Some(directory_entry) => return Ok(Some(directory_entry)),
-                    None => {}
-                }
-            }
             if index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_LAST != 0 {
+                break;
+            }
+            if key_data_size == 0 {
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    "Missing key data",
+                ));
+            }
+            let file_name: NtfsFileName =
+                self.read_index_key(data, key_data_offset, key_data_size)?;
+
+            let result: Ordering = if self.use_case_folding {
+                let mut case_folded_name: Ucs2String = Ucs2String::new();
+
+                for element in file_name.name.elements.iter() {
+                    let folded_element: u16 = match self.case_folding_mappings.get(element) {
+                        Some(&value) => value,
+                        None => *element,
+                    };
+                    case_folded_name.elements.push(folded_element);
+                }
+                // TODO: add a compare_with_case_folding
+                case_folded_name.compare(name)
+            } else {
+                file_name.name.compare(name)
+            };
+            if result == Ordering::Equal {
+                let directory_entry: NtfsDirectoryEntry =
+                    NtfsDirectoryEntry::new(index_value.file_reference, file_name);
+                return Ok(Some(directory_entry));
+            }
+            if result == Ordering::Greater && is_branch {
                 break;
             }
             index_value_offset += value_data_size;
@@ -305,6 +291,26 @@ impl NtfsDirectoryIndex {
                 // TODO: debug print 8-byte alignment padding.
 
                 index_value_offset += 8 - alignment_padding;
+            }
+        }
+        if is_branch {
+            let sub_node_vcn: u64 =
+                self.read_index_branch_value(data, index_value_offset, value_data_size)?;
+
+            // TODO: skip if sub node is not allocated.
+
+            let index_entry: NtfsIndexEntry = self
+                .index
+                .get_entry_at_cluster_block(data_stream, sub_node_vcn)?;
+
+            match self.get_directory_entry_by_name_from_node(
+                &index_entry.data,
+                24,
+                data_stream,
+                name,
+            )? {
+                Some(directory_entry) => return Ok(Some(directory_entry)),
+                None => {}
             }
         }
         Ok(None)
@@ -374,8 +380,9 @@ impl NtfsDirectoryIndex {
 
                 // TODO: skip if sub node is not allocated.
 
-                let index_entry: NtfsIndexEntry =
-                    self.index.get_entry(data_stream, sub_node_vcn)?;
+                let index_entry: NtfsIndexEntry = self
+                    .index
+                    .get_entry_at_cluster_block(data_stream, sub_node_vcn)?;
 
                 self.get_directory_entries_from_node(&index_entry.data, 24, data_stream, entries)?;
             } else if self.mediator.debug_output && value_data_size > 0 {
@@ -558,8 +565,8 @@ mod tests {
 
     use core::open_fake_data_stream;
 
-    fn get_case_folding_mappings() -> Rc<Vec<u16>> {
-        Rc::new(vec![
+    fn get_case_folding_mappings() -> Rc<HashMap<u16, u16>> {
+        let characters: Vec<u16> = vec![
             0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x0008, 0x0009, 0x000a,
             0x000b, 0x000c, 0x000d, 0x000e, 0x000f, 0x0010, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015,
             0x0016, 0x0017, 0x0018, 0x0019, 0x001a, 0x001b, 0x001c, 0x001d, 0x001e, 0x001f, 0x0020,
@@ -6518,7 +6525,17 @@ mod tests {
             0xffe1, 0xffe2, 0xffe3, 0xffe4, 0xffe5, 0xffe6, 0xffe7, 0xffe8, 0xffe9, 0xffea, 0xffeb,
             0xffec, 0xffed, 0xffee, 0xffef, 0xfff0, 0xfff1, 0xfff2, 0xfff3, 0xfff4, 0xfff5, 0xfff6,
             0xfff7, 0xfff8, 0xfff9, 0xfffa, 0xfffb, 0xfffc, 0xfffd, 0xfffe, 0xffff,
-        ])
+        ];
+        let mut case_folding_mappings: HashMap<u16, u16> = HashMap::new();
+
+        for character_value in 0..=65535 {
+            let value_16bit: u16 = characters[character_value as usize];
+
+            if character_value != value_16bit {
+                case_folding_mappings.insert(character_value, value_16bit);
+            }
+        }
+        Rc::new(case_folding_mappings)
     }
 
     // TODO: add tests for initialize
@@ -6826,7 +6843,7 @@ mod tests {
         let mut index_entry = NtfsIndexEntry::new();
         index_entry.read_data(&mut test_data)?;
 
-        let case_folding_mappings: Rc<Vec<u16>> = get_case_folding_mappings();
+        let case_folding_mappings: Rc<HashMap<u16, u16>> = get_case_folding_mappings();
         let test_struct = NtfsDirectoryIndex::new(4096, &case_folding_mappings);
         let data_stream: DataStreamReference = open_fake_data_stream(vec![]);
 

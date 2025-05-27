@@ -55,8 +55,6 @@ pub fn print_gpt_volume_system(data_stream: &DataStreamReference) -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-        let size_string: String = format_as_bytesize(gpt_partition.size, 1024);
-
         println!("Partition: {}", partition_index + 1);
         println!(
             "    Identifier\t\t\t\t: {}",
@@ -70,10 +68,15 @@ pub fn print_gpt_volume_system(data_stream: &DataStreamReference) -> ExitCode {
             "    Offset\t\t\t\t: {} (0x{:08x})",
             gpt_partition.offset, gpt_partition.offset
         );
-        println!(
-            "    Size\t\t\t\t: {} ({} bytes)",
-            size_string, gpt_partition.size
-        );
+        if gpt_partition.size < 1024 {
+            println!("    Size\t\t\t\t: {} bytes", gpt_partition.size);
+        } else {
+            let size_string: String = format_as_bytesize(gpt_partition.size, 1024);
+            println!(
+                "    Size\t\t\t\t: {} ({} bytes)",
+                size_string, gpt_partition.size
+            );
+        }
     }
     println!("");
 

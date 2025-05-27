@@ -20,9 +20,12 @@ use compression::Lznt1Context;
 use core::mediator::{Mediator, MediatorReference};
 use core::{DataStream, DataStreamReference};
 
+use crate::block_tree::BlockTree;
 use crate::lru_cache::LruCache;
 
 use super::block_stream::NtfsBlockStream;
+use super::compression_range::{NtfsCompressionRange, NtfsCompressionRangeType};
+use super::data_run::NtfsDataRunType;
 use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) compressed stream.
@@ -36,20 +39,20 @@ pub struct NtfsCompressedStream {
     /// Cluster block size.
     cluster_block_size: u32,
 
+    /// Compression block tree.
+    block_tree: BlockTree<NtfsCompressionRange>,
+
     /// Compression unit size.
     compression_unit_size: usize,
 
-    /// The compressed size.
-    compressed_size: u64,
+    /// Decompressed block cache.
+    block_cache: LruCache<u64, Vec<u8>>,
 
     /// The current offset.
     current_offset: u64,
 
     /// The size.
     size: u64,
-
-    /// Decompressed block cache.
-    block_cache: LruCache<u64, Vec<u8>>,
 }
 
 impl NtfsCompressedStream {
@@ -59,11 +62,11 @@ impl NtfsCompressedStream {
             mediator: Mediator::current(),
             data_stream: None,
             cluster_block_size: cluster_block_size,
+            block_tree: BlockTree::<NtfsCompressionRange>::new(0, 0, 0),
             compression_unit_size: 0,
-            compressed_size: 0,
+            block_cache: LruCache::new(8),
             current_offset: 0,
             size: 0,
-            block_cache: LruCache::new(8),
         }
     }
 
@@ -79,106 +82,236 @@ impl NtfsCompressedStream {
                 "Unsupported uncompressed $DATA attribute.",
             ));
         }
+        if data_attribute.is_resident() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported resident $DATA attribute.",
+            ));
+        }
+        if data_attribute.compression_unit_size == 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported compression unit size.",
+            ));
+        }
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
         block_stream.open(data_stream, data_attribute)?;
 
         self.data_stream = Some(Arc::new(RwLock::new(block_stream)));
+
         self.compression_unit_size =
             (data_attribute.compression_unit_size as usize) * (self.cluster_block_size as usize);
-        self.compressed_size = data_attribute.compressed_data_size;
+
+        if data_attribute.allocated_data_size % (self.compression_unit_size as u64) != 0 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported allocated data size not a multitude of compression unit size.",
+            ));
+        }
+        let block_tree_size: u64 = data_attribute
+            .allocated_data_size
+            .div_ceil(self.compression_unit_size as u64)
+            * (self.compression_unit_size as u64);
+        self.block_tree = BlockTree::<NtfsCompressionRange>::new(
+            block_tree_size,
+            0,
+            self.compression_unit_size as u64,
+        );
+
+        if data_attribute.allocated_data_size > 0 {
+            let mut virtual_cluster_offset: u64 = 0;
+            let mut last_data_run_type: NtfsDataRunType = NtfsDataRunType::EndOfList;
+            let mut compression_range: NtfsCompressionRange = NtfsCompressionRange::new(
+                virtual_cluster_offset,
+                0,
+                NtfsCompressionRangeType::Uncompressed,
+            );
+            for cluster_group in data_attribute.data_cluster_groups.iter() {
+                for data_run in cluster_group.data_runs.iter() {
+                    let mut data_run_processed: bool = false;
+
+                    loop {
+                        if compression_range.size >= (self.compression_unit_size as u64) {
+                            let compression_range_size: u64 = match compression_range.range_type {
+                                NtfsCompressionRangeType::Compressed => {
+                                    self.compression_unit_size as u64
+                                }
+                                NtfsCompressionRangeType::Uncompressed => {
+                                    (compression_range.size / (self.compression_unit_size as u64))
+                                        * (self.compression_unit_size as u64)
+                                }
+                            };
+                            let remaining_range_size: u64 =
+                                compression_range.size - compression_range_size;
+
+                            compression_range.size = compression_range_size;
+
+                            match self.block_tree.insert_value(
+                                compression_range.offset,
+                                compression_range.size,
+                                compression_range,
+                            ) {
+                                Ok(_) => {}
+                                Err(error) => return Err(core::error_to_io_error!(error)),
+                            };
+                            virtual_cluster_offset += compression_range_size;
+
+                            compression_range = NtfsCompressionRange::new(
+                                virtual_cluster_offset,
+                                remaining_range_size,
+                                NtfsCompressionRangeType::Uncompressed,
+                            );
+                        }
+                        if !data_run_processed {
+                            compression_range.size +=
+                                data_run.number_of_blocks * (self.cluster_block_size as u64);
+
+                            if data_run.run_type != last_data_run_type {
+                                // One or more sparse data runs after one or more regular data runs marks a
+                                // compressed range.
+                                if last_data_run_type == NtfsDataRunType::InFile
+                                    && data_run.run_type == NtfsDataRunType::Sparse
+                                {
+                                    compression_range.range_type =
+                                        NtfsCompressionRangeType::Compressed;
+                                }
+                                last_data_run_type = data_run.run_type.clone();
+                            }
+                            data_run_processed = true
+                        }
+                        if compression_range.size < (self.compression_unit_size as u64) {
+                            break;
+                        }
+                    }
+                }
+            }
+            if compression_range.size > 0 {
+                match self.block_tree.insert_value(
+                    compression_range.offset,
+                    compression_range.size,
+                    compression_range,
+                ) {
+                    Ok(_) => {}
+                    Err(error) => return Err(core::error_to_io_error!(error)),
+                };
+            }
+        }
         self.size = data_attribute.valid_data_size;
 
         Ok(())
     }
 
-    /// Reads media data based on the compressed blocks.
+    /// Reads data based on the compression unit.
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
+        let mut current_offset: u64 = self.current_offset;
 
         while data_offset < read_size {
-            if self.current_offset >= self.size {
+            if current_offset >= self.size {
                 break;
             }
-            let block_offset: u64 = (self.current_offset / (self.compression_unit_size as u64))
-                * (self.compression_unit_size as u64);
+            let compression_unit: &NtfsCompressionRange =
+                match self.block_tree.get_value(current_offset) {
+                    Some(value) => value,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::Other,
+                            format!("Missing compression unit for offset: {}", current_offset),
+                        ));
+                    }
+                };
+            let range_offset: u64 = compression_unit.offset;
+            let range_size: u64 = compression_unit.size;
 
-            let block_relative_offset: u64 = self.current_offset - block_offset;
-            let block_remainder_size: u64 =
-                (self.compression_unit_size as u64) - block_relative_offset;
+            let range_relative_offset: u64 = current_offset - range_offset;
+            let range_end_offset: u64 = min(range_offset + range_size, self.size);
 
-            let mut block_read_size: usize = read_size - data_offset;
+            let range_remainder_size: u64 =
+                (range_end_offset - range_offset) - range_relative_offset;
+            let read_remainder_size: usize = read_size - data_offset;
 
-            if (block_read_size as u64) > block_remainder_size {
-                block_read_size = block_remainder_size as usize;
-            }
-            if block_read_size == 0 {
-                break;
-            }
-            if !self.block_cache.contains(&block_offset) {
-                let mut data: Vec<u8> = vec![0; self.compression_unit_size];
+            let range_read_size: usize = min(read_remainder_size, range_remainder_size as usize);
 
-                self.read_compressed_block(block_offset, &mut data)?;
+            let data_end_offset: usize = data_offset + range_read_size;
+            let read_count: usize = match compression_unit.range_type {
+                NtfsCompressionRangeType::Compressed => {
+                    let range_read_size: usize =
+                        min(read_remainder_size, self.compression_unit_size);
+                    let data_end_offset: usize = data_offset + range_read_size;
 
-                self.block_cache.insert(block_offset, data);
-            }
-            let block_data: &Vec<u8> = match self.block_cache.get(&block_offset) {
-                Some(data) => data,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Unable to retrieve data from cache."),
-                    ));
+                    if !self.block_cache.contains(&range_offset) {
+                        let mut compressed_data: Vec<u8> = vec![0; range_size as usize];
+
+                        match self.data_stream.as_ref() {
+                            Some(data_stream) => match data_stream.write() {
+                                Ok(mut data_stream) => data_stream.read_exact_at_position(
+                                    &mut compressed_data,
+                                    io::SeekFrom::Start(range_offset),
+                                )?,
+                                Err(error) => return Err(core::error_to_io_error!(error)),
+                            },
+                            None => {
+                                return Err(io::Error::new(
+                                    io::ErrorKind::InvalidInput,
+                                    "Missing data stream",
+                                ))
+                            }
+                        };
+                        if self.mediator.debug_output {
+                            self.mediator.debug_print(format!(
+                                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
+                                range_size, range_offset, range_offset,
+                            ));
+                            self.mediator.debug_print_data(&compressed_data, true);
+                        }
+                        let mut block_data: Vec<u8> = vec![0; self.compression_unit_size];
+
+                        let mut lznt1_context: Lznt1Context = Lznt1Context::new();
+                        lznt1_context.decompress(&compressed_data, &mut block_data)?;
+
+                        self.block_cache.insert(range_offset, block_data);
+                    }
+                    let block_data: &Vec<u8> = match self.block_cache.get(&range_offset) {
+                        Some(data) => data,
+                        None => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::Other,
+                                format!("Unable to retrieve data from cache."),
+                            ));
+                        }
+                    };
+                    let block_data_offset: usize = range_relative_offset as usize;
+                    let block_data_end_offset: usize = block_data_offset + range_read_size;
+
+                    data[data_offset..data_end_offset]
+                        .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+
+                    range_read_size
                 }
+                NtfsCompressionRangeType::Uncompressed => match self.data_stream.as_ref() {
+                    Some(data_stream) => match data_stream.write() {
+                        Ok(mut data_stream) => data_stream.read_at_position(
+                            &mut data[data_offset..data_end_offset],
+                            io::SeekFrom::Start(range_offset + range_relative_offset),
+                        )?,
+                        Err(error) => return Err(core::error_to_io_error!(error)),
+                    },
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            "Missing data stream",
+                        ))
+                    }
+                },
             };
-            let data_end_offset: usize = data_offset + block_read_size;
-
-            let block_data_offset: usize = block_relative_offset as usize;
-            let block_data_end_offset: usize = block_data_offset + block_read_size;
-
-            data[data_offset..data_end_offset]
-                .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
-
-            data_offset += block_read_size;
-            self.current_offset += block_read_size as u64;
+            if read_count == 0 {
+                break;
+            }
+            data_offset += read_count;
+            current_offset += read_count as u64;
         }
         Ok(data_offset)
-    }
-
-    /// Reads a compressed block.
-    fn read_compressed_block(&mut self, block_offset: u64, data: &mut Vec<u8>) -> io::Result<()> {
-        let block_size: usize = min(
-            self.compression_unit_size,
-            (self.compressed_size - block_offset) as usize,
-        );
-        let mut compressed_data: Vec<u8> = vec![0; block_size];
-
-        match self.data_stream.as_ref() {
-            Some(data_stream) => match data_stream.write() {
-                Ok(mut data_stream) => data_stream.read_exact_at_position(
-                    &mut compressed_data,
-                    io::SeekFrom::Start(block_offset),
-                )?,
-                Err(error) => return Err(core::error_to_io_error!(error)),
-            },
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ))
-            }
-        };
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                self.compression_unit_size, block_offset, block_offset,
-            ));
-            self.mediator.debug_print_data(&compressed_data, true);
-        }
-        let mut lznt1_context: Lznt1Context = Lznt1Context::new();
-        lznt1_context.decompress(&compressed_data, data)?;
-
-        Ok(())
     }
 }
 
@@ -856,7 +989,6 @@ mod tests {
     }
 
     // TODO: add tests for read_data_from_blocks
-    // TODO: add tests for read_compressed_block
 
     #[test]
     fn test_seek_from_start() -> io::Result<()> {

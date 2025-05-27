@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::rc::Rc;
 
@@ -79,7 +79,7 @@ impl NtfsFileEntry {
     pub(super) fn new(
         data_stream: &DataStreamReference,
         mft: &Rc<NtfsMasterFileTable>,
-        case_folding_mappings: &Rc<Vec<u16>>,
+        case_folding_mappings: &Rc<HashMap<u16, u16>>,
         mft_entry_number: u64,
         mft_entry: NtfsMftEntry,
         name: Option<Ucs2String>,
@@ -245,8 +245,8 @@ impl NtfsFileEntry {
                     reparse_point: reparse_point,
                 }
             }
-            _ => NtfsAttribute::Undefined {
-                attribute_type: mft_attribute.attribute_type,
+            _ => NtfsAttribute::Generic {
+                mft_attribute: mft_attribute,
             },
         };
         Ok(attribute)
@@ -355,14 +355,17 @@ impl NtfsFileEntry {
                     &self.data_stream,
                     self.mft.cluster_block_size,
                 )?;
-                let mut attribute_list_mft_entries: HashSet<u64> = HashSet::new();
+                let mut mft_entries_set: HashSet<u64> = HashSet::new();
                 for entry in attribute_list.entries.iter() {
                     let mft_entry_number: u64 = entry.file_reference & 0x0000ffffffffffff;
                     if mft_entry_number != self.mft_entry_number {
-                        attribute_list_mft_entries.insert(mft_entry_number);
+                        mft_entries_set.insert(mft_entry_number);
                     }
                 }
-                for mft_entry_number in attribute_list_mft_entries.iter() {
+                let mut mft_entries: Vec<u64> = mft_entries_set.drain().collect::<Vec<u64>>();
+                mft_entries.sort();
+
+                for mft_entry_number in mft_entries.iter() {
                     let mft_entry: NtfsMftEntry =
                         self.mft.get_entry(&self.data_stream, *mft_entry_number)?;
                     mft_entry.read_attributes(&mut self.mft_attributes)?;

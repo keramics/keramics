@@ -17,6 +17,7 @@ use core::mediator::{Mediator, MediatorReference};
 use types::Ucs2String;
 
 use super::cluster_group::NtfsClusterGroup;
+use super::data_run::NtfsDataRun;
 use super::mft_attribute_header::NtfsMftAttributeHeader;
 use super::mft_attribute_non_resident::NtfsMftAttributeNonResident;
 use super::mft_attribute_resident::NtfsMftAttributeResident;
@@ -83,9 +84,24 @@ impl NtfsMftAttribute {
         }
     }
 
-    /// Appends a data cluster group.
-    pub fn append_data_cluster_group(&mut self, cluster_group: NtfsClusterGroup) {
-        self.data_cluster_groups.push(cluster_group);
+    /// Retrieves the number of data runs.
+    pub fn get_number_of_data_runs(&self) -> usize {
+        self.data_cluster_groups
+            .iter()
+            .map(|cluster_group| cluster_group.data_runs.len())
+            .sum()
+    }
+
+    /// Retrieves a specific data run.
+    pub fn get_data_run(&self, mut index: usize) -> Option<&NtfsDataRun> {
+        for cluster_group in &self.data_cluster_groups {
+            let number_of_data_runs: usize = cluster_group.data_runs.len();
+            if index < number_of_data_runs {
+                return cluster_group.data_runs.get(index);
+            }
+            index -= number_of_data_runs;
+        }
+        None
     }
 
     /// Determines if the MFT attribute is compressed.
@@ -101,6 +117,31 @@ impl NtfsMftAttribute {
     /// Determines if the MFT attribute is sparse.
     pub fn is_sparse(&self) -> bool {
         self.data_flags & 0x8000 != 0
+    }
+
+    /// Merges the other attribute with the current one.
+    pub fn merge(&mut self, other: &mut Self) -> io::Result<()> {
+        if other.is_resident() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Unsupported resident attribute",
+            ));
+        }
+        if other.data_cluster_groups[0].first_vcn == 0 {
+            self.allocated_data_size = other.allocated_data_size;
+            self.data_size = other.data_size;
+            self.valid_data_size = other.valid_data_size;
+            self.compression_unit_size = other.compression_unit_size;
+            self.compressed_data_size = other.compressed_data_size;
+        }
+        // TODO: check for overlapping clusters
+        for cluster_group in other.data_cluster_groups.drain(..) {
+            self.data_cluster_groups.push(cluster_group);
+        }
+        self.data_cluster_groups
+            .sort_by_key(|cluster_group| cluster_group.first_vcn);
+
+        Ok(())
     }
 
     /// Reads the MFT attribute from a buffer.
@@ -153,7 +194,10 @@ impl NtfsMftAttribute {
             non_resident_attribute.read_data(&data[data_offset..])?;
 
             if self.mediator.debug_output {
-                if self.is_compressed() && non_resident_attribute.compression_unit_size == 0 {
+                if self.is_compressed()
+                    && non_resident_attribute.compression_unit_size == 0
+                    && non_resident_attribute.data_first_vcn == 0
+                {
                     self.mediator.debug_print(format!(
                         "Attribute data flags set compression type but no compression unit size set\n",
                     ));
@@ -285,12 +329,6 @@ impl NtfsMftAttribute {
 
         Ok(())
     }
-
-    /// Sorts the data cluster groups.
-    pub fn sort_data_cluster_groups(&mut self) {
-        self.data_cluster_groups
-            .sort_by_key(|cluster_group| cluster_group.first_vcn);
-    }
 }
 
 #[cfg(test)]
@@ -309,10 +347,10 @@ mod tests {
         ];
     }
 
-    // TODO: add tests for append_data_cluster_group
     // TODO: add tests for is_compressed
     // TODO: add tests for is_resident
     // TODO: add tests for is_sparse
+    // TODO: add tests for merge
 
     #[test]
     fn test_read_data() -> io::Result<()> {
@@ -333,5 +371,4 @@ mod tests {
     }
 
     // TODO: add tests for read_name
-    // TODO: add tests for sort_data_cluster_groups
 }

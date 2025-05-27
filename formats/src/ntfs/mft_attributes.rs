@@ -79,32 +79,15 @@ impl NtfsMftAttributes {
             };
         match attribute_group.get_attribute_index(attribute.attribute_type) {
             Some(existing_attribute_index) => {
-                let existing_attribute: &mut NtfsMftAttribute =
-                    match self.attributes.get_mut(*existing_attribute_index) {
-                        Some(existing_attribute) => existing_attribute,
-                        None => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidInput,
-                                format!("Missing attribute: {}", existing_attribute_index),
-                            ));
-                        }
-                    };
-                // TODO: check attribute.data_size
-
-                if attribute.data_flags != existing_attribute.data_flags {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported data flags: 0x{:04x} expected: 0x{:04x}",
-                            attribute.data_flags, existing_attribute.data_flags
-                        ),
-                    ));
-                }
-                // TODO: check for overlapping clusters
-                for cluster_group in attribute.data_cluster_groups.drain(..) {
-                    existing_attribute.append_data_cluster_group(cluster_group);
-                }
-                existing_attribute.sort_data_cluster_groups();
+                match self.attributes.get_mut(*existing_attribute_index) {
+                    Some(existing_attribute) => existing_attribute.merge(&mut attribute)?,
+                    None => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidInput,
+                            format!("Missing attribute: {}", existing_attribute_index),
+                        ));
+                    }
+                };
             }
             None => {
                 let attribute_index: usize = self.attributes.len();
@@ -136,8 +119,10 @@ impl NtfsMftAttributes {
                     }
                     _ => {}
                 };
-                attribute_group.add_attribute_index(attribute_type, attribute_index);
-
+                // A MFT entry can have mutliple $FILE_NAME attributes.
+                if attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
+                    attribute_group.add_attribute_index(attribute_type, attribute_index);
+                }
                 self.attributes.push(attribute);
             }
         };
@@ -256,16 +241,17 @@ impl NtfsMftAttributes {
             )?;
 
             Ok(Some(Arc::new(RwLock::new(wof_compressed_stream))))
+        } else if data_attribute.is_resident() {
+            // A resident $DATA attribute with a compression type in the data flags is stored uncompressed.
+            let data_stream: FakeDataStream =
+                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
+            Ok(Some(Arc::new(RwLock::new(data_stream))))
         } else if data_attribute.is_compressed() {
             let mut compressed_stream: NtfsCompressedStream =
                 NtfsCompressedStream::new(cluster_block_size);
             compressed_stream.open(data_stream, data_attribute)?;
 
             Ok(Some(Arc::new(RwLock::new(compressed_stream))))
-        } else if data_attribute.is_resident() {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
-            Ok(Some(Arc::new(RwLock::new(data_stream))))
         } else {
             let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
             block_stream.open(data_stream, data_attribute)?;

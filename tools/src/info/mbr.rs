@@ -150,8 +150,6 @@ pub fn print_mbr_volume_system(data_stream: &DataStreamReference) -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-        let size_string: String = format_as_bytesize(mbr_partition.size, 1024);
-
         println!("Partition: {}", partition_index + 1);
 
         match partition_types.get(&mbr_partition.partition_type) {
@@ -169,10 +167,15 @@ pub fn print_mbr_volume_system(data_stream: &DataStreamReference) -> ExitCode {
             "    Offset\t\t\t\t: {} (0x{:08x})",
             mbr_partition.offset, mbr_partition.offset
         );
-        println!(
-            "    Size\t\t\t\t: {} ({} bytes)",
-            size_string, mbr_partition.size
-        );
+        if mbr_partition.size < 1024 {
+            println!("    Size\t\t\t\t: {} bytes", mbr_partition.size);
+        } else {
+            let size_string: String = format_as_bytesize(mbr_partition.size, 1024);
+            println!(
+                "    Size\t\t\t\t: {} ({} bytes)",
+                size_string, mbr_partition.size
+            );
+        }
         println!("    Flags\t\t\t\t: 0x{:02x}", mbr_partition.flags);
     }
     println!("");

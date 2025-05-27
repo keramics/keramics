@@ -25,10 +25,10 @@ use super::mft_attribute::NtfsMftAttribute;
 /// New Technologies File System (NTFS) index.
 pub struct NtfsIndex {
     /// Cluster block size.
-    cluster_block_size: u32,
+    pub cluster_block_size: u32,
 
     /// Index entry size.
-    index_entry_size: u32,
+    pub index_entry_size: u32,
 
     /// Block tree.
     block_tree: BlockTree<NtfsBlockRange>,
@@ -36,28 +36,28 @@ pub struct NtfsIndex {
 
 impl NtfsIndex {
     /// Creates a new index.
-    pub fn new() -> Self {
+    pub fn new(cluster_block_size: u32) -> Self {
         Self {
-            cluster_block_size: 0,
+            cluster_block_size: cluster_block_size,
             index_entry_size: 0,
             block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
         }
     }
 
-    /// Retrieves a specific entry.
-    pub fn get_entry(
+    /// Retrieves a specific index entry.
+    pub fn get_entry_at_cluster_block(
         &self,
         data_stream: &DataStreamReference,
-        entry_number: u64,
+        virtual_cluster_number: u64,
     ) -> io::Result<NtfsIndexEntry> {
-        let virtual_cluster_offset: u64 = entry_number * (self.index_entry_size as u64);
+        let virtual_cluster_offset: u64 = virtual_cluster_number * (self.cluster_block_size as u64);
 
         let block_range: &NtfsBlockRange = match self.block_tree.get_value(virtual_cluster_offset) {
             Some(value) => value,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
-                    format!("Missing block range for index entry: {}", entry_number),
+                    format!("Missing block range for VCN: {}", virtual_cluster_number),
                 ));
             }
         };
@@ -67,6 +67,18 @@ impl NtfsIndex {
             * (self.cluster_block_size as u64))
             + range_relative_offset;
 
+        let remaining_range_size: u64 = (block_range.number_of_blocks
+            * (self.cluster_block_size as u64))
+            - range_relative_offset;
+        if remaining_range_size < (self.index_entry_size as u64) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Block range too small for index entry of size: {}",
+                    self.index_entry_size
+                ),
+            ));
+        }
         let mut index_entry: NtfsIndexEntry = NtfsIndexEntry::new();
 
         index_entry.read_at_position(
@@ -80,23 +92,9 @@ impl NtfsIndex {
     /// Initializes the index.
     pub fn initialize(
         &mut self,
-        cluster_block_size: u32,
         index_entry_size: u32,
         index_allocation_attribute: &NtfsMftAttribute,
     ) -> io::Result<()> {
-        if index_entry_size > cluster_block_size || cluster_block_size % index_entry_size != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported index entry size: {} value not a multitude of cluster block size: {}.",
-                    index_entry_size,
-                    cluster_block_size
-                ),
-            ));
-        }
-        self.cluster_block_size = cluster_block_size;
-        self.index_entry_size = index_entry_size;
-
         if index_allocation_attribute.is_resident() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -110,16 +108,16 @@ impl NtfsIndex {
             ));
         }
         let block_tree_size: u64 = (index_allocation_attribute.allocated_data_size
-            / (index_entry_size as u64))
-            * (cluster_block_size as u64);
+            / (self.cluster_block_size as u64))
+            * (self.cluster_block_size as u64);
         self.block_tree =
-            BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, index_entry_size as u64);
+            BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, self.cluster_block_size as u64);
 
         let mut virtual_cluster_number: u64 = 0;
         let mut virtual_cluster_offset: u64 = 0;
 
         for cluster_group in index_allocation_attribute.data_cluster_groups.iter() {
-            if virtual_cluster_number != cluster_group.first_vcn {
+            if cluster_group.first_vcn != virtual_cluster_number {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!(
@@ -129,7 +127,7 @@ impl NtfsIndex {
                 ));
             }
             for data_run in cluster_group.data_runs.iter() {
-                let range_size: u64 = data_run.number_of_blocks * (cluster_block_size as u64);
+                let range_size: u64 = data_run.number_of_blocks * (self.cluster_block_size as u64);
 
                 let range_type: NtfsBlockRangeType = match &data_run.run_type {
                     NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
@@ -156,7 +154,9 @@ impl NtfsIndex {
                 virtual_cluster_number += data_run.number_of_blocks as u64;
                 virtual_cluster_offset += range_size;
             }
-            if virtual_cluster_number != cluster_group.last_vcn + 1 {
+            if cluster_group.last_vcn != 0xffffffffffffffff
+                && cluster_group.last_vcn + 1 != virtual_cluster_number
+            {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!(
@@ -166,6 +166,8 @@ impl NtfsIndex {
                 ));
             }
         }
+        self.index_entry_size = index_entry_size;
+
         Ok(())
     }
 }

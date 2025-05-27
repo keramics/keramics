@@ -5,16 +5,19 @@ edition.workspace = true
 license.workspace = true
 name = "tools"
 version.workspace = true
+exclude = [
+    "src/image_analyzer.rs",
+    "src/export_tool.rs",
+    "src/writer.rs",
+]
 
 [[bin]]
 name = "image_analyzer"
 path = "src/image_analyzer.rs"
-publish = false
 
 [[bin]]
 name = "keramicsexport"
 path = "src/export_tool.rs"
-publish = false
 
 [[bin]]
 name = "keramicshash"

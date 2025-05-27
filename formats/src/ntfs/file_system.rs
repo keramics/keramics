@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::collections::HashMap;
 use std::io;
 use std::rc::Rc;
 
@@ -49,7 +50,7 @@ pub struct NtfsFileSystem {
     mft: Rc<NtfsMasterFileTable>,
 
     /// Case folding mappings.
-    case_folding_mappings: Rc<Vec<u16>>,
+    case_folding_mappings: Rc<HashMap<u16, u16>>,
 
     /// Volume information from the $VOLUME_INFORMATION attribute of the "$Volume" metadata file.
     volume_information: Option<NtfsVolumeInformation>,
@@ -71,7 +72,7 @@ impl NtfsFileSystem {
             mft_entry_size: 0,
             index_entry_size: 0,
             mft: Rc::new(NtfsMasterFileTable::new()),
-            case_folding_mappings: Rc::new(Vec::with_capacity(65536)),
+            case_folding_mappings: Rc::new(HashMap::new()),
             volume_information: None,
             volume_label: None,
             volume_serial_number: 0,
@@ -250,9 +251,14 @@ impl NtfsFileSystem {
 
         match Rc::get_mut(&mut self.case_folding_mappings) {
             Some(case_folding_mappings) => {
-                for data_offset in (0..131072).step_by(2) {
-                    let value_16bit = bytes_to_u16_le!(data, data_offset);
-                    case_folding_mappings.push(value_16bit);
+                let mut data_offset: usize = 0;
+                for character_value in 0..=65535 {
+                    let value_16bit: u16 = bytes_to_u16_le!(data, data_offset);
+                    data_offset += 2;
+
+                    if character_value != value_16bit {
+                        case_folding_mappings.insert(character_value, value_16bit);
+                    }
                 }
             }
             None => {
@@ -280,44 +286,13 @@ impl NtfsFileSystem {
                 ),
             ));
         }
-        let mft_offset: u64 = mft_block_number * (self.cluster_block_size as u64);
-
-        let mut mft_entry: NtfsMftEntry = NtfsMftEntry::new();
-
-        mft_entry.read_at_position(
-            data_stream,
-            self.mft_entry_size,
-            io::SeekFrom::Start(mft_offset),
-        )?;
-        if mft_entry.is_bad {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported marked bad MFT entry.",
-            ));
-        }
-        if !mft_entry.is_allocated {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported unallocated MFT entry.",
-            ));
-        }
-        let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
-        mft_entry.read_attributes(&mut mft_attributes)?;
-
-        let data_attribute: &NtfsMftAttribute =
-            match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
-                Some(mft_attribute) => mft_attribute,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Missing $Data attribute.",
-                    ))
-                }
-            };
         match Rc::get_mut(&mut self.mft) {
-            Some(mft) => {
-                mft.initialize(self.cluster_block_size, self.mft_entry_size, data_attribute)?
-            }
+            Some(mft) => mft.initialize(
+                self.cluster_block_size,
+                self.mft_entry_size,
+                data_stream,
+                mft_block_number,
+            )?,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::Other,
@@ -325,8 +300,6 @@ impl NtfsFileSystem {
                 ));
             }
         };
-        // TODO: handle attribute list.
-
         Ok(())
     }
 

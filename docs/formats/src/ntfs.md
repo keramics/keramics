@@ -896,7 +896,7 @@ the LSB of the byte corresponds to the first allocation element. The allocation
 element can represent different things:
 
 * an MFT entry in the MFT (nameless) bitmap;
-* an index entry in an index ($I##).
+* an index entry in an index ($I30).
 
 The allocation element is allocated if the corresponding bit contains 1 or
 unallocated if 0.
@@ -1052,7 +1052,7 @@ The index root header is 16 bytes in size and consists of:
 | 0 | 4 | | Attribute type, which contains the type of the indexed attribute or 0 if none
 | 4 | 4 | | [Collation type](#collation_type), which contains a value to indicate the ordering of the index entries
 | 8 | 4 | | Index entry size
-| 12 | 4 | | Index entry number of cluster blocks
+| 12 | 4 | | Number of cluster blocks per index entry
 
 > Note that for NTFS version 1.2 the index entry size does not have to match
 > the index entry size in the volume header. The correct size seems to be the
@@ -1179,19 +1179,23 @@ Also see [the security descriptor identifier index value](#security_descriptor_i
 
 ## <a name="compression"></a>Compression
 
-Typically NTFS compression groups 16 cluster blocks together. This group of 16
-cluster blocks also named a compression unit, which is either "compressed" or
-uncompressed data.
+### Compressed data-runs
+
+NTFS compression groups 16 cluster blocks together. This group of 16 cluster
+blocks also named a compression unit, which is either "compressed" or
+uncompressed.
 
 The term compressed is quoted here because the group of cluster blocks can also
 contain uncompressed data. A group of cluster blocks is "compressed" when it is
 compressed size is smaller than its uncompressed data size. Within a group of
-cluster blocks each of the 16 blocks is "compressed" individually see
-[block based storage](#compression_block_based_storage).
+cluster blocks each of the 16 blocks is "compressed" individually.
 
 The compression unit size is stored in the non-resident MFT attribute. The
 maximum uncompressed data size is always the cluster size (in most case
 4096).
+
+> Note that a resident $DATA attribute with the compression type in the
+> data flags is stored uncompressed.
 
 The data runs in the $DATA attribute define cluster block ranges, e.g.
 
@@ -1200,10 +1204,10 @@ The data runs in the $DATA attribute define cluster block ranges, e.g.
 ```
 
 This data run defines 2 data blocks starting at block number 21045 followed by
-14 sparse blocks. The total number of blocks is 16 which is the size of the
-compression unit. The data is stored compressed in the first 2 blocks and the
-14 sparse blocks are only there to make sure the data runs add up to the
-compression unit size. They do not define actual sparse data.
+14 sparse blocks. The total number of blocks in the compression unit is 16.
+Compressed data is stored in the first 2 blocks and the 14 sparse blocks are
+only there to make sure the data runs add up to the compression unit size. They
+do not define actual sparse data.
 
 Another example:
 
@@ -1230,8 +1234,6 @@ unit size.
 
 The sparse blocks data run can be stored in a subsequent attribute in an
 attribute chain and can be stored in multiple data runs.
-
-### <a name="compression_block_based_storage"></a>Block based storage
 
 NTFS compression stores the "compressed" data in blocks. Each block has a 2
 byte block header.

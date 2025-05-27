@@ -19,6 +19,7 @@ mod block_stream;
 mod boot_record;
 mod cluster_group;
 mod compressed_stream;
+mod compression_range;
 pub mod constants;
 mod data_fork;
 mod data_run;

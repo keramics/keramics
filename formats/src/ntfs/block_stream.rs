@@ -11,10 +11,10 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io;
 use std::io::{Read, Seek};
 
-use core::mediator::Mediator;
 use core::{DataStream, DataStreamReference};
 
 use crate::block_tree::BlockTree;
@@ -39,6 +39,9 @@ pub struct NtfsBlockStream {
 
     /// The size.
     size: u64,
+
+    /// The valid data size.
+    valid_data_size: u64,
 }
 
 impl NtfsBlockStream {
@@ -50,6 +53,7 @@ impl NtfsBlockStream {
             block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
             current_offset: 0,
             size: 0,
+            valid_data_size: 0,
         }
     }
 
@@ -77,7 +81,7 @@ impl NtfsBlockStream {
             let mut virtual_cluster_offset: u64 = 0;
 
             for cluster_group in data_attribute.data_cluster_groups.iter() {
-                if virtual_cluster_number != cluster_group.first_vcn {
+                if cluster_group.first_vcn != virtual_cluster_number {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(
@@ -92,18 +96,7 @@ impl NtfsBlockStream {
 
                     let range_type: NtfsBlockRangeType = match &data_run.run_type {
                         NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
-                        NtfsDataRunType::Sparse => {
-                            let mediator = Mediator::current();
-                            if mediator.debug_output
-                                && !data_attribute.is_compressed()
-                                && !data_attribute.is_sparse()
-                            {
-                                // Observed in $BadClus:$Bad
-                                mediator.debug_print(format!(
-                                "Data run is sparse but no compressed or sparse attribute data flags set.\n"));
-                            }
-                            NtfsBlockRangeType::Sparse
-                        }
+                        NtfsDataRunType::Sparse => NtfsBlockRangeType::Sparse,
                         _ => {
                             return Err(io::Error::new(
                                 io::ErrorKind::InvalidData,
@@ -128,7 +121,9 @@ impl NtfsBlockStream {
                     virtual_cluster_number += data_run.number_of_blocks as u64;
                     virtual_cluster_offset += range_size;
                 }
-                if virtual_cluster_number != cluster_group.last_vcn + 1 {
+                if cluster_group.last_vcn != 0xffffffffffffffff
+                    && cluster_group.last_vcn + 1 != virtual_cluster_number
+                {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!(
@@ -142,10 +137,12 @@ impl NtfsBlockStream {
         self.data_stream = Some(data_stream.clone());
 
         if data_attribute.is_compressed() {
-            self.size = data_attribute.compressed_data_size;
+            self.size = data_attribute.allocated_data_size;
+            self.valid_data_size = data_attribute.allocated_data_size;
         } else {
-            self.size = data_attribute.valid_data_size;
-        }
+            self.size = data_attribute.data_size;
+            self.valid_data_size = data_attribute.valid_data_size;
+        };
         Ok(())
     }
 
@@ -159,58 +156,76 @@ impl NtfsBlockStream {
             if current_offset >= self.size {
                 break;
             }
-            let block_range: &NtfsBlockRange = match self.block_tree.get_value(current_offset) {
-                Some(value) => value,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Missing block range for offset: {}", current_offset),
-                    ));
-                }
-            };
-            let range_logical_offset: u64 = block_range.virtual_cluster_offset;
-            let range_size: u64 = block_range.number_of_blocks * (self.cluster_block_size as u64);
+            let read_count: usize = if current_offset >= self.valid_data_size {
+                let range_remainder_size: u64 = self.size - current_offset;
+                let read_remainder_size: usize = read_size - data_offset;
+                let range_read_size: usize =
+                    min(read_remainder_size, range_remainder_size as usize);
+                let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_relative_offset: u64 = current_offset - range_logical_offset;
-            let range_remainder_size: u64 = range_size - range_relative_offset;
+                data[data_offset..data_end_offset].fill(0);
 
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
-            let data_end_offset: usize = data_offset + range_read_size;
-            let range_read_count: usize = match block_range.range_type {
-                NtfsBlockRangeType::InFile => match self.data_stream.as_ref() {
-                    Some(data_stream) => match data_stream.write() {
-                        Ok(mut data_stream) => {
-                            let range_physical_offset: u64 =
-                                block_range.cluster_block_number * (self.cluster_block_size as u64);
-                            data_stream.read_at_position(
-                                &mut data[data_offset..data_end_offset],
-                                io::SeekFrom::Start(range_physical_offset + range_relative_offset),
-                            )?
-                        }
-                        Err(error) => return Err(core::error_to_io_error!(error)),
-                    },
+                range_read_size
+            } else {
+                let block_range: &NtfsBlockRange = match self.block_tree.get_value(current_offset) {
+                    Some(value) => value,
                     None => {
                         return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ))
+                            io::ErrorKind::Other,
+                            format!("Missing block range for offset: {}", current_offset),
+                        ));
                     }
-                },
-                NtfsBlockRangeType::Sparse => {
-                    data[data_offset..data_end_offset].fill(0);
+                };
+                let range_logical_offset: u64 = block_range.virtual_cluster_offset;
+                let range_size: u64 =
+                    block_range.number_of_blocks * (self.cluster_block_size as u64);
 
-                    range_read_size
+                let mut range_logical_end_offset: u64 = range_logical_offset + range_size;
+                if range_logical_end_offset > self.valid_data_size {
+                    range_logical_end_offset = self.valid_data_size;
+                };
+                let range_relative_offset: u64 = current_offset - range_logical_offset;
+                let range_remainder_size: u64 =
+                    (range_logical_end_offset - range_logical_offset) - range_relative_offset;
+                let read_remainder_size: usize = read_size - data_offset;
+                let range_read_size: usize =
+                    min(read_remainder_size, range_remainder_size as usize);
+
+                let data_end_offset: usize = data_offset + range_read_size;
+                match block_range.range_type {
+                    NtfsBlockRangeType::InFile => match self.data_stream.as_ref() {
+                        Some(data_stream) => match data_stream.write() {
+                            Ok(mut data_stream) => {
+                                let range_physical_offset: u64 = block_range.cluster_block_number
+                                    * (self.cluster_block_size as u64);
+                                data_stream.read_at_position(
+                                    &mut data[data_offset..data_end_offset],
+                                    io::SeekFrom::Start(
+                                        range_physical_offset + range_relative_offset,
+                                    ),
+                                )?
+                            }
+                            Err(error) => return Err(core::error_to_io_error!(error)),
+                        },
+                        None => {
+                            return Err(io::Error::new(
+                                io::ErrorKind::InvalidInput,
+                                "Missing data stream",
+                            ))
+                        }
+                    },
+                    NtfsBlockRangeType::Sparse => {
+                        data[data_offset..data_end_offset].fill(0);
+
+                        range_read_size
+                    }
                 }
             };
-            if range_read_count == 0 {
+            if read_count == 0 {
                 break;
             }
-            data_offset += range_read_count;
-            current_offset += range_read_count as u64;
+            data_offset += read_count;
+            current_offset += read_count as u64;
         }
         Ok(data_offset)
     }

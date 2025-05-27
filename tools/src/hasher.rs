@@ -1,4 +1,4 @@
-/* Copyright 2024 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -18,6 +18,8 @@ use core::DataStreamReference;
 use hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
+
+const READ_BUFFER_SIZE: usize = 65536;
 
 #[derive(Clone)]
 pub enum DigestHashType {
@@ -54,7 +56,7 @@ impl DigestHasher {
             DigestHashType::Sha256 => Box::new(Sha256Context::new()),
             DigestHashType::Sha512 => Box::new(Sha512Context::new()),
         };
-        let mut data: [u8; 65536] = [0; 65536];
+        let mut data: [u8; READ_BUFFER_SIZE] = [0; READ_BUFFER_SIZE];
 
         match data_stream.write() {
             Ok(mut data_stream) => loop {
@@ -78,7 +80,7 @@ impl DigestHasher {
             DigestHashType::Sha256 => Box::new(Sha256Context::new()),
             DigestHashType::Sha512 => Box::new(Sha512Context::new()),
         };
-        let mut data: [u8; 65536] = [0; 65536];
+        let mut data: [u8; READ_BUFFER_SIZE] = [0; READ_BUFFER_SIZE];
 
         while let Ok(read_count) = reader.read(&mut data) {
             if read_count == 0 {
