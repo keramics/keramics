@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use compression::LzxpressHuffmanContext;
+use keramics_compression::LzxpressHuffmanContext;
 
 // LZXPRESS Huffman decompression fuzz target.
 fuzz_target!(|data: &[u8]| {

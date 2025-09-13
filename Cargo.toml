@@ -1,18 +1,18 @@
 [workspace]
 members = [
-    "./checksums",
-    "./compression",
-    "./core",
-    "./datetime",
     "./docs/mdbook-tables",
-    "./encoding",
-    "./formats",
-    "./hashes",
-    "./layout_map",
-    "./sigscan",
-    "./tools",
-    "./types",
-    "./vfs",
+    "./keramics-checksums",
+    "./keramics-compression",
+    "./keramics-core",
+    "./keramics-datetime",
+    "./keramics-encodings",
+    "./keramics-formats",
+    "./keramics-hashes",
+    "./keramics-sigscan",
+    "./keramics-tools",
+    "./keramics-types",
+    "./keramics-vfs",
+    "./layout-map",
 ]
 resolver = "2"
 
@@ -20,4 +20,5 @@ resolver = "2"
 authors = ["Joachim Metz <joachim.metz@gmail.com>"]
 edition = "2021"
 license = "Apache-2.0"
+repository = "https://github.com/libyal/keramics"
 version = "0.0.0"

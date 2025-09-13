@@ -15,8 +15,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use core::{open_fake_data_stream, DataStreamReference};
-use formats::qcow::QcowFile;
+use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_formats::qcow::QcowFile;
 
 // QEMU Copy-On-Write (QCOW) file fuzz target.
 fuzz_target!(|data: &[u8]| {

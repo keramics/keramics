@@ -1,11 +1,12 @@
 [package]
+authors.workspace = true
+description = "Keramics OSS-Fuzz fuzz targets"
+edition.workspace = true
+license.workspace = true
 name = "keramics-fuzz"
-description = "Analysis of data formats"
-version = "0.0.0"
-edition = "2021"
-authors = ["Joachim Metz <joachim.metz@gmail.com>"]
-license = "Apache-2.0"
 publish = false
+repository.workspace = true
+version.workspace = true
 
 [package.metadata]
 cargo-fuzz = true
@@ -143,8 +144,8 @@ test = false
 doc = false
 
 [dependencies]
-compression = { path = "../compression" }
-core = { path = "../core" }
-formats = { path = "../formats" }
-hashes = { path = "../hashes" }
+keramics-compression = { version = "0", path = "../keramics-compression" }
+keramics-core = { version = "0", path = "../keramics-core" }
+keramics-formats = { version = "0", path = "../keramics-formats" }
+keramics-hashes = { version = "0", path = "../keramics-hashes" }
 libfuzzer-sys = { version = "0.4" }

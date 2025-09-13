@@ -15,8 +15,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use core::{open_fake_data_stream, DataStreamReference};
-use formats::sparseimage::SparseImageFile;
+use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_formats::sparseimage::SparseImageFile;
 
 //  Mac OS sparse image (.sparseimage) file fuzz target.
 fuzz_target!(|data: &[u8]| {

@@ -1,0 +1,27 @@
+[package]
+authors.workspace = true
+description = "Keramics data formats"
+edition.workspace = true
+license.workspace = true
+name = "keramics-formats"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+name = "keramics_formats"
+path = "src/lib.rs"
+
+[dependencies]
+keramics-checksums = { version = "0", path = "../keramics-checksums" }
+keramics-compression = { version = "0", path = "../keramics-compression" }
+keramics-core = { version = "0", path = "../keramics-core" }
+keramics-datetime = { version = "0", path = "../keramics-datetime" }
+keramics-encodings = { version = "0", path = "../keramics-encodings" }
+keramics-sigscan = { version = "0", path = "../keramics-sigscan" }
+keramics-types = { version = "0", path = "../keramics-types" }
+layout-map = { version = "0", path = "../layout-map" }
+pest = { version = "2.7.14" }
+pest_derive = { version = "2.7.14" }
+
+[dev-dependencies]
+keramics-hashes = { version = "0", path = "../keramics-hashes" }

@@ -15,8 +15,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use core::{open_fake_data_stream, DataStreamReference};
-use formats::mbr::MbrVolumeSystem;
+use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_formats::mbr::MbrVolumeSystem;
 
 // Master Boot Record (MBR) volume system fuzz target.
 fuzz_target!(|data: &[u8]| {
