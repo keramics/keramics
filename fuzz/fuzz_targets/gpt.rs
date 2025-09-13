@@ -15,8 +15,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use core::{open_fake_data_stream, DataStreamReference};
-use formats::gpt::GptVolumeSystem;
+use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_formats::gpt::GptVolumeSystem;
 
 // GUID Partition Table (GPT) volume system fuzz target.
 fuzz_target!(|data: &[u8]| {

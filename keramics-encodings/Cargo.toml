@@ -1,0 +1,12 @@
+[package]
+authors.workspace = true
+description = "Keramics decoding methods"
+edition.workspace = true
+license.workspace = true
+name = "keramics-encodings"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+name = "keramics_encodings"
+path = "src/lib.rs"

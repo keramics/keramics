@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 name = "mdbook-tables"
 publish = false
+repository.workspace = true
 version.workspace = true
 
 [dependencies]

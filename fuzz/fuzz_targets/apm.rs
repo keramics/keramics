@@ -15,8 +15,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use core::{open_fake_data_stream, DataStreamReference};
-use formats::apm::ApmVolumeSystem;
+use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_formats::apm::ApmVolumeSystem;
 
 // Apple Partition Map (APM) volume system fuzz target.
 fuzz_target!(|data: &[u8]| {

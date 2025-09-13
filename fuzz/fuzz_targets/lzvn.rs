@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use compression::LzvnContext;
+use keramics_compression::LzvnContext;
 
 // LZVN decompression fuzz target.
 fuzz_target!(|data: &[u8]| {

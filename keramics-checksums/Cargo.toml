@@ -1,0 +1,12 @@
+[package]
+authors.workspace = true
+description = "Keramics checksum calculation methods"
+edition.workspace = true
+license.workspace = true
+name = "keramics-checksums"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+name = "keramics_checksums"
+path = "src/lib.rs"

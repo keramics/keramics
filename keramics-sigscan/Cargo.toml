@@ -1,0 +1,15 @@
+[package]
+authors.workspace = true
+description = "Keramics signature scanner"
+edition.workspace = true
+license.workspace = true
+name = "keramics-sigscan"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+name = "keramics_sigscan"
+path = "src/lib.rs"
+
+[dependencies]
+keramics-core = { version = "0", path = "../keramics-core" }

@@ -15,8 +15,8 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use core::{open_fake_data_stream, DataStreamReference};
-use formats::vhd::VhdFile;
+use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_formats::vhd::VhdFile;
 
 // Virtual Hard Disk (VHD) file fuzz target.
 fuzz_target!(|data: &[u8]| {

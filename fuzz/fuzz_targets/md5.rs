@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use hashes::{DigestHashContext, Md5Context};
+use keramics_hashes::{DigestHashContext, Md5Context};
 
 // MD5 hash fuzz target.
 fuzz_target!(|data: &[u8]| {

@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use compression::Bzip2Context;
+use keramics_compression::Bzip2Context;
 
 // Bzip2 decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
