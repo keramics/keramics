@@ -80,7 +80,7 @@ impl VhdDynamicDiskHeader {
         if data[0..8] != VHD_DYNAMIC_DISK_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported VHD dynamic disk header signature"),
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 24);

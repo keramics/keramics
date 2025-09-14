@@ -59,7 +59,7 @@ impl NtfsIndexEntryHeader {
         if data[0..4] != NTFS_INDEX_ENTRY_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported NTFS index entry header signature"),
             ));
         }
         self.fixup_values_offset = bytes_to_u16_le!(data, 4);

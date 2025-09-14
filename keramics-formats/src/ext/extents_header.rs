@@ -55,7 +55,7 @@ impl ExtExtentsHeader {
         if data[0..2] != EXT_EXTENTS_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported ext extents header signature"),
             ));
         }
         self.number_of_entries = bytes_to_u16_le!(data, 2);

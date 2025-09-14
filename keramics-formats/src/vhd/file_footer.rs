@@ -83,7 +83,7 @@ impl VhdFileFooter {
         if data[0..8] != VHD_FILE_FOOTER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported VHD file footer signature"),
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 12);

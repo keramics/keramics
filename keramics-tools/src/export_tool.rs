@@ -18,7 +18,6 @@ use std::process::ExitCode;
 use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
-
 use keramics_vfs::{
     VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
 };

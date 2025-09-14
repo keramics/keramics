@@ -48,7 +48,7 @@ impl VhdxFileHeader {
         if data[0..8] != VHDX_FILE_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported VHDX file header signature"),
             ));
         }
         Ok(())

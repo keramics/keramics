@@ -65,7 +65,7 @@ impl MbrMasterBootRecord {
         if data[510..512] != MBR_BOOT_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported MBR master boot record signature"),
             ));
         }
         self.disk_identity = bytes_to_u32_le!(data, 440);
