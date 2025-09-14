@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::io;
 use std::process::ExitCode;
 
 use clap::Parser;
@@ -25,7 +26,7 @@ struct CommandLineArguments {
 }
 
 /// Prints information about a scan node.
-fn print_scan_node(scan_node: &VfsScanNode, depth: usize) {
+fn print_scan_node(scan_node: &VfsScanNode, depth: usize) -> io::Result<()> {
     let indentation: String = vec![" "; depth * 4].join("");
     let format_identifier: &str = match &scan_node.path {
         VfsPath::Apm { .. } => "APM",
@@ -49,8 +50,9 @@ fn print_scan_node(scan_node: &VfsScanNode, depth: usize) {
     );
 
     for sub_scan_node in scan_node.sub_nodes.iter() {
-        print_scan_node(sub_scan_node, depth + 1);
+        print_scan_node(sub_scan_node, depth + 1)?;
     }
+    Ok(())
 }
 
 fn main() -> ExitCode {
@@ -86,7 +88,16 @@ fn main() -> ExitCode {
     // TODO: print source type.
 
     match vfs_scan_context.root_node {
-        Some(scan_node) => print_scan_node(&scan_node, 0),
+        Some(scan_node) => match print_scan_node(&scan_node, 0) {
+            Ok(_) => {}
+            Err(error) => {
+                println!(
+                    "Unable to print results of scan: {} with error: {}",
+                    source, error
+                );
+                return ExitCode::FAILURE;
+            }
+        },
         None => {}
     };
     ExitCode::SUCCESS

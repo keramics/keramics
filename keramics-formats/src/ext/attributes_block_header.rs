@@ -51,7 +51,7 @@ impl ExtAttributesBlockHeader {
         if data[0..4] != EXT_ATTRIBUTES_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported ext attributes block header signature"),
             ));
         }
         let number_of_blocks: u32 = bytes_to_u32_le!(data, 8);

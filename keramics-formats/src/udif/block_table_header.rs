@@ -67,7 +67,7 @@ impl UdifBlockTableHeader {
         if data[0..4] != UDIF_BLOCK_TABLE_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported UDIF block table header signature"),
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);

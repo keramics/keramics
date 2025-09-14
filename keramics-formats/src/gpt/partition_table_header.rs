@@ -80,7 +80,7 @@ impl GptPartitionTableHeader {
         if data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported GPT partition table header signature"),
             ));
         }
         let format_version: u32 = bytes_to_u32_le!(data, 8);

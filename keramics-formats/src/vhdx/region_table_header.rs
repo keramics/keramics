@@ -58,7 +58,7 @@ impl VhdxRegionTableHeader {
         if data[0..4] != VHDX_REGION_TABLE_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported VHDX region table header signature"),
             ));
         }
         self.checksum = bytes_to_u32_le!(data, 4);

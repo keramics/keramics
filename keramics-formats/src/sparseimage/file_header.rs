@@ -62,7 +62,7 @@ impl SparseImageFileHeader {
         if data[0..4] != SPARSEIMAGE_FILE_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported sparse image file header signature"),
             ));
         }
         self.sectors_per_band = bytes_to_u32_be!(data, 8);

@@ -71,7 +71,7 @@ impl VhdxImageHeader {
         if data[0..4] != VHDX_IMAGE_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported VHDX image header signature"),
             ));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 4);

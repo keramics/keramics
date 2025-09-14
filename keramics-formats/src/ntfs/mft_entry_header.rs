@@ -88,7 +88,7 @@ impl NtfsMftEntryHeader {
         if data[0..4] != NTFS_MFT_ENTRY_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported NTFS MFT entry signature"),
             ));
         }
         self.fixup_values_offset = bytes_to_u16_le!(data, 4);

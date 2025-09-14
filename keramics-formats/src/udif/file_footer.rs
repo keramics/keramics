@@ -87,7 +87,7 @@ impl UdifFileFooter {
         if data[0..4] != UDIF_FILE_FOOTER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported UDIF file footer signature"),
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);

@@ -98,7 +98,7 @@ impl NtfsMftEntry {
 
     /// Reads the MFT entry from a buffer.
     fn read_data(&mut self, data: &mut [u8]) -> io::Result<()> {
-        if data[0..4] == [4; 0] {
+        if data[0..4] == [0; 4] {
             self.is_empty = true;
 
             return Ok(());

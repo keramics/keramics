@@ -72,7 +72,7 @@ impl QcowFileHeaderV1 {
         if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported QCOW file header version 1 signature"),
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);

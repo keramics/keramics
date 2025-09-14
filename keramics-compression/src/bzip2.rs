@@ -168,7 +168,7 @@ impl Bzip2StreamHeader {
         if data[0..2] != BZIP2_DATA_HEADER_SIGNATURE {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature"),
+                format!("Unsupported bzip2 header signature"),
             ));
         }
         let compression_level: u8 = data[3];
@@ -226,7 +226,7 @@ impl Bzip2BlockHeader {
         } else {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
-                format!("Unsupported signature: 0x{:12x}", self.signature),
+                format!("Unsupported bzip2 signature: 0x{:12x}", self.signature),
             ));
         }
         let mediator = Mediator::current();
