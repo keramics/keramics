@@ -50,7 +50,7 @@ impl NtfsDataRun {
         if data_size < 1 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS data run data size"),
             ));
         }
         let sizes_tuple: usize = data[0] as usize;

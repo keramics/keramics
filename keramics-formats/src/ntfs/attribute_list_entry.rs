@@ -65,7 +65,7 @@ impl NtfsAttributeListEntry {
         if data.len() < 26 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS attribute list entry data size"),
             ));
         }
         self.attribute_type = bytes_to_u32_le!(data, 0);

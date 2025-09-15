@@ -47,7 +47,7 @@ impl ExtExtentIndex {
         if data.len() != 12 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext extent index data size"),
             ));
         }
         self.logical_block_number = bytes_to_u32_le!(data, 0);

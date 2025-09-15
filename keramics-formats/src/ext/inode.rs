@@ -94,7 +94,7 @@ impl Ext2Inode {
         if data.len() < 128 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext inode data size"),
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -184,7 +184,7 @@ impl Ext3Inode {
         if data.len() < 128 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext inode data size"),
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -288,7 +288,7 @@ impl Ext4Inode {
         if data_size < 128 + (extra_size as usize) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext inode data size"),
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);

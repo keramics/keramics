@@ -60,7 +60,7 @@ pub struct NtfsMftAttributeNonResident {
 }
 
 impl NtfsMftAttributeNonResident {
-    /// Creates a new MFT attribute header.
+    /// Creates a new MFT non-resident attribute.
     pub fn new() -> Self {
         Self {
             data_first_vcn: 0,
@@ -74,13 +74,13 @@ impl NtfsMftAttributeNonResident {
         }
     }
 
-    /// Reads the MFT attribute header from a buffer.
+    /// Reads the MFT non-resident attribute from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
         let data_size: usize = data.len();
         if data_size < 48 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported MFT non-resident attribute data size"),
             ));
         }
         let compression_unit_size: u16 = bytes_to_u16_le!(data, 18);
@@ -89,7 +89,7 @@ impl NtfsMftAttributeNonResident {
             if data_size < 56 {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!("Unsupported data size"),
+                    format!("Unsupported MFT non-resident attribute data size"),
                 ));
             }
             // The size is calculated as: 2 ^ value

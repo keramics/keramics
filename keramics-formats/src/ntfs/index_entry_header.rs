@@ -53,7 +53,7 @@ impl NtfsIndexEntryHeader {
         if data.len() < 24 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS index entry header data size"),
             ));
         }
         if data[0..4] != NTFS_INDEX_ENTRY_SIGNATURE {

@@ -45,7 +45,7 @@ impl ExtAttributesBlockHeader {
         if data.len() != 32 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext attributes block header data size"),
             ));
         }
         if data[0..4] != EXT_ATTRIBUTES_HEADER_SIGNATURE {

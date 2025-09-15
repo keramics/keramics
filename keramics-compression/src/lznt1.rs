@@ -54,7 +54,7 @@ impl Lznt1BlockHeader {
         if data.len() < 2 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported LZNT1 block header data size"),
             ));
         }
         let bit_fields1: u16 = bytes_to_u16_le!(data, 0);

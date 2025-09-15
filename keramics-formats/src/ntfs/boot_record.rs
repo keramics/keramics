@@ -98,7 +98,7 @@ impl NtfsBootRecord {
         if data.len() != 512 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS boot record data size"),
             ));
         }
         if data[3..11] != NTFS_FILE_SYSTEM_SIGNATURE {

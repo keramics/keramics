@@ -98,7 +98,7 @@ impl NtfsFileName {
         if data_size < 66 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS file name data size"),
             ));
         }
         self.parent_file_reference = bytes_to_u64_le!(data, 0);
@@ -146,7 +146,7 @@ impl NtfsFileName {
             if data_end_offset > data_size {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!("Unsupported data size"),
+                    format!("Unsupported NTFS file name data size"),
                 ));
             }
             Ucs2String::read_elements_le(&mut self.name.elements, &data[66..data_end_offset]);

@@ -54,7 +54,7 @@ impl MbrExtendedBootRecord {
         if data.len() != 512 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported MBR extended boot record data size"),
             ));
         }
         if data[510..512] != MBR_BOOT_SIGNATURE {

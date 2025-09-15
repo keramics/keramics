@@ -69,7 +69,7 @@ impl NtfsMftAttributeHeader {
         if data.len() < 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported MFT attribute header data size"),
             ));
         }
         self.attribute_type = bytes_to_u32_le!(data, 0);

@@ -50,7 +50,7 @@ impl NtfsMftAttributeResident {
         if data.len() < 8 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported MFT resident attribute data size"),
             ));
         }
         self.data_size = bytes_to_u32_le!(data, 0);

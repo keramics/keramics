@@ -64,7 +64,7 @@ impl ExtAttributesEntry {
         if data.len() < 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext attributes entry data size"),
             ));
         }
         self.name_size = data[0];
@@ -83,7 +83,7 @@ impl ExtAttributesEntry {
         if data.len() < data_end_offset {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext attributes entry name size"),
             ));
         }
         let name_prefix: &str = match self.name_index {
