@@ -74,7 +74,7 @@ impl GptPartitionTableHeader {
         if data.len() != 92 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported GPT partition table header data size"),
             ));
         }
         if data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {

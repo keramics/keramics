@@ -50,7 +50,7 @@ impl NtfsReparsePointHeader {
         if data_size < 8 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS reparse point header data size"),
             ));
         }
         self.tag = bytes_to_u32_le!(data, 0);

@@ -219,10 +219,11 @@ impl ExtFileSystem {
                 if block_group_offset == 0 || self.block_size == 1024 {
                     superblock_offset += 1024;
                 }
-                let mut superblock: ExtSuperblock = ExtSuperblock::new();
-                superblock.read_at_position(data_stream, io::SeekFrom::Start(superblock_offset))?;
-
                 if block_group_number == 0 {
+                    let mut superblock: ExtSuperblock = ExtSuperblock::new();
+                    superblock
+                        .read_at_position(data_stream, io::SeekFrom::Start(superblock_offset))?;
+
                     self.features.initialize(&superblock);
 
                     number_of_block_groups = superblock.get_number_of_block_groups();
@@ -262,8 +263,19 @@ impl ExtFileSystem {
                             crc32_context.finalize()
                         }
                     };
+                } else {
+                    let mut superblock: ExtSuperblock = ExtSuperblock::new();
+
+                    match superblock
+                        .read_at_position(data_stream, io::SeekFrom::Start(superblock_offset))
+                    {
+                        Ok(_) => {
+                            // TODO: compare superblock
+                        }
+                        // Ignore backup superblocks without a correct signature.
+                        Err(_) => {}
+                    }
                 }
-                // TODO: compare superblock
             }
             // When the has meta block groups feature is enabled group descriptors are stored at the
             // beginning of the first, second, and last block groups in a meta block group,

@@ -54,7 +54,7 @@ impl NtfsIndexRootHeader {
         if data.len() < 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS index root header data size"),
             ));
         }
         self.attribute_type = bytes_to_u32_le!(data, 0);

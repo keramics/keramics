@@ -57,7 +57,7 @@ impl NtfsVolumeInformation {
         if data.len() < 12 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS volume information data size"),
             ));
         }
         self.major_format_version = data[8];

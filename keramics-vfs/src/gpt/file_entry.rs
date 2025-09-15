@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::DataStreamReference;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
+use keramics_types::Uuid;
 
 use crate::enums::VfsFileType;
 
@@ -51,6 +52,17 @@ impl GptFileEntry {
         match self {
             GptFileEntry::Partition { .. } => VfsFileType::File,
             GptFileEntry::Root { .. } => VfsFileType::Directory,
+        }
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> Option<Uuid> {
+        match self {
+            GptFileEntry::Partition { partition, .. } => match partition.read() {
+                Ok(gpt_partition) => Some(gpt_partition.identifier.clone()),
+                Err(_) => None,
+            },
+            GptFileEntry::Root { .. } => None,
         }
     }
 

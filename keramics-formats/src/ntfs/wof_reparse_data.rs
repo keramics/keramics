@@ -47,7 +47,7 @@ impl NtfsWofReparseData {
         if data_size != 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported WOF reparse data size"),
             ));
         }
         self.compression_method = bytes_to_u32_le!(data, 12);

@@ -58,7 +58,7 @@ impl ExtDirectoryEntry {
         if data.len() < 8 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext directory entry data size"),
             ));
         }
         self.inode_number = bytes_to_u32_le!(data, 0);
@@ -76,7 +76,7 @@ impl ExtDirectoryEntry {
         if data_end_offset > data.len() {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext directory entry name size"),
             ));
         }
         let name: ByteString = ByteString::from_bytes(&data[0..data_end_offset]);

@@ -49,7 +49,7 @@ impl ExtExtentsHeader {
         if data.len() != 12 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext extents header data size"),
             ));
         }
         if data[0..2] != EXT_EXTENTS_HEADER_SIGNATURE {

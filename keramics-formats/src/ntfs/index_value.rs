@@ -58,7 +58,7 @@ impl NtfsIndexValue {
         if data.len() < 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS index value data size"),
             ));
         }
         self.file_reference = bytes_to_u64_le!(data, 0);

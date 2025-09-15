@@ -64,7 +64,7 @@ impl MbrPartitionEntry {
         if data.len() != 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported MBR partition entry data size"),
             ));
         }
         self.flags = data[0];

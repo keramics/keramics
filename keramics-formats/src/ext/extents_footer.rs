@@ -37,7 +37,7 @@ impl ExtExtentsFooter {
         if data.len() != 4 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported extents footer data size"),
             ));
         }
         self.checksum = bytes_to_u32_le!(data, 0);

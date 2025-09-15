@@ -82,7 +82,7 @@ impl NtfsStandardInformation {
         if data.len() < 48 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported NTFS standard information data size"),
             ));
         }
         let filetime: Filetime = Filetime::from_bytes(&data);

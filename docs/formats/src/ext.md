@@ -49,8 +49,8 @@ backups of the group descriptor table. Later revisions can reduce the number of
 backup copies by only putting backups in specific groups (sparse superblock
 feature EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER).
 
-> Note backup superblocks can be empty (filled with 0-byte values). Observed in
-> Android file system with sparse_super and uninit_bg.
+> Note backup superblocks can be empty (filled with 0-byte values) or contain
+> remnant data on an Android ext file system with sparse_super.
 
 > Note that not all values in a backup superblock and backup group descriptor
 > tables always match those of the primary superblock and group descriptor

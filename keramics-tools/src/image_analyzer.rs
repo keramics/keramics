@@ -16,7 +16,10 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use keramics_vfs::{VfsPath, VfsScanContext, VfsScanNode, VfsScanner};
+use keramics_vfs::{
+    VfsFileEntry, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode,
+    VfsScanner,
+};
 
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]
@@ -42,13 +45,24 @@ fn print_scan_node(scan_node: &VfsScanNode, depth: usize) -> io::Result<()> {
         VfsPath::Vhd { .. } => "VHD",
         VfsPath::Vhdx { .. } => "VHDX",
     };
+    let vfs_resolver: VfsResolverReference = VfsResolver::current();
+    let suffix: String = match vfs_resolver.get_file_entry_by_path(&scan_node.path)? {
+        Some(file_entry) => match file_entry {
+            VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
+                Some(identifier) => format!(" (identifier: {})", identifier.to_string()),
+                _ => String::new(),
+            },
+            _ => String::new(),
+        },
+        None => String::new(),
+    };
     println!(
-        "{}{}: location: {}",
+        "{}{}: location: {}{}",
         indentation,
         format_identifier,
-        scan_node.path.get_location()
+        scan_node.path.get_location(),
+        suffix,
     );
-
     for sub_scan_node in scan_node.sub_nodes.iter() {
         print_scan_node(sub_scan_node, depth + 1)?;
     }

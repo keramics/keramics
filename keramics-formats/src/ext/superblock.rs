@@ -194,9 +194,6 @@ pub struct ExtSuperblock {
 
     /// Metadata checksum seed.
     pub metadata_checksum_seed: Option<u32>,
-
-    /// Value to indicate the superblock is empty.
-    pub is_empty: bool,
 }
 
 impl ExtSuperblock {
@@ -222,7 +219,6 @@ impl ExtSuperblock {
             number_of_block_groups_per_flex_group: 0,
             first_meta_block_group: 0,
             metadata_checksum_seed: None,
-            is_empty: false,
         }
     }
 
@@ -231,13 +227,8 @@ impl ExtSuperblock {
         if data.len() != 1024 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext superblock data size"),
             ));
-        }
-        if data[0..1024] == [0; 1024] {
-            self.is_empty = true;
-
-            return Ok(());
         }
         if data[56..58] != EXT_SUPERBLOCK_SIGNATURE {
             return Err(io::Error::new(

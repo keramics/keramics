@@ -162,7 +162,7 @@ impl Bzip2StreamHeader {
         if data.len() < 4 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported bzip2 stream header data size"),
             ));
         }
         if data[0..2] != BZIP2_DATA_HEADER_SIGNATURE {

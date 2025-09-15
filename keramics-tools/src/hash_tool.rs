@@ -49,6 +49,15 @@ enum HashType {
     Sha512,
 }
 
+#[derive(Clone, ValueEnum)]
+enum VolumePathType {
+    /// Identifier based volume or partition path, such as /apfs{f449e580-e355-4e74-8880-05e46e4e3b1e}
+    Identifier,
+
+    /// Index based bolurm or partition path, such as /apfs1 or /p1
+    Index,
+}
+
 #[derive(Parser)]
 #[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
 struct CommandLineArguments {
@@ -62,6 +71,10 @@ struct CommandLineArguments {
 
     /// Path of the file to read the data from, if not provided the data will be read from standard input
     source: Option<PathBuf>,
+
+    /// Volume or partition path type
+    #[arg(long, default_value_t = VolumePathType::Index, value_enum)]
+    volume_path_type: VolumePathType,
 }
 
 /// Tool for calculating digest hashes of data streams.
@@ -71,11 +84,14 @@ struct HashTool {
 
     /// Character translation table.
     translation_table: HashMap<u32, String>,
+
+    /// Volume or partition path type
+    volume_path_type: VolumePathType,
 }
 
 impl HashTool {
     /// Creates a new tool.
-    fn new(hash_type: &HashType) -> Self {
+    fn new(hash_type: &HashType, volume_path_type: &VolumePathType) -> Self {
         let digest_hash_type: hasher::DigestHashType = match hash_type {
             HashType::Md5 => hasher::DigestHashType::Md5,
             HashType::Sha1 => hasher::DigestHashType::Sha1,
@@ -86,6 +102,7 @@ impl HashTool {
         Self {
             digest_hasher: hasher::DigestHasher::new(&digest_hash_type),
             translation_table: HashTool::get_character_translation_table(),
+            volume_path_type: volume_path_type.clone(),
         }
     }
 
@@ -155,19 +172,17 @@ impl HashTool {
             let file_system: VfsFileSystemReference =
                 vfs_resolver.open_file_system(&vfs_scan_node.path)?;
 
+            let display_path: String = match vfs_scan_node.path.get_parent() {
+                Some(parent_path) => self.get_display_path(parent_path)?,
+                None => String::new(),
+            };
             for result in VfsFinder::new(&file_system) {
                 match result {
-                    Ok((file_entry, path_components)) => {
-                        let display_path: String = match vfs_scan_node.path.get_parent() {
-                            Some(parent_path) => self.get_display_path(parent_path),
-                            None => String::new(),
-                        };
-                        self.calculate_hash_from_file_entry(
-                            &file_entry,
-                            &display_path,
-                            &path_components,
-                        )?
-                    }
+                    Ok((file_entry, path_components)) => self.calculate_hash_from_file_entry(
+                        &file_entry,
+                        &display_path,
+                        &path_components,
+                    )?,
                     Err(error) => return Err(error),
                 };
             }
@@ -223,25 +238,12 @@ impl HashTool {
     }
 
     /// Retrieves a string representation of a path.
-    fn get_display_path(&self, path: &VfsPath) -> String {
-        // TODO: add support for aliases
-        // TODO: santize path (control characters, etc.)
-        match path {
-            VfsPath::Apm { location, .. } => location.replace("apm", "p"),
-            VfsPath::Ext { ext_path, parent } => {
-                let parent_display_path: String = self.get_display_path(parent);
-                let location: String = ext_path.to_string();
-                format!("{}{}", parent_display_path, location)
-            }
-            VfsPath::Gpt { location, .. } => location.replace("gpt", "p"),
-            VfsPath::Mbr { location, .. } => location.replace("mbr", "p"),
-            VfsPath::Ntfs { ntfs_path, parent } => {
-                let parent_display_path: String = self.get_display_path(parent);
-                let location: String = ntfs_path.to_string();
-                format!("{}{}", parent_display_path, location)
-            }
-            _ => String::new(),
+    fn get_display_path(&self, path: &VfsPath) -> io::Result<String> {
+        match &self.volume_path_type {
+            VolumePathType::Identifier => self.get_identifier_display_path(path),
+            VolumePathType::Index => self.get_index_display_path(path),
         }
+        // TODO: santize path (control characters, etc.)
     }
 
     /// Retrieves an escaped path.
@@ -257,6 +259,46 @@ impl HashTool {
         }
         string_parts.join("")
     }
+
+    /// Retrieves an identifier-based a string representation of a path.
+    fn get_identifier_display_path(&self, path: &VfsPath) -> io::Result<String> {
+        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+        let display_path: Option<String> = match vfs_resolver.get_file_entry_by_path(path)? {
+            Some(file_entry) => match file_entry {
+                VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
+                    Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),
+                    _ => None,
+                },
+                _ => None,
+            },
+            None => None,
+        };
+        match display_path {
+            Some(display_path) => Ok(display_path),
+            None => self.get_index_display_path(path),
+        }
+    }
+
+    /// Retrieves an index-based a string representation of a path.
+    fn get_index_display_path(&self, path: &VfsPath) -> io::Result<String> {
+        let display_path: String = match path {
+            VfsPath::Apm { location, .. } => location.replace("apm", "p"),
+            VfsPath::Ext { ext_path, parent } => {
+                let parent_display_path: String = self.get_display_path(parent)?;
+                let location: String = ext_path.to_string();
+                format!("{}{}", parent_display_path, location)
+            }
+            VfsPath::Gpt { location, .. } => location.replace("gpt", "p"),
+            VfsPath::Mbr { location, .. } => location.replace("mbr", "p"),
+            VfsPath::Ntfs { ntfs_path, parent } => {
+                let parent_display_path: String = self.get_display_path(parent)?;
+                let location: String = ntfs_path.to_string();
+                format!("{}{}", parent_display_path, location)
+            }
+            _ => String::new(),
+        };
+        Ok(display_path)
+    }
 }
 
 fn main() -> ExitCode {
@@ -267,7 +309,8 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    let hash_tool: HashTool = HashTool::new(&arguments.digest_hash_type);
+    let hash_tool: HashTool =
+        HashTool::new(&arguments.digest_hash_type, &arguments.volume_path_type);
 
     match arguments.source {
         None => {

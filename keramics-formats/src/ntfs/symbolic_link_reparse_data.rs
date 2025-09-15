@@ -48,7 +48,7 @@ impl NtfsSymoblicLinkReparseData {
         if data_size < 12 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported symbolic link reparse data size"),
             ));
         }
         // TODO: read substitute name.

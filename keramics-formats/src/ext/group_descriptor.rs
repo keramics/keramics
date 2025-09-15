@@ -49,7 +49,7 @@ impl Ext2GroupDescriptor {
         if data.len() != 32 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext group descriptor data size"),
             ));
         }
         group_descriptor.inode_table_block_number = bytes_to_u32_le!(data, 8) as u64;
@@ -127,7 +127,7 @@ impl Ext4GroupDescriptor {
         if data_size != 32 && data_size != 64 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported ext group descriptor data size"),
             ));
         }
         let lower_32bit: u32 = bytes_to_u32_le!(data, 8);

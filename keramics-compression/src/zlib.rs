@@ -72,7 +72,7 @@ impl ZlibDataHeader {
         if data.len() < 2 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported zlib data header data size"),
             ));
         }
         let compression_data: u8 = data[0];
@@ -105,7 +105,7 @@ impl ZlibDataHeader {
             if data.len() < 6 {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    format!("Unsupported data size"),
+                    format!("Unsupported zlib data header data size"),
                 ));
             }
             self.header_size += 4;

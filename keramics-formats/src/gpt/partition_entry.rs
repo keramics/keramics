@@ -59,7 +59,7 @@ impl GptPartitionEntry {
         if data.len() != 128 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported GPT partition entry data size"),
             ));
         }
         self.type_identifier = Uuid::from_le_bytes(&data[0..16]);

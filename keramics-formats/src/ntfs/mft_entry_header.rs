@@ -82,7 +82,7 @@ impl NtfsMftEntryHeader {
         if data.len() < 42 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported MFT entry header data size"),
             ));
         }
         if data[0..4] != NTFS_MFT_ENTRY_SIGNATURE {

@@ -50,7 +50,7 @@ impl ExtAttributesBlock {
             if data_end_offset >= data_size {
                 break;
             }
-            if data[entry_data_offset..data_end_offset] == [0, 0, 0, 0, 0, 0, 0, 0] {
+            if data[entry_data_offset..data_end_offset] == [0; 8] {
                 break;
             }
             data_end_offset += 8;
@@ -86,6 +86,18 @@ impl ExtAttributesBlock {
                 alignment_padding_size = 4 - alignment_padding_size;
             }
             // TODO: debug print padding data.
+            if self.mediator.debug_output {
+                self.mediator.debug_print(format!(
+                "ExtAttributesBlock: alignment padding data of size: {} at offset: {} (0x{:08x})\n",
+                alignment_padding_size,
+                entry_data_offset,
+                entry_data_offset
+            ));
+                self.mediator.debug_print_data(
+                    &data[entry_data_offset..entry_data_offset + alignment_padding_size],
+                    true,
+                );
+            }
 
             // TODO: read inline value data.
 

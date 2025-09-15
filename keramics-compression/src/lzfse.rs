@@ -222,7 +222,7 @@ impl LzfseBlockV1Header {
         if data.len() != 42 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported LZFSE version 1 block header data size"),
             ));
         }
         decoder.number_of_literals = bytes_to_u32_le!(data, 4);
@@ -289,7 +289,7 @@ impl LzfseBlockV2Header {
         if data.len() < 24 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported LZFSE version 2 block header data size"),
             ));
         }
         let bit_fields1: u64 = bytes_to_u64_le!(data, 0);
