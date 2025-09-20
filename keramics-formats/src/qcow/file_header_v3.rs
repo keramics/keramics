@@ -83,7 +83,7 @@ impl QcowFileHeaderV3 {
         if data.len() < 104 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported QCOW file header version 3 data size"),
             ));
         }
         if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {

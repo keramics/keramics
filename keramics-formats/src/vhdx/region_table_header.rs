@@ -52,7 +52,7 @@ impl VhdxRegionTableHeader {
         if data.len() < 16 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX region table header data size"),
             ));
         }
         if data[0..4] != VHDX_REGION_TABLE_HEADER_SIGNATURE {

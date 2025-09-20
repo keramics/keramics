@@ -61,7 +61,7 @@ impl UdifBlockTableHeader {
         if data.len() != 204 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported UDIF block table header data size"),
             ));
         }
         if data[0..4] != UDIF_BLOCK_TABLE_HEADER_SIGNATURE {

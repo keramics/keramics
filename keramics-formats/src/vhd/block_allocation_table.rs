@@ -40,7 +40,7 @@ impl VhdBlockAllocationTableEntry {
         if data.len() != 4 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHD block allocation table entry data size"),
             ));
         }
         self.sector_number = bytes_to_u32_be!(data, 0);

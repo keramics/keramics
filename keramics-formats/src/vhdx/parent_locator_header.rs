@@ -47,7 +47,7 @@ impl VhdxParentLocatorHeader {
         if data.len() < 20 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX parent locator header data size"),
             ));
         }
         if data[0..16] != VHDX_PARENT_LOCATOR_TYPE_INDICATOR {

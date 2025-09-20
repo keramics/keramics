@@ -19,7 +19,7 @@ use keramics_formats::sparseimage::SparseImageFile;
 
 use crate::enums::VfsFileType;
 
-/// Universal Disk Image Format (UDIF) storage media image file entry.
+/// Mac OS sparse image (.sparseimage) storage media image file entry.
 pub enum SparseImageFileEntry {
     /// Layer file entry.
     Layer {

@@ -74,7 +74,7 @@ impl VhdDynamicDiskHeader {
         if data.len() != 1024 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHD dynamic disk header data size"),
             ));
         }
         if data[0..8] != VHD_DYNAMIC_DISK_HEADER_SIGNATURE {

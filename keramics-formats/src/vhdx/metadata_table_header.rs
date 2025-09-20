@@ -48,7 +48,7 @@ impl VhdxMetadataTableHeader {
         if data.len() < 32 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX metadata table header data size"),
             ));
         }
         if data[0..8] != VHDX_METADATA_TABLE_HEADER_SIGNATURE {

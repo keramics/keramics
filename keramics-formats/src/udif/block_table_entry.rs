@@ -64,7 +64,7 @@ impl UdifBlockTableEntry {
         if data.len() != 40 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported UDIF block table entry data size"),
             ));
         }
         self.entry_type = bytes_to_u32_be!(data, 0);

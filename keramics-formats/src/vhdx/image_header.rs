@@ -65,7 +65,7 @@ impl VhdxImageHeader {
         if data.len() != 4096 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX image header data size"),
             ));
         }
         if data[0..4] != VHDX_IMAGE_HEADER_SIGNATURE {

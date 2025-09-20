@@ -58,7 +58,7 @@ impl VhdxRegionTableEntry {
         if data.len() != 32 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX region table entry data size"),
             ));
         }
         let is_required_flag: u32 = bytes_to_u32_le!(data, 28);

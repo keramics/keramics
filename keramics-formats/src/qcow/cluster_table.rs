@@ -42,7 +42,7 @@ impl QcowClusterTableEntry {
         if data.len() != 8 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported QCOW cluster table entry data size"),
             ));
         }
         self.reference = bytes_to_u64_be!(data, 0);

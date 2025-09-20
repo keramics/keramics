@@ -51,7 +51,7 @@ impl VhdxBlockAllocationTableEntry {
         if data.len() != 8 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX block allocation table entry data size"),
             ));
         }
         let entry: u64 = bytes_to_u64_le!(data, 0);

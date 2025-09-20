@@ -42,7 +42,7 @@ impl VhdxFileHeader {
         if data.len() != 65536 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX file header data size"),
             ));
         }
         if data[0..8] != VHDX_FILE_HEADER_SIGNATURE {
