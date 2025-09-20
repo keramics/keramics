@@ -56,7 +56,7 @@ impl SparseImageFileHeader {
         if data.len() != 64 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported sparse image file header data size"),
             ));
         }
         if data[0..4] != SPARSEIMAGE_FILE_HEADER_SIGNATURE {

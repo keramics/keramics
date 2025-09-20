@@ -58,7 +58,7 @@ impl VhdxParentLocatorEntry {
         if data.len() != 12 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX parent locator entry data size"),
             ));
         }
         self.key_data_offset = bytes_to_u32_le!(data, 0);

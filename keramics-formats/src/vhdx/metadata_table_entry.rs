@@ -54,7 +54,7 @@ impl VhdxMetadataTableEntry {
         if data.len() != 32 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported VHDX metadata table entry data size"),
             ));
         }
         self.item_identifier = Uuid::from_le_bytes(&data[0..16]);

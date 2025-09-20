@@ -81,7 +81,7 @@ impl UdifFileFooter {
         if data.len() != 512 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                format!("Unsupported data size"),
+                format!("Unsupported UDIF file footer data size"),
             ));
         }
         if data[0..4] != UDIF_FILE_FOOTER_SIGNATURE {

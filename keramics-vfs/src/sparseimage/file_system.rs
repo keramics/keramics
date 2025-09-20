@@ -21,7 +21,7 @@ use crate::types::VfsFileSystemReference;
 
 use super::file_entry::SparseImageFileEntry;
 
-/// Universal Disk Image Format (UDIF) storage media image file system.
+/// Mac OS sparse image (.sparseimage) storage media image file system.
 pub struct SparseImageFileSystem {
     /// File.
     file: Arc<RwLock<SparseImageFile>>,
