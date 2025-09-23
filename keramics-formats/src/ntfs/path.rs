@@ -21,6 +21,8 @@ pub struct NtfsPath {
 }
 
 impl NtfsPath {
+    const COMPONENT_SEPARATOR: &'static str = "\\";
+
     /// Creates a new path.
     pub fn new() -> Self {
         Self {
@@ -28,13 +30,8 @@ impl NtfsPath {
         }
     }
 
-    /// Determines if the path is empty.
-    pub fn is_empty(&self) -> bool {
-        self.components.is_empty()
-    }
-
     /// Creates a new path of the parent directory.
-    pub fn parent_directory(&self) -> Self {
+    pub fn new_with_parent_directory(&self) -> Self {
         let mut number_of_components: usize = self.components.len();
         if number_of_components > 1 {
             number_of_components -= 1;
@@ -47,16 +44,22 @@ impl NtfsPath {
         }
     }
 
+    /// Determines if the path is empty.
+    pub fn is_empty(&self) -> bool {
+        self.components.is_empty()
+    }
+
     /// Retrieves a string representation of the path.
     pub fn to_string(&self) -> String {
-        if self.components.len() > 1 {
+        let number_of_components: usize = self.components.len();
+        if number_of_components == 1 && self.components[0].is_empty() {
+            NtfsPath::COMPONENT_SEPARATOR.to_string()
+        } else {
             self.components
                 .iter()
                 .map(|component| component.to_string())
                 .collect::<Vec<String>>()
-                .join("/")
-        } else {
-            "/".to_string()
+                .join(NtfsPath::COMPONENT_SEPARATOR)
         }
     }
 }
@@ -64,11 +67,12 @@ impl NtfsPath {
 impl From<&str> for NtfsPath {
     /// Converts a [`&str`] into a [`NtfsPath`]
     fn from(string: &str) -> NtfsPath {
-        let components: Vec<Ucs2String> = if string == "/" {
+        let components: Vec<Ucs2String> = if string == NtfsPath::COMPONENT_SEPARATOR {
+            // Splitting "\\" results in ["", ""]
             vec![Ucs2String::new()]
         } else {
             string
-                .split("/")
+                .split(NtfsPath::COMPONENT_SEPARATOR)
                 .map(|component| Ucs2String::from_string(component))
                 .collect::<Vec<Ucs2String>>()
         };
@@ -134,54 +138,54 @@ impl From<&Vec<String>> for NtfsPath {
 mod tests {
     use super::*;
 
+    // TODO: add tests for new_with_parent_directory
     // TODO: add tests for is_empty
-    // TODO: add tests for parent_directory
 
     #[test]
     fn test_to_string() {
-        let test_struct: NtfsPath = NtfsPath::from("/");
-        assert_eq!(test_struct.to_string(), "/");
+        let test_struct: NtfsPath = NtfsPath::from("\\");
+        assert_eq!(test_struct.to_string(), "\\");
 
-        let test_struct: NtfsPath = NtfsPath::from("/directory");
-        assert_eq!(test_struct.to_string(), "/directory");
+        let test_struct: NtfsPath = NtfsPath::from("\\directory");
+        assert_eq!(test_struct.to_string(), "\\directory");
 
-        let test_struct: NtfsPath = NtfsPath::from("/directory/filename.txt");
-        assert_eq!(test_struct.to_string(), "/directory/filename.txt");
+        let test_struct: NtfsPath = NtfsPath::from("\\directory\\filename.txt");
+        assert_eq!(test_struct.to_string(), "\\directory\\filename.txt");
 
-        let test_struct: NtfsPath = NtfsPath::from("/directory/");
-        assert_eq!(test_struct.to_string(), "/directory/");
+        let test_struct: NtfsPath = NtfsPath::from("\\directory/");
+        assert_eq!(test_struct.to_string(), "\\directory/");
     }
 
     #[test]
     fn test_from_str() {
-        let test_struct: NtfsPath = NtfsPath::from("/");
+        let test_struct: NtfsPath = NtfsPath::from("\\");
         assert_eq!(test_struct.components.len(), 1);
 
-        let test_struct: NtfsPath = NtfsPath::from("/directory");
+        let test_struct: NtfsPath = NtfsPath::from("\\directory");
         assert_eq!(test_struct.components.len(), 2);
 
-        let test_struct: NtfsPath = NtfsPath::from("/directory/filename.txt");
+        let test_struct: NtfsPath = NtfsPath::from("\\directory\\filename.txt");
         assert_eq!(test_struct.components.len(), 3);
 
-        let test_struct: NtfsPath = NtfsPath::from("/directory/");
+        let test_struct: NtfsPath = NtfsPath::from("\\directory\\");
         assert_eq!(test_struct.components.len(), 3);
     }
 
     #[test]
     fn test_from_string() {
-        let string: String = "/".to_string();
+        let string: String = "\\".to_string();
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 1);
 
-        let string: String = "/directory".to_string();
+        let string: String = "\\directory".to_string();
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 2);
 
-        let string: String = "/directory/filename.txt".to_string();
+        let string: String = "\\directory\\filename.txt".to_string();
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 3);
 
-        let string: String = "/directory/".to_string();
+        let string: String = "\\directory\\".to_string();
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 3);
     }

@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_formats::sparseimage::SparseImageFile;
 
+use crate::location::VfsLocation;
 use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
 
@@ -42,48 +43,69 @@ impl SparseImageFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, path: &VfsPath) -> io::Result<bool> {
-        let location: &String = match path {
-            VfsPath::SparseImage { location, .. } => location,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                ))
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+        match vfs_path {
+            VfsPath::String(string_path_components) => {
+                let number_of_components: usize = string_path_components.len();
+                if number_of_components == 0 || number_of_components > 2 {
+                    return Ok(false);
+                }
+                if string_path_components[0] != "" {
+                    return Ok(false);
+                }
+                // A single empty component represents "/".
+                if number_of_components == 1 {
+                    return Ok(true);
+                }
+                if string_path_components[1] == "sparseimage1" {
+                    Ok(true)
+                } else {
+                    Ok(false)
+                }
             }
-        };
-        if location == "/" {
-            return Ok(true);
-        } else if location == "/sparseimage1" {
-            return Ok(true);
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unsupported VFS path type",
+            )),
         }
-        Ok(false)
     }
 
     /// Retrieves the file entry with the specific location.
     pub fn get_file_entry_by_path(
         &self,
-        path: &VfsPath,
+        vfs_path: &VfsPath,
     ) -> io::Result<Option<SparseImageFileEntry>> {
-        let location: &String = match path {
-            VfsPath::SparseImage { location, .. } => location,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                ))
-            }
-        };
-        if location == "/" {
-            let sparseimage_file_entry: SparseImageFileEntry = self.get_root_file_entry()?;
+        match vfs_path {
+            VfsPath::String(string_path_components) => {
+                let number_of_components: usize = string_path_components.len();
+                if number_of_components == 0 || number_of_components > 2 {
+                    return Ok(None);
+                }
+                if string_path_components[0] != "" {
+                    return Ok(None);
+                }
+                // A single empty component represents "/".
+                if number_of_components == 1 {
+                    let sparseimage_file_entry: SparseImageFileEntry =
+                        self.get_root_file_entry()?;
 
-            return Ok(Some(sparseimage_file_entry));
-        } else if location == "/sparseimage1" {
-            return Ok(Some(SparseImageFileEntry::Layer {
-                file: self.file.clone(),
-            }));
+                    return Ok(Some(sparseimage_file_entry));
+                }
+                if string_path_components[1] == "sparseimage1" {
+                    let sparseimage_file_entry: SparseImageFileEntry =
+                        SparseImageFileEntry::Layer {
+                            file: self.file.clone(),
+                        };
+                    Ok(Some(sparseimage_file_entry))
+                } else {
+                    Ok(None)
+                }
+            }
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unsupported VFS path type",
+            )),
         }
-        Ok(None)
     }
 
     /// Retrieves the root file entry.
@@ -97,7 +119,7 @@ impl SparseImageFileSystem {
     pub fn open(
         &mut self,
         parent_file_system: Option<&VfsFileSystemReference>,
-        path: &VfsPath,
+        vfs_location: &VfsLocation,
     ) -> io::Result<()> {
         let file_system: &VfsFileSystemReference = match parent_file_system {
             Some(file_system) => file_system,
@@ -108,7 +130,8 @@ impl SparseImageFileSystem {
                 ))
             }
         };
-        match file_system.get_data_stream_by_path_and_name(path, None)? {
+        let vfs_path: &VfsPath = vfs_location.get_path();
+        match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
             Some(data_stream) => match self.file.write() {
                 Ok(mut file) => {
                     file.read_data_stream(&data_stream)?;
@@ -120,7 +143,7 @@ impl SparseImageFileSystem {
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.to_string()),
+                    format!("No such file: {}", vfs_path.to_string()),
                 ))
             }
         }
@@ -132,37 +155,35 @@ impl SparseImageFileSystem {
 mod tests {
     use super::*;
 
-    use crate::enums::{VfsFileType, VfsPathType};
+    use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
+    use crate::location::new_os_vfs_location;
 
-    fn get_file_system() -> io::Result<(SparseImageFileSystem, VfsPath)> {
+    fn get_file_system() -> io::Result<SparseImageFileSystem> {
         let mut sparseimage_file_system: SparseImageFileSystem = SparseImageFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
-        let parent_vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
-        };
-        sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_path)?;
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location("../test_data/sparseimage/hfsplus.sparseimage");
+        sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
-        Ok((sparseimage_file_system, parent_vfs_path))
+        Ok(sparseimage_file_system)
     }
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let (sparseimage_file_system, parent_vfs_path): (SparseImageFileSystem, VfsPath) =
-            get_file_system()?;
+        let sparseimage_file_system: SparseImageFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath =
-            parent_vfs_path.new_child(VfsPathType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/sparseimage1");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::SparseImage, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/bogus1");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
@@ -171,10 +192,9 @@ mod tests {
 
     #[test]
     fn test_get_file_entry_by_path() -> io::Result<()> {
-        let (sparseimage_file_system, parent_vfs_path): (SparseImageFileSystem, VfsPath) =
-            get_file_system()?;
+        let sparseimage_file_system: SparseImageFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/");
         let result: Option<SparseImageFileEntry> =
             sparseimage_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -187,8 +207,7 @@ mod tests {
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath =
-            parent_vfs_path.new_child(VfsPathType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/sparseimage1");
         let result: Option<SparseImageFileEntry> =
             sparseimage_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -201,7 +220,7 @@ mod tests {
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::SparseImage, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/bogus1");
         let result: Option<SparseImageFileEntry> =
             sparseimage_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
@@ -211,7 +230,7 @@ mod tests {
 
     #[test]
     fn test_get_root_file_entry() -> io::Result<()> {
-        let (sparseimage_file_system, _): (SparseImageFileSystem, VfsPath) = get_file_system()?;
+        let sparseimage_file_system: SparseImageFileSystem = get_file_system()?;
 
         let sparseimage_file_entry: SparseImageFileEntry =
             sparseimage_file_system.get_root_file_entry()?;
@@ -227,11 +246,10 @@ mod tests {
         let mut sparseimage_file_system: SparseImageFileSystem = SparseImageFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
-        let parent_vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/sparseimage/hfsplus.sparseimage".to_string(),
-        };
-        sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_path)?;
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location("../test_data/sparseimage/hfsplus.sparseimage");
+        sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(sparseimage_file_system.number_of_layers, 1);
 

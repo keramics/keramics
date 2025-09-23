@@ -54,4 +54,27 @@ pub fn open_os_file_resolver(base_path: &str) -> io::Result<FileResolverReferenc
     Ok(FileResolverReference::new(Box::new(file_resolver)))
 }
 
-// TODO: add tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_data_stream() -> io::Result<()> {
+        let file_resolver: OsFileResolver = OsFileResolver::new("../test_data/");
+
+        let mut path_components: Vec<&str> = vec!["file.txt"];
+
+        let data_stream: Option<DataStreamReference> =
+            file_resolver.get_data_stream(&mut path_components)?;
+        assert!(data_stream.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_open_os_file_resolver() -> io::Result<()> {
+        let _ = open_os_file_resolver("../test_data/")?;
+
+        Ok(())
+    }
+}

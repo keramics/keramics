@@ -18,7 +18,7 @@ use keramics_core::DataStreamReference;
 
 use super::context::VfsContext;
 use super::file_entry::VfsFileEntry;
-use super::path::VfsPath;
+use super::location::VfsLocation;
 use super::types::{VfsFileSystemReference, VfsResolverReference};
 
 /// Virtual File System (VFS) resolver.
@@ -43,27 +43,33 @@ impl VfsResolver {
     /// Retrieves a data stream with the specified path and name.
     pub fn get_data_stream_by_path_and_name(
         &self,
-        path: &VfsPath,
+        vfs_location: &VfsLocation,
         name: Option<&str>,
     ) -> io::Result<Option<DataStreamReference>> {
         match self.context.write() {
-            Ok(mut context) => context.get_data_stream_by_path_and_name(path, name),
+            Ok(mut context) => context.get_data_stream_by_path_and_name(vfs_location, name),
             Err(error) => Err(keramics_core::error_to_io_error!(error)),
         }
     }
 
     /// Retrieves a file entry with the specified path.
-    pub fn get_file_entry_by_path(&self, path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        vfs_location: &VfsLocation,
+    ) -> io::Result<Option<VfsFileEntry>> {
         match self.context.write() {
-            Ok(mut context) => context.get_file_entry_by_path(path),
+            Ok(mut context) => context.get_file_entry_by_path(vfs_location),
             Err(error) => Err(keramics_core::error_to_io_error!(error)),
         }
     }
 
     /// Opens a file system.
-    pub fn open_file_system(&self, path: &VfsPath) -> io::Result<VfsFileSystemReference> {
+    pub fn open_file_system(
+        &self,
+        vfs_location: &VfsLocation,
+    ) -> io::Result<VfsFileSystemReference> {
         match self.context.write() {
-            Ok(mut context) => context.open_file_system(path),
+            Ok(mut context) => context.open_file_system(vfs_location),
             Err(error) => Err(keramics_core::error_to_io_error!(error)),
         }
     }
@@ -77,25 +83,21 @@ thread_local! {
 mod tests {
     use super::*;
 
-    use crate::enums::VfsPathType;
-    use crate::path::VfsPath;
+    use crate::file_system::VfsFileSystem;
+    use crate::location::new_os_vfs_location;
 
     #[test]
     fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/file.txt".to_string(),
-        };
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
         let result: Option<DataStreamReference> =
-            vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, None)?;
+            vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/bogus.txt".to_string(),
-        };
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/bogus.txt");
         let result: Option<DataStreamReference> =
-            vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, None)?;
+            vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, None)?;
         assert!(result.is_none());
 
         Ok(())
@@ -105,16 +107,12 @@ mod tests {
     fn test_get_file_entry_by_path() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/file.txt".to_string(),
-        };
-        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_path)?;
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
+        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_location)?;
         assert!(result.is_some());
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/bogus.txt".to_string(),
-        };
-        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_path)?;
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/bogus.txt");
+        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_location)?;
         assert!(result.is_none());
 
         Ok(())
@@ -124,12 +122,11 @@ mod tests {
     fn test_open_file_system() -> io::Result<()> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "/".to_string(),
-        };
-        let vfs_file_system: VfsFileSystemReference = vfs_resolver.open_file_system(&vfs_path)?;
+        let vfs_location: VfsLocation = new_os_vfs_location("/");
+        let vfs_file_system: VfsFileSystemReference =
+            vfs_resolver.open_file_system(&vfs_location)?;
 
-        assert!(vfs_file_system.get_vfs_path_type() == VfsPathType::Os);
+        assert!(matches!(*vfs_file_system, VfsFileSystem::Os { .. }));
 
         Ok(())
     }

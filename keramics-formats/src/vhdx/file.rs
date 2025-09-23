@@ -107,8 +107,8 @@ impl VhdxFile {
         }
     }
 
-    /// Retrieves the parent filename
-    pub fn get_parent_filename(&self) -> Option<Ucs2String> {
+    /// Retrieves the parent file name
+    pub fn get_parent_file_name(&self) -> Option<Ucs2String> {
         let parent_name: &Ucs2String = match &self.parent_name {
             Some(parent_name) => parent_name,
             None => return None,
@@ -122,10 +122,10 @@ impl VhdxFile {
                 break;
             }
         }
-        let mut parent_filename: Ucs2String = Ucs2String::new();
-        parent_filename.elements = parent_name.elements[string_index..].to_vec();
+        let mut parent_file_name: Ucs2String = Ucs2String::new();
+        parent_file_name.elements = parent_name.elements[string_index..].to_vec();
 
-        Some(parent_filename)
+        Some(parent_file_name)
     }
 
     /// Reads a file from a data stream.
@@ -829,15 +829,15 @@ mod tests {
     }
 
     #[test]
-    fn test_get_parent_filename() -> io::Result<()> {
+    fn test_get_parent_file_name() -> io::Result<()> {
         let mut file: VhdxFile = VhdxFile::new();
 
         let data_stream: DataStreamReference =
             open_os_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
         file.read_data_stream(&data_stream)?;
 
-        let parent_filename: Option<Ucs2String> = file.get_parent_filename();
-        assert_eq!(parent_filename.unwrap().to_string(), "ntfs-parent.vhdx");
+        let parent_file_name: Option<Ucs2String> = file.get_parent_file_name();
+        assert_eq!(parent_file_name.unwrap().to_string(), "ntfs-parent.vhdx");
 
         Ok(())
     }

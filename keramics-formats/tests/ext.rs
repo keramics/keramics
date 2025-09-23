@@ -41,8 +41,8 @@ fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, Strin
     Ok((offset, hash_string))
 }
 
-fn read_path(file_system: &ExtFileSystem, location: &str) -> io::Result<(u64, String)> {
-    let path: ExtPath = ExtPath::from(location);
+fn read_path(file_system: &ExtFileSystem, path: &str) -> io::Result<(u64, String)> {
+    let path: ExtPath = ExtPath::from(path);
     let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
     let data_stream: DataStreamReference = file_entry.get_data_stream()?.unwrap();
@@ -50,10 +50,10 @@ fn read_path(file_system: &ExtFileSystem, location: &str) -> io::Result<(u64, St
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(location: &str) -> io::Result<ExtFileSystem> {
+fn open_file_system(path: &str) -> io::Result<ExtFileSystem> {
     let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    let data_stream: DataStreamReference = open_os_data_stream(path)?;
     file_system.read_data_stream(&data_stream)?;
 
     Ok(file_system)

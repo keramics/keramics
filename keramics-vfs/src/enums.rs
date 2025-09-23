@@ -27,8 +27,8 @@ pub enum VfsFileType {
     Whiteout,
 }
 
-#[derive(Clone, Default, PartialEq)]
-pub enum VfsPathType {
+#[derive(Clone, Default, Eq, Hash, PartialEq)]
+pub enum VfsType {
     Apm,
     Ext,
     #[default]
@@ -42,4 +42,24 @@ pub enum VfsPathType {
     Udif,
     Vhd,
     Vhdx,
+}
+
+impl VfsType {
+    /// Retrieves a string representation of the type.
+    pub fn as_str(&self) -> &str {
+        match self {
+            VfsType::Apm => "APM",
+            VfsType::Ext => "EXT",
+            VfsType::Fake => "FAKE",
+            VfsType::Gpt => "GPT",
+            VfsType::Mbr => "MBR",
+            VfsType::Ntfs => "NTFS",
+            VfsType::Os => "OS",
+            VfsType::Qcow => "QCOW",
+            VfsType::SparseImage => "SPARSEIMAGE",
+            VfsType::Udif => "UDIF",
+            VfsType::Vhd => "VHD",
+            VfsType::Vhdx => "VHDX",
+        }
+    }
 }

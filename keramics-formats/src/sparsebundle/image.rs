@@ -15,7 +15,7 @@ use std::io;
 use std::io::{Read, Seek};
 
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{open_fake_file_resolver, DataStreamReference, FileResolverReference};
+use keramics_core::{DataStreamReference, FakeFileResolver, FileResolverReference};
 
 use crate::plist::XmlPlist;
 
@@ -42,7 +42,7 @@ impl SparseBundleImage {
     pub fn new() -> Self {
         Self {
             mediator: Mediator::current(),
-            file_resolver: open_fake_file_resolver(),
+            file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             block_size: 0,
             media_size: 0,
             media_offset: 0,
@@ -62,15 +62,15 @@ impl SparseBundleImage {
     fn read_info_plist(
         &mut self,
         file_resolver: &FileResolverReference,
-        filename: &str,
+        file_name: &str,
     ) -> io::Result<()> {
         let data_stream: DataStreamReference =
-            match file_resolver.get_data_stream(&mut vec![filename])? {
+            match file_resolver.get_data_stream(&mut vec![file_name])? {
                 Some(data_stream) => data_stream,
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
-                        format!("No such file: {}", filename),
+                        format!("No such file: {}", file_name),
                     ))
                 }
             };

@@ -11,12 +11,13 @@
  * under the License.
  */
 
-use crate::path::VfsPath;
+use crate::enums::VfsType;
+use crate::location::VfsLocation;
 
 /// Virtual File System (VFS) scan node.
 pub struct VfsScanNode {
-    /// Path.
-    pub path: VfsPath,
+    /// Location.
+    pub location: VfsLocation,
 
     /// Sub nodes.
     pub sub_nodes: Vec<VfsScanNode>,
@@ -24,11 +25,16 @@ pub struct VfsScanNode {
 
 impl VfsScanNode {
     /// Creates a new scan node.
-    pub(super) fn new(path: VfsPath) -> Self {
+    pub(super) fn new(location: VfsLocation) -> Self {
         Self {
-            path: path,
+            location: location,
             sub_nodes: Vec::new(),
         }
+    }
+
+    /// Retrieves the type.
+    pub fn get_type(&self) -> &VfsType {
+        self.location.get_type()
     }
 
     /// Determines if the scan node is empty.

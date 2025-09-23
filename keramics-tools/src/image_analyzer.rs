@@ -17,8 +17,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use keramics_vfs::{
-    VfsFileEntry, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode,
-    VfsScanner,
+    new_os_vfs_location, VfsFileEntry, VfsLocation, VfsPath, VfsResolver, VfsResolverReference,
+    VfsScanContext, VfsScanNode, VfsScanner, VfsType,
 };
 
 #[derive(Parser)]
@@ -31,22 +31,8 @@ struct CommandLineArguments {
 /// Prints information about a scan node.
 fn print_scan_node(scan_node: &VfsScanNode, depth: usize) -> io::Result<()> {
     let indentation: String = vec![" "; depth * 4].join("");
-    let format_identifier: &str = match &scan_node.path {
-        VfsPath::Apm { .. } => "APM",
-        VfsPath::Ext { .. } => "EXT",
-        VfsPath::Fake { .. } => "FAKE",
-        VfsPath::Gpt { .. } => "GPT",
-        VfsPath::Mbr { .. } => "MBR",
-        VfsPath::Ntfs { .. } => "NTFS",
-        VfsPath::Os { .. } => "OS",
-        VfsPath::Qcow { .. } => "QCOW",
-        VfsPath::SparseImage { .. } => "SPARSEIMAGE",
-        VfsPath::Udif { .. } => "UDIF",
-        VfsPath::Vhd { .. } => "VHD",
-        VfsPath::Vhdx { .. } => "VHDX",
-    };
     let vfs_resolver: VfsResolverReference = VfsResolver::current();
-    let suffix: String = match vfs_resolver.get_file_entry_by_path(&scan_node.path)? {
+    let suffix: String = match vfs_resolver.get_file_entry_by_path(&scan_node.location)? {
         Some(file_entry) => match file_entry {
             VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
                 Some(identifier) => format!(" (identifier: {})", identifier.to_string()),
@@ -56,11 +42,14 @@ fn print_scan_node(scan_node: &VfsScanNode, depth: usize) -> io::Result<()> {
         },
         None => String::new(),
     };
+    let vfs_path: &VfsPath = scan_node.location.get_path();
+    let vfs_type: &VfsType = scan_node.get_type();
+
     println!(
-        "{}{}: location: {}{}",
+        "{}{}: path: {}{}",
         indentation,
-        format_identifier,
-        scan_node.path.get_location(),
+        vfs_type.as_str(),
+        vfs_path.to_string(),
         suffix,
     );
     for sub_scan_node in scan_node.sub_nodes.iter() {
@@ -79,11 +68,10 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: source.to_string(),
-    };
+    let vfs_location: VfsLocation = new_os_vfs_location(source);
 
     let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
     match vfs_scanner.build() {
         Ok(_) => {}
         Err(error) => {
@@ -92,7 +80,8 @@ fn main() -> ExitCode {
         }
     };
     let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-    match vfs_scanner.scan(&mut vfs_scan_context, &vfs_path) {
+
+    match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to scan: {} with error: {}", source, error);

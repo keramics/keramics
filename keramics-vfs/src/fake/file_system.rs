@@ -15,6 +15,8 @@ use std::collections::HashMap;
 use std::io;
 use std::rc::Rc;
 
+use crate::path::VfsPath;
+
 use super::file_entry::FakeFileEntry;
 
 /// Fake (or virtual) file system.
@@ -46,13 +48,22 @@ impl FakeFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, path: &str) -> io::Result<bool> {
-        Ok(self.paths.contains_key(path))
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+        // TODO: use string path components as key
+        let path: String = vfs_path.to_string();
+
+        Ok(self.paths.contains_key(&path))
     }
 
     /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(&self, path: &str) -> io::Result<Option<Rc<FakeFileEntry>>> {
-        let result: Option<Rc<FakeFileEntry>> = match self.paths.get(path) {
+    pub fn get_file_entry_by_path(
+        &self,
+        vfs_path: &VfsPath,
+    ) -> io::Result<Option<Rc<FakeFileEntry>>> {
+        // TODO: use string path components as key
+        let path: String = vfs_path.to_string();
+
+        let result: Option<Rc<FakeFileEntry>> = match self.paths.get(&path) {
             Some(file_entry) => Some(file_entry.clone()),
             None => None,
         };
@@ -64,25 +75,29 @@ impl FakeFileSystem {
 mod tests {
     use super::*;
 
+    use crate::VfsType;
+
     fn get_file_system() -> io::Result<FakeFileSystem> {
-        let mut test_file_system: FakeFileSystem = FakeFileSystem::new();
+        let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
 
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
-        test_file_system.add_file_entry("/fake/file.txt", fake_file_entry)?;
+        fake_file_system.add_file_entry("/fake/file.txt", fake_file_entry)?;
 
-        Ok(test_file_system)
+        Ok(fake_file_system)
     }
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let test_file_system: FakeFileSystem = get_file_system()?;
+        let fake_file_system: FakeFileSystem = get_file_system()?;
 
-        assert_eq!(test_file_system.file_entry_exists("/fake/file.txt")?, true);
-        assert_eq!(
-            test_file_system.file_entry_exists("/fake/bogus.txt")?,
-            false
-        );
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/file.txt");
+        let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, true);
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/bogus.txt");
+        let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
 
         Ok(())
     }

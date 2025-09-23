@@ -14,7 +14,7 @@
 use std::io;
 
 use super::data_stream::DataStreamReference;
-use super::file_resolver::{FileResolver, FileResolverReference};
+use super::file_resolver::FileResolver;
 
 pub struct FakeFileResolver {}
 
@@ -29,14 +29,26 @@ impl FileResolver for FakeFileResolver {
     /// Retrieves a data stream with the specified path.
     fn get_data_stream<'a>(
         &'a self,
-        path_components: &mut Vec<&'a str>,
+        _path_components: &mut Vec<&'a str>,
     ) -> io::Result<Option<DataStreamReference>> {
         Ok(None)
     }
 }
 
-/// Opens a new fake file resolver.
-pub fn open_fake_file_resolver() -> FileResolverReference {
-    let fake_file_resolver: FakeFileResolver = FakeFileResolver::new();
-    FileResolverReference::new(Box::new(fake_file_resolver))
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_data_stream() -> io::Result<()> {
+        let file_resolver: FakeFileResolver = FakeFileResolver::new();
+
+        let mut path_components: Vec<&str> = vec!["file.txt"];
+
+        let data_stream: Option<DataStreamReference> =
+            file_resolver.get_data_stream(&mut path_components)?;
+        assert!(data_stream.is_none());
+
+        Ok(())
+    }
 }

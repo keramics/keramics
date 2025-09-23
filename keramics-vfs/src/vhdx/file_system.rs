@@ -18,6 +18,7 @@ use keramics_core::FileResolverReference;
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 
 use crate::file_resolver::open_vfs_file_resolver;
+use crate::location::VfsLocation;
 use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
 
@@ -44,79 +45,84 @@ impl VhdxFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, path: &VfsPath) -> io::Result<bool> {
-        let location: &String = match path {
-            VfsPath::Vhdx { location, .. } => location,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                ))
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+        match vfs_path {
+            VfsPath::String(string_path_components) => {
+                let number_of_components: usize = string_path_components.len();
+                if number_of_components == 0 || number_of_components > 2 {
+                    return Ok(false);
+                }
+                if string_path_components[0] != "" {
+                    return Ok(false);
+                }
+                // A single empty component represents "/".
+                if number_of_components == 1 {
+                    return Ok(true);
+                }
+                match self.get_layer_index(&string_path_components[1]) {
+                    Some(_) => Ok(true),
+                    None => Ok(false),
+                }
             }
-        };
-        if location == "/" {
-            return Ok(true);
-        }
-        match self.get_layer_index_by_path(&location) {
-            Ok(_) => Ok(true),
-            Err(_) => Ok(false),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unsupported VFS path type",
+            )),
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(&self, path: &VfsPath) -> io::Result<Option<VhdxFileEntry>> {
-        let location: &String = match path {
-            VfsPath::Vhdx { location, .. } => location,
-            _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
-                ))
-            }
-        };
-        if location == "/" {
-            let vhdx_file_entry: VhdxFileEntry = self.get_root_file_entry()?;
+    pub fn get_file_entry_by_path(&self, vfs_path: &VfsPath) -> io::Result<Option<VhdxFileEntry>> {
+        match vfs_path {
+            VfsPath::String(string_path_components) => {
+                let number_of_components: usize = string_path_components.len();
+                if number_of_components == 0 || number_of_components > 2 {
+                    return Ok(None);
+                }
+                if string_path_components[0] != "" {
+                    return Ok(None);
+                }
+                // A single empty component represents "/".
+                if number_of_components == 1 {
+                    let vhdx_file_entry: VhdxFileEntry = self.get_root_file_entry()?;
 
-            return Ok(Some(vhdx_file_entry));
-        }
-        match self.get_layer_index_by_path(location) {
-            Ok(layer_index) => {
-                let vhdx_layer: VhdxImageLayer = self.image.get_layer_by_index(layer_index)?;
+                    return Ok(Some(vhdx_file_entry));
+                }
+                match self.get_layer_index(&string_path_components[1]) {
+                    Some(layer_index) => {
+                        let vhdx_layer: VhdxImageLayer =
+                            self.image.get_layer_by_index(layer_index)?;
 
-                Ok(Some(VhdxFileEntry::Layer {
-                    index: layer_index,
-                    layer: vhdx_layer.clone(),
-                }))
+                        Ok(Some(VhdxFileEntry::Layer {
+                            index: layer_index,
+                            layer: vhdx_layer.clone(),
+                        }))
+                    }
+                    None => Ok(None),
+                }
             }
-            Err(_) => Ok(None),
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Unsupported VFS path type",
+            )),
         }
     }
 
-    /// Retrieves the layer index with the specific location.
-    // TODO: return None instead of Err
-    fn get_layer_index_by_path(&self, location: &String) -> io::Result<usize> {
-        if !location.starts_with(VhdxFileSystem::PATH_PREFIX) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
-        };
-        let layer_index: usize = match location[5..].parse::<usize>() {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported path: {}", location),
-                ))
-            }
-        };
-        if layer_index == 0 || layer_index > self.number_of_layers {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported path: {}", location),
-            ));
+    /// Retrieves the layer index.
+    fn get_layer_index(&self, file_name: &String) -> Option<usize> {
+        if !file_name.starts_with("vhdx") {
+            return None;
         }
-        Ok(layer_index - 1)
+        match file_name[4..].parse::<usize>() {
+            Ok(layer_index) => {
+                if layer_index > 0 && layer_index <= self.number_of_layers {
+                    Some(layer_index - 1)
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
     }
 
     /// Retrieves the root file entry.
@@ -130,10 +136,14 @@ impl VhdxFileSystem {
     pub fn open(
         &mut self,
         parent_file_system: Option<&VfsFileSystemReference>,
-        path: &VfsPath,
+        vfs_location: &VfsLocation,
     ) -> io::Result<()> {
+        let vfs_path: &VfsPath = vfs_location.get_path();
         let file_resolver: FileResolverReference = match parent_file_system {
-            Some(file_system) => open_vfs_file_resolver(file_system, path.parent_directory())?,
+            Some(file_system) => {
+                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
+                open_vfs_file_resolver(file_system, parent_vfs_path)?
+            }
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
@@ -143,7 +153,7 @@ impl VhdxFileSystem {
         };
         match Arc::get_mut(&mut self.image) {
             Some(image) => {
-                image.open(&file_resolver, path.get_file_name())?;
+                image.open(&file_resolver, vfs_path.get_file_name())?;
 
                 self.number_of_layers = image.get_number_of_layers();
             }
@@ -157,35 +167,35 @@ impl VhdxFileSystem {
 mod tests {
     use super::*;
 
-    use crate::enums::{VfsFileType, VfsPathType};
+    use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
+    use crate::location::new_os_vfs_location;
 
-    fn get_file_system() -> io::Result<(VhdxFileSystem, VfsPath)> {
+    fn get_file_system() -> io::Result<VhdxFileSystem> {
         let mut vhdx_file_system: VhdxFileSystem = VhdxFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
-        let parent_vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/vhdx/ntfs-differential.vhdx".to_string(),
-        };
-        vhdx_file_system.open(Some(&parent_file_system), &parent_vfs_path)?;
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location("../test_data/vhdx/ntfs-differential.vhdx");
+        vhdx_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
-        Ok((vhdx_file_system, parent_vfs_path))
+        Ok(vhdx_file_system)
     }
 
     #[test]
     fn test_file_entry_exists() -> io::Result<()> {
-        let (vhdx_file_system, parent_vfs_path): (VhdxFileSystem, VfsPath) = get_file_system()?;
+        let vhdx_file_system: VhdxFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/vhdx1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/bogus1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
@@ -194,9 +204,9 @@ mod tests {
 
     #[test]
     fn test_get_file_entry_by_path() -> io::Result<()> {
-        let (vhdx_file_system, parent_vfs_path): (VhdxFileSystem, VfsPath) = get_file_system()?;
+        let vhdx_file_system: VhdxFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -208,7 +218,7 @@ mod tests {
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/vhdx1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/vhdx1");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -220,7 +230,7 @@ mod tests {
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = parent_vfs_path.new_child(VfsPathType::Vhdx, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/bogus1");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 
@@ -228,31 +238,27 @@ mod tests {
     }
 
     #[test]
-    fn get_layer_index_by_path() -> io::Result<()> {
-        let (vhdx_file_system, _): (VhdxFileSystem, VfsPath) = get_file_system()?;
+    fn test_get_layer_index() -> io::Result<()> {
+        let vhdx_file_system: VhdxFileSystem = get_file_system()?;
 
-        let path: String = "/".to_string();
-        let result = vhdx_file_system.get_layer_index_by_path(&path);
-        assert!(result.is_err());
+        let file_name: String = "vhdx1".to_string();
+        let layer_index: Option<usize> = vhdx_file_system.get_layer_index(&file_name);
+        assert_eq!(layer_index, Some(0));
 
-        let path: String = "/vhdx1".to_string();
-        let layer_index: usize = vhdx_file_system.get_layer_index_by_path(&path)?;
-        assert_eq!(layer_index, 0);
+        let file_name: String = "vhdx99".to_string();
+        let layer_index: Option<usize> = vhdx_file_system.get_layer_index(&file_name);
+        assert!(layer_index.is_none());
 
-        let path: String = "/vhdx99".to_string();
-        let result = vhdx_file_system.get_layer_index_by_path(&path);
-        assert!(result.is_err());
-
-        let path: String = "/bogus1".to_string();
-        let result = vhdx_file_system.get_layer_index_by_path(&path);
-        assert!(result.is_err());
+        let file_name: String = "bogus1".to_string();
+        let layer_index: Option<usize> = vhdx_file_system.get_layer_index(&file_name);
+        assert!(layer_index.is_none());
 
         Ok(())
     }
 
     #[test]
     fn test_get_root_file_entry() -> io::Result<()> {
-        let (vhdx_file_system, _): (VhdxFileSystem, VfsPath) = get_file_system()?;
+        let vhdx_file_system: VhdxFileSystem = get_file_system()?;
 
         let vhdx_file_entry: VhdxFileEntry = vhdx_file_system.get_root_file_entry()?;
 
@@ -267,11 +273,10 @@ mod tests {
         let mut vhdx_file_system: VhdxFileSystem = VhdxFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsPathType::Os));
-        let parent_vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/vhdx/ntfs-differential.vhdx".to_string(),
-        };
-        vhdx_file_system.open(Some(&parent_file_system), &parent_vfs_path)?;
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location("../test_data/vhdx/ntfs-differential.vhdx");
+        vhdx_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(vhdx_file_system.number_of_layers, 2);
 

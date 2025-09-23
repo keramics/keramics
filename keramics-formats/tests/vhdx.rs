@@ -39,10 +39,10 @@ fn read_media_from_file(file: &mut VhdxFile) -> io::Result<(u64, String)> {
     Ok((media_offset, hash_string))
 }
 
-fn open_file(location: &str) -> io::Result<VhdxFile> {
+fn open_file(path: &str) -> io::Result<VhdxFile> {
     let mut file: VhdxFile = VhdxFile::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    let data_stream: DataStreamReference = open_os_data_stream(path)?;
     file.read_data_stream(&data_stream)?;
 
     Ok(file)

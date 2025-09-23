@@ -52,18 +52,18 @@ impl QcowImage {
     pub fn open(
         &mut self,
         file_resolver: &FileResolverReference,
-        filename: &str,
+        file_name: &str,
     ) -> io::Result<()> {
         let mut files: Vec<QcowFile> = Vec::new();
 
         let mut file: QcowFile = QcowFile::new();
 
-        match file_resolver.get_data_stream(&mut vec![filename])? {
+        match file_resolver.get_data_stream(&mut vec![file_name])? {
             Some(data_stream) => file.read_data_stream(&data_stream)?,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", filename),
+                    format!("No such file: {}", file_name),
                 ))
             }
         };

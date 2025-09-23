@@ -46,4 +46,11 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_open_os_data_stream() -> io::Result<()> {
+        let _ = open_os_data_stream("../test_data/file.txt")?;
+
+        Ok(())
+    }
 }

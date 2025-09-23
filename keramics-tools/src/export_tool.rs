@@ -19,7 +19,8 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
 use keramics_vfs::{
-    VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+    new_os_vfs_location, VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext,
+    VfsScanNode, VfsScanner,
 };
 
 mod writer;
@@ -73,8 +74,8 @@ fn export_data_stream_from_scan_node(
     if vfs_scan_node.is_empty() {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_path: VfsPath = vfs_scan_node.path.new_with_parent(path.as_str());
-        match vfs_resolver.get_data_stream_by_path_and_name(&vfs_path, name)? {
+        let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.as_str());
+        match vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, name)? {
             // TODO: pass sanitized file entry path and data stream name.
             Some(data_stream) => data_stream_writer.write_data_stream(&data_stream)?,
             None => {}
@@ -97,13 +98,12 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let vfs_path: VfsPath = VfsPath::Os {
-        location: source.to_string(),
-    };
+    let vfs_location: VfsLocation = new_os_vfs_location(source);
 
     // TODO: add scanner options (such as offset).
     // TODO: add scanner mediator.
     let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
     match vfs_scanner.build() {
         Ok(_) => {}
         Err(error) => {
@@ -112,7 +112,8 @@ fn main() -> ExitCode {
         }
     };
     let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-    match vfs_scanner.scan(&mut vfs_scan_context, &vfs_path) {
+
+    match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to scan: {} with error: {}", source, error);

@@ -54,39 +54,39 @@ impl VhdImage {
     pub fn open(
         &mut self,
         file_resolver: &FileResolverReference,
-        filename: &str,
+        file_name: &str,
     ) -> io::Result<()> {
         let mut files: Vec<VhdFile> = Vec::new();
 
         let mut file: VhdFile = VhdFile::new();
 
-        match file_resolver.get_data_stream(&mut vec![filename])? {
+        match file_resolver.get_data_stream(&mut vec![file_name])? {
             Some(data_stream) => file.read_data_stream(&data_stream)?,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", filename),
+                    format!("No such file: {}", file_name),
                 ))
             }
         };
         while file.parent_identifier.is_some() {
-            let parent_filename: String = match file.get_parent_filename() {
+            let parent_file_name: String = match file.get_parent_file_name() {
                 Some(file_name) => file_name.to_string(),
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        "Missing parent filename",
+                        "Missing parent file name",
                     ));
                 }
             };
             let mut parent_file: VhdFile = VhdFile::new();
 
-            match file_resolver.get_data_stream(&mut vec![parent_filename.as_str()])? {
+            match file_resolver.get_data_stream(&mut vec![parent_file_name.as_str()])? {
                 Some(data_stream) => parent_file.read_data_stream(&data_stream)?,
                 None => {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
-                        format!("Missing parent file: {}", parent_filename),
+                        format!("Missing parent file: {}", parent_file_name),
                     ))
                 }
             };

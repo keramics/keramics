@@ -28,11 +28,12 @@ use keramics_formats::vhdx::VhdxImage;
 use keramics_formats::{FormatIdentifier, FormatScanner};
 
 use crate::apm::ApmFileSystem;
-use crate::enums::{VfsFileType, VfsPathType};
+use crate::enums::{VfsFileType, VfsType};
 use crate::file_entry::VfsFileEntry;
 use crate::file_resolver::open_vfs_file_resolver;
 use crate::file_system::VfsFileSystem;
 use crate::gpt::GptFileSystem;
+use crate::location::VfsLocation;
 use crate::mbr::MbrFileSystem;
 use crate::path::VfsPath;
 use crate::qcow::QcowFileSystem;
@@ -120,18 +121,19 @@ impl VfsScanner {
     pub fn scan<'a>(
         &self,
         scan_context: &mut VfsScanContext<'a>,
-        path: &'a VfsPath,
+        vfs_location: &'a VfsLocation,
     ) -> io::Result<()> {
-        let mut scan_node: VfsScanNode = VfsScanNode::new(path.clone());
+        let mut scan_node: VfsScanNode = VfsScanNode::new(vfs_location.clone());
 
-        let file_system: VfsFileSystemReference = self.resolver.open_file_system(path)?;
+        let file_system: VfsFileSystemReference = self.resolver.open_file_system(vfs_location)?;
 
-        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(path)? {
+        let vfs_path: &VfsPath = vfs_location.get_path();
+        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(vfs_path)? {
             Some(file_entry) => file_entry,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.to_string()),
+                    format!("No such file: {}", vfs_location.to_string()),
                 ))
             }
         };
@@ -151,7 +153,7 @@ impl VfsScanner {
                 ));
             }
         };
-        self.scan_for_sub_nodes(&file_system, path, &mut scan_node)?;
+        self.scan_for_sub_nodes(&file_system, vfs_location, &mut scan_node)?;
 
         scan_context.root_node = Some(scan_node);
 
@@ -162,26 +164,27 @@ impl VfsScanner {
     fn scan_for_format(
         &self,
         file_system: &VfsFileSystem,
-        path: &VfsPath,
-    ) -> io::Result<Option<VfsPathType>> {
+        vfs_location: &VfsLocation,
+    ) -> io::Result<Option<VfsType>> {
+        let vfs_path: &VfsPath = vfs_location.get_path();
         let result: Option<DataStreamReference> =
-            file_system.get_data_stream_by_path_and_name(path, None)?;
+            file_system.get_data_stream_by_path_and_name(vfs_path, None)?;
 
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
-                    format!("No such file: {}", path.to_string()),
+                    format!("No such file: {}", vfs_location.to_string()),
                 ))
             }
         };
-        match path {
-            VfsPath::Apm { .. } | VfsPath::Gpt { .. } | VfsPath::Mbr { .. } => {
+        match vfs_location.get_type() {
+            VfsType::Apm { .. } | VfsType::Gpt { .. } | VfsType::Mbr { .. } => {
                 self.scan_for_file_system_format(&data_stream)
             }
-            VfsPath::Fake { .. } | VfsPath::Os { .. } => {
-                let mut result: Option<VfsPathType> =
+            VfsType::Fake { .. } | VfsType::Os { .. } => {
+                let mut result: Option<VfsType> =
                     self.scan_for_storage_media_image_format(&data_stream)?;
 
                 if result.is_none() {
@@ -192,8 +195,8 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            VfsPath::Qcow { .. } | VfsPath::Vhd { .. } | VfsPath::Vhdx { .. } => {
-                let mut result: Option<VfsPathType> =
+            VfsType::Qcow { .. } | VfsType::Vhd { .. } | VfsType::Vhdx { .. } => {
+                let mut result: Option<VfsType> =
                     self.scan_for_volume_system_format(&data_stream)?;
 
                 if result.is_none() {
@@ -203,7 +206,7 @@ impl VfsScanner {
             }
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
-                "Unsupported path type",
+                "Unsupported VFS location type",
             )),
         }
     }
@@ -212,7 +215,7 @@ impl VfsScanner {
     fn scan_for_file_system_format(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<Option<VfsPathType>> {
+    ) -> io::Result<Option<VfsType>> {
         let scan_results: HashSet<FormatIdentifier> =
             self.file_system_scanner.scan_data_stream(data_stream)?;
 
@@ -224,8 +227,8 @@ impl VfsScanner {
         }
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
-                FormatIdentifier::Ext => Ok(Some(VfsPathType::Ext)),
-                FormatIdentifier::Ntfs => Ok(Some(VfsPathType::Ntfs)),
+                FormatIdentifier::Ext => Ok(Some(VfsType::Ext)),
+                FormatIdentifier::Ntfs => Ok(Some(VfsType::Ntfs)),
                 _ => Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Found unsupported file system format signature"),
@@ -239,7 +242,7 @@ impl VfsScanner {
     fn scan_for_storage_media_image_format(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<Option<VfsPathType>> {
+    ) -> io::Result<Option<VfsType>> {
         let scan_results: HashSet<FormatIdentifier> = self
             .storage_media_image_scanner
             .scan_data_stream(data_stream)?;
@@ -252,11 +255,11 @@ impl VfsScanner {
         }
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
-                FormatIdentifier::Qcow => Ok(Some(VfsPathType::Qcow)),
-                FormatIdentifier::SparseImage => Ok(Some(VfsPathType::SparseImage)),
-                FormatIdentifier::Udif => Ok(Some(VfsPathType::Udif)),
-                FormatIdentifier::Vhd => Ok(Some(VfsPathType::Vhd)),
-                FormatIdentifier::Vhdx => Ok(Some(VfsPathType::Vhdx)),
+                FormatIdentifier::Qcow => Ok(Some(VfsType::Qcow)),
+                FormatIdentifier::SparseImage => Ok(Some(VfsType::SparseImage)),
+                FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
+                FormatIdentifier::Vhd => Ok(Some(VfsType::Vhd)),
+                FormatIdentifier::Vhdx => Ok(Some(VfsType::Vhdx)),
                 _ => Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Found unsupported storage media image format signature"),
@@ -271,7 +274,7 @@ impl VfsScanner {
     fn scan_for_storage_media_image_sub_nodes(
         &self,
         file_system: &VfsFileSystem,
-        path: &VfsPath,
+        vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
         number_of_layers: usize,
@@ -279,18 +282,20 @@ impl VfsScanner {
         if number_of_layers == 0 {
             return Ok(());
         }
-        let node_file_system_path: VfsPath = path.new_child(scan_node.path.get_path_type(), "/");
+        let vfs_type: &VfsType = scan_node.get_type();
+        let node_file_system_path: VfsLocation = vfs_location.new_child(vfs_type, "/");
         let node_file_system: VfsFileSystemReference =
             self.resolver.open_file_system(&node_file_system_path)?;
 
         // TODO: add support for configuration driven scanning older image layers
 
         // TODO: use layer identifier in location?
+        let vfs_type: &VfsType = scan_node.get_type();
         let location: String = format!("{}{}", path_prefix, number_of_layers);
-        let node_path: VfsPath = path.new_child(scan_node.path.get_path_type(), location.as_str());
+        let node_path: VfsLocation = vfs_location.new_child(vfs_type, location.as_str());
         match self.scan_for_format(&node_file_system, &node_path)? {
-            Some(path_type) => {
-                let sub_node_path: VfsPath = node_path.new_child(path_type, "/");
+            Some(vfs_type) => {
+                let sub_node_path: VfsLocation = node_path.new_child(&vfs_type, "/");
                 let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
                 self.scan_for_sub_nodes(&node_file_system, &node_path, &mut sub_scan_node)?;
 
@@ -305,172 +310,173 @@ impl VfsScanner {
     fn scan_for_sub_nodes(
         &self,
         file_system: &VfsFileSystemReference,
-        path: &VfsPath,
+        vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
     ) -> io::Result<()> {
+        let vfs_path: &VfsPath = vfs_location.get_path();
         // TODO: handle image with both gpt and mbr volume systems
-        match &scan_node.path {
-            VfsPath::Apm { .. } => {
+        match scan_node.get_type() {
+            VfsType::Apm { .. } => {
                 let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
                     Some(data_stream) => apm_volume_system.read_data_stream(&data_stream)?,
                     None => {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
+                            format!("No such file: {}", vfs_location.to_string()),
                         ))
                     }
                 };
                 let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
                 self.scan_for_volume_system_sub_nodes(
-                    file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     ApmFileSystem::PATH_PREFIX,
                     number_of_partitions,
                 )?;
             }
-            VfsPath::Ext { .. } => {}
-            VfsPath::Gpt { .. } => {
+            VfsType::Ext { .. } => {}
+            VfsType::Gpt { .. } => {
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
                     Some(data_stream) => gpt_volume_system.read_data_stream(&data_stream)?,
                     None => {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
+                            format!("No such file: {}", vfs_location.to_string()),
                         ))
                     }
                 };
                 let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
                 self.scan_for_volume_system_sub_nodes(
-                    file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     GptFileSystem::PATH_PREFIX,
                     number_of_partitions,
                 )?;
             }
-            VfsPath::Mbr { .. } => {
+            VfsType::Mbr { .. } => {
                 let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
                     Some(data_stream) => mbr_volume_system.read_data_stream(&data_stream)?,
                     None => {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
+                            format!("No such file: {}", vfs_location.to_string()),
                         ))
                     }
                 };
                 let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
                 self.scan_for_volume_system_sub_nodes(
-                    file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     MbrFileSystem::PATH_PREFIX,
                     number_of_partitions,
                 )?;
             }
-            VfsPath::Ntfs { .. } => {}
-            VfsPath::Os { .. } => match self.scan_for_format(&file_system, &path)? {
-                Some(path_type) => {
-                    let sub_node_path: VfsPath = path.new_child(path_type, "/");
+            VfsType::Ntfs { .. } => {}
+            VfsType::Os { .. } => match self.scan_for_format(&file_system, vfs_location)? {
+                Some(vfs_type) => {
+                    let sub_node_path: VfsLocation = vfs_location.new_child(&vfs_type, "/");
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
-                    self.scan_for_sub_nodes(file_system, path, &mut sub_scan_node)?;
+                    self.scan_for_sub_nodes(file_system, vfs_location, &mut sub_scan_node)?;
 
                     scan_node.sub_nodes.push(sub_scan_node);
                 }
                 None => {}
             },
-            VfsPath::Qcow { .. } => {
+            VfsType::Qcow { .. } => {
                 let mut qcow_image: QcowImage = QcowImage::new();
 
+                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
                 let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, path.parent_directory())?;
+                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                qcow_image.open(&file_resolver, path.get_file_name())?;
+                qcow_image.open(&file_resolver, vfs_path.get_file_name())?;
 
                 let number_of_layers: usize = qcow_image.get_number_of_layers();
                 self.scan_for_storage_media_image_sub_nodes(
                     file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     QcowFileSystem::PATH_PREFIX,
                     number_of_layers,
                 )?;
             }
-            VfsPath::SparseImage { .. } => {
+            VfsType::SparseImage { .. } => {
                 let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
                     Some(data_stream) => sparseimage_file.read_data_stream(&data_stream)?,
                     None => {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
+                            format!("No such file: {}", vfs_location.to_string()),
                         ))
                     }
                 };
                 self.scan_for_storage_media_image_sub_nodes(
                     file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     SparseImageFileSystem::PATH_PREFIX,
                     1,
                 )?;
             }
-            VfsPath::Udif { .. } => {
+            VfsType::Udif { .. } => {
                 let mut udif_file: UdifFile = UdifFile::new();
 
-                match file_system.get_data_stream_by_path_and_name(path, None)? {
+                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
                     Some(data_stream) => udif_file.read_data_stream(&data_stream)?,
                     None => {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
-                            format!("No such file: {}", path.to_string()),
+                            format!("No such file: {}", vfs_location.to_string()),
                         ))
                     }
                 };
                 self.scan_for_storage_media_image_sub_nodes(
                     file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     UdifFileSystem::PATH_PREFIX,
                     1,
                 )?;
             }
-            VfsPath::Vhd { .. } => {
+            VfsType::Vhd { .. } => {
                 let mut vhd_image: VhdImage = VhdImage::new();
 
+                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
                 let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, path.parent_directory())?;
+                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                vhd_image.open(&file_resolver, path.get_file_name())?;
+                vhd_image.open(&file_resolver, vfs_path.get_file_name())?;
 
                 let number_of_layers: usize = vhd_image.get_number_of_layers();
                 self.scan_for_storage_media_image_sub_nodes(
                     file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     VhdFileSystem::PATH_PREFIX,
                     number_of_layers,
                 )?;
             }
-            VfsPath::Vhdx { .. } => {
+            VfsType::Vhdx { .. } => {
                 let mut vhdx_image: VhdxImage = VhdxImage::new();
 
+                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
                 let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, path.parent_directory())?;
+                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                vhdx_image.open(&file_resolver, path.get_file_name())?;
+                vhdx_image.open(&file_resolver, vfs_path.get_file_name())?;
 
                 let number_of_layers: usize = vhdx_image.get_number_of_layers();
                 self.scan_for_storage_media_image_sub_nodes(
                     file_system,
-                    path,
+                    vfs_location,
                     scan_node,
                     VhdxFileSystem::PATH_PREFIX,
                     number_of_layers,
@@ -479,7 +485,7 @@ impl VfsScanner {
             _ => {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
-                    "Unsupported path type",
+                    "Unsupported VFS location type",
                 ))
             }
         };
@@ -490,7 +496,7 @@ impl VfsScanner {
     fn scan_for_volume_system_format(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<Option<VfsPathType>> {
+    ) -> io::Result<Option<VfsType>> {
         let scan_results: HashSet<FormatIdentifier> = self
             .phase1_volume_system_scanner
             .scan_data_stream(data_stream)?;
@@ -503,8 +509,8 @@ impl VfsScanner {
         }
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
-                FormatIdentifier::Apm => Ok(Some(VfsPathType::Apm)),
-                FormatIdentifier::Gpt => Ok(Some(VfsPathType::Gpt)),
+                FormatIdentifier::Apm => Ok(Some(VfsType::Apm)),
+                FormatIdentifier::Gpt => Ok(Some(VfsType::Gpt)),
                 _ => Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Found unsupported non-overlapping volume system format signature"),
@@ -544,7 +550,7 @@ impl VfsScanner {
                         }
                         match scan_results.iter().next() {
                             Some(format_identifier) => match format_identifier {
-                                FormatIdentifier::Mbr => Ok(Some(VfsPathType::Mbr)),
+                                FormatIdentifier::Mbr => Ok(Some(VfsType::Mbr)),
                                 _ => Err(io::Error::new(
                                     io::ErrorKind::InvalidData,
                                     format!("Found unsupported overlapping volume system format signature"),
@@ -561,13 +567,13 @@ impl VfsScanner {
     /// Scans for volume system sub nodes.
     fn scan_for_volume_system_sub_nodes(
         &self,
-        file_system: &VfsFileSystem,
-        path: &VfsPath,
+        vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
         number_of_volumes: usize,
     ) -> io::Result<()> {
-        let node_file_system_path: VfsPath = path.new_child(scan_node.path.get_path_type(), "/");
+        let vfs_type: &VfsType = scan_node.get_type();
+        let node_file_system_path: VfsLocation = vfs_location.new_child(vfs_type, "/");
         let node_file_system: VfsFileSystemReference =
             self.resolver.open_file_system(&node_file_system_path)?;
 
@@ -575,17 +581,18 @@ impl VfsScanner {
             // TODO: use volume identifier in location?
             let location: String = format!("{}{}", path_prefix, volume_index + 1);
 
-            let node_path: VfsPath =
-                path.new_child(scan_node.path.get_path_type(), location.as_str());
+            let vfs_type: &VfsType = scan_node.get_type();
+            let node_path: VfsLocation = vfs_location.new_child(vfs_type, location.as_str());
             let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_path);
 
-            match self.scan_for_format(&node_file_system, &volume_scan_node.path)? {
-                Some(path_type) => {
-                    let sub_node_path: VfsPath = volume_scan_node.path.new_child(path_type, "/");
+            match self.scan_for_format(&node_file_system, &volume_scan_node.location)? {
+                Some(vfs_type) => {
+                    let sub_node_path: VfsLocation =
+                        volume_scan_node.location.new_child(&vfs_type, "/");
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
                     self.scan_for_sub_nodes(
                         &node_file_system,
-                        &volume_scan_node.path,
+                        &volume_scan_node.location,
                         &mut sub_scan_node,
                     )?;
 
@@ -604,18 +611,17 @@ mod tests {
     use super::*;
 
     use crate::context::VfsContext;
+    use crate::location::new_os_vfs_location;
 
-    fn get_data_stream(location: &str) -> io::Result<DataStreamReference> {
+    fn get_data_stream(path: &str) -> io::Result<DataStreamReference> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: location.to_string(),
-        };
-        match vfs_context.get_data_stream_by_path_and_name(&vfs_path, None)? {
+        let vfs_location: VfsLocation = new_os_vfs_location(path);
+        match vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)? {
             Some(data_stream) => Ok(data_stream),
             None => Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("No such file: {}", vfs_path.to_string()),
+                format!("No such file: {}", vfs_location.to_string()),
             )),
         }
     }
@@ -623,9 +629,7 @@ mod tests {
     fn get_file_system() -> io::Result<VfsFileSystemReference> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_file_system_path: VfsPath = VfsPath::Os {
-            location: "/".to_string(),
-        };
+        let vfs_file_system_path: VfsLocation = new_os_vfs_location("/");
         vfs_context.open_file_system(&vfs_file_system_path)
     }
 
@@ -642,22 +646,23 @@ mod tests {
             Ok(_) => {}
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         }
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/qcow/ext2.qcow2".to_string(),
-        };
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
         let mut scan_context: VfsScanContext = VfsScanContext::new();
-        format_scanner.scan(&mut scan_context, &vfs_path)?;
+        format_scanner.scan(&mut scan_context, &vfs_location)?;
 
         let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
-        assert!(scan_node.path.get_path_type() == VfsPathType::Os);
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert!(vfs_type == &VfsType::Os);
         assert_eq!(scan_node.sub_nodes.len(), 1);
 
         let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
-        assert!(scan_node.path.get_path_type() == VfsPathType::Qcow);
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert!(vfs_type == &VfsType::Qcow);
         assert_eq!(scan_node.sub_nodes.len(), 1);
 
         let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
-        assert!(scan_node.path.get_path_type() == VfsPathType::Ext);
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert!(vfs_type == &VfsType::Ext);
         assert_eq!(scan_node.sub_nodes.len(), 0);
 
         Ok(())
@@ -672,14 +677,12 @@ mod tests {
         }
         let vfs_file_system: VfsFileSystemReference = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/qcow/ext2.qcow2".to_string(),
-        };
-        let vfs_path_type: VfsPathType = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_path)?
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let vfs_type: VfsType = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Qcow);
+        assert!(vfs_type == VfsType::Qcow);
 
         Ok(())
     }
@@ -693,19 +696,17 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/qcow/ext2.qcow2".to_string(),
-        };
-        let vfs_file_system_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/");
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let vfs_file_system_path: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/");
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Qcow, "/qcow1");
-        let vfs_path_type: VfsPathType = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_path)?
+        let vfs_location: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/qcow1");
+        let vfs_type: VfsType = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Ext);
+        assert!(vfs_type == VfsType::Ext);
 
         Ok(())
     }
@@ -719,19 +720,17 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_path: VfsPath = VfsPath::Os {
-            location: "../test_data/gpt/gpt.raw".to_string(),
-        };
-        let vfs_file_system_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/");
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let vfs_file_system_path: VfsLocation = os_vfs_location.new_child(&VfsType::Gpt, "/");
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: VfsPath = os_vfs_path.new_child(VfsPathType::Gpt, "/gpt1");
-        let vfs_path_type: VfsPathType = format_scanner
-            .scan_for_format(&vfs_file_system, &vfs_path)?
+        let vfs_location: VfsLocation = os_vfs_location.new_child(&VfsType::Gpt, "/gpt1");
+        let vfs_type: VfsType = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Ext);
+        assert!(vfs_type == VfsType::Ext);
 
         Ok(())
     }
@@ -746,11 +745,11 @@ mod tests {
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/ext/ext2.raw")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Ext);
+        assert!(vfs_type == VfsType::Ext);
 
         Ok(())
     }
@@ -763,11 +762,11 @@ mod tests {
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/ntfs/ntfs.raw")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_file_system_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Ntfs);
+        assert!(vfs_type == VfsType::Ntfs);
 
         Ok(())
     }
@@ -780,11 +779,11 @@ mod tests {
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/qcow/ext2.qcow2")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Qcow);
+        assert!(vfs_type == VfsType::Qcow);
 
         Ok(())
     }
@@ -798,11 +797,11 @@ mod tests {
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/sparseimage/hfsplus.sparseimage")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::SparseImage);
+        assert!(vfs_type == VfsType::SparseImage);
 
         Ok(())
     }
@@ -816,11 +815,11 @@ mod tests {
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Udif);
+        assert!(vfs_type == VfsType::Udif);
 
         Ok(())
     }
@@ -834,11 +833,11 @@ mod tests {
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Vhd);
+        assert!(vfs_type == VfsType::Vhd);
 
         Ok(())
     }
@@ -852,11 +851,11 @@ mod tests {
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Vhdx);
+        assert!(vfs_type == VfsType::Vhdx);
 
         Ok(())
     }
@@ -873,11 +872,11 @@ mod tests {
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/apm/apm.dmg")?;
 
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Apm);
+        assert!(vfs_type == VfsType::Apm);
 
         Ok(())
     }
@@ -891,11 +890,11 @@ mod tests {
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/gpt/gpt.raw")?;
 
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Gpt);
+        assert!(vfs_type == VfsType::Gpt);
 
         Ok(())
     }
@@ -909,11 +908,11 @@ mod tests {
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/mbr/mbr.raw")?;
 
-        let vfs_path_type: VfsPathType = format_scanner
+        let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?
             .unwrap();
 
-        assert!(vfs_path_type == VfsPathType::Mbr);
+        assert!(vfs_type == VfsType::Mbr);
 
         Ok(())
     }
