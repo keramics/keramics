@@ -21,6 +21,8 @@ pub struct ExtPath {
 }
 
 impl ExtPath {
+    const COMPONENT_SEPARATOR: &'static str = "/";
+
     /// Creates a new path.
     pub fn new() -> Self {
         Self {
@@ -28,13 +30,8 @@ impl ExtPath {
         }
     }
 
-    /// Determines if the path is empty.
-    pub fn is_empty(&self) -> bool {
-        self.components.is_empty()
-    }
-
     /// Creates a new path of the parent directory.
-    pub fn parent_directory(&self) -> Self {
+    pub fn new_with_parent_directory(&self) -> Self {
         let mut number_of_components: usize = self.components.len();
         if number_of_components > 1 {
             number_of_components -= 1;
@@ -47,16 +44,22 @@ impl ExtPath {
         }
     }
 
+    /// Determines if the path is empty.
+    pub fn is_empty(&self) -> bool {
+        self.components.is_empty()
+    }
+
     /// Retrieves a string representation of the path.
     pub fn to_string(&self) -> String {
-        if self.components.len() > 1 {
+        let number_of_components: usize = self.components.len();
+        if number_of_components == 1 && self.components[0].is_empty() {
+            ExtPath::COMPONENT_SEPARATOR.to_string()
+        } else {
             self.components
                 .iter()
                 .map(|component| component.to_string())
                 .collect::<Vec<String>>()
-                .join("/")
-        } else {
-            "/".to_string()
+                .join(ExtPath::COMPONENT_SEPARATOR)
         }
     }
 }
@@ -64,11 +67,12 @@ impl ExtPath {
 impl From<&str> for ExtPath {
     /// Converts a [`&str`] into a [`ExtPath`]
     fn from(string: &str) -> ExtPath {
-        let components: Vec<ByteString> = if string == "/" {
+        let components: Vec<ByteString> = if string == ExtPath::COMPONENT_SEPARATOR {
+            // Splitting "/" results in ["", ""]
             vec![ByteString::new()]
         } else {
             string
-                .split("/")
+                .split(ExtPath::COMPONENT_SEPARATOR)
                 .map(|component| ByteString::from_string(component))
                 .collect::<Vec<ByteString>>()
         };
@@ -134,8 +138,8 @@ impl From<&Vec<String>> for ExtPath {
 mod tests {
     use super::*;
 
+    // TODO: add tests for new_with_parent_directory
     // TODO: add tests for is_empty
-    // TODO: add tests for parent_directory
 
     #[test]
     fn test_to_string() {

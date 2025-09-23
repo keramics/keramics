@@ -41,8 +41,8 @@ fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, Strin
     Ok((offset, hash_string))
 }
 
-fn read_path(file_system: &NtfsFileSystem, location: &str) -> io::Result<(u64, String)> {
-    let path: NtfsPath = NtfsPath::from(location);
+fn read_path(file_system: &NtfsFileSystem, path: &str) -> io::Result<(u64, String)> {
+    let path: NtfsPath = NtfsPath::from(path);
     let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
     let data_stream: DataStreamReference = file_entry.get_data_stream()?.unwrap();
@@ -50,10 +50,10 @@ fn read_path(file_system: &NtfsFileSystem, location: &str) -> io::Result<(u64, S
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(location: &str) -> io::Result<NtfsFileSystem> {
+fn open_file_system(path: &str) -> io::Result<NtfsFileSystem> {
     let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    let data_stream: DataStreamReference = open_os_data_stream(path)?;
     file_system.read_data_stream(&data_stream)?;
 
     Ok(file_system)
@@ -63,7 +63,7 @@ fn open_file_system(location: &str) -> io::Result<NtfsFileSystem> {
 fn read_ntfs_empty_file() -> io::Result<()> {
     let file_system: NtfsFileSystem = open_file_system("../test_data/ntfs/ntfs.raw")?;
 
-    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
+    let (offset, md5_hash): (u64, String) = read_path(&file_system, "\\emptyfile")?;
     assert_eq!(offset, 0);
     assert_eq!(md5_hash.as_str(), "d41d8cd98f00b204e9800998ecf8427e");
 

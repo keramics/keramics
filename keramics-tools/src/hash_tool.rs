@@ -25,8 +25,8 @@ use keramics_core::{open_os_data_stream, DataStreamReference};
 use keramics_types::Ucs2String;
 
 use keramics_vfs::{
-    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsPath, VfsResolver,
-    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString,
+    new_os_vfs_location, VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
 };
 
 mod hasher;
@@ -163,16 +163,16 @@ impl HashTool {
     fn calculate_hash_from_scan_node(&self, vfs_scan_node: &VfsScanNode) -> io::Result<()> {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
-            match &vfs_scan_node.path {
-                VfsPath::Ext { .. } | VfsPath::Ntfs { .. } => {}
+            match vfs_scan_node.get_type() {
+                VfsType::Ext { .. } | VfsType::Ntfs { .. } => {}
                 _ => return Ok(()),
             }
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
             let file_system: VfsFileSystemReference =
-                vfs_resolver.open_file_system(&vfs_scan_node.path)?;
+                vfs_resolver.open_file_system(&vfs_scan_node.location)?;
 
-            let display_path: String = match vfs_scan_node.path.get_parent() {
+            let display_path: String = match vfs_scan_node.location.get_parent() {
                 Some(parent_path) => self.get_display_path(parent_path)?,
                 None => String::new(),
             };
@@ -237,11 +237,11 @@ impl HashTool {
         translation_table
     }
 
-    /// Retrieves a string representation of a path.
-    fn get_display_path(&self, path: &VfsPath) -> io::Result<String> {
+    /// Retrieves a human readable path representation of a VFS location.
+    fn get_display_path(&self, vfs_location: &VfsLocation) -> io::Result<String> {
         match &self.volume_path_type {
-            VolumePathType::Identifier => self.get_identifier_display_path(path),
-            VolumePathType::Index => self.get_index_display_path(path),
+            VolumePathType::Identifier => self.get_identifier_display_path(vfs_location),
+            VolumePathType::Index => self.get_index_display_path(vfs_location),
         }
         // TODO: santize path (control characters, etc.)
     }
@@ -260,40 +260,49 @@ impl HashTool {
         string_parts.join("")
     }
 
-    /// Retrieves an identifier-based a string representation of a path.
-    fn get_identifier_display_path(&self, path: &VfsPath) -> io::Result<String> {
+    /// Retrieves an identifier-based a human readable path representation of a VFS location.
+    fn get_identifier_display_path(&self, vfs_location: &VfsLocation) -> io::Result<String> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
-        let display_path: Option<String> = match vfs_resolver.get_file_entry_by_path(path)? {
-            Some(file_entry) => match file_entry {
-                VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
-                    Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),
+        let display_path: Option<String> =
+            match vfs_resolver.get_file_entry_by_path(vfs_location)? {
+                Some(file_entry) => match file_entry {
+                    VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
+                        Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),
+                        _ => None,
+                    },
                     _ => None,
                 },
-                _ => None,
-            },
-            None => None,
-        };
+                None => None,
+            };
         match display_path {
             Some(display_path) => Ok(display_path),
-            None => self.get_index_display_path(path),
+            None => self.get_index_display_path(vfs_location),
         }
     }
 
-    /// Retrieves an index-based a string representation of a path.
-    fn get_index_display_path(&self, path: &VfsPath) -> io::Result<String> {
-        let display_path: String = match path {
-            VfsPath::Apm { location, .. } => location.replace("apm", "p"),
-            VfsPath::Ext { ext_path, parent } => {
-                let parent_display_path: String = self.get_display_path(parent)?;
-                let location: String = ext_path.to_string();
-                format!("{}{}", parent_display_path, location)
-            }
-            VfsPath::Gpt { location, .. } => location.replace("gpt", "p"),
-            VfsPath::Mbr { location, .. } => location.replace("mbr", "p"),
-            VfsPath::Ntfs { ntfs_path, parent } => {
-                let parent_display_path: String = self.get_display_path(parent)?;
-                let location: String = ntfs_path.to_string();
-                format!("{}{}", parent_display_path, location)
+    /// Retrieves an index-based a string representation of a VFS location.
+    fn get_index_display_path(&self, vfs_location: &VfsLocation) -> io::Result<String> {
+        let display_path: String = match vfs_location {
+            VfsLocation::Layer {
+                path,
+                parent,
+                vfs_type,
+            } => {
+                let path_string: String = path.to_string();
+                match vfs_type {
+                    VfsType::Apm => path_string.replace("apm", "p"),
+                    VfsType::Ext => {
+                        let parent_display_path: String = self.get_display_path(parent)?;
+                        format!("{}{}", parent_display_path, path_string)
+                    }
+                    VfsType::Gpt => path_string.replace("gpt", "p"),
+                    VfsType::Ntfs => {
+                        let parent_display_path: String = self.get_display_path(parent)?;
+                        format!("{}{}", parent_display_path, path_string)
+                    }
+                    VfsType::Mbr => path_string.replace("mbr", "p"),
+                    _ => String::new(),
+                }
             }
             _ => String::new(),
         };
@@ -329,9 +338,7 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            let vfs_path: VfsPath = VfsPath::Os {
-                location: source.to_string(),
-            };
+            let vfs_location: VfsLocation = new_os_vfs_location(source);
 
             // TODO: add scanner options.
             // TODO: add scanner mediator.
@@ -344,7 +351,7 @@ fn main() -> ExitCode {
                 }
             };
             let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-            match vfs_scanner.scan(&mut vfs_scan_context, &vfs_path) {
+            match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
                 Ok(_) => {}
                 Err(error) => {
                     println!("Unable to scan: {} with error: {}", source, error);

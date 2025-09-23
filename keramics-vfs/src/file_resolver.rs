@@ -42,7 +42,7 @@ impl FileResolver for VfsFileResolver {
         &'a self,
         path_components: &mut Vec<&'a str>,
     ) -> io::Result<Option<DataStreamReference>> {
-        let path: VfsPath = self.base_path.append_components(path_components);
+        let path: VfsPath = self.base_path.new_with_join(path_components);
 
         match self.file_system.get_file_entry_by_path(&path)? {
             // TODO: replace by get_data_fork_by_name

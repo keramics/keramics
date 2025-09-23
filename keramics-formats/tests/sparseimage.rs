@@ -62,10 +62,10 @@ fn read_media_from_file(file: &mut SparseImageFile) -> io::Result<(u64, String)>
     Ok((media_offset, hash_string))
 }
 
-fn open_file(location: &str) -> io::Result<SparseImageFile> {
+fn open_file(path: &str) -> io::Result<SparseImageFile> {
     let mut file: SparseImageFile = SparseImageFile::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(location)?;
+    let data_stream: DataStreamReference = open_os_data_stream(path)?;
     file.read_data_stream(&data_stream)?;
 
     Ok(file)
