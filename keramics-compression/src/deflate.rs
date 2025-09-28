@@ -514,7 +514,7 @@ impl DeflateContext {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Unsupported block type",
-                    ))
+                    ));
                 }
             }
             if block_header.last_block_flag != 0 {

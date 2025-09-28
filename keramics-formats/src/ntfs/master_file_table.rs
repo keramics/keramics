@@ -79,7 +79,7 @@ impl NtfsMasterFileTable {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Unsupported data run type.",
-                    ))
+                    ));
                 }
             };
             let block_range: NtfsBlockRange = NtfsBlockRange::new(
@@ -179,7 +179,7 @@ impl NtfsMasterFileTable {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Missing $Data attribute in MFT entry: 0.",
-                    ))
+                    ));
                 }
             };
         if data_attribute.is_resident() {

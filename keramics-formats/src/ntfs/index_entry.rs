@@ -13,8 +13,8 @@
 
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::fixup_values::apply_fixup_values;
 use super::index_entry_header::NtfsIndexEntryHeader;

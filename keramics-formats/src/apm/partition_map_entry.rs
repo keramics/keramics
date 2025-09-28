@@ -13,7 +13,7 @@
 
 use std::io;
 
-use keramics_types::{bytes_to_u32_be, ByteString};
+use keramics_types::{ByteString, bytes_to_u32_be};
 use layout_map::LayoutMap;
 
 use super::constants::*;
@@ -97,7 +97,7 @@ impl ApmPartitionMapEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::{open_fake_data_stream, DataStreamReference};
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
         return vec![

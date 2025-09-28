@@ -19,8 +19,8 @@ use std::sync::{Arc, RwLock};
 
 use clap::{Args, Parser, Subcommand};
 
-use keramics_core::mediator::Mediator;
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::Mediator;
 use keramics_formats::{FormatIdentifier, FormatScanner};
 
 mod formatters;

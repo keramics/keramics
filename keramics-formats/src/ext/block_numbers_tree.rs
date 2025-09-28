@@ -14,8 +14,8 @@
 use std::cmp::min;
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::bytes_to_u32_le;
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};

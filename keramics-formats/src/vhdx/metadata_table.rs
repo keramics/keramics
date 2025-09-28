@@ -14,8 +14,8 @@
 use std::collections::HashMap;
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::Uuid;
 
 use super::metadata_table_entry::VhdxMetadataTableEntry;

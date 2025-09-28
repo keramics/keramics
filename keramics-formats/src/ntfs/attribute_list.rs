@@ -14,8 +14,8 @@
 use std::io;
 use std::io::Read;
 
-use keramics_core::mediator::Mediator;
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::Mediator;
 
 use super::attribute_list_entry::NtfsAttributeListEntry;
 use super::block_stream::NtfsBlockStream;

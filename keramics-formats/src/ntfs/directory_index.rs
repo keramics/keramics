@@ -16,9 +16,9 @@ use std::collections::HashMap;
 use std::io;
 use std::rc::Rc;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
-use keramics_types::{bytes_to_u64_le, Ucs2String};
+use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_types::{Ucs2String, bytes_to_u64_le};
 
 use super::constants::*;
 use super::directory_entries::NtfsDirectoryEntries;
@@ -78,7 +78,7 @@ impl NtfsDirectoryIndex {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         format!("Missing $I30 attributes."),
-                    ))
+                    ));
                 }
             };
         let i30_index_root_attribute: &NtfsMftAttribute = match mft_attributes
@@ -89,7 +89,7 @@ impl NtfsDirectoryIndex {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     format!("Missing $I30 $INDEX_ROOT attribute."),
-                ))
+                ));
             }
         };
         if !i30_index_root_attribute.is_resident() {

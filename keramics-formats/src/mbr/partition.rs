@@ -77,7 +77,7 @@ impl Read for MbrPartition {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if self.current_offset >= self.size {

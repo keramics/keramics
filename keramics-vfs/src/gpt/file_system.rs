@@ -142,7 +142,7 @@ impl GptFileSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
-                ))
+                ));
             }
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
@@ -157,14 +157,14 @@ impl GptFileSystem {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "Missing volume system",
-                    ))
+                    ));
                 }
             },
             None => {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("No such file: {}", vfs_path.to_string()),
-                ))
+                ));
             }
         }
         Ok(())

@@ -64,7 +64,7 @@ impl ScanTreeNode {
             None => {
                 return Err(BuildError::new(format!(
                     "Unable to determine most significant pattern offset"
-                )))
+                )));
             }
         };
         let signatures_in_node: Vec<SignatureReference> =
@@ -88,7 +88,9 @@ impl ScanTreeNode {
 
                     if number_of_signatures == 0 {
                         return Err(BuildError::new(format!(
-                                "Invalid byte value group for pattern offset: {} invalid signature group: {} missing signatures", self.pattern_offset, group_index)));
+                            "Invalid byte value group for pattern offset: {} invalid signature group: {} missing signatures",
+                            self.pattern_offset, group_index
+                        )));
                     }
                     if number_of_signatures == 1 {
                         self.scan_objects.insert(

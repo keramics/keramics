@@ -64,7 +64,7 @@ impl QcowImage {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("No such file: {}", file_name),
-                ))
+                ));
             }
         };
         while let Some(file_name) = file.get_backing_file_name() {
@@ -78,7 +78,7 @@ impl QcowImage {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
                         format!("Missing backing file: {}", backing_file_name),
-                    ))
+                    ));
                 }
             };
             files.push(file);

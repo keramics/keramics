@@ -248,7 +248,10 @@ mod tests {
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
-        assert_eq!(test_hash_string, "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e");
+        assert_eq!(
+            test_hash_string,
+            "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+        );
     }
 
     #[test]
@@ -271,7 +274,10 @@ mod tests {
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
-        assert_eq!(test_hash_string, "c6a5f4bbdb075c17ebcf4131de0fe33d3e2bb6edb5af7c277b472ea7847b11d2aa2598cb7ca75e4fe94c264bd2942bd82fc60b5045bd7c5cbc31325954713dfc");
+        assert_eq!(
+            test_hash_string,
+            "c6a5f4bbdb075c17ebcf4131de0fe33d3e2bb6edb5af7c277b472ea7847b11d2aa2598cb7ca75e4fe94c264bd2942bd82fc60b5045bd7c5cbc31325954713dfc"
+        );
     }
 
     #[test]
@@ -303,7 +309,10 @@ mod tests {
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
-        assert_eq!(test_hash_string, "8a006a0a1e2dd36ba57aa0325b2c9532db7649a4c3c6214ee0f004ecabcf1eef89a91b225ffc52a4f811791d20f6faddd900b863386da65daec18e00c48412d6");
+        assert_eq!(
+            test_hash_string,
+            "8a006a0a1e2dd36ba57aa0325b2c9532db7649a4c3c6214ee0f004ecabcf1eef89a91b225ffc52a4f811791d20f6faddd900b863386da65daec18e00c48412d6"
+        );
     }
 
     #[test]
@@ -346,6 +355,9 @@ mod tests {
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
-        assert_eq!(test_hash_string, "8a006a0a1e2dd36ba57aa0325b2c9532db7649a4c3c6214ee0f004ecabcf1eef89a91b225ffc52a4f811791d20f6faddd900b863386da65daec18e00c48412d6");
+        assert_eq!(
+            test_hash_string,
+            "8a006a0a1e2dd36ba57aa0325b2c9532db7649a4c3c6214ee0f004ecabcf1eef89a91b225ffc52a4f811791d20f6faddd900b863386da65daec18e00c48412d6"
+        );
     }
 }

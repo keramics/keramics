@@ -12,7 +12,7 @@
  */
 
 use std::ffi::{OsStr, OsString};
-use std::fs::{metadata, File, Metadata};
+use std::fs::{File, Metadata, metadata};
 use std::io;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
@@ -136,7 +136,7 @@ impl OsFileEntry {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Unsupported file mode",
-                ))
+                ));
             }
         };
         self.modification_time = Some(get_posix_datetime_value(
@@ -231,7 +231,7 @@ mod tests {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("Missing data stream"),
-                ))
+                ));
             }
         };
         let mut test_data: Vec<u8> = vec![];

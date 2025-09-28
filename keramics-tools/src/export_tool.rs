@@ -19,8 +19,8 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
 use keramics_vfs::{
-    new_os_vfs_location, VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext,
-    VfsScanNode, VfsScanner,
+    VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+    new_os_vfs_location,
 };
 
 mod writer;

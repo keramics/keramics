@@ -407,7 +407,7 @@ impl QcowFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         let level1_table_index: u64 = media_offset >> self.level1_index_bit_shift;
@@ -556,7 +556,7 @@ impl QcowFile {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
                 QcowBlockRangeType::Sparse => {

@@ -15,7 +15,7 @@ use std::io;
 
 use keramics_checksums::ReversedCrc32Context;
 use keramics_datetime::PosixTime32;
-use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, ByteString};
+use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
 use layout_map::LayoutMap;
 
 use super::constants::*;

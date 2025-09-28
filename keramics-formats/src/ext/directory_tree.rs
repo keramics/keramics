@@ -14,9 +14,9 @@
 use std::collections::BTreeMap;
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
-use keramics_types::{bytes_to_u32_le, ByteString};
+use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_types::{ByteString, bytes_to_u32_le};
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 use super::directory_entry::ExtDirectoryEntry;

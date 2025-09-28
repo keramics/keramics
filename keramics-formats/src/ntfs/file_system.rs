@@ -16,7 +16,7 @@ use std::io;
 use std::rc::Rc;
 
 use keramics_core::{DataStream, DataStreamReference};
-use keramics_types::{bytes_to_u16_le, Ucs2String};
+use keramics_types::{Ucs2String, bytes_to_u16_le};
 
 use super::block_stream::NtfsBlockStream;
 use super::boot_record::NtfsBootRecord;
@@ -111,7 +111,7 @@ impl NtfsFileSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if mft_entry_number >= self.mft.number_of_entries {
@@ -227,7 +227,7 @@ impl NtfsFileSystem {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
                         "Missing $Data attribute.",
-                    ))
+                    ));
                 }
             };
         if data_attribute.is_resident() {

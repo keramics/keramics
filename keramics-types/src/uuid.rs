@@ -96,7 +96,7 @@ impl Uuid {
                 return Err(ParseError::new(format!(
                     "Unable to parse part1: {}",
                     &string[0..8]
-                )))
+                )));
             }
         };
         self.part2 = match u16::from_str_radix(&string[9..13], 16) {
@@ -105,7 +105,7 @@ impl Uuid {
                 return Err(ParseError::new(format!(
                     "Unable to parse part2: {}",
                     &string[9..13]
-                )))
+                )));
             }
         };
         self.part3 = match u16::from_str_radix(&string[14..18], 16) {
@@ -114,7 +114,7 @@ impl Uuid {
                 return Err(ParseError::new(format!(
                     "Unable to parse part3: {}",
                     &string[14..18]
-                )))
+                )));
             }
         };
         self.part4 = match u16::from_str_radix(&string[19..23], 16) {
@@ -123,7 +123,7 @@ impl Uuid {
                 return Err(ParseError::new(format!(
                     "Unable to parse part4: {}",
                     &string[19..24]
-                )))
+                )));
             }
         };
         self.part5 = match u64::from_str_radix(&string[24..36], 16) {
@@ -132,7 +132,7 @@ impl Uuid {
                 return Err(ParseError::new(format!(
                     "Unable to parse part5: {}",
                     &string[24..36]
-                )))
+                )));
             }
         };
         Ok(())

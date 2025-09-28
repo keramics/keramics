@@ -125,7 +125,7 @@ impl ExtBlockStream {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
                 ExtBlockRangeType::Sparse => {

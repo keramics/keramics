@@ -13,7 +13,7 @@
 
 use std::io;
 
-use keramics_types::{bytes_to_u64_le, Utf16String, Uuid};
+use keramics_types::{Utf16String, Uuid, bytes_to_u64_le};
 use layout_map::LayoutMap;
 
 #[derive(LayoutMap)]

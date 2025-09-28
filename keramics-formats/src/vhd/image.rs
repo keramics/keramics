@@ -66,7 +66,7 @@ impl VhdImage {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("No such file: {}", file_name),
-                ))
+                ));
             }
         };
         while file.parent_identifier.is_some() {
@@ -87,7 +87,7 @@ impl VhdImage {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
                         format!("Missing parent file: {}", parent_file_name),
-                    ))
+                    ));
                 }
             };
             files.push(file);

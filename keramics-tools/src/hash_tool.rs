@@ -21,12 +21,13 @@ use clap::{Parser, ValueEnum};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
-use keramics_core::{open_os_data_stream, DataStreamReference};
+use keramics_core::{DataStreamReference, open_os_data_stream};
 use keramics_types::Ucs2String;
 
 use keramics_vfs::{
-    new_os_vfs_location, VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
+    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
+    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
+    new_os_vfs_location,
 };
 
 mod hasher;

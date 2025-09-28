@@ -68,7 +68,7 @@ impl MbrVolumeSystem {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 };
                 if self.bytes_per_sector == 0 {
@@ -100,7 +100,7 @@ impl MbrVolumeSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("No partition with index: {}", partition_index),
-                ))
+                ));
             }
         }
     }
@@ -158,7 +158,9 @@ impl MbrVolumeSystem {
                 if extended_boot_record_offset != 0 {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("More than 1 extended partition entry per boot record is not supported."),
+                        format!(
+                            "More than 1 extended partition entry per boot record is not supported."
+                        ),
                     ));
                 }
                 extended_boot_record_offset =
@@ -230,7 +232,9 @@ impl MbrVolumeSystem {
                 if extended_boot_record_offset != 0 {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidData,
-                        format!("More than 1 extended partition entry per boot record is not supported."),
+                        format!(
+                            "More than 1 extended partition entry per boot record is not supported."
+                        ),
                     ));
                 }
                 extended_boot_record_offset = self.first_extended_boot_record_offset

@@ -16,8 +16,8 @@ use std::rc::Rc;
 
 use keramics_core::DataStreamReference;
 use keramics_datetime::DateTime;
-use keramics_formats::ext::constants::*;
 use keramics_formats::ext::ExtFileEntry;
+use keramics_formats::ext::constants::*;
 use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry};
 use keramics_types::Ucs2String;
 
@@ -294,7 +294,7 @@ impl VfsFileEntry {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             format!("Missing data stream"),
-                        ))
+                        ));
                     }
                 }
             }
@@ -458,7 +458,7 @@ mod tests {
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
-    use crate::location::{new_os_vfs_location, VfsLocation};
+    use crate::location::{VfsLocation, new_os_vfs_location};
     use crate::path::VfsPath;
     use crate::types::VfsFileSystemReference;
 

@@ -71,7 +71,7 @@ impl SparseBundleImage {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
                         format!("No such file: {}", file_name),
-                    ))
+                    ));
                 }
             };
         let string: String = match data_stream.write() {
@@ -201,7 +201,7 @@ impl SparseBundleImage {
                     return Err(io::Error::new(
                         io::ErrorKind::NotFound,
                         format!("No such bands file: {}", band_file_name),
-                    ))
+                    ));
                 }
             };
             let mut range_read_size: usize = read_size - data_offset;

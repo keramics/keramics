@@ -150,11 +150,14 @@ impl VhdFile {
             if file_footer.data_size > block_tree_data_size {
                 let calculated_number_of_blocks: u64 = file_footer.data_size.div_ceil(block_size);
                 return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                        format!(
-                    "Number of blocks: {} in block allocation table too small for data size: {} ({} blocks)",
-                    dynamic_disk_header.number_of_blocks, file_footer.data_size, calculated_number_of_blocks,
-                )));
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "Number of blocks: {} in block allocation table too small for data size: {} ({} blocks)",
+                        dynamic_disk_header.number_of_blocks,
+                        file_footer.data_size,
+                        calculated_number_of_blocks,
+                    ),
+                ));
             }
             self.block_size = dynamic_disk_header.block_size;
 
@@ -186,7 +189,7 @@ impl VhdFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         let block_allocation_table: &VhdBlockAllocationTable =
@@ -234,7 +237,7 @@ impl VhdFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         let sector_bitmap_offset: u64 = (sector_number as u64) * (self.bytes_per_sector as u64);
@@ -332,7 +335,7 @@ impl VhdFile {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
                 VhdBlockRangeType::InParent => match &self.parent_file {
@@ -376,7 +379,7 @@ impl VhdFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing parent identifier",
-                ))
+                ));
             }
         };
         match parent_file.read() {
@@ -427,7 +430,7 @@ impl Read for VhdFile {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "Missing data stream",
-                    ))
+                    ));
                 }
             }
         };

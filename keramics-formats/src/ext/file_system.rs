@@ -116,7 +116,7 @@ impl ExtFileSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if self.features.is_unsupported() {

@@ -229,7 +229,7 @@ impl NtfsMftAttributes {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing WofCompressedData $DATA attribute",
-                        ))
+                        ));
                     }
                 };
             let mut wof_compressed_stream: NtfsWofCompressedStream =

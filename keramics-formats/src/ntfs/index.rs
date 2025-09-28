@@ -135,7 +135,7 @@ impl NtfsIndex {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
                             "Unsupported data run type.",
-                        ))
+                        ));
                     }
                 };
                 let block_range: NtfsBlockRange = NtfsBlockRange::new(

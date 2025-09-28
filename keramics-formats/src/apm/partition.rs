@@ -78,7 +78,7 @@ impl Read for ApmPartition {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if self.current_offset >= self.size {

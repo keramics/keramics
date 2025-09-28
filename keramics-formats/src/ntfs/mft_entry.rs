@@ -13,8 +13,8 @@
 
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::constants::*;
 use super::fixup_values::apply_fixup_values;

@@ -56,7 +56,7 @@ impl ApmVolumeSystem {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 };
                 let partition_offset: u64 =
@@ -79,7 +79,7 @@ impl ApmVolumeSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("No partition with index: {}", partition_index),
-                ))
+                ));
             }
         }
     }
@@ -119,12 +119,12 @@ impl ApmVolumeSystem {
                 number_of_entries = partition_map_entry.number_of_entries;
             } else if partition_map_entry.number_of_entries != number_of_entries {
                 return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported partition map entry: {} number of entries: {} value out of bounds",
-                            partition_map_entry_index, partition_map_entry.number_of_entries,
-                        ),
-                    ));
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "Unsupported partition map entry: {} number of entries: {} value out of bounds",
+                        partition_map_entry_index, partition_map_entry.number_of_entries,
+                    ),
+                ));
             } else {
                 self.partition_map_entries.push(partition_map_entry);
             }
