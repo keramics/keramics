@@ -13,8 +13,8 @@
 
 use std::io;
 
-use keramics_core::mediator::Mediator;
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::Mediator;
 
 /// Virtual Hard Disk (VHD) sector bitmap range.
 pub struct VhdSectorBitmapRange {

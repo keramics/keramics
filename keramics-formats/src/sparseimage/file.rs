@@ -220,7 +220,7 @@ impl SparseImageFile {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
                 None => {

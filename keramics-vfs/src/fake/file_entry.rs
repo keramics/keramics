@@ -154,7 +154,7 @@ mod tests {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("Missing data stream"),
-                ))
+                ));
             }
         };
         let mut test_data: Vec<u8> = vec![];

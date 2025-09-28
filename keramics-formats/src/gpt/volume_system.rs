@@ -14,8 +14,8 @@
 use std::io;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::Uuid;
 
 use super::partition::GptPartition;
@@ -70,7 +70,7 @@ impl GptVolumeSystem {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 };
                 let partition_offset: u64 =
@@ -95,7 +95,7 @@ impl GptVolumeSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("No partition with index: {}", partition_index),
-                ))
+                ));
             }
         }
     }
@@ -219,7 +219,8 @@ impl GptVolumeSystem {
                         io::ErrorKind::InvalidData,
                         format!(
                             "Partition entry: {} start block number: {} value out of bounds: {} - {}",
-                            entry_index, partition_entry.start_block_number,
+                            entry_index,
+                            partition_entry.start_block_number,
                             partition_table_header.area_start_block_number,
                             partition_table_header.area_end_block_number,
                         ),

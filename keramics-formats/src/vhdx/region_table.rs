@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::io;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::Uuid;
 
 use super::region_table_entry::VhdxRegionTableEntry;

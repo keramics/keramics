@@ -14,7 +14,7 @@
 use std::io;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_types::{bytes_to_u32_le, bytes_to_u64_le, Uuid};
+use keramics_types::{Uuid, bytes_to_u32_le, bytes_to_u64_le};
 use layout_map::LayoutMap;
 
 use super::constants::*;

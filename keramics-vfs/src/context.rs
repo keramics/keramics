@@ -20,7 +20,7 @@ use keramics_core::DataStreamReference;
 use super::enums::VfsType;
 use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
-use super::location::{new_os_vfs_location, VfsLocation};
+use super::location::{VfsLocation, new_os_vfs_location};
 use super::path::VfsPath;
 use super::types::VfsFileSystemReference;
 

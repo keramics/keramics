@@ -17,7 +17,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference};
-use keramics_types::{bytes_to_u32_le, bytes_to_u64_le, Ucs2String, Uuid};
+use keramics_types::{Ucs2String, Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
 use crate::block_tree::BlockTree;
 
@@ -187,7 +187,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing metadata region",
-                ))
+                ));
             }
         };
         self.read_metadata_values(data_stream, metadata_region)?;
@@ -201,7 +201,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing block allocation table region",
-                ))
+                ));
             }
         };
         self.entries_per_chunk =
@@ -220,11 +220,12 @@ impl VhdxFile {
         if self.media_size > block_tree_data_size {
             let calculated_number_of_blocks: u64 = self.media_size.div_ceil(self.block_size as u64);
             return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-                    format!(
-                "Number of blocks: {} in block allocation table too small for virtual disk size: {} ({} blocks)",
-                number_of_entries, self.media_size, calculated_number_of_blocks,
-            )));
+                io::ErrorKind::InvalidData,
+                format!(
+                    "Number of blocks: {} in block allocation table too small for virtual disk size: {} ({} blocks)",
+                    number_of_entries, self.media_size, calculated_number_of_blocks,
+                ),
+            ));
         }
         self.block_tree = BlockTree::<VhdxBlockRange>::new(
             block_tree_data_size,
@@ -306,7 +307,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing file parameters metadata item",
-                ))
+                ));
             }
         };
         match metadata_table
@@ -343,7 +344,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing virtual disk size metadata item",
-                ))
+                ));
             }
         };
         match metadata_table
@@ -392,7 +393,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing logical sector size metadata item",
-                ))
+                ));
             }
         };
         match metadata_table
@@ -474,7 +475,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing virtual disk identifier metadata item",
-                ))
+                ));
             }
         };
         if self.mediator.debug_output {
@@ -544,7 +545,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         let table_entry: u64 = if self.disk_type == VhdxDiskType::Fixed {
@@ -598,7 +599,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         let table_entry: u64 =
@@ -698,7 +699,7 @@ impl VhdxFile {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
                 VhdxBlockRangeType::InParent => match &self.parent_file {
@@ -742,7 +743,7 @@ impl VhdxFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "Missing parent identifier",
-                ))
+                ));
             }
         };
         match parent_file.read() {

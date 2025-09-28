@@ -55,7 +55,7 @@ impl BitmapOptions {
                 return Err(ParseError::new(format!(
                     "Unsupported bit order: {}",
                     self.bit_order
-                )))
+                )));
             }
         }
     }
@@ -74,7 +74,7 @@ impl BitmapOptions {
                 return Err(ParseError::new(format!(
                     "Unsupported data type: {}",
                     self.data_type
-                )))
+                )));
             }
         };
         Ok(data_type)
@@ -111,7 +111,7 @@ impl FieldOptions {
                 return Err(ParseError::new(format!(
                     "Unsupported byte order: {}",
                     self.byte_order
-                )))
+                )));
             }
         }
     }
@@ -198,7 +198,7 @@ impl FieldOptions {
                     return Err(ParseError::new(format!(
                         "Unsupported number of elements: {} in data type: {}",
                         number_of_elements_str, data_type_str
-                    )))
+                    )));
                 }
             }
         }
@@ -215,7 +215,7 @@ impl FieldOptions {
                 return Err(ParseError::new(format!(
                     "Unsupported format: {}",
                     self.format
-                )))
+                )));
             }
         }
     }
@@ -288,7 +288,7 @@ impl StructureOptions {
                 return Err(ParseError::new(format!(
                     "Unsupported byte order: {}",
                     self.byte_order
-                )))
+                )));
             }
         }
     }
@@ -324,7 +324,7 @@ fn parse_bitmap_layout(
             return Err(ParseError::new(format!(
                 "{} in layout map of {}",
                 error, name
-            )))
+            )));
         }
     };
     let data_type: DataType = match options.bitmap.parse_data_type() {
@@ -333,7 +333,7 @@ fn parse_bitmap_layout(
             return Err(ParseError::new(format!(
                 "{} in layout map of {}",
                 error, name
-            )))
+            )));
         }
     };
     let bitmap_layout: BitmapLayout = BitmapLayout::new(data_type, bit_order);
@@ -361,7 +361,7 @@ fn parse_structure_layout_bitfield(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let format: Format = match field_options.parse_format() {
@@ -370,7 +370,7 @@ fn parse_structure_layout_bitfield(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
@@ -399,7 +399,7 @@ fn parse_structure_layout_field(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let byte_order: ByteOrder = match field_options.parse_byte_order() {
@@ -408,7 +408,7 @@ fn parse_structure_layout_field(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let format: Format = match field_options.parse_format() {
@@ -417,7 +417,7 @@ fn parse_structure_layout_field(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let field: StructureLayoutField = StructureLayoutField::new(
@@ -441,7 +441,7 @@ fn parse_structure_layout_member(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let field_member: StructureLayoutMember = match data_type {
@@ -501,7 +501,7 @@ fn parse_structure_layout_sequence(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let byte_order: ByteOrder = match field_options.parse_byte_order() {
@@ -510,7 +510,7 @@ fn parse_structure_layout_sequence(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let format: Format = match field_options.parse_format() {
@@ -519,7 +519,7 @@ fn parse_structure_layout_sequence(
             return Err(ParseError::new(format!(
                 "{} in field: {}",
                 error, field_options.name
-            )))
+            )));
         }
     };
     let field: StructureLayoutField = StructureLayoutField::new(
@@ -577,7 +577,7 @@ fn parse_structure_layout(
             return Err(ParseError::new(format!(
                 "{} in layout map of {}",
                 error, name
-            )))
+            )));
         }
     };
     if !options.structure.fields.is_empty() && !options.structure.members.is_empty() {
@@ -598,7 +598,7 @@ fn parse_structure_layout(
                     return Err(ParseError::new(format!(
                         "{} in field: {}",
                         error, field_options.name
-                    )))
+                    )));
                 }
             };
             match data_type {
@@ -624,7 +624,7 @@ fn parse_structure_layout(
                             return Err(ParseError::new(format!(
                                 "{} in field: {}",
                                 error, field_options.name
-                            )))
+                            )));
                         }
                     };
                     let mut bitfields_group: StructureLayoutBitFieldsGroup =

@@ -17,8 +17,8 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use keramics_vfs::{
-    new_os_vfs_location, VfsFileEntry, VfsLocation, VfsPath, VfsResolver, VfsResolverReference,
-    VfsScanContext, VfsScanNode, VfsScanner, VfsType,
+    VfsFileEntry, VfsLocation, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext,
+    VfsScanNode, VfsScanner, VfsType, new_os_vfs_location,
 };
 
 #[derive(Parser)]

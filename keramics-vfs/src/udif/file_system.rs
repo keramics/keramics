@@ -122,7 +122,7 @@ impl UdifFileSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
-                ))
+                ));
             }
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
@@ -139,7 +139,7 @@ impl UdifFileSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("No such file: {}", vfs_location.to_string()),
-                ))
+                ));
             }
         }
         Ok(())

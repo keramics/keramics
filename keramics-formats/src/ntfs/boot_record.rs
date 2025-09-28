@@ -241,7 +241,7 @@ impl NtfsBootRecord {
 mod tests {
     use super::*;
 
-    use keramics_core::{open_fake_data_stream, DataStreamReference};
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
         return vec![

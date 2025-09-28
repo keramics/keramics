@@ -16,7 +16,7 @@ use std::io::Read;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::formatters::format_as_string;
-use keramics_core::{open_os_data_stream, DataStreamReference};
+use keramics_core::{DataStreamReference, open_os_data_stream};
 use keramics_formats::vhd::VhdFile;
 use keramics_hashes::{DigestHashContext, Md5Context};
 

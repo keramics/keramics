@@ -14,7 +14,7 @@
 use std::io;
 
 use keramics_datetime::{DateTime, Filetime};
-use keramics_types::{bytes_to_u32_le, bytes_to_u64_le, Ucs2String};
+use keramics_types::{Ucs2String, bytes_to_u32_le, bytes_to_u64_le};
 use layout_map::LayoutMap;
 
 use super::constants::*;

@@ -1129,7 +1129,7 @@ impl LzfseContext {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidData,
                             format!("Missing decoder entry for literal state: {}", literal_state,),
-                        ))
+                        ));
                     }
                 };
                 let value: u32 = bitstream.get_value(decoder_entry.number_of_bits as usize);
@@ -1211,7 +1211,7 @@ impl LzfseContext {
                                 "Missing value decoder entry for L value state: {}",
                                 l_value_state,
                             ),
-                        ))
+                        ));
                     }
                 };
             let value: u32 = bitstream.get_value(value_decoder_entry.number_of_bits as usize);
@@ -1246,7 +1246,7 @@ impl LzfseContext {
                                 "Missing value decoder entry for M value state: {}",
                                 m_value_state,
                             ),
-                        ))
+                        ));
                     }
                 };
             let value: u32 = bitstream.get_value(value_decoder_entry.number_of_bits as usize);
@@ -1281,7 +1281,7 @@ impl LzfseContext {
                                 "Missing value decoder entry for D value state: {}",
                                 d_value_state,
                             ),
-                        ))
+                        ));
                     }
                 };
             let value: u32 = bitstream.get_value(value_decoder_entry.number_of_bits as usize);

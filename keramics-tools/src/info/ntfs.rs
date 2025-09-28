@@ -88,7 +88,9 @@ fn print_attribute_flags(flags: u32) {
         println!("        0x00000200: Is a sparse file (FILE_ATTRIBUTE_SPARSE_FILE)");
     }
     if flags & 0x00000400 != 0 {
-        println!("        0x00000400: Is a reparse point or symbolic link (FILE_ATTRIBUTE_FLAG_REPARSE_POINT)");
+        println!(
+            "        0x00000400: Is a reparse point or symbolic link (FILE_ATTRIBUTE_FLAG_REPARSE_POINT)"
+        );
     }
     if flags & 0x00000800 != 0 {
         println!("        0x00000800: Is compressed (FILE_ATTRIBUTE_COMPRESSED)");
@@ -97,7 +99,9 @@ fn print_attribute_flags(flags: u32) {
         println!("        0x00001000: Is offline (FILE_ATTRIBUTE_OFFLINE)");
     }
     if flags & 0x00002000 != 0 {
-        println!("        0x00002000: Content should not be indexed (FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)");
+        println!(
+            "        0x00002000: Content should not be indexed (FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)"
+        );
     }
     if flags & 0x00004000 != 0 {
         println!("        0x00004000: Is encrypted (FILE_ATTRIBUTE_ENCRYPTED)");

@@ -134,7 +134,7 @@ impl VfsScanner {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("No such file: {}", vfs_location.to_string()),
-                ))
+                ));
             }
         };
         let file_type: VfsFileType = file_entry.get_file_type();
@@ -176,7 +176,7 @@ impl VfsScanner {
                 return Err(io::Error::new(
                     io::ErrorKind::NotFound,
                     format!("No such file: {}", vfs_location.to_string()),
-                ))
+                ));
             }
         };
         match vfs_location.get_type() {
@@ -325,7 +325,7 @@ impl VfsScanner {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
                             format!("No such file: {}", vfs_location.to_string()),
-                        ))
+                        ));
                     }
                 };
                 let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
@@ -346,7 +346,7 @@ impl VfsScanner {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
                             format!("No such file: {}", vfs_location.to_string()),
-                        ))
+                        ));
                     }
                 };
                 let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
@@ -366,7 +366,7 @@ impl VfsScanner {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
                             format!("No such file: {}", vfs_location.to_string()),
-                        ))
+                        ));
                     }
                 };
                 let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
@@ -415,7 +415,7 @@ impl VfsScanner {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
                             format!("No such file: {}", vfs_location.to_string()),
-                        ))
+                        ));
                     }
                 };
                 self.scan_for_storage_media_image_sub_nodes(
@@ -435,7 +435,7 @@ impl VfsScanner {
                         return Err(io::Error::new(
                             io::ErrorKind::NotFound,
                             format!("No such file: {}", vfs_location.to_string()),
-                        ))
+                        ));
                     }
                 };
                 self.scan_for_storage_media_image_sub_nodes(
@@ -486,7 +486,7 @@ impl VfsScanner {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Unsupported VFS location type",
-                ))
+                ));
             }
         };
         Ok(())
@@ -553,7 +553,9 @@ impl VfsScanner {
                                 FormatIdentifier::Mbr => Ok(Some(VfsType::Mbr)),
                                 _ => Err(io::Error::new(
                                     io::ErrorKind::InvalidData,
-                                    format!("Found unsupported overlapping volume system format signature"),
+                                    format!(
+                                        "Found unsupported overlapping volume system format signature"
+                                    ),
                                 )),
                             },
                             None => Ok(None),

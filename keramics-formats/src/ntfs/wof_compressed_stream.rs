@@ -112,7 +112,7 @@ impl NtfsWofCompressedStream {
                         "Unsupported compression method: {}",
                         self.compression_method
                     ),
-                ))
+                ));
             }
         };
         self.size = size;
@@ -170,7 +170,7 @@ impl NtfsWofCompressedStream {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 };
             } else {
@@ -223,7 +223,7 @@ impl NtfsWofCompressedStream {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if self.mediator.debug_output {
@@ -249,7 +249,7 @@ impl NtfsWofCompressedStream {
                         "Unsupported compression method: {}",
                         self.compression_method
                     ),
-                ))
+                ));
             }
         }
         Ok(())
@@ -282,7 +282,7 @@ impl NtfsWofCompressedStream {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if self.mediator.debug_output {

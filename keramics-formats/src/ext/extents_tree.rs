@@ -13,8 +13,8 @@
 
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 use super::extent_descriptor::ExtExtentDescriptor;

@@ -255,7 +255,7 @@ impl NtfsCompressedStream {
                                 return Err(io::Error::new(
                                     io::ErrorKind::InvalidInput,
                                     "Missing data stream",
-                                ))
+                                ));
                             }
                         };
                         if self.mediator.debug_output {
@@ -301,7 +301,7 @@ impl NtfsCompressedStream {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
             };

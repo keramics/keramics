@@ -13,8 +13,8 @@
 
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::bytes_to_u64_le;
 use layout_map::LayoutMap;
 

@@ -16,11 +16,11 @@ use std::io;
 use std::iter;
 use std::process::ExitCode;
 
+use mdbook::BookItem;
 use mdbook::book::{Book, Chapter};
 use mdbook::errors::Error;
 use mdbook::preprocess::{CmdPreprocessor, Preprocessor, PreprocessorContext};
-use mdbook::BookItem;
-use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag, TagEnd};
+use pulldown_cmark::{CowStr, Event, Options, Parser, Tag, TagEnd, html};
 use pulldown_cmark_to_cmark::cmark;
 
 struct TablesPreprocessor {}

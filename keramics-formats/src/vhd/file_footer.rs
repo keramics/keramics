@@ -13,7 +13,7 @@
 
 use std::io;
 
-use keramics_types::{bytes_to_u32_be, bytes_to_u64_be, Uuid};
+use keramics_types::{Uuid, bytes_to_u32_be, bytes_to_u64_be};
 use layout_map::LayoutMap;
 
 use super::constants::*;
@@ -128,7 +128,7 @@ impl VhdFileFooter {
 mod tests {
     use super::*;
 
-    use keramics_core::{open_fake_data_stream, DataStreamReference};
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
         return vec![

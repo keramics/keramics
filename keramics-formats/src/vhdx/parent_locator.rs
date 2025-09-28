@@ -14,8 +14,8 @@
 use std::collections::HashMap;
 use std::io;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::Ucs2String;
 
 use super::parent_locator_entry::VhdxParentLocatorEntry;

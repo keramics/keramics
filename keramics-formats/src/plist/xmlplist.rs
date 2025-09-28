@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::io;
 use std::str::FromStr;
 
-use pest::iterators::{Pair, Pairs};
 use pest::Parser;
+use pest::iterators::{Pair, Pairs};
 use pest_derive::Parser;
 
 use keramics_encodings::Base64Stream;
@@ -53,7 +53,7 @@ impl XmlPlist {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("Missing plist document"),
-                ))
+                ));
             }
         };
         let mut root_object: PlistObject = PlistObject::None;
@@ -70,7 +70,7 @@ impl XmlPlist {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("Unsupported plist document rule: {:?}", rule),
-                    ))
+                    ));
                 }
             }
         }
@@ -100,7 +100,7 @@ impl XmlPlist {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("Unsupported plist array content rule: {:?}", rule),
-                    ))
+                    ));
                 }
             };
         }
@@ -157,7 +157,7 @@ impl XmlPlist {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("Unsupported plist dict content rule: {:?}", rule),
-                    ))
+                    ));
                 }
             };
         }
@@ -209,7 +209,7 @@ impl XmlPlist {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("Unsupported plist content rule: {:?}", rule),
-                    ))
+                    ));
                 }
             };
         }
@@ -375,7 +375,7 @@ impl XmlPlist {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("Unsupported plist key and object rule: {:?}", rule),
-                    ))
+                    ));
                 }
             };
         }
@@ -435,7 +435,7 @@ impl XmlPlist {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("Unsupported plist object rule: {:?}", rule),
-                ))
+                ));
             }
         };
         match inner_pairs.next() {
@@ -464,7 +464,7 @@ impl XmlPlist {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         format!("Unsupported plist string content rule: {:?}", rule),
-                    ))
+                    ));
                 }
             };
         }

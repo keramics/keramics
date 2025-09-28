@@ -212,8 +212,7 @@ impl UdifFile {
                             io::ErrorKind::InvalidData,
                             format!(
                                 "Unsupported block table: {} entry: {} start sector value out of bounds",
-                                table_index,
-                                entry_index,
+                                table_index, entry_index,
                             ),
                         ));
                     }
@@ -224,8 +223,7 @@ impl UdifFile {
                             io::ErrorKind::InvalidData,
                             format!(
                                 "Unsupported block table: {} entry: {} number of sectors value out of bounds",
-                                table_index,
-                                entry_index,
+                                table_index, entry_index,
                             ),
                         ));
                     }
@@ -236,8 +234,7 @@ impl UdifFile {
                             io::ErrorKind::InvalidData,
                             format!(
                                 "Unsupported block table: {} entry: {} data offset value out of bounds",
-                                table_index,
-                                entry_index,
+                                table_index, entry_index,
                             ),
                         ));
                     }
@@ -248,8 +245,7 @@ impl UdifFile {
                             io::ErrorKind::InvalidData,
                             format!(
                                 "Unsupported block table: {} entry: {} data size value out of bounds",
-                                table_index,
-                                entry_index,
+                                table_index, entry_index,
                             ),
                         ));
                     }
@@ -274,13 +270,12 @@ impl UdifFile {
                         0x80000004..0x80000008 => {
                             if block_table_entry.number_of_sectors > 2048 {
                                 return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Unsupported compressed block table: {} entry: {} number of sectors value out of bounds",
-                                table_index,
-                                entry_index,
-                            ),
-                        ));
+                                    io::ErrorKind::InvalidData,
+                                    format!(
+                                        "Unsupported compressed block table: {} entry: {} number of sectors value out of bounds",
+                                        table_index, entry_index,
+                                    ),
+                                ));
                             }
                             if compressed_entry_type == 0 {
                                 compressed_entry_type = block_table_entry.entry_type;
@@ -416,7 +411,7 @@ impl UdifFile {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             "Missing data stream",
-                        ))
+                        ));
                     }
                 },
                 UdifBlockRangeType::Sparse => {
@@ -454,7 +449,7 @@ impl UdifFile {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing data stream",
-                ))
+                ));
             }
         };
         if self.mediator.debug_output {
@@ -527,7 +522,7 @@ impl Read for UdifFile {
                     return Err(io::Error::new(
                         io::ErrorKind::InvalidInput,
                         "Missing data stream",
-                    ))
+                    ));
                 }
             }
         };

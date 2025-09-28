@@ -13,8 +13,8 @@
 
 use std::io;
 
-use keramics_core::formatters::format_as_string;
 use keramics_core::DataStreamReference;
+use keramics_core::formatters::format_as_string;
 use keramics_datetime::DateTime;
 use keramics_hashes::{DigestHashContext, Md5Context};
 
@@ -61,7 +61,7 @@ pub fn format_as_timestamp(date_time_value: Option<&DateTime>) -> io::Result<Str
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!("Unsupported date time"),
-                ))
+                ));
             }
         },
         // Note that a timestamp value of 0 can represent that the timestamp is not present or

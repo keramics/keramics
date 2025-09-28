@@ -101,7 +101,7 @@ impl NtfsBlockStream {
                             return Err(io::Error::new(
                                 io::ErrorKind::InvalidData,
                                 "Unsupported data run type.",
-                            ))
+                            ));
                         }
                     };
                     let block_range: NtfsBlockRange = NtfsBlockRange::new(
@@ -211,7 +211,7 @@ impl NtfsBlockStream {
                             return Err(io::Error::new(
                                 io::ErrorKind::InvalidInput,
                                 "Missing data stream",
-                            ))
+                            ));
                         }
                     },
                     NtfsBlockRangeType::Sparse => {

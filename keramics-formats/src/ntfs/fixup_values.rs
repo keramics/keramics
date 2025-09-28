@@ -86,15 +86,12 @@ pub fn apply_fixup_values(
                 let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
                 let fixup_value: u16 = bytes_to_u16_le!(buffer, fixup_value_offset);
                 return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "corruption detected - mismatch between placeholder: {} and value: {} at offset: {} (0x{:08x})",
-                placeholder_value,
-                fixup_value,
-                fixup_value_offset,
-                fixup_value_offset,
-            ),
-        ));
+                    io::ErrorKind::InvalidInput,
+                    format!(
+                        "corruption detected - mismatch between placeholder: {} and value: {} at offset: {} (0x{:08x})",
+                        placeholder_value, fixup_value, fixup_value_offset, fixup_value_offset,
+                    ),
+                ));
             }
             buffer.copy_within(fixup_value_offset..fixup_value_end_offset, buffer_offset);
         }

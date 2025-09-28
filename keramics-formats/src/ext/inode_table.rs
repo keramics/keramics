@@ -14,8 +14,8 @@
 use std::io;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::DataStreamReference;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use crate::block_tree::BlockTree;
 

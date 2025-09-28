@@ -148,7 +148,7 @@ impl VhdxFileSystem {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     "Missing parent file system",
-                ))
+                ));
             }
         };
         match Arc::get_mut(&mut self.image) {

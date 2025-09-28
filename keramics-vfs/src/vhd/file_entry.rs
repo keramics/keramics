@@ -96,7 +96,7 @@ impl VhdFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::{open_os_file_resolver, FileResolverReference};
+    use keramics_core::{FileResolverReference, open_os_file_resolver};
 
     fn get_image() -> io::Result<VhdImage> {
         let mut image: VhdImage = VhdImage::new();

@@ -20,7 +20,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, FakeDataStream};
 use keramics_datetime::DateTime;
-use keramics_types::{bytes_to_u16_le, ByteString};
+use keramics_types::{ByteString, bytes_to_u16_le};
 
 use super::block_stream::ExtBlockStream;
 use super::constants::*;

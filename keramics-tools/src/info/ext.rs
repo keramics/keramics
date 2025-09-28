@@ -100,7 +100,9 @@ fn print_ext_compatible_feature_flags(flags: u32) {
     }
 
     if flags & 0x00000200 != 0 {
-        println!("        0x00000200: Has sparse superblock version 2 (EXT4_FEATURE_COMPAT_SPARSE_SUPER2)");
+        println!(
+            "        0x00000200: Has sparse superblock version 2 (EXT4_FEATURE_COMPAT_SPARSE_SUPER2)"
+        );
     }
     if flags & 0x00000400 != 0 {
         println!("        0x00000400: (EXT4_FEATURE_COMPAT_FAST_COMMIT)");
@@ -176,7 +178,9 @@ fn print_ext_incompatible_feature_flags(flags: u32) {
 /// Prints the read-only compatible feature flags.
 fn print_ext_read_only_compatible_feature_flags(flags: u32) {
     if flags & 0x00000001 != 0 {
-        println!("        0x00000001: Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)");
+        println!(
+            "        0x00000001: Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)"
+        );
     }
     if flags & 0x00000002 != 0 {
         println!("        0x00000002: Contains large files (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)");
@@ -226,7 +230,9 @@ fn print_ext_read_only_compatible_feature_flags(flags: u32) {
         println!("        0x00008000: (EXT4_FEATURE_RO_COMPAT_VERITY)");
     }
     if flags & 0x00010000 != 0 {
-        println!("        0x00010000: Orphan file may be non-empty (EXT4_FEATURE_RO_COMPAT_ORPHAN_PRESENT)");
+        println!(
+            "        0x00010000: Orphan file may be non-empty (EXT4_FEATURE_RO_COMPAT_ORPHAN_PRESENT)"
+        );
     }
     println!("");
 }
