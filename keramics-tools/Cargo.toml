@@ -7,14 +7,9 @@ name = "keramics-tools"
 repository.workspace = true
 version.workspace = true
 exclude = [
-    "src/image_analyzer.rs",
     "src/export_tool.rs",
     "src/writer.rs",
 ]
-
-[[bin]]
-name = "image_analyzer"
-path = "src/image_analyzer.rs"
 
 [[bin]]
 name = "keramicsexport"
@@ -25,11 +20,16 @@ name = "keramicshash"
 path = "src/hash_tool.rs"
 
 [[bin]]
+name = "keramicsimage"
+path = "src/image_tool.rs"
+
+[[bin]]
 name = "keramicsinfo"
 path = "src/info_tool.rs"
 
 [dependencies]
-clap = { version = "4.0", features = ["derive"] }
+clap = { version = "4.5", features = ["derive"] }
+indicatif = { version = "0.18" }
 keramics-core = { version = "0", path = "../keramics-core" }
 keramics-datetime = { version = "0", path = "../keramics-datetime" }
 keramics-formats = { version = "0", path = "../keramics-formats" }

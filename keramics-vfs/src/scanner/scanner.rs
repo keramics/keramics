@@ -183,6 +183,15 @@ impl VfsScanner {
             VfsType::Apm { .. } | VfsType::Gpt { .. } | VfsType::Mbr { .. } => {
                 self.scan_for_file_system_format(&data_stream)
             }
+            VfsType::Qcow { .. } | VfsType::Vhd { .. } | VfsType::Vhdx { .. } => {
+                let mut result: Option<VfsType> =
+                    self.scan_for_volume_system_format(&data_stream)?;
+
+                if result.is_none() {
+                    result = self.scan_for_file_system_format(&data_stream)?;
+                }
+                Ok(result)
+            }
             VfsType::Fake { .. } | VfsType::Os { .. } => {
                 let mut result: Option<VfsType> =
                     self.scan_for_storage_media_image_format(&data_stream)?;
@@ -190,15 +199,6 @@ impl VfsScanner {
                 if result.is_none() {
                     result = self.scan_for_volume_system_format(&data_stream)?;
                 }
-                if result.is_none() {
-                    result = self.scan_for_file_system_format(&data_stream)?;
-                }
-                Ok(result)
-            }
-            VfsType::Qcow { .. } | VfsType::Vhd { .. } | VfsType::Vhdx { .. } => {
-                let mut result: Option<VfsType> =
-                    self.scan_for_volume_system_format(&data_stream)?;
-
                 if result.is_none() {
                     result = self.scan_for_file_system_format(&data_stream)?;
                 }
@@ -273,7 +273,6 @@ impl VfsScanner {
     /// Scans for storage media image sub nodes.
     fn scan_for_storage_media_image_sub_nodes(
         &self,
-        file_system: &VfsFileSystem,
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
@@ -399,7 +398,6 @@ impl VfsScanner {
 
                 let number_of_layers: usize = qcow_image.get_number_of_layers();
                 self.scan_for_storage_media_image_sub_nodes(
-                    file_system,
                     vfs_location,
                     scan_node,
                     QcowFileSystem::PATH_PREFIX,
@@ -419,7 +417,6 @@ impl VfsScanner {
                     }
                 };
                 self.scan_for_storage_media_image_sub_nodes(
-                    file_system,
                     vfs_location,
                     scan_node,
                     SparseImageFileSystem::PATH_PREFIX,
@@ -439,7 +436,6 @@ impl VfsScanner {
                     }
                 };
                 self.scan_for_storage_media_image_sub_nodes(
-                    file_system,
                     vfs_location,
                     scan_node,
                     UdifFileSystem::PATH_PREFIX,
@@ -457,7 +453,6 @@ impl VfsScanner {
 
                 let number_of_layers: usize = vhd_image.get_number_of_layers();
                 self.scan_for_storage_media_image_sub_nodes(
-                    file_system,
                     vfs_location,
                     scan_node,
                     VhdFileSystem::PATH_PREFIX,
@@ -475,7 +470,6 @@ impl VfsScanner {
 
                 let number_of_layers: usize = vhdx_image.get_number_of_layers();
                 self.scan_for_storage_media_image_sub_nodes(
-                    file_system,
                     vfs_location,
                     scan_node,
                     VhdxFileSystem::PATH_PREFIX,

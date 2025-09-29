@@ -22,8 +22,10 @@ use clap::{Parser, ValueEnum};
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, open_os_data_stream};
+use keramics_hashes::{
+    DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
+};
 use keramics_types::Ucs2String;
-
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
     VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
@@ -55,7 +57,7 @@ enum VolumePathType {
     /// Identifier based volume or partition path, such as /apfs{f449e580-e355-4e74-8880-05e46e4e3b1e}
     Identifier,
 
-    /// Index based bolurm or partition path, such as /apfs1 or /p1
+    /// Index based volume or partition path, such as /apfs1 or /p1
     Index,
 }
 
@@ -73,26 +75,40 @@ struct CommandLineArguments {
     /// Path of the file to read the data from, if not provided the data will be read from standard input
     source: Option<PathBuf>,
 
+    #[arg(long, default_value_t = false)]
+    /// Stop when an error is encountered
+    stop_on_error: bool,
+
     /// Volume or partition path type
     #[arg(long, default_value_t = VolumePathType::Index, value_enum)]
     volume_path_type: VolumePathType,
 }
+
+// TODO: move DigestHasher into HashTool
 
 /// Tool for calculating digest hashes of data streams.
 struct HashTool {
     /// The digest hasher.
     pub digest_hasher: hasher::DigestHasher,
 
+    /// The digest hash type.
+    hash_type: HashType,
+
     /// Character translation table.
     translation_table: HashMap<u32, String>,
 
     /// Volume or partition path type
     volume_path_type: VolumePathType,
+
+    /// Value to indicate to stop on error.
+    pub stop_on_error: bool,
 }
 
 impl HashTool {
+    const READ_BUFFER_SIZE: usize = 65536;
+
     /// Creates a new tool.
-    fn new(hash_type: &HashType, volume_path_type: &VolumePathType) -> Self {
+    fn new(hash_type: &HashType, volume_path_type: &VolumePathType, stop_on_error: bool) -> Self {
         let digest_hash_type: hasher::DigestHashType = match hash_type {
             HashType::Md5 => hasher::DigestHashType::Md5,
             HashType::Sha1 => hasher::DigestHashType::Sha1,
@@ -102,9 +118,77 @@ impl HashTool {
         };
         Self {
             digest_hasher: hasher::DigestHasher::new(&digest_hash_type),
+            hash_type: hash_type.clone(),
             translation_table: HashTool::get_character_translation_table(),
             volume_path_type: volume_path_type.clone(),
+            stop_on_error: stop_on_error,
         }
+    }
+
+    /// Calculates a digest hash from a data fork.
+    fn calculate_hash_from_data_fork(
+        &self,
+        data_fork: &VfsDataFork,
+        path_components: &Vec<VfsString>,
+    ) -> io::Result<String> {
+        let data_stream: DataStreamReference = data_fork.get_data_stream()?;
+
+        let hash_string: String = match self.calculate_hash_from_data_stream(&data_stream) {
+            Ok(hash) => hash,
+            Err(error) => {
+                if self.stop_on_error {
+                    let path: String = self.get_path(path_components);
+                    let escaped_path: String = self.get_escaped_path(&path);
+
+                    let error_message: String = match data_fork.get_name() {
+                        Some(fork_name) => {
+                            let name: String = fork_name.to_string();
+                            let escaped_name: String = self.get_escaped_path(&name);
+                            format!(
+                                "Unable to calculate hash of data stream: {}:{} with error: {}",
+                                escaped_path, escaped_name, error
+                            )
+                        }
+                        None => format!(
+                            "Unable to calculate hash of data stream: {} with error: {}",
+                            escaped_path, error
+                        ),
+                    };
+                    return Err(io::Error::new(io::ErrorKind::InvalidData, error_message));
+                }
+                String::from("N/A (error)")
+            }
+        };
+        Ok(hash_string)
+    }
+
+    /// Calculates a digest hash from a data stream.
+    fn calculate_hash_from_data_stream(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> io::Result<String> {
+        let mut hash_context: Box<dyn DigestHashContext> = match &self.hash_type {
+            HashType::Md5 => Box::new(Md5Context::new()),
+            HashType::Sha1 => Box::new(Sha1Context::new()),
+            HashType::Sha224 => Box::new(Sha224Context::new()),
+            HashType::Sha256 => Box::new(Sha256Context::new()),
+            HashType::Sha512 => Box::new(Sha512Context::new()),
+        };
+        let mut data: [u8; HashTool::READ_BUFFER_SIZE] = [0; HashTool::READ_BUFFER_SIZE];
+
+        match data_stream.write() {
+            Ok(mut data_stream) => loop {
+                let read_count = data_stream.read(&mut data)?;
+                if read_count == 0 {
+                    break;
+                }
+                hash_context.update(&data[0..read_count]);
+            },
+            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+        };
+        let hash: Vec<u8> = hash_context.finalize();
+
+        Ok(format_as_string(&hash))
     }
 
     /// Calculates a digest hash from a file entry.
@@ -120,7 +204,7 @@ impl HashTool {
             let data_fork: VfsDataFork = file_entry.get_data_fork_by_index(data_fork_index)?;
 
             let name: Option<String> = match data_fork.get_name() {
-                Some(name) => Some(name.to_string()),
+                Some(fork_name) => Some(fork_name.to_string()),
                 None => None,
             };
             // TODO: create skip list
@@ -128,21 +212,13 @@ impl HashTool {
                 && path_components[1] == VfsString::Ucs2(Ucs2String::from_string("$BadClus"))
                 && name == Some("$Bad".to_string())
             {
-                String::from("N/A")
+                String::from("N/A (skipped)")
             } else {
-                let data_stream: DataStreamReference = data_fork.get_data_stream()?;
-                let hash: Vec<u8> = self
-                    .digest_hasher
-                    .calculate_hash_from_data_stream(&data_stream)?;
-
-                format_as_string(&hash)
+                self.calculate_hash_from_data_fork(&data_fork, path_components)?
             };
-            let path: String = path_components
-                .iter()
-                .map(|component| component.to_string())
-                .collect::<Vec<String>>()
-                .join("/");
+            let path: String = self.get_path(path_components);
             let escaped_path: String = self.get_escaped_path(&path);
+
             match name {
                 Some(name) => {
                     let escaped_name: String = self.get_escaped_path(&name);
@@ -309,6 +385,15 @@ impl HashTool {
         };
         Ok(display_path)
     }
+
+    /// Retrieves a path string based on the path components.
+    fn get_path(&self, path_components: &Vec<VfsString>) -> String {
+        path_components
+            .iter()
+            .map(|component| component.to_string())
+            .collect::<Vec<String>>()
+            .join("/")
+    }
 }
 
 fn main() -> ExitCode {
@@ -319,17 +404,27 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    let hash_tool: HashTool =
-        HashTool::new(&arguments.digest_hash_type, &arguments.volume_path_type);
-
+    let hash_tool: HashTool = HashTool::new(
+        &arguments.digest_hash_type,
+        &arguments.volume_path_type,
+        arguments.stop_on_error,
+    );
     match arguments.source {
         None => {
             let mut reader: BufReader<Stdin> = BufReader::new(io::stdin());
 
-            let hash: Vec<u8> = hash_tool
+            let hash: Vec<u8> = match hash_tool
                 .digest_hasher
-                .calculate_hash_from_reader(&mut reader);
-            println!("{}  -", format_as_string(&hash));
+                .calculate_hash_from_reader(&mut reader)
+            {
+                Ok(hash) => hash,
+                Err(error) => {
+                    println!("Unable to calculate hash from stdin with error: {}", error);
+                    return ExitCode::FAILURE;
+                }
+            };
+            let hash_string: String = format_as_string(&hash);
+            println!("{}  -", hash_string);
         }
         Some(source_argument) => {
             let source: &str = match source_argument.to_str() {
@@ -374,28 +469,26 @@ fn main() -> ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
-                let hash: Vec<u8> = match hash_tool
-                    .digest_hasher
-                    .calculate_hash_from_data_stream(&data_stream)
-                {
-                    Ok(hash) => hash,
-                    Err(error) => {
-                        println!(
-                            "Unable to calculate hash from data stream with error: {}",
-                            error
-                        );
-                        return ExitCode::FAILURE;
-                    }
-                };
-                println!("{}  {}", format_as_string(&hash), source);
+                let hash_string: String =
+                    match hash_tool.calculate_hash_from_data_stream(&data_stream) {
+                        Ok(hash) => hash,
+                        Err(error) => {
+                            if hash_tool.stop_on_error {
+                                println!(
+                                    "Unable to calculate hash of data stream: {} with error: {}",
+                                    source, error
+                                );
+                                return ExitCode::FAILURE;
+                            }
+                            String::from("N/A (error)")
+                        }
+                    };
+                println!("{}  {}", hash_string, source);
             } else {
                 match hash_tool.calculate_hash_from_scan_node(root_scan_node) {
                     Ok(_) => {}
                     Err(error) => {
-                        println!(
-                            "Unable to calculate hash from root scan node with error: {}",
-                            error
-                        );
+                        println!("{}", error);
                         return ExitCode::FAILURE;
                     }
                 };

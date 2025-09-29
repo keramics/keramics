@@ -64,7 +64,7 @@ impl ByteString {
         }
     }
 
-    /// Retrieves the string representation of the byte string.
+    /// Converts the byte string to a `String`.
     pub fn to_string(&self) -> String {
         // TODO: add support for encoding.
         String::from_utf8(self.elements.to_vec()).unwrap()

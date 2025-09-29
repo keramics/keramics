@@ -115,7 +115,7 @@ impl ExtGroupDescriptorTable {
                         return Err(io::Error::new(
                             io::ErrorKind::InvalidInput,
                             format!(
-                                "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
+                                "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} ext group descriptor table checksums",
                                 group_descriptor.checksum, calculated_checksum
                             ),
                         ));

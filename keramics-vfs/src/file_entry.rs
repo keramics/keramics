@@ -967,6 +967,7 @@ mod tests {
     }
 
     // TODO: add test_get_file_type_with_ext
+
     // TODO: add test_get_file_type_with_fake
 
     #[test]
@@ -1223,6 +1224,7 @@ mod tests {
     }
 
     // TODO: add test_get_data_stream_with_ext
+
     // TODO: add test_get_data_stream_with_fake
 
     #[test]

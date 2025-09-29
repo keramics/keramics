@@ -139,10 +139,10 @@ impl SignatureTable {
             ));
             if result.is_none() {
                 self.mediator
-                    .debug_print(format!("    most significant pattern offset: N/A\n"));
+                    .debug_print(format!("    most_significant_pattern_offset: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
-                    "    most significant pattern offset: {}\n",
+                    "    most_significant_pattern_offset: {}\n",
                     result.unwrap(),
                 ));
             }
@@ -159,10 +159,10 @@ impl SignatureTable {
             ));
             if self.byte_value_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(format!("    largest byte value weight: N/A\n"));
+                    .debug_print(format!("    largest_byte_value_weight: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
-                    "    largest byte value weight: {}\n",
+                    "    largest_byte_value_weight: {}\n",
                     self.byte_value_weights.largest_weight
                 ));
             }
@@ -175,7 +175,7 @@ impl SignatureTable {
                 None => 0,
             };
             self.mediator
-                .debug_print(format!("    number of offsets: {}\n", number_of_offsets,));
+                .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets,));
             self.mediator.debug_print(format!("}}\n\n"));
         }
         match self
@@ -196,10 +196,10 @@ impl SignatureTable {
             ));
             if self.occurrence_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(format!("    largest occurrence weight: N/A\n"));
+                    .debug_print(format!("    largest_occurrence_weight: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
-                    "    largest occurrence weight: {}\n",
+                    "    largest_occurrence_weight: {}\n",
                     self.occurrence_weights.largest_weight
                 ));
             }
@@ -212,7 +212,7 @@ impl SignatureTable {
                 None => 0,
             };
             self.mediator
-                .debug_print(format!("    number of offsets: {}\n", number_of_offsets));
+                .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets));
         }
         match self
             .occurrence_weights
@@ -234,7 +234,7 @@ impl SignatureTable {
                         self.mediator
                             .debug_print(format!("    offset: {} {{\n", *occurrence_offset));
                         self.mediator.debug_print(format!(
-                            "        byte value weight: {},\n",
+                            "        byte_value_weight: {},\n",
                             byte_value_weight
                         ));
                         self.mediator.debug_print(format!("    }},\n"));
@@ -242,9 +242,9 @@ impl SignatureTable {
                 }
                 if self.mediator.debug_output {
                     self.mediator
-                        .debug_print(format!("    pattern offset: {},\n", pattern_offset));
+                        .debug_print(format!("    pattern_offset: {},\n", pattern_offset));
                     self.mediator.debug_print(format!(
-                        "    largest byte value weight: {},\n",
+                        "    largest_byte_value_weight: {},\n",
                         largest_byte_value_weight
                     ));
                     self.mediator.debug_print(format!("}}\n\n"));
@@ -268,10 +268,10 @@ impl SignatureTable {
             ));
             if self.similarity_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(format!("    largest similarity weight: N/A\n"));
+                    .debug_print(format!("    largest_similarity_weight: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
-                    "    largest similarity weight: {}\n",
+                    "    largest_similarity_weight: {}\n",
                     self.similarity_weights.largest_weight
                 ));
             }
@@ -284,7 +284,7 @@ impl SignatureTable {
                 None => 0,
             };
             self.mediator
-                .debug_print(format!("    number of offsets: {}\n", number_of_offsets));
+                .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets));
         }
         match self
             .similarity_weights
@@ -318,11 +318,11 @@ impl SignatureTable {
                         self.mediator
                             .debug_print(format!("    offset: {} {{\n", *similarity_offset));
                         self.mediator.debug_print(format!(
-                            "        occurrence weight: {},\n",
+                            "        occurrence_weight: {},\n",
                             occurrence_weight
                         ));
                         self.mediator.debug_print(format!(
-                            "        byte value weight: {},\n",
+                            "        byte_value_weight: {},\n",
                             byte_value_weight
                         ));
                         self.mediator.debug_print(format!("    }},\n"));
@@ -330,13 +330,13 @@ impl SignatureTable {
                 }
                 if self.mediator.debug_output {
                     self.mediator
-                        .debug_print(format!("    pattern offset: {},\n", pattern_offset));
+                        .debug_print(format!("    pattern_offset: {},\n", pattern_offset));
                     self.mediator.debug_print(format!(
-                        "    largest occurrence weight: {},\n",
+                        "    largest_occurrence_weight: {},\n",
                         largest_occurrence_weight
                     ));
                     self.mediator.debug_print(format!(
-                        "    largest byte value weight: {},\n",
+                        "    largest_byte_value_weight: {},\n",
                         largest_byte_value_weight
                     ));
                     self.mediator.debug_print(format!("}}\n\n"));

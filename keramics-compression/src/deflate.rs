@@ -316,6 +316,26 @@ impl DeflateContext {
 
         let number_of_code_sizes: usize = (value_32bit as usize) + 4;
 
+        let mediator = Mediator::current();
+        if mediator.debug_output {
+            let mut string_parts: Vec<String> = Vec::new();
+            string_parts.push(format!("DeflateContext::build_dynamic_huffman_trees {{\n"));
+            string_parts.push(format!(
+                "    number_of_literal_codes: {},\n",
+                number_of_literal_codes
+            ));
+            string_parts.push(format!(
+                "    number_of_distance_codes: {},\n",
+                number_of_distance_codes
+            ));
+            string_parts.push(format!(
+                "    number_of_code_sizes: {},\n",
+                number_of_code_sizes
+            ));
+            string_parts.push(format!("}}\n\n"));
+
+            mediator.debug_print(string_parts.join(""));
+        }
         for sequence_index in 0..number_of_code_sizes {
             let code_size: u32 = bitstream.get_value(3);
             let code_size_index: usize = DEFLATE_CODE_SIZES_SEQUENCE[sequence_index] as usize;
@@ -458,7 +478,7 @@ impl DeflateContext {
                     }
                     let value_32bit: u32 = bitstream.get_value(32);
                     let block_size: usize = (value_32bit & 0x0000ffff) as usize;
-                    let block_size_copy: usize = (value_32bit >> 16) as usize;
+                    let block_size_copy: usize = ((value_32bit >> 16) ^ 0xffff) as usize;
 
                     if block_size != block_size_copy {
                         return Err(io::Error::new(
@@ -538,9 +558,19 @@ impl DeflateContext {
     ) -> io::Result<()> {
         let mut data_offset: usize = *uncompressed_data_offset;
 
+        let mediator = Mediator::current();
+        if mediator.debug_output {
+            mediator.debug_print(format!(
+                "DeflateContext::decompress_huffmann_encoded_block {{\n"
+            ));
+        }
         loop {
             let mut symbol: u16 = literals_huffman_tree.decode_symbol(bitstream)?;
 
+            if mediator.debug_output {
+                mediator.debug_print(format!("    uncompressed_data_offset: {},\n", data_offset));
+                mediator.debug_print(format!("    symbol: {},\n", symbol));
+            }
             if symbol == 256 {
                 break;
             }
@@ -560,14 +590,25 @@ impl DeflateContext {
                 let number_of_extra_bits: u16 =
                     DEFLATE_LITERAL_CODES_NUMBER_OF_EXTRA_BITS[symbol as usize];
                 let extra_bits: u32 = bitstream.get_value(number_of_extra_bits as usize);
+
+                if mediator.debug_output {
+                    mediator.debug_print(format!("    extra_bits: 0x{:04x},\n", extra_bits));
+                }
                 let compression_size: usize =
                     ((DEFLATE_LITERAL_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
 
                 symbol = distances_huffman_tree.decode_symbol(bitstream)?;
 
+                if mediator.debug_output {
+                    mediator.debug_print(format!("    symbol: {},\n", symbol));
+                }
                 let number_of_extra_bits: u16 =
                     DEFLATE_DISTANCE_CODES_NUMBER_OF_EXTRA_BITS[symbol as usize];
                 let extra_bits: u32 = bitstream.get_value(number_of_extra_bits as usize);
+
+                if mediator.debug_output {
+                    mediator.debug_print(format!("    extra_bits: 0x{:04x},\n", extra_bits));
+                }
                 let compression_offset: usize =
                     ((DEFLATE_DISTANCE_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
 
@@ -589,6 +630,11 @@ impl DeflateContext {
                         ),
                     ));
                 }
+                if mediator.debug_output {
+                    mediator
+                        .debug_print(format!("    compression_offset: {},\n", compression_offset));
+                    mediator.debug_print(format!("    compression_size: {},\n", compression_size));
+                }
                 let mut compression_data_offset: usize = data_offset - compression_offset;
 
                 for _ in 0..compression_size {
@@ -603,6 +649,9 @@ impl DeflateContext {
                     format!("Invalid symbol: {}", symbol),
                 ));
             }
+        }
+        if mediator.debug_output {
+            mediator.debug_print(format!("}}\n\n"));
         }
         *uncompressed_data_offset = data_offset;
 

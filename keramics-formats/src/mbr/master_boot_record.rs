@@ -26,7 +26,7 @@ use super::partition_entry::MbrPartitionEntry;
         byte_order = "little",
         member(field(name = "boot_loader", data_type = "[u8; 440]", format = "hex")),
         member(field(name = "disk_identity", data_type = "u32", format = "hex")),
-        member(field(name = "unknown1", data_type = "[u8; 2]")),
+        member(field(name = "unknown1", data_type = "[u8; 2]", format = "hex")),
         member(field(
             name = "partition_entries",
             data_type = "[Struct<MbrPartitionEntry; 16>; 4]"

@@ -390,7 +390,7 @@ impl Bzip2Context {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} bzip2 block checksums",
                     block_header.checksum, calculated_checksum
                 ),
             ));

@@ -112,7 +112,7 @@ impl GptPartitionTableHeader {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} GPT partitiohn table header checksums",
                     stored_checksum, calculated_checksum
                 ),
             ));

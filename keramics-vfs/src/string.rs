@@ -26,7 +26,7 @@ pub enum VfsString {
 }
 
 impl VfsString {
-    /// Retrieves the string representation.
+    /// Converts the VFS string to a `String`.
     pub fn to_string(&self) -> String {
         match self {
             VfsString::Byte(byte_string) => byte_string.to_string(),

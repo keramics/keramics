@@ -249,7 +249,7 @@ impl GptVolumeSystem {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidInput,
                 format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} GPT partition table entries checksums",
                     partition_table_header.entries_data_checksum, calculated_checksum
                 ),
             ));

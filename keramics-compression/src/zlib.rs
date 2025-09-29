@@ -48,12 +48,17 @@ impl ZlibDataHeader {
         let compression_window_bits: u8 = (compression_data >> 4) + 8;
         let compression_window_size: u32 = 1u32 << compression_window_bits;
         string_parts.push(format!(
-            "    compression_window_size: {} bits,\n",
-            compression_window_size,
+            "    compression_window_size: {} bytes ({}),\n",
+            compression_window_size, compression_window_bits,
         ));
 
         let flags: u8 = data[1];
-        string_parts.push(format!("    flags: {},\n", flags));
+        string_parts.push(format!("    check_bits: 0x{:02x},\n", flags & 0x1f));
+        string_parts.push(format!(
+            "    preset_dictionary_flag: {},\n",
+            (flags & 0x20) >> 5
+        ));
+        string_parts.push(format!("    compression_level: {},\n", flags >> 6));
 
         if flags & 0x20 != 0 {
             let preset_dictionary_identifier: u32 = bytes_to_u32_be!(data, 0);
@@ -120,7 +125,7 @@ pub struct ZlibContext {
     mediator: MediatorReference,
 
     /// Uncompressed data size.
-    uncompressed_data_size: usize,
+    pub uncompressed_data_size: usize,
 }
 
 impl ZlibContext {
@@ -141,13 +146,14 @@ impl ZlibContext {
         let mut data_header: ZlibDataHeader = ZlibDataHeader::new();
 
         if self.mediator.debug_output {
-            let header_size: usize = if compressed_data[0] & 0x20 == 0 { 2 } else { 6 };
+            let header_size: usize = if compressed_data[1] & 0x20 == 0 { 2 } else { 6 };
 
             self.mediator.debug_print(format!(
                 "ZlibDataHeader data of size: {} at offset: 0 (0x00000000)\n",
                 header_size,
             ));
-            self.mediator.debug_print_data(compressed_data, true);
+            self.mediator
+                .debug_print_data(&compressed_data[0..header_size], true);
             self.mediator
                 .debug_print(ZlibDataHeader::debug_read_data(compressed_data));
         }
@@ -171,7 +177,7 @@ impl ZlibContext {
                 return Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!(
-                        "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                        "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} zlib data checksums",
                         stored_checksum, calculated_checksum
                     ),
                 ));
