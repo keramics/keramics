@@ -11,32 +11,29 @@
  * under the License.
  */
 
-mod block_tree;
+mod block_range;
+mod constants;
+mod digest;
 mod enums;
-mod errors;
-mod lru_cache;
-mod scanner;
+mod error2;
+mod error2_entry;
+mod error2_footer;
+mod error2_header;
+mod file;
+mod file_header;
+mod hash;
+mod header;
+mod header2;
+mod header_value;
+mod image;
+mod object_storage;
+mod section_header;
+mod table;
+mod table_entry;
+mod table_footer;
+mod table_header;
+mod volume;
 
-// Data formats used in other formats.
-mod plist;
-
-// Storage media image formats
-pub mod ewf;
-pub mod qcow;
-pub mod sparsebundle;
-pub mod sparseimage;
-pub mod udif;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
-
-// File system formats
-pub mod ext;
-pub mod ntfs;
-
-pub use enums::FormatIdentifier;
-pub use scanner::FormatScanner;
+pub use enums::{EwfHeaderValueType, EwfMediaType};
+pub use header_value::EwfHeaderValue;
+pub use image::EwfImage;

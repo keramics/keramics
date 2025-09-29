@@ -472,6 +472,19 @@ create_test_file_entries ${MOUNT_POINT}
 
 sudo umount ${MOUNT_POINT}
 
+# Create an EWF image with an ext2 file system.
+set +e
+
+which ewfacquire > /dev/null 2>&1
+RESULT=$?
+
+set -e
+
+if test ${RESULT} -eq ${EXIT_SUCCESS}
+then
+	ewfacquire -u -c best -C case -D description -e examiner -E evidence -M logical -N notes -t test_data/ewf/ext2 test_data/ext/ext2.raw
+fi
+
 # Create a QCOW image with an ext2 file system.
 IMAGE_FILE="test_data/qcow/ext2.qcow2"
 

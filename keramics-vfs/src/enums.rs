@@ -31,6 +31,7 @@ pub enum VfsFileType {
 pub enum VfsType {
     Apm,
     Ext,
+    Ewf,
     #[default]
     Fake,
     Gpt,
@@ -50,6 +51,7 @@ impl VfsType {
         match self {
             VfsType::Apm => "APM",
             VfsType::Ext => "EXT",
+            VfsType::Ewf => "EWF",
             VfsType::Fake => "FAKE",
             VfsType::Gpt => "GPT",
             VfsType::Mbr => "MBR",

@@ -37,6 +37,7 @@ impl VfsLocation {
         match &vfs_type {
             VfsType::Apm
             | VfsType::Ext
+            | VfsType::Ewf
             | VfsType::Gpt
             | VfsType::Ntfs
             | VfsType::Mbr

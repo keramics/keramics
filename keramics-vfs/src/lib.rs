@@ -25,6 +25,7 @@ mod types;
 
 // Format specific back-ends.
 mod apm;
+mod ewf;
 mod fake;
 mod gpt;
 mod mbr;

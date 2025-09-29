@@ -13,6 +13,7 @@
 
 mod apm;
 mod bodyfile;
+mod ewf;
 mod ext;
 mod gpt;
 mod mbr;
@@ -24,6 +25,7 @@ mod vhd;
 mod vhdx;
 
 pub use apm::print_apm_volume_system;
+pub use ewf::print_ewf_image;
 pub use ext::{
     print_entry_ext_file_system, print_ext_file_system, print_hierarcy_ext_file_system,
     print_path_ext_file_system,

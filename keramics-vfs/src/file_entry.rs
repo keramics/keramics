@@ -24,6 +24,7 @@ use keramics_types::Ucs2String;
 use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
 use super::enums::VfsFileType;
+use super::ewf::EwfFileEntry;
 use super::fake::FakeFileEntry;
 use super::gpt::GptFileEntry;
 use super::iterators::VfsFileEntriesIterator;
@@ -40,6 +41,7 @@ use super::vhdx::VhdxFileEntry;
 pub enum VfsFileEntry {
     Apm(ApmFileEntry),
     Ext(ExtFileEntry),
+    Ewf(EwfFileEntry),
     Fake(Rc<FakeFileEntry>),
     Gpt(GptFileEntry),
     Mbr(MbrFileEntry),
@@ -58,6 +60,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::Apm(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
+            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
@@ -76,6 +79,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::Apm(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_change_time(),
+            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
@@ -94,6 +98,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::Apm(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
+            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
@@ -124,6 +129,7 @@ impl VfsFileEntry {
                     _ => VfsFileType::Unknown,
                 }
             }
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_file_type(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_file_type(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_file_type(),
@@ -155,6 +161,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::Apm(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
+            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
             VfsFileEntry::Gpt(_) => None,
             VfsFileEntry::Mbr(_) => None,
@@ -177,6 +184,10 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
                 Some(name) => Some(VfsString::Byte(name.clone())),
+                None => None,
+            },
+            VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name)),
                 None => None,
             },
             VfsFileEntry::Fake(_) => todo!(),
@@ -236,6 +247,10 @@ impl VfsFileEntry {
                     1
                 }
             }
+            VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry {
+                EwfFileEntry::Layer { .. } => 1,
+                EwfFileEntry::Root { .. } => 0,
+            },
             VfsFileEntry::Fake(fake_file_entry) => match fake_file_entry.get_file_type() {
                 VfsFileType::File => 1,
                 _ => 0,
@@ -298,6 +313,7 @@ impl VfsFileEntry {
                     }
                 }
             }
+            VfsFileEntry::Ewf(_) => todo!(),
             VfsFileEntry::Fake(_) => todo!(),
             VfsFileEntry::Gpt(_) => todo!(),
             VfsFileEntry::Mbr(_) => todo!(),
@@ -321,6 +337,7 @@ impl VfsFileEntry {
         let result: Option<DataStreamReference> = match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream()?,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream()?,
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream()?,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream()?,
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_data_stream()?,
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_data_stream()?,
@@ -345,6 +362,7 @@ impl VfsFileEntry {
         let result: Option<DataStreamReference> = match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ext(_)
+            | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
@@ -373,6 +391,7 @@ impl VfsFileEntry {
         let number_of_sub_file_entries: usize = match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_number_of_sub_file_entries()?,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries()?,
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_number_of_sub_file_entries()?,
             VfsFileEntry::Fake(_) => todo!(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_number_of_sub_file_entries()?,
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_number_of_sub_file_entries()?,
@@ -408,6 +427,9 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Ext(ext_file_entry) => {
                 VfsFileEntry::Ext(ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
+            }
+            VfsFileEntry::Ewf(ewf_file_entry) => {
+                VfsFileEntry::Ewf(ewf_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?)
             }
             VfsFileEntry::Fake(_) => todo!(),
             VfsFileEntry::Gpt(gpt_file_entry) => {
@@ -503,6 +525,29 @@ mod tests {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::Ext(ExtPath::from(path));
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("No such file entry: {}", path),
+            )),
+        }
+    }
+
+    fn get_ewf_file_system() -> io::Result<VfsFileSystem> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/ewf/ext2.E01");
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_ewf_file_entry(path: &str) -> io::Result<VfsFileEntry> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(io::Error::new(
@@ -699,6 +744,15 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_get_access_time_with_ewf() -> io::Result<()> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
     // TODO: add test_get_access_time_with_fake
 
     #[test]
@@ -791,6 +845,15 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_get_change_time_with_ewf() -> io::Result<()> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
     // TODO: add test_get_change_time_with_fake
 
     #[test]
@@ -872,6 +935,15 @@ mod tests {
     #[test]
     fn test_get_creation_time_with_ext() -> io::Result<()> {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_ewf() -> io::Result<()> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
         assert_eq!(vfs_file_entry.get_creation_time(), None);
 
@@ -967,6 +1039,25 @@ mod tests {
     }
 
     // TODO: add test_get_file_type_with_ext
+
+    #[test]
+    fn test_get_file_type_with_ewf() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/ewf1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
 
     // TODO: add test_get_file_type_with_fake
 
@@ -1130,6 +1221,15 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_get_modification_time_with_ewf() -> io::Result<()> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
     // TODO: add test_get_modification_time_with_fake
 
     #[test]
@@ -1224,6 +1324,27 @@ mod tests {
     }
 
     // TODO: add test_get_data_stream_with_ext
+
+    #[test]
+    fn test_get_data_stream_with_ewf() -> io::Result<()> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/ewf1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
 
     // TODO: add test_get_data_stream_with_fake
 

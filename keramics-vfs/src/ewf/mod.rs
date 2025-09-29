@@ -11,32 +11,8 @@
  * under the License.
  */
 
-mod block_tree;
-mod enums;
-mod errors;
-mod lru_cache;
-mod scanner;
+mod file_entry;
+mod file_system;
 
-// Data formats used in other formats.
-mod plist;
-
-// Storage media image formats
-pub mod ewf;
-pub mod qcow;
-pub mod sparsebundle;
-pub mod sparseimage;
-pub mod udif;
-pub mod vhd;
-pub mod vhdx;
-
-// Volume system formats
-pub mod apm;
-pub mod gpt;
-pub mod mbr;
-
-// File system formats
-pub mod ext;
-pub mod ntfs;
-
-pub use enums::FormatIdentifier;
-pub use scanner::FormatScanner;
+pub use file_entry::EwfFileEntry;
+pub use file_system::EwfFileSystem;

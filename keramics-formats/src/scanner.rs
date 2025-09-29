@@ -62,6 +62,17 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds Expert Witness Compression Format (EWF) signatures.
+    pub fn add_ewf_signatures(&mut self) {
+        // Version 1 signature in file header.
+        self.signature_scanner.add_signature(Signature::new(
+            "ewf1",
+            PatternType::BoundToStart,
+            0,
+            &[0x45, 0x56, 0x46, 0x09, 0x0d, 0x0a, 0xff, 0x00],
+        ));
+    }
+
     /// Adds GUID Partition Table (GPT) signatures.
     pub fn add_gpt_signatures(&mut self) {
         // Signature for 512 bytes per sector.
@@ -260,6 +271,7 @@ impl FormatScanner {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
                 "apm1" => FormatIdentifier::Apm,
                 "ext1" => FormatIdentifier::Ext,
+                "ewf1" => FormatIdentifier::Ewf,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
@@ -287,6 +299,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
+        format_scanner.add_ewf_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_qcow_signatures();
@@ -303,6 +316,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
+        format_scanner.add_ewf_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_qcow_signatures();

@@ -26,6 +26,7 @@ use keramics_core::mediator::Mediator;
 use keramics_core::{
     DataStreamReference, FileResolverReference, open_os_data_stream, open_os_file_resolver,
 };
+use keramics_formats::ewf::EwfImage;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::udif::UdifFile;
@@ -66,6 +67,7 @@ fn scan_for_storage_image_formats(
     data_stream: &DataStreamReference,
 ) -> io::Result<Option<FormatIdentifier>> {
     let mut format_scanner: FormatScanner = FormatScanner::new();
+    format_scanner.add_ewf_signatures();
     format_scanner.add_qcow_signatures();
     // TODO: support for sparse bundle.
     format_scanner.add_sparseimage_signatures();
@@ -117,6 +119,7 @@ fn print_scan_node(scan_node: &VfsScanNode, depth: usize) -> io::Result<()> {
 
 /// Storage media image.
 enum StorageMediaImage {
+    Ewf(EwfImage),
     Qcow(QcowImage),
     SparseImage(SparseImageFile),
     Udif(UdifFile),
@@ -167,6 +170,7 @@ impl StorageMediaImage {
     /// Retrieves the stored MD5 hash.
     fn get_md5_hash(&self) -> Option<&[u8]> {
         match self {
+            StorageMediaImage::Ewf(image) => Some(&image.md5_hash),
             _ => None,
         }
     }
@@ -174,6 +178,7 @@ impl StorageMediaImage {
     /// Retrieves the media size.
     fn get_media_size(&self) -> u64 {
         match self {
+            StorageMediaImage::Ewf(image) => image.media_size,
             // TODO: add Qcow layer support.
             StorageMediaImage::SparseImage(file) => file.media_size,
             StorageMediaImage::Udif(file) => file.media_size,
@@ -186,6 +191,7 @@ impl StorageMediaImage {
     /// Retrieves the stored SHA1 hash.
     fn get_sha1_hash(&self) -> Option<&[u8]> {
         match self {
+            StorageMediaImage::Ewf(image) => Some(&image.sha1_hash),
             _ => None,
         }
     }
@@ -193,6 +199,12 @@ impl StorageMediaImage {
     /// Opens a storage media image.
     fn open(&mut self, path: &PathBuf) -> io::Result<()> {
         match self {
+            StorageMediaImage::Ewf(image) => {
+                let (base_path, file_name) = StorageMediaImage::get_base_path_and_file_name(path)?;
+                let file_resolver: FileResolverReference = open_os_file_resolver(base_path)?;
+
+                image.open(&file_resolver, file_name)?;
+            }
             StorageMediaImage::Qcow(image) => {
                 let (base_path, file_name) = StorageMediaImage::get_base_path_and_file_name(path)?;
                 let file_resolver: FileResolverReference = open_os_file_resolver(base_path)?;
@@ -246,6 +258,7 @@ impl Read for StorageMediaImage {
     /// Reads media data.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self {
+            StorageMediaImage::Ewf(image) => image.read(buf),
             // TODO: add Qcow layer support.
             StorageMediaImage::SparseImage(file) => file.read(buf),
             StorageMediaImage::Udif(file) => file.read(buf),
@@ -300,6 +313,7 @@ fn main() -> ExitCode {
                 }
             };
             let mut storage_media_image: StorageMediaImage = match &format_identifier {
+                FormatIdentifier::Ewf => StorageMediaImage::Ewf(EwfImage::new()),
                 FormatIdentifier::Qcow => StorageMediaImage::Qcow(QcowImage::new()),
                 // TODO: add support for sparse bundle.
                 FormatIdentifier::SparseImage => {
