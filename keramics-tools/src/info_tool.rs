@@ -85,6 +85,7 @@ fn scan_for_formats(data_stream: &DataStreamReference) -> io::Result<Option<Form
     let mut format_scanner: FormatScanner = FormatScanner::new();
     format_scanner.add_apm_signatures();
     format_scanner.add_ext_signatures();
+    format_scanner.add_ewf_signatures();
     format_scanner.add_gpt_signatures();
     format_scanner.add_ntfs_signatures();
     format_scanner.add_qcow_signatures();
@@ -222,6 +223,7 @@ fn main() -> ExitCode {
         None => match &format_identifier {
             FormatIdentifier::Apm => info::print_apm_volume_system(&data_stream),
             FormatIdentifier::Ext => info::print_ext_file_system(&data_stream),
+            FormatIdentifier::Ewf => info::print_ewf_image(&arguments.source),
             FormatIdentifier::Gpt => info::print_gpt_volume_system(&data_stream),
             FormatIdentifier::Mbr => info::print_mbr_volume_system(&data_stream),
             FormatIdentifier::Ntfs => info::print_ntfs_file_system(&data_stream),

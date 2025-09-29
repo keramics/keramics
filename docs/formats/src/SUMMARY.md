@@ -3,6 +3,8 @@
 [Introduction](introduction.md)
 
 - [Storage media image formats](storage_media_image.md)
+    - [Expert Witness Compression Format (EWF)](ewf.md)
+    - [Expert Witness Compression Format version 2 (EWF2)](ewf2.md)
     - [Mac OS sparse bundle](sparsebundle.md)
     - [Mac OS sparse image](sparseimage.md)
     - [QEMU Copy-On-Write (QCOW)](qcow.md)
@@ -18,3 +20,4 @@
     - [New Technologies File System (NTFS)](ntfs.md)
 - [Assorted formats](assorted.md)
     - [Property list (plist)](plist.md)
+    - [Zlib compressed data](zlib.md)

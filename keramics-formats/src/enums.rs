@@ -16,6 +16,7 @@
 pub enum FormatIdentifier {
     Apm,
     Ext,
+    Ewf,
     Gpt,
     Mbr,
     Ntfs,
@@ -34,6 +35,7 @@ impl FormatIdentifier {
         match self {
             FormatIdentifier::Apm => "apm",
             FormatIdentifier::Ext => "ext",
+            FormatIdentifier::Ewf => "ewf",
             FormatIdentifier::Gpt => "gpt",
             FormatIdentifier::Mbr => "mbr",
             FormatIdentifier::Ntfs => "ntfs",

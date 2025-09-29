@@ -63,6 +63,7 @@ impl VfsPath {
     pub fn new(vfs_type: &VfsType, path: &str) -> Self {
         match vfs_type {
             VfsType::Apm
+            | VfsType::Ewf
             | VfsType::Fake
             | VfsType::Gpt
             | VfsType::Mbr

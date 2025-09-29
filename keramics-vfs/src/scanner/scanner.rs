@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, FileResolverReference};
 use keramics_sigscan::BuildError;
 
 use keramics_formats::apm::ApmVolumeSystem;
+use keramics_formats::ewf::EwfImage;
 use keramics_formats::gpt::GptVolumeSystem;
 use keramics_formats::mbr::MbrVolumeSystem;
 use keramics_formats::qcow::QcowImage;
@@ -29,6 +30,7 @@ use keramics_formats::{FormatIdentifier, FormatScanner};
 
 use crate::apm::ApmFileSystem;
 use crate::enums::{VfsFileType, VfsType};
+use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
 use crate::file_resolver::open_vfs_file_resolver;
 use crate::file_system::VfsFileSystem;
@@ -83,6 +85,7 @@ impl VfsScanner {
 
     /// Builds the scanner.
     pub fn build(&mut self) -> Result<(), BuildError> {
+        self.storage_media_image_scanner.add_ewf_signatures();
         self.storage_media_image_scanner.add_qcow_signatures();
         self.storage_media_image_scanner
             .add_sparseimage_signatures();
@@ -183,7 +186,10 @@ impl VfsScanner {
             VfsType::Apm { .. } | VfsType::Gpt { .. } | VfsType::Mbr { .. } => {
                 self.scan_for_file_system_format(&data_stream)
             }
-            VfsType::Qcow { .. } | VfsType::Vhd { .. } | VfsType::Vhdx { .. } => {
+            VfsType::Ewf { .. }
+            | VfsType::Qcow { .. }
+            | VfsType::Vhd { .. }
+            | VfsType::Vhdx { .. } => {
                 let mut result: Option<VfsType> =
                     self.scan_for_volume_system_format(&data_stream)?;
 
@@ -255,6 +261,7 @@ impl VfsScanner {
         }
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
+                FormatIdentifier::Ewf => Ok(Some(VfsType::Ewf)),
                 FormatIdentifier::Qcow => Ok(Some(VfsType::Qcow)),
                 FormatIdentifier::SparseImage => Ok(Some(VfsType::SparseImage)),
                 FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
@@ -336,6 +343,22 @@ impl VfsScanner {
                 )?;
             }
             VfsType::Ext { .. } => {}
+            VfsType::Ewf { .. } => {
+                let mut ewf_image: EwfImage = EwfImage::new();
+
+                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
+                let file_resolver: FileResolverReference =
+                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
+
+                ewf_image.open(&file_resolver, vfs_path.get_file_name())?;
+
+                self.scan_for_storage_media_image_sub_nodes(
+                    vfs_location,
+                    scan_node,
+                    EwfFileSystem::PATH_PREFIX,
+                    1,
+                )?;
+            }
             VfsType::Gpt { .. } => {
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
@@ -746,6 +769,23 @@ mod tests {
             .unwrap();
 
         assert!(vfs_type == VfsType::Ext);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_storage_media_image_format_with_ewf() -> io::Result<()> {
+        let mut format_scanner: VfsScanner = VfsScanner::new();
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+        }
+        let data_stream: DataStreamReference = get_data_stream("../test_data/ewf/ext2.E01")?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
+            .unwrap();
+
+        assert!(vfs_type == VfsType::Ewf);
 
         Ok(())
     }
