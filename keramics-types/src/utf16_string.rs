@@ -34,7 +34,7 @@ impl Utf16String {
         let mut elements: Vec<u16> = Vec::new();
 
         for data_offset in (0..data_size).step_by(2) {
-            let value_16bit = bytes_to_u16_be!(data, data_offset);
+            let value_16bit: u16 = bytes_to_u16_be!(data, data_offset);
             if value_16bit == 0 {
                 break;
             }
@@ -49,7 +49,7 @@ impl Utf16String {
         let mut elements: Vec<u16> = Vec::new();
 
         for data_offset in (0..data_size).step_by(2) {
-            let value_16bit = bytes_to_u16_le!(data, data_offset);
+            let value_16bit: u16 = bytes_to_u16_le!(data, data_offset);
             if value_16bit == 0 {
                 break;
             }
@@ -58,7 +58,7 @@ impl Utf16String {
         Self { elements: elements }
     }
 
-    /// Retrieves the string representation of an UTF-16 string.
+    /// Converts the UTF-16 string to a `String`.
     pub fn to_string(&self) -> String {
         String::from_utf16(&self.elements).unwrap()
     }

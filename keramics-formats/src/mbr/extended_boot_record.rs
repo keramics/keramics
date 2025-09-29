@@ -24,7 +24,7 @@ use super::partition_entry::MbrPartitionEntry;
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "unknown1", data_type = "[u8; 446]"),
+        field(name = "unknown1", data_type = "[u8; 446]", format = "hex"),
         field(
             name = "partition_entries",
             data_type = "[Struct<MbrPartitionEntry; 16>; 4]"

@@ -127,24 +127,22 @@ impl HuffmanTree {
         for symbol in 0..number_of_code_sizes {
             let code_size: usize = code_sizes[symbol] as usize;
 
-            if code_size == 0 {
-                continue;
+            if code_size > 0 {
+                let code_offset: isize = symbol_offsets[code_size];
+
+                if code_offset < 0 || code_offset > number_of_code_sizes as isize {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        format!(
+                            "Invalid symbol: {} code offset: {} value out bounds",
+                            symbol, code_offset
+                        ),
+                    ));
+                }
+                symbol_offsets[code_size] += 1;
+
+                self.symbols[code_offset as usize] = symbol as u16;
             }
-            let code_offset: isize = symbol_offsets[code_size];
-
-            if code_offset < 0 || code_offset > number_of_code_sizes as isize {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Invalid symbol: {} code offset: {} value out bounds",
-                        symbol, code_offset
-                    ),
-                ));
-            }
-            symbol_offsets[code_size] += 1;
-
-            self.symbols[code_offset as usize] = symbol as u16;
-
             if self.mediator.debug_output {
                 self.mediator.debug_print(format!(
                     "    symbol: {}, code_size: {},\n",
@@ -164,7 +162,7 @@ impl HuffmanTree {
         let mut huffman_code: isize = 0;
         let mut first_index: isize = 0;
 
-        for bit_index in 1..self.largest_code_size {
+        for bit_index in 1..self.maximum_code_size {
             huffman_code = (huffman_code << 1) | (bitstream.get_value(1) as isize);
 
             let code_size_count: isize = self.code_size_counts[bit_index];

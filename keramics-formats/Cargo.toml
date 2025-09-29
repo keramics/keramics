@@ -20,8 +20,8 @@ keramics-encodings = { version = "0", path = "../keramics-encodings" }
 keramics-sigscan = { version = "0", path = "../keramics-sigscan" }
 keramics-types = { version = "0", path = "../keramics-types" }
 layout-map = { version = "0", path = "../layout-map" }
-pest = { version = "2.7.14" }
-pest_derive = { version = "2.7.14" }
+pest = { version = "2.8.2" }
+pest_derive = { version = "2.8.2" }
 
 [dev-dependencies]
 keramics-hashes = { version = "0", path = "../keramics-hashes" }

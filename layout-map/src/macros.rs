@@ -355,7 +355,7 @@ fn parse_structure_layout_bitfield(
             name
         )));
     }
-    let (data_type, number_of_elements): (DataType, usize) = match field_options.parse_data_type() {
+    let (_, number_of_elements): (DataType, usize) = match field_options.parse_data_type() {
         Ok(value) => value,
         Err(error) => {
             return Err(ParseError::new(format!(

@@ -49,13 +49,13 @@ struct CommandLineArguments {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    /// Shows the information about a specific entry
+    /// Show the information about a specific entry
     Entry(EntryCommandArguments),
 
-    /// Shows the in-format hierarchy
+    /// Show the in-format hierarchy
     Hierarchy(HierarchyCommandArguments),
 
-    /// Shows the information about a specific path
+    /// Show the information about a specific path
     Path(PathCommandArguments),
 }
 

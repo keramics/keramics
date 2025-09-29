@@ -11,21 +11,8 @@
  * under the License.
  */
 
-mod data_stream;
-mod enums;
-mod fake_data_stream;
-mod fake_file_resolver;
-mod file_resolver;
-pub mod formatters;
-pub mod macros;
-pub mod mediator;
-mod os_data_stream;
-mod os_file_resolver;
-
-pub use data_stream::{DataStream, DataStreamReference};
-pub use enums::ByteOrder;
-pub use fake_data_stream::{FakeDataStream, open_fake_data_stream};
-pub use fake_file_resolver::FakeFileResolver;
-pub use file_resolver::{FileResolver, FileResolverReference};
-pub use os_data_stream::open_os_data_stream;
-pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
+/// Byte order.
+pub enum ByteOrder {
+    BigEndian,
+    LittleEndian,
+}

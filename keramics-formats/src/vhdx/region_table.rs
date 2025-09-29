@@ -65,7 +65,7 @@ impl VhdxRegionTable {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} VHDX region table checksums",
                     region_table_header.checksum, calculated_checksum
                 ),
             ));

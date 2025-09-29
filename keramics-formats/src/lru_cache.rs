@@ -62,6 +62,14 @@ impl<K: Hash + Eq + Copy, V> LruCache<K, V> {
         }
     }
 
+    /// Retrieves a specific mutable value from the cache.
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        match self.values.get_mut(key) {
+            Some(entry) => Some(&mut (*entry).value),
+            None => None,
+        }
+    }
+
     /// Inserts a specific value into the cache.
     pub fn insert(&mut self, key: K, value: V) {
         if self.usage.len() == self.number_of_entries {
@@ -98,6 +106,19 @@ mod tests {
         assert_eq!(result.unwrap().as_str(), "test1");
 
         let result: Option<&String> = lru_cache.get(&99);
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_mut() {
+        let mut lru_cache: LruCache<usize, String> = LruCache::new(2);
+        lru_cache.insert(1, "test1".to_string());
+
+        let result: Option<&mut String> = lru_cache.get_mut(&1);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().as_str(), "test1");
+
+        let result: Option<&mut String> = lru_cache.get_mut(&99);
         assert!(result.is_none());
     }
 
