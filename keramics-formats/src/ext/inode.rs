@@ -16,8 +16,8 @@ use std::io;
 
 use keramics_core::DataStreamReference;
 use keramics_datetime::{DateTime, PosixTime32, PosixTime64Ns};
+use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le};
-use layout_map::LayoutMap;
 
 use super::attribute::ExtAttribute;
 use super::attributes_block::ExtAttributesBlock;

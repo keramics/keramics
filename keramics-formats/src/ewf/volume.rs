@@ -14,8 +14,8 @@
 use std::io;
 
 use keramics_checksums::Adler32Context;
+use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_le};
-use layout_map::LayoutMap;
 
 #[derive(LayoutMap)]
 #[layout_map(

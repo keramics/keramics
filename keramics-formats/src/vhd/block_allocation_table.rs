@@ -15,8 +15,8 @@ use std::io;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_be;
-use layout_map::LayoutMap;
 
 #[derive(LayoutMap)]
 #[layout_map(

@@ -14,8 +14,8 @@
 use std::collections::VecDeque;
 use std::io;
 
+use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
-use layout_map::LayoutMap;
 
 use super::constants::*;
 use super::partition_entry::MbrPartitionEntry;

@@ -13,8 +13,8 @@
 
 use std::io;
 
+use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
-use layout_map::LayoutMap;
 
 #[derive(Debug, LayoutMap)]
 #[layout_map(

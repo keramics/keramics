@@ -19,8 +19,8 @@ use std::cmp;
 use std::io;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
-use layout_map::LayoutMap;
 
 use super::lzvn::LzvnContext;
 use super::traits::Bitstream;

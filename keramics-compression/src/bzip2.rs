@@ -21,7 +21,7 @@ use std::io;
 use keramics_checksums::Crc32Context;
 use keramics_core::formatters::debug_format_array;
 use keramics_core::mediator::{Mediator, MediatorReference};
-use layout_map::LayoutMap;
+use keramics_layout_map::LayoutMap;
 
 use super::huffman::HuffmanTree;
 use super::traits::Bitstream;

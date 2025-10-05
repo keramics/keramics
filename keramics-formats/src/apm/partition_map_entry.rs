@@ -13,8 +13,8 @@
 
 use std::io;
 
+use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u32_be};
-use layout_map::LayoutMap;
 
 use super::constants::*;
 

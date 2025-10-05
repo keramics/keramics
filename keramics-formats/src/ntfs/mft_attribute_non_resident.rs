@@ -13,8 +13,8 @@
 
 use std::io;
 
+use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u64_le};
-use layout_map::LayoutMap;
 
 // TODO: add value_condition for compressed_data_size
 #[derive(LayoutMap)]

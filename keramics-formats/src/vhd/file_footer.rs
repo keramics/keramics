@@ -13,8 +13,8 @@
 
 use std::io;
 
+use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_be, bytes_to_u64_be};
-use layout_map::LayoutMap;
 
 use super::constants::*;
 
