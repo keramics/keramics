@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::Mediator;
@@ -96,7 +97,7 @@ impl VhdSectorBitmap {
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,
-        position: io::SeekFrom,
+        position: SeekFrom,
     ) -> io::Result<()> {
         let mut data: Vec<u8> = vec![0; self.size];
 
@@ -139,7 +140,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = VhdSectorBitmap::new(32, 512);
-        test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.ranges.len(), 4);
         assert_eq!(test_struct.ranges[2].size, 32768);

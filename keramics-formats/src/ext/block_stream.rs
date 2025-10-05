@@ -12,7 +12,7 @@
  */
 
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference};
 
@@ -116,7 +116,7 @@ impl ExtBlockStream {
                                 block_range.physical_block_number * (self.block_size as u64);
                             data_stream.read_at_position(
                                 &mut data[data_offset..data_end_offset],
-                                io::SeekFrom::Start(range_physical_offset + range_relative_offset),
+                                SeekFrom::Start(range_physical_offset + range_relative_offset),
                             )?
                         }
                         Err(error) => return Err(keramics_core::error_to_io_error!(error)),
@@ -144,8 +144,13 @@ impl ExtBlockStream {
     }
 }
 
-impl Read for ExtBlockStream {
-    /// Reads data.
+impl DataStream for ExtBlockStream {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.current_offset >= self.size {
             return Ok(0);
@@ -162,33 +167,29 @@ impl Read for ExtBlockStream {
 
         Ok(read_count)
     }
-}
 
-impl Seek for ExtBlockStream {
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.current_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
     }
 }
 
-impl DataStream for ExtBlockStream {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.size)
-    }
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-// TODO: add tests
+    // TODO: add tests
+}

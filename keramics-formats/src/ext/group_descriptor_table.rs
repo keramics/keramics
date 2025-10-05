@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::DataStreamReference;
@@ -134,7 +135,7 @@ impl ExtGroupDescriptorTable {
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,
-        position: io::SeekFrom,
+        position: SeekFrom,
     ) -> io::Result<()> {
         let data_size: usize =
             (self.number_of_group_descriptors as usize) * self.group_descriptor_size;

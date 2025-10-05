@@ -12,10 +12,9 @@
  */
 
 use std::io;
-use std::io::Read;
 
 use keramics_core::formatters::format_as_string;
-use keramics_core::{FileResolverReference, open_os_file_resolver};
+use keramics_core::{DataStream, FileResolverReference, open_os_file_resolver};
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_hashes::{DigestHashContext, Md5Context};
 

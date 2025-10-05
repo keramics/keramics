@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 
@@ -118,7 +119,7 @@ impl MbrVolumeSystem {
     fn read_master_boot_record(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         let mut master_boot_record = MbrMasterBootRecord::new();
 
-        master_boot_record.read_at_position(data_stream, io::SeekFrom::Start(0))?;
+        master_boot_record.read_at_position(data_stream, SeekFrom::Start(0))?;
         if self.bytes_per_sector == 0 {
             for partition_entry in master_boot_record.partition_entries.iter() {
                 if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
@@ -131,7 +132,7 @@ impl MbrVolumeSystem {
                         match data_stream.write() {
                             Ok(mut data_stream) => data_stream.read_at_position(
                                 &mut boot_signature,
-                                io::SeekFrom::Start(offset + 510),
+                                SeekFrom::Start(offset + 510),
                             )?,
                             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
                         };
@@ -219,7 +220,7 @@ impl MbrVolumeSystem {
             ));
         }
         let mut extended_boot_record = MbrExtendedBootRecord::new();
-        extended_boot_record.read_at_position(data_stream, io::SeekFrom::Start(offset))?;
+        extended_boot_record.read_at_position(data_stream, SeekFrom::Start(offset))?;
 
         let mut entry_index: usize = 0;
         let mut extended_boot_record_offset: u64 = 0;

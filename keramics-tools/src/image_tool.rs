@@ -24,7 +24,8 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
 use keramics_core::{
-    DataStreamReference, FileResolverReference, open_os_data_stream, open_os_file_resolver,
+    DataStream, DataStreamReference, FileResolverReference, open_os_data_stream,
+    open_os_file_resolver,
 };
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};

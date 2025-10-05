@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -259,7 +259,7 @@ impl EwfImage {
 
                         segment_file.read_exact_at_position(
                             &mut compressed_data,
-                            io::SeekFrom::Start(block_range.data_offset),
+                            SeekFrom::Start(block_range.data_offset),
                         )?;
                         if self.mediator.debug_output {
                             self.mediator.debug_print(format!(
@@ -295,7 +295,7 @@ impl EwfImage {
                 EwfBlockRangeType::InFile => {
                     segment_file.read_exact_at_position(
                         &mut data[data_offset..data_end_offset],
-                        io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                        SeekFrom::Start(block_range.data_offset + range_relative_offset),
                     )?;
                     // TODO: calculate and compare checksum
 
@@ -329,7 +329,7 @@ impl EwfImage {
                 &EWF_SECTION_TYPE_DATA => {
                     let mut volume: EwfE01Volume = EwfE01Volume::new();
 
-                    volume.read_at_position(&data_stream, io::SeekFrom::Start(file_offset + 76))?;
+                    volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
 
                     if self.set_identifier != volume.set_identifier {
                         return Err(io::Error::new(
@@ -345,7 +345,7 @@ impl EwfImage {
                 &EWF_SECTION_TYPE_DIGEST => {
                     let mut digest: EwfDigest = EwfDigest::new();
 
-                    digest.read_at_position(&data_stream, io::SeekFrom::Start(file_offset + 76))?;
+                    digest.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
 
                     self.md5_hash.copy_from_slice(&digest.md5_hash);
                     self.sha1_hash.copy_from_slice(&digest.sha1_hash);
@@ -368,14 +368,14 @@ impl EwfImage {
                     error2.read_at_position(
                         &data_stream,
                         section_header.size - 76,
-                        io::SeekFrom::Start(file_offset + 76),
+                        SeekFrom::Start(file_offset + 76),
                     )?;
                     // TODO: store entries
                 }
                 &EWF_SECTION_TYPE_HASH => {
                     let mut hash: EwfHash = EwfHash::new();
 
-                    hash.read_at_position(&data_stream, io::SeekFrom::Start(file_offset + 76))?;
+                    hash.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
 
                     self.md5_hash.copy_from_slice(&hash.md5_hash);
                 }
@@ -393,7 +393,7 @@ impl EwfImage {
                     header.read_at_position(
                         &data_stream,
                         section_header.size - 76,
-                        io::SeekFrom::Start(file_offset + 76),
+                        SeekFrom::Start(file_offset + 76),
                         &mut self.header_values,
                     )?;
                 }
@@ -411,7 +411,7 @@ impl EwfImage {
                     header2.read_at_position(
                         &data_stream,
                         section_header.size - 76,
-                        io::SeekFrom::Start(file_offset + 76),
+                        SeekFrom::Start(file_offset + 76),
                         &mut self.header_values,
                     )?;
                 }
@@ -440,7 +440,7 @@ impl EwfImage {
                     table2.read_at_position(
                         &data_stream,
                         section_header.size - 76,
-                        io::SeekFrom::Start(file_offset + 76),
+                        SeekFrom::Start(file_offset + 76),
                     )?;
                     // TODO: compare with table
                 }
@@ -548,7 +548,7 @@ impl EwfImage {
         table.read_at_position(
             &data_stream,
             section_header.size - 76,
-            io::SeekFrom::Start(file_offset + 76),
+            SeekFrom::Start(file_offset + 76),
         )?;
         let number_of_entries: usize = table.entries.len();
 
@@ -717,7 +717,7 @@ impl EwfImage {
             170 => {
                 let mut volume: EwfS01Volume = EwfS01Volume::new();
 
-                volume.read_at_position(&data_stream, io::SeekFrom::Start(file_offset + 76))?;
+                volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
                 self.number_of_chunks = volume.number_of_chunks;
                 self.sectors_per_chunk = volume.sectors_per_chunk;
                 self.bytes_per_sector = volume.bytes_per_sector;
@@ -726,7 +726,7 @@ impl EwfImage {
             1128 => {
                 let mut volume: EwfE01Volume = EwfE01Volume::new();
 
-                volume.read_at_position(&data_stream, io::SeekFrom::Start(file_offset + 76))?;
+                volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
 
                 self.media_type = match volume.media_type {
                     0x00 => EwfMediaType::RemoveableDisk,
@@ -768,8 +768,13 @@ impl EwfImage {
     }
 }
 
-impl Read for EwfImage {
-    /// Reads media data.
+impl DataStream for EwfImage {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.media_offset >= self.media_size {
             return Ok(0);
@@ -786,32 +791,23 @@ impl Read for EwfImage {
 
         Ok(read_count)
     }
-}
 
-impl Seek for EwfImage {
-    /// Sets the current position of the media data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    /// Sets the current position of the data.
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.media_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.media_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.media_size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.media_offset)
-    }
-}
-
-impl DataStream for EwfImage {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.media_size)
     }
 }
 
@@ -904,7 +900,7 @@ mod tests {
     fn test_seek_from_start() -> io::Result<()> {
         let mut image: EwfImage = get_image()?;
 
-        let offset: u64 = image.seek(io::SeekFrom::Start(1024))?;
+        let offset: u64 = image.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
         Ok(())
@@ -914,7 +910,7 @@ mod tests {
     fn test_seek_from_end() -> io::Result<()> {
         let mut image: EwfImage = get_image()?;
 
-        let offset: u64 = image.seek(io::SeekFrom::End(-512))?;
+        let offset: u64 = image.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, image.media_size - 512);
 
         Ok(())
@@ -924,10 +920,10 @@ mod tests {
     fn test_seek_from_current() -> io::Result<()> {
         let mut image: EwfImage = get_image()?;
 
-        let offset = image.seek(io::SeekFrom::Start(1024))?;
+        let offset = image.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
-        let offset: u64 = image.seek(io::SeekFrom::Current(-512))?;
+        let offset: u64 = image.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
 
         Ok(())
@@ -937,7 +933,7 @@ mod tests {
     fn test_seek_beyond_media_size() -> io::Result<()> {
         let mut image: EwfImage = get_image()?;
 
-        let offset: u64 = image.seek(io::SeekFrom::End(512))?;
+        let offset: u64 = image.seek(SeekFrom::End(512))?;
         assert_eq!(offset, image.media_size + 512);
 
         Ok(())
@@ -946,7 +942,7 @@ mod tests {
     #[test]
     fn test_seek_and_read() -> io::Result<()> {
         let mut image: EwfImage = get_image()?;
-        image.seek(io::SeekFrom::Start(1024))?;
+        image.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = image.read(&mut data)?;
@@ -999,7 +995,7 @@ mod tests {
     #[test]
     fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
         let mut image: EwfImage = get_image()?;
-        image.seek(io::SeekFrom::End(512))?;
+        image.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = image.read(&mut data)?;

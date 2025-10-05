@@ -81,6 +81,8 @@ impl EwfDigest {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
+
     use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
@@ -141,7 +143,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = EwfDigest::new();
-        test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         let expected_md5_hash: [u8; 16] = [
             0x03, 0xc9, 0xd5, 0x33, 0x9a, 0xbf, 0x1e, 0xbd, 0xc1, 0x44, 0xb9, 0xed, 0x3d, 0x7e,

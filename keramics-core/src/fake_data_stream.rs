@@ -12,7 +12,7 @@
  */
 
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};
@@ -40,8 +40,13 @@ impl FakeDataStream {
     }
 }
 
-impl Read for FakeDataStream {
-    /// Reads data.
+impl DataStream for FakeDataStream {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.current_offset >= self.size {
             return Ok(0);
@@ -61,32 +66,23 @@ impl Read for FakeDataStream {
 
         Ok(read_size)
     }
-}
 
-impl Seek for FakeDataStream {
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.current_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
-    }
-}
-
-impl DataStream for FakeDataStream {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.size)
     }
 }
 

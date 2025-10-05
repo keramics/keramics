@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_checksums::Adler32Context;
 use keramics_core::DataStreamReference;
@@ -101,7 +102,7 @@ impl EwfError2 {
         &mut self,
         data_stream: &DataStreamReference,
         data_size: u64,
-        position: io::SeekFrom,
+        position: SeekFrom,
     ) -> io::Result<()> {
         // Note that 16777216 is an arbitrary chosen limit.
         if data_size < 28 || data_size > 16777216 {
@@ -209,7 +210,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = EwfError2::new();
-        test_struct.read_at_position(&data_stream, 548, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, 548, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.entries.len(), 3);
 

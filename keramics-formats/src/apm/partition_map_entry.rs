@@ -97,6 +97,8 @@ impl ApmPartitionMapEntry {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
+
     use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
@@ -168,7 +170,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = ApmPartitionMapEntry::new();
-        test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.status_flags, 0x0000007f);
 

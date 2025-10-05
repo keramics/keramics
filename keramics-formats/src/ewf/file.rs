@@ -79,14 +79,14 @@ impl EwfFile {
         };
         let mut file_header: EwfFileHeader = EwfFileHeader::new();
 
-        file_header.read_at_position(data_stream, io::SeekFrom::Start(0))?;
+        file_header.read_at_position(data_stream, SeekFrom::Start(0))?;
 
         let mut file_offset: u64 = 13;
 
         while file_offset < file_size {
             let mut section_header: EwfSectionHeader = EwfSectionHeader::new();
 
-            section_header.read_at_position(data_stream, io::SeekFrom::Start(file_offset))?;
+            section_header.read_at_position(data_stream, SeekFrom::Start(file_offset))?;
 
             let mut is_last_section: bool = false;
             let mut section_size: u64 = section_header.size;

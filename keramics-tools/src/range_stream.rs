@@ -13,7 +13,7 @@
 
 use std::fs::{File, Metadata};
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 
 use keramics_core::DataStream;
 
@@ -55,10 +55,15 @@ impl FileRangeDataStream {
     }
 }
 
-impl Read for FileRangeDataStream {
-    /// Reads data.
+impl DataStream for FileRangeDataStream {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.range_size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        let mut file: &File = match self.file.as_mut() {
+        let file: &mut File = match self.file.as_mut() {
             Some(file) => file,
             None => return Err(io::Error::new(io::ErrorKind::InvalidInput, "Missing file")),
         };
@@ -71,7 +76,7 @@ impl Read for FileRangeDataStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        file.seek(io::SeekFrom::Start(self.range_offset + self.current_offset))?;
+        file.seek(SeekFrom::Start(self.range_offset + self.current_offset))?;
 
         let read_count: usize = file.read(&mut buf[0..read_size])?;
 
@@ -79,32 +84,23 @@ impl Read for FileRangeDataStream {
 
         Ok(read_count)
     }
-}
 
-impl Seek for FileRangeDataStream {
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.current_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.range_size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
-    }
-}
-
-impl DataStream for FileRangeDataStream {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.range_size)
     }
 }
 

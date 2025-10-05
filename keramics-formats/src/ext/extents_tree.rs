@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -119,7 +120,7 @@ impl ExtExtentsTree {
 
                 self.read_node_at_position(
                     data_stream,
-                    io::SeekFrom::Start(sub_node_offset),
+                    SeekFrom::Start(sub_node_offset),
                     logical_block_number,
                     block_ranges,
                     extents_header.depth,
@@ -193,7 +194,7 @@ impl ExtExtentsTree {
     fn read_node_at_position(
         &mut self,
         data_stream: &DataStreamReference,
-        position: io::SeekFrom,
+        position: SeekFrom,
         logical_block_number: &mut u64,
         block_ranges: &mut Vec<ExtBlockRange>,
         parent_depth: u16,

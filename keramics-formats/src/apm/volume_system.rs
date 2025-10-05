@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 
@@ -105,7 +106,7 @@ impl ApmVolumeSystem {
             let mut partition_map_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
 
             partition_map_entry
-                .read_at_position(data_stream, io::SeekFrom::Start(partition_map_entry_offset))?;
+                .read_at_position(data_stream, SeekFrom::Start(partition_map_entry_offset))?;
             if partition_map_entry_index == 0 {
                 if partition_map_entry.type_identifier.elements != APM_PARTITION_MAP_TYPE {
                     return Err(io::Error::new(

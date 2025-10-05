@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -183,7 +184,7 @@ impl NtfsMftEntry {
         &mut self,
         data_stream: &DataStreamReference,
         data_size: u32,
-        position: io::SeekFrom,
+        position: SeekFrom,
     ) -> io::Result<()> {
         // Note that 42 is the minimum MFT entry size and 65535 is chosen given the fix-up values
         // and attributes offsets of the MFT entry are 16-bit.
@@ -371,7 +372,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = NtfsMftEntry::new();
-        test_struct.read_at_position(&data_stream, test_data_size, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, test_data_size, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.sequence_number, 1);
         assert_eq!(test_struct.base_record_file_reference, 0);

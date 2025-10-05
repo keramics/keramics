@@ -170,7 +170,7 @@ impl OsFileEntry {
 
     /// Opens the file entry.
     #[cfg(windows)]
-    pub(crate) fn open(&mut self, path: &str) -> io::Result<()> {
+    pub(crate) fn open(&mut self, path: &OsStr) -> io::Result<()> {
         // TODO: add Windows support.
         todo!();
     }
@@ -234,9 +234,9 @@ mod tests {
                 ));
             }
         };
-        let mut test_data: Vec<u8> = vec![];
+        let mut test_data: Vec<u8> = vec![0; 202];
         let read_count: usize = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_to_end(&mut test_data)?,
+            Ok(mut data_stream) => data_stream.read(&mut test_data)?,
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         };
         assert_eq!(read_count, 202);

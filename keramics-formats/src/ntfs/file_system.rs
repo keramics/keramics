@@ -13,6 +13,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::io::SeekFrom;
 use std::rc::Rc;
 
 use keramics_core::{DataStream, DataStreamReference};
@@ -175,7 +176,7 @@ impl NtfsFileSystem {
     /// Reads the boot record, master file table and security descriptors.
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         let mut boot_record: NtfsBootRecord = NtfsBootRecord::new();
-        boot_record.read_at_position(data_stream, io::SeekFrom::Start(0))?;
+        boot_record.read_at_position(data_stream, SeekFrom::Start(0))?;
 
         self.bytes_per_sector = boot_record.bytes_per_sector;
         self.cluster_block_size = boot_record.cluster_block_size;
@@ -247,7 +248,7 @@ impl NtfsFileSystem {
 
         let mut data: Vec<u8> = vec![0; 131072];
 
-        block_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(0))?;
+        block_stream.read_exact_at_position(&mut data, SeekFrom::Start(0))?;
 
         match Rc::get_mut(&mut self.case_folding_mappings) {
             Some(case_folding_mappings) => {

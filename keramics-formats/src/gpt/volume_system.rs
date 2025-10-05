@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::DataStreamReference;
@@ -116,14 +117,12 @@ impl GptVolumeSystem {
         let mut partition_table_header = GptPartitionTableHeader::new();
 
         if self.bytes_per_sector != 0 {
-            partition_table_header.read_at_position(
-                data_stream,
-                io::SeekFrom::Start(self.bytes_per_sector as u64),
-            )?;
+            partition_table_header
+                .read_at_position(data_stream, SeekFrom::Start(self.bytes_per_sector as u64))?;
         } else {
             for bytes_per_sector in SUPPORTED_BYTES_PER_SECTOR.iter() {
                 match partition_table_header
-                    .read_at_position(data_stream, io::SeekFrom::Start(*bytes_per_sector as u64))
+                    .read_at_position(data_stream, SeekFrom::Start(*bytes_per_sector as u64))
                 {
                     Ok(_) => self.bytes_per_sector = *bytes_per_sector,
                     Err(_) => {}
@@ -145,10 +144,9 @@ impl GptVolumeSystem {
         let mut backup_partition_table_header = GptPartitionTableHeader::new();
 
         if backup_partition_table_offset > 0 {
-            match backup_partition_table_header.read_at_position(
-                data_stream,
-                io::SeekFrom::Start(backup_partition_table_offset),
-            ) {
+            match backup_partition_table_header
+                .read_at_position(data_stream, SeekFrom::Start(backup_partition_table_offset))
+            {
                 Ok(_) => {}
                 Err(_) => {
                     if self.mediator.debug_output {
@@ -158,7 +156,7 @@ impl GptVolumeSystem {
                     }
                     backup_partition_table_header.read_at_position(
                         data_stream,
-                        io::SeekFrom::End(-(self.bytes_per_sector as i64)),
+                        SeekFrom::End(-(self.bytes_per_sector as i64)),
                     )?;
                 }
             };
@@ -193,7 +191,7 @@ impl GptVolumeSystem {
             partition_table_header.entries_start_block_number * self.bytes_per_sector as u64;
 
         match data_stream.write() {
-            Ok(mut data_stream) => data_stream.seek(io::SeekFrom::Start(entries_start_offset))?,
+            Ok(mut data_stream) => data_stream.seek(SeekFrom::Start(entries_start_offset))?,
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         };
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);

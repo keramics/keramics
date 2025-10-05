@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::Mediator;
@@ -92,7 +93,7 @@ impl QcowClusterTable {
 
         match data_stream.write() {
             Ok(mut data_stream) => {
-                data_stream.read_exact_at_position(&mut data, io::SeekFrom::Start(entry_offset))?
+                data_stream.read_exact_at_position(&mut data, SeekFrom::Start(entry_offset))?
             }
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         };

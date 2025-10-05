@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::DataStreamReference;
@@ -124,8 +125,9 @@ impl ExtInodeTable {
         let mut data: Vec<u8> = vec![0; inode_size];
 
         match data_stream.write() {
-            Ok(mut data_stream) => data_stream
-                .read_exact_at_position(&mut data, io::SeekFrom::Start(inode_data_offset))?,
+            Ok(mut data_stream) => {
+                data_stream.read_exact_at_position(&mut data, SeekFrom::Start(inode_data_offset))?
+            }
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         };
         if self.mediator.debug_output {

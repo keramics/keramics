@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 
@@ -84,7 +85,7 @@ impl NtfsIndex {
         index_entry.read_at_position(
             data_stream,
             self.index_entry_size,
-            io::SeekFrom::Start(index_entry_offset),
+            SeekFrom::Start(index_entry_offset),
         )?;
         Ok(index_entry)
     }

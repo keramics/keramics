@@ -12,6 +12,7 @@
  */
 
 use std::io;
+use std::io::SeekFrom;
 use std::rc::Rc;
 
 use keramics_checksums::ReversedCrc32Context;
@@ -221,8 +222,7 @@ impl ExtFileSystem {
                 }
                 if block_group_number == 0 {
                     let mut superblock: ExtSuperblock = ExtSuperblock::new();
-                    superblock
-                        .read_at_position(data_stream, io::SeekFrom::Start(superblock_offset))?;
+                    superblock.read_at_position(data_stream, SeekFrom::Start(superblock_offset))?;
 
                     self.features.initialize(&superblock);
 
@@ -267,7 +267,7 @@ impl ExtFileSystem {
                     let mut superblock: ExtSuperblock = ExtSuperblock::new();
 
                     match superblock
-                        .read_at_position(data_stream, io::SeekFrom::Start(superblock_offset))
+                        .read_at_position(data_stream, SeekFrom::Start(superblock_offset))
                     {
                         Ok(_) => {
                             // TODO: compare superblock
@@ -331,7 +331,7 @@ impl ExtFileSystem {
                     number_of_group_descriptors,
                 );
                 group_descriptor_table
-                    .read_at_position(data_stream, io::SeekFrom::Start(group_descriptor_offset))?;
+                    .read_at_position(data_stream, SeekFrom::Start(group_descriptor_offset))?;
                 if !self.features.has_meta_block_groups()
                     || block_group_number < meta_group_start_block_number
                 {
