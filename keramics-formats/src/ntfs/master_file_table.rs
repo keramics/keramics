@@ -13,6 +13,7 @@
 
 use std::collections::HashSet;
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 
@@ -140,7 +141,7 @@ impl NtfsMasterFileTable {
         mft_entry.read_at_position(
             data_stream,
             self.mft_entry_size,
-            io::SeekFrom::Start(mft_entry_offset),
+            SeekFrom::Start(mft_entry_offset),
         )?;
         Ok(mft_entry)
     }
@@ -156,7 +157,7 @@ impl NtfsMasterFileTable {
         let mut mft_entry: NtfsMftEntry = NtfsMftEntry::new();
         let mft_offset: u64 = mft_block_number * (cluster_block_size as u64);
 
-        mft_entry.read_at_position(data_stream, mft_entry_size, io::SeekFrom::Start(mft_offset))?;
+        mft_entry.read_at_position(data_stream, mft_entry_size, SeekFrom::Start(mft_offset))?;
         if mft_entry.is_bad {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

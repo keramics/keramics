@@ -12,10 +12,9 @@
  */
 
 use std::io;
-use std::io::Read;
 
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStreamReference, open_os_data_stream};
+use keramics_core::{DataStream, DataStreamReference, open_os_data_stream};
 use keramics_formats::qcow::QcowFile;
 use keramics_hashes::{DigestHashContext, Md5Context};
 

@@ -13,6 +13,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -211,7 +212,7 @@ impl EwfHeader2 {
         &mut self,
         data_stream: &DataStreamReference,
         data_size: u64,
-        position: io::SeekFrom,
+        position: SeekFrom,
         header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
     ) -> io::Result<()> {
         // Note that 16777216 is an arbitrary chosen limit.
@@ -288,12 +289,7 @@ mod tests {
 
         let mut test_struct = EwfHeader2::new();
         let mut header_values: HashMap<EwfHeaderValueType, EwfHeaderValue> = HashMap::new();
-        test_struct.read_at_position(
-            &data_stream,
-            197,
-            io::SeekFrom::Start(0),
-            &mut header_values,
-        )?;
+        test_struct.read_at_position(&data_stream, 197, SeekFrom::Start(0), &mut header_values)?;
 
         assert_eq!(header_values.len(), 11);
         Ok(())

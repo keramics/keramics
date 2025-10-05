@@ -14,11 +14,10 @@
 use std::cmp::max;
 use std::collections::BTreeMap;
 use std::io;
-use std::io::Read;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, FakeDataStream};
+use keramics_core::{DataStream, DataStreamReference, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_types::{ByteString, bytes_to_u16_le};
 

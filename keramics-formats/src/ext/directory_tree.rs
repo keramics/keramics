@@ -13,6 +13,7 @@
 
 use std::collections::BTreeMap;
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -54,11 +55,7 @@ impl ExtDirectoryTree {
                 block_range.physical_block_number * (self.block_size as u64);
 
             for _ in 0..block_range.number_of_blocks as usize {
-                self.read_node_at_position(
-                    data_stream,
-                    io::SeekFrom::Start(block_offset),
-                    entries,
-                )?;
+                self.read_node_at_position(data_stream, SeekFrom::Start(block_offset), entries)?;
                 block_offset += self.block_size as u64;
             }
         }
@@ -150,7 +147,7 @@ impl ExtDirectoryTree {
     fn read_node_at_position(
         &mut self,
         data_stream: &DataStreamReference,
-        position: io::SeekFrom,
+        position: SeekFrom,
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
     ) -> io::Result<()> {
         let mut data: Vec<u8> = vec![0; self.block_size as usize];
@@ -281,7 +278,7 @@ mod tests {
         let mut test_struct = ExtDirectoryTree::new(1024);
 
         let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
-        test_struct.read_node_at_position(&data_stream, io::SeekFrom::Start(0), &mut entries)?;
+        test_struct.read_node_at_position(&data_stream, SeekFrom::Start(0), &mut entries)?;
 
         assert_eq!(entries.len(), 4);
 

@@ -13,6 +13,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -162,7 +163,7 @@ impl VhdxParentLocator {
         &mut self,
         data_stream: &DataStreamReference,
         data_size: u32,
-        position: io::SeekFrom,
+        position: SeekFrom,
     ) -> io::Result<()> {
         // Note that 65536 is an arbitrary chosen limit.
         if data_size < 20 || data_size > 65536 {
@@ -285,7 +286,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = VhdxParentLocator::new();
-        test_struct.read_at_position(&data_stream, test_data_size, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, test_data_size, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.entries.len(), 5);
 

@@ -13,16 +13,27 @@
 
 use std::fs::{File, Metadata};
 use std::io;
+use std::io::{Read, Seek, SeekFrom};
 use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};
 
 impl DataStream for File {
-    /// Retrieves the size of the data stream.
+    /// Retrieves the size of the data.
     fn get_size(&mut self) -> io::Result<u64> {
         let metadata: Metadata = self.metadata()?;
 
         Ok(metadata.len())
+    }
+
+    /// Reads data at the current position.
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        Read::read(self, buf)
+    }
+
+    /// Sets the current position of the data.
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+        Seek::seek(self, pos)
     }
 }
 

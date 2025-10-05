@@ -13,7 +13,7 @@
 
 use std::cmp::min;
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_compression::Lznt1Context;
@@ -247,7 +247,7 @@ impl NtfsCompressedStream {
                             Some(data_stream) => match data_stream.write() {
                                 Ok(mut data_stream) => data_stream.read_exact_at_position(
                                     &mut compressed_data,
-                                    io::SeekFrom::Start(range_offset),
+                                    SeekFrom::Start(range_offset),
                                 )?,
                                 Err(error) => return Err(keramics_core::error_to_io_error!(error)),
                             },
@@ -293,7 +293,7 @@ impl NtfsCompressedStream {
                     Some(data_stream) => match data_stream.write() {
                         Ok(mut data_stream) => data_stream.read_at_position(
                             &mut data[data_offset..data_end_offset],
-                            io::SeekFrom::Start(range_offset + range_relative_offset),
+                            SeekFrom::Start(range_offset + range_relative_offset),
                         )?,
                         Err(error) => return Err(keramics_core::error_to_io_error!(error)),
                     },
@@ -315,8 +315,13 @@ impl NtfsCompressedStream {
     }
 }
 
-impl Read for NtfsCompressedStream {
-    /// Reads data.
+impl DataStream for NtfsCompressedStream {
+    /// Retrieves the size of the data stream.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.current_offset >= self.size {
             return Ok(0);
@@ -333,32 +338,23 @@ impl Read for NtfsCompressedStream {
 
         Ok(read_count)
     }
-}
 
-impl Seek for NtfsCompressedStream {
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.current_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
-    }
-}
-
-impl DataStream for NtfsCompressedStream {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.size)
     }
 }
 
@@ -1002,7 +998,7 @@ mod tests {
         let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::Start(1024))?;
+        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
         Ok(())
@@ -1020,7 +1016,7 @@ mod tests {
         let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::End(-512))?;
+        let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, 11358 - 512);
 
         Ok(())
@@ -1038,10 +1034,10 @@ mod tests {
         let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::Start(1024))?;
+        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::Current(-512))?;
+        let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
 
         Ok(())
@@ -1059,7 +1055,7 @@ mod tests {
         let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::End(512))?;
+        let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
         assert_eq!(offset, 11358 + 512);
 
         Ok(())
@@ -1077,14 +1073,14 @@ mod tests {
         let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        block_stream.seek(io::SeekFrom::Start(1024))?;
+        block_stream.seek(SeekFrom::Start(1024))?;
 
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = block_stream.read(&mut data)?;
+        let mut uncompressed_data: Vec<u8> = vec![0; 512];
+        let read_size: usize = block_stream.read(&mut uncompressed_data)?;
         assert_eq!(read_size, 512);
 
-        let expected_data: String = fs::read_to_string("../LICENSE")?;
-        assert_eq!(&data, expected_data[1024..1536].as_bytes());
+        let expected_data: Vec<u8> = fs::read("../LICENSE")?;
+        assert_eq!(&uncompressed_data, &expected_data[1024..1536]);
 
         Ok(())
     }
@@ -1101,7 +1097,7 @@ mod tests {
         let mut block_stream: NtfsCompressedStream = NtfsCompressedStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        block_stream.seek(io::SeekFrom::End(512))?;
+        block_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = block_stream.read(&mut data)?;

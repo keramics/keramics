@@ -12,7 +12,7 @@
  */
 
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference};
 use keramics_types::Uuid;
@@ -69,8 +69,13 @@ impl GptPartition {
     }
 }
 
-impl Read for GptPartition {
-    /// Reads data.
+impl DataStream for GptPartition {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
@@ -93,7 +98,7 @@ impl Read for GptPartition {
         let read_count: usize = match data_stream.write() {
             Ok(mut data_stream) => data_stream.read_at_position(
                 &mut buf[0..read_size],
-                io::SeekFrom::Start(self.offset + self.current_offset),
+                SeekFrom::Start(self.offset + self.current_offset),
             )?,
             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         };
@@ -101,32 +106,23 @@ impl Read for GptPartition {
 
         Ok(read_count)
     }
-}
 
-impl Seek for GptPartition {
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.current_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
-    }
-}
-
-impl DataStream for GptPartition {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.size)
     }
 }
 

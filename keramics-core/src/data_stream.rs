@@ -12,30 +12,56 @@
  */
 
 use std::io;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 pub type DataStreamReference = Arc<RwLock<dyn DataStream>>;
 
 /// Data stream trait.
-pub trait DataStream: Read + Seek {
-    /// Retrieves the size of the data stream.
+pub trait DataStream {
+    /// Retrieves the size of the data.
     fn get_size(&mut self) -> io::Result<u64>;
+
+    /// Reads data at the current position.
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
 
     /// Reads data at a specific position.
     #[inline(always)]
-    fn read_at_position(&mut self, data: &mut [u8], position: SeekFrom) -> io::Result<usize> {
+    fn read_at_position(&mut self, buf: &mut [u8], position: SeekFrom) -> io::Result<usize> {
         self.seek(position)?;
-        self.read(data)
+        self.read(buf)
+    }
+
+    /// Reads an exact amount of data at the current position.
+    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+        let read_size: usize = buf.len();
+        let read_count: usize = self.read(buf)?;
+
+        if read_count != read_size {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Unable to read the exact amount",
+            ));
+        }
+        Ok(())
     }
 
     /// Reads an exact amount of data at a specific position.
     #[inline(always)]
-    fn read_exact_at_position(&mut self, data: &mut [u8], position: SeekFrom) -> io::Result<u64> {
+    fn read_exact_at_position(&mut self, buf: &mut [u8], position: SeekFrom) -> io::Result<u64> {
         let offset: u64 = self.seek(position)?;
+        let read_size: usize = buf.len();
+        let read_count: usize = self.read(buf)?;
 
-        self.read_exact(data)?;
-
+        if read_count != read_size {
+            return Err(io::Error::new(
+                io::ErrorKind::UnexpectedEof,
+                "Unable to read the exact amount",
+            ));
+        }
         Ok(offset)
     }
+
+    /// Sets the current position of the data.
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
 }

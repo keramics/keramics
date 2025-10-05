@@ -13,7 +13,7 @@
 
 use std::cmp::min;
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference};
 
@@ -200,9 +200,7 @@ impl NtfsBlockStream {
                                     * (self.cluster_block_size as u64);
                                 data_stream.read_at_position(
                                     &mut data[data_offset..data_end_offset],
-                                    io::SeekFrom::Start(
-                                        range_physical_offset + range_relative_offset,
-                                    ),
+                                    SeekFrom::Start(range_physical_offset + range_relative_offset),
                                 )?
                             }
                             Err(error) => return Err(keramics_core::error_to_io_error!(error)),
@@ -231,8 +229,13 @@ impl NtfsBlockStream {
     }
 }
 
-impl Read for NtfsBlockStream {
-    /// Reads data.
+impl DataStream for NtfsBlockStream {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.current_offset >= self.size {
             return Ok(0);
@@ -249,32 +252,23 @@ impl Read for NtfsBlockStream {
 
         Ok(read_count)
     }
-}
 
-impl Seek for NtfsBlockStream {
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.current_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
-    }
-}
-
-impl DataStream for NtfsBlockStream {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.size)
     }
 }
 
@@ -323,7 +317,7 @@ mod tests {
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::Start(1024))?;
+        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
         Ok(())
@@ -340,7 +334,7 @@ mod tests {
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::End(-512))?;
+        let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, 11358 - 512);
 
         Ok(())
@@ -357,10 +351,10 @@ mod tests {
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::Start(1024))?;
+        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::Current(-512))?;
+        let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
 
         Ok(())
@@ -377,7 +371,7 @@ mod tests {
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        let offset: u64 = block_stream.seek(io::SeekFrom::End(512))?;
+        let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
         assert_eq!(offset, 11358 + 512);
 
         Ok(())
@@ -394,7 +388,7 @@ mod tests {
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        block_stream.seek(io::SeekFrom::Start(1024))?;
+        block_stream.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = block_stream.read(&mut data)?;
@@ -455,7 +449,7 @@ mod tests {
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(4096);
         block_stream.open(&data_stream, &data_attribute)?;
 
-        block_stream.seek(io::SeekFrom::End(512))?;
+        block_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = block_stream.read(&mut data)?;

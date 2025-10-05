@@ -12,7 +12,7 @@
  */
 
 use std::io;
-use std::io::{Read, Seek};
+use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference};
@@ -124,7 +124,7 @@ impl VhdFile {
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
         let mut file_footer: VhdFileFooter = VhdFileFooter::new();
 
-        file_footer.read_at_position(data_stream, io::SeekFrom::End(-512))?;
+        file_footer.read_at_position(data_stream, SeekFrom::End(-512))?;
 
         self.disk_type = match file_footer.disk_type {
             VHD_DISK_TYPE_FIXED => VhdDiskType::Fixed,
@@ -142,7 +142,7 @@ impl VhdFile {
             let mut dynamic_disk_header: VhdDynamicDiskHeader = VhdDynamicDiskHeader::new();
 
             dynamic_disk_header
-                .read_at_position(data_stream, io::SeekFrom::Start(file_footer.next_offset))?;
+                .read_at_position(data_stream, SeekFrom::Start(file_footer.next_offset))?;
             let block_size: u64 = dynamic_disk_header.block_size as u64;
             let block_tree_data_size: u64 =
                 (dynamic_disk_header.number_of_blocks as u64) * block_size;
@@ -244,7 +244,7 @@ impl VhdFile {
 
         let mut sector_bitmap: VhdSectorBitmap =
             VhdSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
-        sector_bitmap.read_at_position(data_stream, io::SeekFrom::Start(sector_bitmap_offset))?;
+        sector_bitmap.read_at_position(data_stream, SeekFrom::Start(sector_bitmap_offset))?;
 
         let mut range_media_offset: u64 = block_number * (self.block_size as u64);
         let mut range_data_offset: u64 = sector_bitmap_offset + (self.sector_bitmap_size as u64);
@@ -327,7 +327,7 @@ impl VhdFile {
                     Some(data_stream) => match data_stream.write() {
                         Ok(mut data_stream) => data_stream.read_at_position(
                             &mut data[data_offset..data_end_offset],
-                            io::SeekFrom::Start(block_range.data_offset + range_relative_offset),
+                            SeekFrom::Start(block_range.data_offset + range_relative_offset),
                         )?,
                         Err(error) => return Err(keramics_core::error_to_io_error!(error)),
                     },
@@ -341,7 +341,7 @@ impl VhdFile {
                 VhdBlockRangeType::InParent => match &self.parent_file {
                     Some(parent_file) => match parent_file.write() {
                         Ok(mut file) => {
-                            file.seek(io::SeekFrom::Start(media_offset))?;
+                            file.seek(SeekFrom::Start(media_offset))?;
 
                             file.read(&mut data[data_offset..data_end_offset])?
                         }
@@ -403,8 +403,13 @@ impl VhdFile {
     }
 }
 
-impl Read for VhdFile {
-    /// Reads media data.
+impl DataStream for VhdFile {
+    /// Retrieves the size of the data.
+    fn get_size(&mut self) -> io::Result<u64> {
+        Ok(self.media_size)
+    }
+
+    /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         if self.media_offset >= self.media_size {
             return Ok(0);
@@ -422,7 +427,7 @@ impl Read for VhdFile {
                 Some(data_stream) => match data_stream.write() {
                     Ok(mut data_stream) => data_stream.read_at_position(
                         &mut buf[0..read_size],
-                        io::SeekFrom::Start(self.media_offset),
+                        SeekFrom::Start(self.media_offset),
                     )?,
                     Err(error) => return Err(keramics_core::error_to_io_error!(error)),
                 },
@@ -438,32 +443,23 @@ impl Read for VhdFile {
 
         Ok(read_count)
     }
-}
 
-impl Seek for VhdFile {
-    /// Sets the current position of the media data.
-    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+    /// Sets the current position of the data.
+    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
         self.media_offset = match pos {
-            io::SeekFrom::Current(relative_offset) => {
+            SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.media_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
-            io::SeekFrom::End(relative_offset) => {
+            SeekFrom::End(relative_offset) => {
                 let mut end_offset: i64 = self.media_size as i64;
                 end_offset += relative_offset;
                 end_offset as u64
             }
-            io::SeekFrom::Start(offset) => offset,
+            SeekFrom::Start(offset) => offset,
         };
         Ok(self.media_offset)
-    }
-}
-
-impl DataStream for VhdFile {
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
-        Ok(self.media_size)
     }
 }
 
@@ -553,7 +549,7 @@ mod tests {
     fn test_seek_from_start() -> io::Result<()> {
         let mut file: VhdFile = get_file()?;
 
-        let offset: u64 = file.seek(io::SeekFrom::Start(1024))?;
+        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
         Ok(())
@@ -563,7 +559,7 @@ mod tests {
     fn test_seek_from_end() -> io::Result<()> {
         let mut file: VhdFile = get_file()?;
 
-        let offset: u64 = file.seek(io::SeekFrom::End(-512))?;
+        let offset: u64 = file.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, file.media_size - 512);
 
         Ok(())
@@ -573,10 +569,10 @@ mod tests {
     fn test_seek_from_current() -> io::Result<()> {
         let mut file: VhdFile = get_file()?;
 
-        let offset = file.seek(io::SeekFrom::Start(1024))?;
+        let offset = file.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
-        let offset: u64 = file.seek(io::SeekFrom::Current(-512))?;
+        let offset: u64 = file.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
 
         Ok(())
@@ -586,7 +582,7 @@ mod tests {
     fn test_seek_beyond_media_size() -> io::Result<()> {
         let mut file: VhdFile = get_file()?;
 
-        let offset: u64 = file.seek(io::SeekFrom::End(512))?;
+        let offset: u64 = file.seek(SeekFrom::End(512))?;
         assert_eq!(offset, file.media_size + 512);
 
         Ok(())
@@ -595,7 +591,7 @@ mod tests {
     #[test]
     fn test_seek_and_read() -> io::Result<()> {
         let mut file: VhdFile = get_file()?;
-        file.seek(io::SeekFrom::Start(1024))?;
+        file.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = file.read(&mut data)?;
@@ -648,7 +644,7 @@ mod tests {
     #[test]
     fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
         let mut file: VhdFile = get_file()?;
-        file.seek(io::SeekFrom::End(512))?;
+        file.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = file.read(&mut data)?;

@@ -13,6 +13,7 @@
 
 use std::collections::HashMap;
 use std::io;
+use std::io::SeekFrom;
 
 use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
@@ -77,7 +78,7 @@ impl VhdxMetadataTable {
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,
-        position: io::SeekFrom,
+        position: SeekFrom,
     ) -> io::Result<()> {
         let mut data: Vec<u8> = vec![0; 65536];
 

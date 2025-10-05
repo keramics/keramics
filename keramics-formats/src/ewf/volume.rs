@@ -209,6 +209,8 @@ impl EwfS01Volume {
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
+
     use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data_e01() -> Vec<u8> {
@@ -351,7 +353,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = EwfE01Volume::new();
-        test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.media_type, 0);
         assert_eq!(test_struct.number_of_chunks, 45);
@@ -408,7 +410,7 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
         let mut test_struct = EwfS01Volume::new();
-        test_struct.read_at_position(&data_stream, io::SeekFrom::Start(0))?;
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.number_of_chunks, 45);
         assert_eq!(test_struct.sectors_per_chunk, 64);
