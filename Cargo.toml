@@ -8,11 +8,11 @@ members = [
     "./keramics-encodings",
     "./keramics-formats",
     "./keramics-hashes",
+    "./keramics-layout-map",
     "./keramics-sigscan",
     "./keramics-tools",
     "./keramics-types",
     "./keramics-vfs",
-    "./layout-map",
 ]
 resolver = "2"
 

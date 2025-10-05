@@ -13,7 +13,7 @@
 
 use std::io;
 
-use layout_map::LayoutMap;
+use keramics_layout_map::LayoutMap;
 
 use super::constants::*;
 
