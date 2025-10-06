@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u16_le;
 
@@ -43,29 +42,25 @@ impl EwfFileHeader {
     }
 
     /// Reads the file header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 13 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported EWF file header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF file header data size"
             ));
         }
         if data[0..8] != EWF_FILE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported EWF file header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF file header signature"
             ));
         }
         if data[8] != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported EWF file header start of fields"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF file header start of fields"
             ));
         }
         if data[11..13] != [0; 2] {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported EWF file header end of fields"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF file header end of fields"
             ));
         }
         self.segment_number = bytes_to_u16_le!(data, 9);
@@ -89,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfFileHeader::new();
@@ -140,7 +135,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

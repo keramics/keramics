@@ -11,11 +11,12 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference, FakeFileResolver, FileResolverReference};
+use keramics_core::{
+    DataStream, DataStreamReference, ErrorTrace, FakeFileResolver, FileResolverReference,
+};
 
 use crate::plist::XmlPlist;
 
@@ -50,7 +51,7 @@ impl SparseBundleImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(&mut self, file_resolver: &FileResolverReference) -> io::Result<()> {
+    pub fn open(&mut self, file_resolver: &FileResolverReference) -> Result<(), ErrorTrace> {
         self.read_info_plist(&file_resolver, "Info.plist")?;
 
         self.file_resolver = file_resolver.clone();
@@ -63,64 +64,80 @@ impl SparseBundleImage {
         &mut self,
         file_resolver: &FileResolverReference,
         file_name: &str,
-    ) -> io::Result<()> {
-        let data_stream: DataStreamReference =
-            match file_resolver.get_data_stream(&mut vec![file_name])? {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("No such file: {}", file_name),
-                    ));
+    ) -> Result<(), ErrorTrace> {
+        let result: Option<DataStreamReference> =
+            match file_resolver.get_data_stream(&mut vec![file_name]) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open info.plist file: {}", file_name)
+                    );
+                    return Err(error);
                 }
             };
-        let string: String = match data_stream.write() {
-            Ok(mut data_stream) => {
-                let data_stream_size: u64 = data_stream.get_size()?;
-
-                if data_stream_size == 0 || data_stream_size > 65536 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported Info.plist file size",
-                    ));
-                }
-                let mut data: Vec<u8> = vec![0; data_stream_size as usize];
-                data_stream.read_at_position(&mut data, SeekFrom::Start(0))?;
-
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "Info.plist data of size: {} at offset: 0 (0x00000000)\n",
-                        data_stream_size,
-                    ));
-                    self.mediator.debug_print_data(&data, true);
-                }
-                match String::from_utf8(data) {
-                    Ok(string) => string,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                }
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No such file: {}",
+                    file_name
+                )));
             }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+        };
+        let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
+        if data_stream_size == 0 || data_stream_size > 65536 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported Info.plist file size"
+            ));
+        }
+        let mut data: Vec<u8> = vec![0; data_stream_size as usize];
+
+        keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "Info.plist data of size: {} at offset: 0 (0x00000000)\n",
+                data_stream_size,
+            ));
+            self.mediator.debug_print_data(&data, true);
+        }
+        let string: String = match String::from_utf8(data) {
+            Ok(string) => string,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to convert plist data into UTF-8 string",
+                    error
+                ));
+            }
         };
         let mut xml_plist: XmlPlist = XmlPlist::new();
-        xml_plist.parse(string.as_str())?;
 
+        match xml_plist.parse(string.as_str()) {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to parse plist",
+                    error
+                ));
+            }
+        }
         let version: &String = match xml_plist
             .root_object
             .get_string_by_key("CFBundleInfoDictionaryVersion")
         {
             Some(string) => string,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unable to retrieve CFBundleInfoDictionaryVersion value from Info.plist",
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve CFBundleInfoDictionaryVersion value from Info.plist"
                 ));
             }
         };
         if version != "6.0" {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported CFBundleInfoDictionaryVersion: {}", version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported CFBundleInfoDictionaryVersion: {}",
+                version
+            )));
         }
         let bundle_type: &String = match xml_plist
             .root_object
@@ -128,49 +145,46 @@ impl SparseBundleImage {
         {
             Some(string) => string,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unable to retrieve diskimage-bundle-type value from Info.plist",
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve diskimage-bundle-type value from Info.plist"
                 ));
             }
         };
         if bundle_type != "com.apple.diskimage.sparsebundle" {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported diskimage-bundle-type: {}", bundle_type),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported diskimage-bundle-type: {}",
+                bundle_type
+            )));
         }
         let band_size: &i64 = match xml_plist.root_object.get_integer_by_key("band-size") {
             Some(integer) => integer,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unable to retrieve band-size value from Info.plist",
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve band-size value from Info.plist"
                 ));
             }
         };
         if *band_size <= 0 || *band_size > u32::MAX as i64 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid band-size: {} value out of bounds", *band_size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid band-size: {} value out of bounds",
+                *band_size
+            )));
         }
         self.block_size = *band_size as u32;
 
         let size: &i64 = match xml_plist.root_object.get_integer_by_key("size") {
             Some(integer) => integer,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unable to retrieve size value from Info.plist",
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve size value from Info.plist"
                 ));
             }
         };
         if *size <= 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid size: {} value out of bounds", *size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid size: {} value out of bounds",
+                *size
+            )));
         }
         self.media_size = *size as u64;
 
@@ -178,7 +192,7 @@ impl SparseBundleImage {
     }
 
     /// Reads media data from the bands based on the block size.
-    fn read_data_from_bands(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_bands(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.media_offset;
@@ -192,16 +206,28 @@ impl SparseBundleImage {
                 break;
             }
             let band_file_name: String = format!("{:x}", block_number);
-            let data_stream: DataStreamReference = match self
+
+            // TODO: cache band files like EWF
+            let result: Option<DataStreamReference> = match self
                 .file_resolver
-                .get_data_stream(&mut vec!["bands", band_file_name.as_str()])?
+                .get_data_stream(&mut vec!["bands", band_file_name.as_str()])
             {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open bands file: {}", band_file_name)
+                    );
+                    return Err(error);
+                }
+            };
+            let data_stream: DataStreamReference = match result {
                 Some(data_stream) => data_stream,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("No such bands file: {}", band_file_name),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "No such bands file: {}",
+                        band_file_name
+                    )));
                 }
             };
             let mut range_read_size: usize = read_size - data_offset;
@@ -211,18 +237,16 @@ impl SparseBundleImage {
             }
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_read_count: usize = match data_stream.write() {
-                Ok(mut data_stream) => data_stream.read_at_position(
-                    &mut data[data_offset..data_end_offset],
-                    SeekFrom::Start(range_relative_offset),
-                )?,
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            };
-            if range_read_count == 0 {
+            let read_count: usize = keramics_core::data_stream_read_at_position!(
+                data_stream,
+                &mut data[data_offset..data_end_offset],
+                SeekFrom::Start(range_relative_offset)
+            );
+            if read_count == 0 {
                 break;
             }
-            data_offset += range_read_count;
-            media_offset += range_read_count as u64;
+            data_offset += read_count;
+            media_offset += read_count as u64;
 
             block_number += 1;
             range_relative_offset = 0;
@@ -234,12 +258,12 @@ impl SparseBundleImage {
 
 impl DataStream for SparseBundleImage {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.media_size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.media_offset >= self.media_size {
             return Ok(0);
         }
@@ -249,15 +273,20 @@ impl DataStream for SparseBundleImage {
         if (read_size as u64) > remaining_media_size {
             read_size = remaining_media_size as usize;
         }
-        let read_count: usize = self.read_data_from_bands(&mut buf[..read_size])?;
-
+        let read_count: usize = match self.read_data_from_bands(&mut buf[..read_size]) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from bands");
+                return Err(error);
+            }
+        };
         self.media_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.media_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.media_offset as i64;
@@ -281,7 +310,7 @@ mod tests {
 
     use keramics_core::open_os_file_resolver;
 
-    fn get_image() -> io::Result<SparseBundleImage> {
+    fn get_image() -> Result<SparseBundleImage, ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
         let file_resolver: FileResolverReference =
@@ -292,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
         let file_resolver: FileResolverReference =
@@ -306,7 +335,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_info_plist() -> io::Result<()> {
+    fn test_read_info_plist() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
         let file_resolver: FileResolverReference =
@@ -322,7 +351,7 @@ mod tests {
     // TODO: add tests for read_data_from_bands
 
     #[test]
-    fn test_seek_from_start() -> io::Result<()> {
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = get_image()?;
 
         let offset: u64 = image.seek(SeekFrom::Start(1024))?;
@@ -332,7 +361,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_end() -> io::Result<()> {
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = get_image()?;
 
         let offset: u64 = image.seek(SeekFrom::End(-512))?;
@@ -342,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_current() -> io::Result<()> {
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = get_image()?;
 
         let offset = image.seek(SeekFrom::Start(1024))?;
@@ -355,7 +384,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_media_size() -> io::Result<()> {
+    fn test_seek_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = get_image()?;
 
         let offset: u64 = image.seek(SeekFrom::End(512))?;
@@ -365,7 +394,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read() -> io::Result<()> {
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = get_image()?;
         image.seek(SeekFrom::Start(1024))?;
 
@@ -418,7 +447,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = get_image()?;
         image.seek(SeekFrom::End(512))?;
 

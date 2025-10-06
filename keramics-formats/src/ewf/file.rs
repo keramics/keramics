@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
 use super::file_header::EwfFileHeader;
@@ -47,23 +46,23 @@ impl EwfFile {
         &mut self,
         data: &mut [u8],
         position: SeekFrom,
-    ) -> io::Result<u64> {
-        match self.data_stream.as_ref() {
-            Some(data_stream) => match data_stream.write() {
-                Ok(mut data_stream) => data_stream.read_exact_at_position(data, position),
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            },
+    ) -> Result<u64, ErrorTrace> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
-        }
+        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, data, position);
+        Ok(offset)
     }
 
     /// Reads a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_sections(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -72,11 +71,9 @@ impl EwfFile {
     }
 
     /// Reads the file header and section headers.
-    fn read_sections(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
-        let file_size: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.get_size()?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+    fn read_sections(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let file_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
         let mut file_header: EwfFileHeader = EwfFileHeader::new();
 
         file_header.read_at_position(data_stream, SeekFrom::Start(0))?;
@@ -97,23 +94,20 @@ impl EwfFile {
                 if section_size == 0 {
                     section_size = 76;
                 } else if section_size != 76 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported done or next section size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported done or next section size"
                     ));
                 }
                 if section_header.next_offset != file_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported done or next section header next offset does not align with file offset",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported done or next section header next offset does not align with file offset"
                     ));
                 }
                 is_last_section = true;
             } else {
                 if section_header.next_offset <= file_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported section next offset",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported section next offset"
                     ));
                 }
                 let calculated_section_size: u64 = section_header.next_offset - file_offset;
@@ -121,15 +115,13 @@ impl EwfFile {
                 if section_size == 0 {
                     section_size = calculated_section_size;
                 } else if section_size != calculated_section_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported section size value does not align with next offset",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported section size value does not align with next offset"
                     ));
                 }
                 if section_size < 76 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported section size value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported section size value too small"
                     ));
                 }
             }
@@ -144,9 +136,8 @@ impl EwfFile {
             }
         }
         if file_offset != file_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported trailing data after last section header",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported trailing data after last section header"
             ));
         }
         self.segment_number = file_header.segment_number;
@@ -161,7 +152,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file() -> io::Result<EwfFile> {
+    fn get_file() -> Result<EwfFile, ErrorTrace> {
         let mut file: EwfFile = EwfFile::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ewf/ext2.E01")?;
@@ -171,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file = EwfFile::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ewf/ext2.E01")?;

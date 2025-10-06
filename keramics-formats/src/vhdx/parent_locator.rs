@@ -12,11 +12,10 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Ucs2String;
 
 use super::parent_locator_entry::VhdxParentLocatorEntry;
@@ -41,7 +40,7 @@ impl VhdxParentLocator {
     }
 
     /// Reads the parent locator from a buffer.
-    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut parent_locator_header: VhdxParentLocatorHeader = VhdxParentLocatorHeader::new();
 
         if self.mediator.debug_output {
@@ -56,13 +55,10 @@ impl VhdxParentLocator {
         for parent_locator_entry_index in 0..parent_locator_header.number_of_entries {
             let data_end_offset: usize = data_offset + 12;
             if data_end_offset > data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid number of entries: {} value out of bounds",
-                        parent_locator_header.number_of_entries
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid number of entries: {} value out of bounds",
+                    parent_locator_header.number_of_entries
+                )));
             }
             let mut parent_locator_entry: VhdxParentLocatorEntry = VhdxParentLocatorEntry::new();
 
@@ -78,46 +74,34 @@ impl VhdxParentLocator {
             if parent_locator_entry.key_data_offset < 20
                 || parent_locator_entry.key_data_offset as usize >= data_size
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid parent locator entry: {} key data offset: {} value out of bounds",
-                        parent_locator_entry_index, parent_locator_entry.key_data_offset,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid parent locator entry: {} key data offset: {} value out of bounds",
+                    parent_locator_entry_index, parent_locator_entry.key_data_offset,
+                )));
             }
             if parent_locator_entry.key_data_size as usize
                 > data_size - (parent_locator_entry.key_data_offset as usize)
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid parent locator entry: {} key data size: {} value out of bounds",
-                        parent_locator_entry_index, parent_locator_entry.key_data_size,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid parent locator entry: {} key data size: {} value out of bounds",
+                    parent_locator_entry_index, parent_locator_entry.key_data_size,
+                )));
             }
             if parent_locator_entry.value_data_offset < 20
                 || parent_locator_entry.value_data_offset as usize >= data_size
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid parent locator entry: {} value data offset: {} value out of bounds",
-                        parent_locator_entry_index, parent_locator_entry.value_data_offset,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid parent locator entry: {} value data offset: {} value out of bounds",
+                    parent_locator_entry_index, parent_locator_entry.value_data_offset,
+                )));
             }
             if parent_locator_entry.value_data_size as usize
                 > data_size - (parent_locator_entry.value_data_offset as usize)
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid parent locator entry: {} value data size: {} value out of bounds",
-                        parent_locator_entry_index, parent_locator_entry.value_data_size,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid parent locator entry: {} value data size: {} value out of bounds",
+                    parent_locator_entry_index, parent_locator_entry.value_data_size,
+                )));
             }
             let key_data_offset: usize = parent_locator_entry.key_data_offset as usize;
             let key_data_end_offset: usize =
@@ -164,23 +148,18 @@ impl VhdxParentLocator {
         data_stream: &DataStreamReference,
         data_size: u32,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         // Note that 65536 is an arbitrary chosen limit.
         if data_size < 20 || data_size > 65536 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported parent locator data size: {} value out of bounds",
-                    data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported parent locator data size: {} value out of bounds",
+                data_size
+            )));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "VhdxParentLocator data of size: {} at offset: {} (0x{:08x})\n",
@@ -253,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdxParentLocator::new();
@@ -280,7 +259,7 @@ mod tests {
     // TODO: add test_read_data with invalid value data size
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let test_data_size: u32 = test_data.len() as u32;
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);

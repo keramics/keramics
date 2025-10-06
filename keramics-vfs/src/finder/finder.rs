@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::io;
+use keramics_core::ErrorTrace;
 
 use crate::file_entry::VfsFileEntry;
 use crate::file_system::VfsFileSystem;
@@ -70,7 +70,7 @@ impl<'a> VfsFinder<'a> {
 }
 
 impl<'a> Iterator for VfsFinder<'a> {
-    type Item = io::Result<(VfsFileEntry, Vec<VfsString>)>;
+    type Item = Result<(VfsFileEntry, Vec<VfsString>), ErrorTrace>;
 
     /// Retrieves the next file entry.
     fn next(&mut self) -> Option<Self::Item> {
@@ -105,9 +105,11 @@ impl<'a> Iterator for VfsFinder<'a> {
 
                 return Some(Ok((state.file_entry, path_components)));
             }
-            let result: io::Result<VfsFileEntry> = state
+            let result: Result<VfsFileEntry, ErrorTrace> = state
                 .file_entry
                 .get_sub_file_entry_by_index(state.sub_file_entry_index);
+            let sub_file_entry_index: usize = state.sub_file_entry_index;
+
             state.sub_file_entry_index += 1;
             self.states.push(state);
 
@@ -122,11 +124,20 @@ impl<'a> Iterator for VfsFinder<'a> {
                     match file_entry.get_name() {
                         Some(name) => self.path_components.push(name),
                         None => self.path_components.push(VfsString::Empty),
-                    };
+                    }
                     self.states
                         .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
                 }
-                Err(error) => return Some(Err(error)),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Some(Err(error));
+                }
             }
         }
         None

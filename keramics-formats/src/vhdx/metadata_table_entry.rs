@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_le};
 
@@ -50,11 +49,10 @@ impl VhdxMetadataTableEntry {
     }
 
     /// Reads the metadata table entry from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported VHDX metadata table entry data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHDX metadata table entry data size"
             ));
         }
         self.item_identifier = Uuid::from_le_bytes(&data[0..16]);
@@ -62,13 +60,10 @@ impl VhdxMetadataTableEntry {
         self.item_size = bytes_to_u32_le!(data, 20);
 
         if self.item_offset < 65536 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid item offset: 0x{:04x} value out of bounds",
-                    self.item_offset
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid item offset: 0x{:04x} value out of bounds",
+                self.item_offset
+            )));
         }
         Ok(())
     }
@@ -87,7 +82,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdxMetadataTableEntry::new();

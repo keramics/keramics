@@ -12,10 +12,9 @@
  */
 
 use std::collections::HashSet;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{BuildError, PatternType, ScanContext, Scanner, Signature};
 
 use super::enums::FormatIdentifier;
@@ -226,20 +225,15 @@ impl FormatScanner {
     pub fn scan_data_stream(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<HashSet<FormatIdentifier>> {
-        let data_size: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.get_size()?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+    ) -> Result<HashSet<FormatIdentifier>, ErrorTrace> {
+        let data_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
         let mut scan_context: ScanContext = ScanContext::new(&self.signature_scanner, data_size);
 
         // The size of the header range can be larger than the size of the data stream.
         let mut data: Vec<u8> = vec![0; scan_context.header_range_size as usize];
 
-        match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_at_position(&mut data, SeekFrom::Start(0))?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
         scan_context.data_offset = 0;
         scan_context.scan_buffer(&data);
 
@@ -256,13 +250,11 @@ impl FormatScanner {
         } else {
             0
         };
-        match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_at_position(
-                &mut data[data_offset..],
-                SeekFrom::Start(data_stream_offset),
-            )?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        keramics_core::data_stream_read_at_position!(
+            data_stream,
+            &mut data[data_offset..],
+            SeekFrom::Start(data_stream_offset)
+        );
         scan_context.data_offset = data_stream_offset;
         scan_context.scan_buffer(&data);
 
@@ -312,7 +304,7 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_data_stream() -> io::Result<()> {
+    fn test_scan_data_stream() -> Result<(), ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
@@ -327,9 +319,13 @@ mod tests {
 
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         };
-
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/qcow/ext2.qcow2")?;
         let scan_results: HashSet<FormatIdentifier> =
             format_scanner.scan_data_stream(&data_stream)?;

@@ -15,8 +15,7 @@
 //!
 //! Provides decompression support for LZNT1 compressed data.
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u16_le;
@@ -50,11 +49,10 @@ impl Lznt1BlockHeader {
     }
 
     /// Reads the block header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 2 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported LZNT1 block header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported LZNT1 block header data size"
             ));
         }
         let bit_fields1: u16 = bytes_to_u16_le!(data, 0);
@@ -89,7 +87,7 @@ impl Lznt1Context {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut compressed_data_offset: usize = 0;
         let compressed_data_size: usize = compressed_data.len();
 
@@ -101,9 +99,8 @@ impl Lznt1Context {
                 break;
             }
             if 2 > compressed_data_size - compressed_data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid compressed data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
                 ));
             }
             let compressed_data_end_offset: usize = compressed_data_offset + 2;
@@ -157,15 +154,13 @@ impl Lznt1Context {
                     self.mediator.debug_print(format!("}}\n\n"));
                 }
                 if compressed_data_end_offset > compressed_data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid compressed data value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid compressed data value too small"
                     ));
                 }
                 if uncompressed_data_end_offset > uncompressed_data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid uncompressed data value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data value too small"
                     ));
                 }
                 uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
@@ -191,7 +186,7 @@ impl Lznt1Context {
         compressed_data_size: usize,
         uncompressed_data: &mut [u8],
         uncompressed_data_size: usize,
-    ) -> io::Result<usize> {
+    ) -> Result<usize, ErrorTrace> {
         let mut safe_compressed_data_offset: usize = *compressed_data_offset;
         let mut uncompressed_data_offset: usize = 0;
 
@@ -225,9 +220,8 @@ impl Lznt1Context {
             for _ in 0..8 {
                 if compression_flags & 0x01 != 0 {
                     if 2 > compressed_data_size - safe_compressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     let compression_tuple: u16 =
@@ -259,15 +253,13 @@ impl Lznt1Context {
                         ));
                     }
                     if distance as usize > uncompressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid distance value exceeds uncompressed data offset",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid distance value exceeds uncompressed data offset"
                         ));
                     }
                     if match_size as usize > uncompressed_data_size - uncompressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid match size value exceeds uncompressed data size",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid match size value exceeds uncompressed data size"
                         ));
                     }
                     let match_offset: usize = uncompressed_data_offset - distance as usize;
@@ -291,15 +283,13 @@ impl Lznt1Context {
                     }
                 } else {
                     if safe_compressed_data_offset >= compressed_data_size {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     if uncompressed_data_offset >= uncompressed_data_size {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid uncompressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid uncompressed data value too small"
                         ));
                     }
                     uncompressed_data[uncompressed_data_offset] =
@@ -316,9 +306,8 @@ impl Lznt1Context {
                 // The compression tuple match size mask and distance shift are dependent on the uncompressed data offset.
                 while uncompressed_data_offset > compression_tuple_threshold {
                     if compression_tuple_distance_shift == 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compression tuple offset shift value out of bounds",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compression tuple offset shift value out of bounds"
                         ));
                     }
                     compression_tuple_distance_shift -= 1;
@@ -934,7 +923,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress() -> io::Result<()> {
+    fn test_decompress() -> Result<(), ErrorTrace> {
         let mut test_context: Lznt1Context = Lznt1Context::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -942,7 +931,15 @@ mod tests {
         test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, 65536);
 
-        let expected_data: Vec<u8> = fs::read("../LICENSE")?;
+        let expected_data: Vec<u8> = match fs::read("../LICENSE") {
+            Ok(data) => data,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable read test reference file",
+                    error
+                ));
+            }
+        };
         assert_eq!(&uncompressed_data[0..11358], &expected_data);
 
         Ok(())

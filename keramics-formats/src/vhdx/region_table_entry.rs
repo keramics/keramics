@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
@@ -54,11 +53,10 @@ impl VhdxRegionTableEntry {
     }
 
     /// Reads the region table entry from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported VHDX region table entry data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHDX region table entry data size"
             ));
         }
         let is_required_flag: u32 = bytes_to_u32_le!(data, 28);
@@ -88,7 +86,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdxRegionTableEntry::new();

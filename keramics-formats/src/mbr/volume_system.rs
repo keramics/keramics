@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
 use super::extended_boot_record::MbrExtendedBootRecord;
@@ -60,22 +59,21 @@ impl MbrVolumeSystem {
     }
 
     /// Retrieves a partition by index.
-    pub fn get_partition_by_index(&self, partition_index: usize) -> io::Result<MbrPartition> {
+    pub fn get_partition_by_index(
+        &self,
+        partition_index: usize,
+    ) -> Result<MbrPartition, ErrorTrace> {
         match self.partition_entries.get(partition_index) {
             Some(partition_entry) => {
                 let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
                     Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Missing data stream"));
                     }
                 };
                 if self.bytes_per_sector == 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported bytes per sector: 0"),
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported bytes per sector: 0"
                     ));
                 }
                 let mut partition_offset: u64 =
@@ -98,16 +96,19 @@ impl MbrVolumeSystem {
                 Ok(partition)
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("No partition with index: {}", partition_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No partition with index: {}",
+                    partition_index
+                )));
             }
         }
     }
 
     /// Reads the volume system from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_master_boot_record(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -116,7 +117,10 @@ impl MbrVolumeSystem {
     }
 
     /// Reads the master and extended boot records.
-    fn read_master_boot_record(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_master_boot_record(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         let mut master_boot_record = MbrMasterBootRecord::new();
 
         master_boot_record.read_at_position(data_stream, SeekFrom::Start(0))?;
@@ -129,13 +133,11 @@ impl MbrVolumeSystem {
                         let offset: u64 =
                             partition_entry.start_address_lba as u64 * *bytes_per_sector as u64;
 
-                        match data_stream.write() {
-                            Ok(mut data_stream) => data_stream.read_at_position(
-                                &mut boot_signature,
-                                SeekFrom::Start(offset + 510),
-                            )?,
-                            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                        };
+                        keramics_core::data_stream_read_at_position!(
+                            data_stream,
+                            &mut boot_signature,
+                            SeekFrom::Start(offset + 510)
+                        );
                         if boot_signature == MBR_BOOT_SIGNATURE {
                             self.bytes_per_sector = *bytes_per_sector;
                             break;
@@ -151,17 +153,13 @@ impl MbrVolumeSystem {
         while let Some(mut partition_entry) = master_boot_record.partition_entries.pop_front() {
             if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
                 if self.bytes_per_sector == 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported bytes per sector: 0"),
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported bytes per sector: 0"
                     ));
                 }
                 if extended_boot_record_offset != 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "More than 1 extended partition entry per boot record is not supported."
-                        ),
+                    return Err(keramics_core::error_trace_new!(
+                        "More than 1 extended partition entry per boot record is not supported"
                     ));
                 }
                 extended_boot_record_offset =
@@ -184,10 +182,8 @@ impl MbrVolumeSystem {
                 .max_by_key(|element| element.start_address_lba)
             {
                 Some(last_partition_entry) => {
-                    let data_stream_size: u64 = match data_stream.write() {
-                        Ok(mut data_stream) => data_stream.get_size()?,
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    };
+                    let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
                     let end_address_lba: u64 = (last_partition_entry.start_address_lba as u64)
                         + (last_partition_entry.number_of_sectors as u64);
 
@@ -212,11 +208,10 @@ impl MbrVolumeSystem {
         data_stream: &DataStreamReference,
         offset: u64,
         first_entry_index: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if first_entry_index >= 1024 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("More than 1024 partition entries not supported."),
+            return Err(keramics_core::error_trace_new!(
+                "More than 1024 partition entries not supported"
             ));
         }
         let mut extended_boot_record = MbrExtendedBootRecord::new();
@@ -231,11 +226,8 @@ impl MbrVolumeSystem {
             }
             if partition_entry.partition_type == 5 {
                 if extended_boot_record_offset != 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "More than 1 extended partition entry per boot record is not supported."
-                        ),
+                    return Err(keramics_core::error_trace_new!(
+                        "More than 1 extended partition entry per boot record is not supported"
                     ));
                 }
                 extended_boot_record_offset = self.first_extended_boot_record_offset
@@ -257,12 +249,12 @@ impl MbrVolumeSystem {
     }
 
     /// Sets the number of bytes per sector.
-    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> io::Result<()> {
+    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> Result<(), ErrorTrace> {
         if !SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported bytes per sector: {}", bytes_per_sector),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported bytes per sector: {}",
+                bytes_per_sector
+            )));
         }
         self.bytes_per_sector = bytes_per_sector;
 
@@ -276,7 +268,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_volume_system() -> io::Result<MbrVolumeSystem> {
+    fn get_volume_system() -> Result<MbrVolumeSystem, ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
@@ -286,7 +278,7 @@ mod tests {
     }
 
     #[test]
-    fn test_number_of_partitions() -> io::Result<()> {
+    fn test_number_of_partitions() -> Result<(), ErrorTrace> {
         let volume_system: MbrVolumeSystem = get_volume_system()?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
@@ -295,7 +287,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_partition_by_index() -> io::Result<()> {
+    fn test_get_partition_by_index() -> Result<(), ErrorTrace> {
         let volume_system: MbrVolumeSystem = get_volume_system()?;
 
         let partition: MbrPartition = volume_system.get_partition_by_index(0)?;
@@ -307,7 +299,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
@@ -319,7 +311,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_master_boot_record() -> io::Result<()> {
+    fn test_read_master_boot_record() -> Result<(), ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;

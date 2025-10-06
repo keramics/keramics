@@ -12,10 +12,9 @@
  */
 
 use std::collections::{HashMap, HashSet};
-use std::io;
 use std::rc::Rc;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::Ucs2String;
 
@@ -171,7 +170,7 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the symbolic link target.
-    pub fn get_symbolic_link_target(&mut self) -> io::Result<Option<&Ucs2String>> {
+    pub fn get_symbolic_link_target(&mut self) -> Result<Option<&Ucs2String>, ErrorTrace> {
         match &self.mft_attributes.reparse_point {
             Some(NtfsReparsePoint::SymbolicLink { .. }) => {
                 // TODO: implement
@@ -182,12 +181,15 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the number of attributes.
-    pub fn get_number_of_attributes(&self) -> io::Result<usize> {
+    pub fn get_number_of_attributes(&self) -> Result<usize, ErrorTrace> {
         self.mft_attributes.get_number_of_attributes()
     }
 
     /// Retrieves a specific attribute.
-    pub fn get_attribute_by_index(&self, attribute_index: usize) -> io::Result<NtfsAttribute<'_>> {
+    pub fn get_attribute_by_index(
+        &self,
+        attribute_index: usize,
+    ) -> Result<NtfsAttribute<'_>, ErrorTrace> {
         let mft_attribute: &NtfsMftAttribute = self
             .mft_attributes
             .get_attribute_by_index(attribute_index)?;
@@ -227,9 +229,8 @@ impl NtfsFileEntry {
             }
             NTFS_ATTRIBUTE_TYPE_VOLUME_NAME => {
                 if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $VOLUME_NAME attribute.",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported non-resident $VOLUME_NAME attribute"
                     ));
                 }
                 let volume_name: Ucs2String =
@@ -253,7 +254,7 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         self.mft_attributes.get_data_stream_by_name(
             &None,
             &self.data_stream,
@@ -265,7 +266,7 @@ impl NtfsFileEntry {
     pub fn get_data_stream_by_name(
         &self,
         name: &Option<Ucs2String>,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         self.mft_attributes.get_data_stream_by_name(
             name,
             &self.data_stream,
@@ -274,12 +275,15 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the number of data forks.
-    pub fn get_number_of_data_forks(&self) -> io::Result<usize> {
+    pub fn get_number_of_data_forks(&self) -> Result<usize, ErrorTrace> {
         Ok(self.mft_attributes.get_number_of_data_attributes())
     }
 
     /// Retrieves a specific data fork.
-    pub fn get_data_fork_by_index(&self, data_fork_index: usize) -> io::Result<NtfsDataFork<'_>> {
+    pub fn get_data_fork_by_index(
+        &self,
+        data_fork_index: usize,
+    ) -> Result<NtfsDataFork<'_>, ErrorTrace> {
         match self
             .mft_attributes
             .get_data_attribute_by_index(data_fork_index)
@@ -290,15 +294,15 @@ impl NtfsFileEntry {
                 &self.mft_attributes,
                 data_attribute,
             )),
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Missing data attribute: {}", data_fork_index),
-            )),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing data attribute: {}",
+                data_fork_index
+            ))),
         }
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         if !self.has_directory_entries {
             return Ok(0);
         }
@@ -312,7 +316,7 @@ impl NtfsFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<NtfsFileEntry> {
+    ) -> Result<NtfsFileEntry, ErrorTrace> {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
@@ -340,7 +344,7 @@ impl NtfsFileEntry {
     }
 
     /// Reads the attributes.
-    pub(super) fn read_attributes(&mut self) -> io::Result<()> {
+    pub(super) fn read_attributes(&mut self) -> Result<(), ErrorTrace> {
         self.mft_entry.read_attributes(&mut self.mft_attributes)?;
 
         match self.mft_attributes.attribute_list {
@@ -383,7 +387,7 @@ impl NtfsFileEntry {
     pub fn get_sub_file_entry_by_name(
         &mut self,
         sub_file_entry_name: &Ucs2String,
-    ) -> io::Result<Option<NtfsFileEntry>> {
+    ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
         if !self.has_directory_entries {
             return Ok(None);
         }
@@ -447,12 +451,9 @@ impl NtfsFileEntry {
     }
 
     /// Reads the directory entries.
-    fn read_directory_entries(&mut self) -> io::Result<()> {
+    fn read_directory_entries(&mut self) -> Result<(), ErrorTrace> {
         if !self.has_directory_entries {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Missing directory entries"),
-            ));
+            return Err(keramics_core::error_trace_new!("Missing directory entries"));
         }
         if !self.directory_index.is_initialized {
             self.directory_index.initialize(&self.mft_attributes)?;
@@ -483,6 +484,7 @@ mod tests {
     // TODO: add tests for get_data_stream
     // TODO: add tests for get_data_stream_by_name
     // TODO: add tests for get_number_of_data_forks
+    // TODO: add tests for get_data_fork_by_index
     // TODO: add tests for get_number_of_sub_file_entries
     // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for get_sub_file_entry_by_name

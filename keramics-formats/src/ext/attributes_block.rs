@@ -12,8 +12,8 @@
  */
 
 use std::collections::BTreeMap;
-use std::io;
 
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::ByteString;
 
@@ -41,7 +41,7 @@ impl ExtAttributesBlock {
         data_offset: usize,
         data_size: usize,
         entries: &mut Vec<ExtAttribute>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut entry_data_offset: usize = data_offset;
 
         while entry_data_offset < data_size {
@@ -193,7 +193,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let test_struct = ExtAttributesBlock::new();

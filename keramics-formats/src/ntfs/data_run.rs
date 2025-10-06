@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::io;
+use keramics_core::ErrorTrace;
 
 /// New Technologies File System (NTFS) data run typ.
 #[derive(Clone, Debug, PartialEq)]
@@ -45,13 +45,10 @@ impl NtfsDataRun {
     }
 
     /// Reads the data run from a buffer.
-    pub fn read_data(&mut self, data: &[u8], last_block_number: u64) -> io::Result<usize> {
+    pub fn read_data(&mut self, data: &[u8], last_block_number: u64) -> Result<usize, ErrorTrace> {
         let data_size: usize = data.len();
         if data_size < 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported NTFS data run data size"),
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let sizes_tuple: usize = data[0] as usize;
 
@@ -60,25 +57,22 @@ impl NtfsDataRun {
 
         let data_run_size: usize = 1 + number_of_blocks_size + block_number_size;
         if data_run_size > data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported data run size: {}", data_run_size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported data run size: {}",
+                data_run_size
+            )));
         }
         if number_of_blocks_size > 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported number of blocks size: {}",
-                    number_of_blocks_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported number of blocks size: {}",
+                number_of_blocks_size
+            )));
         }
         if block_number_size > 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported block number size: {}", block_number_size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported block number size: {}",
+                block_number_size
+            )));
         }
         // A number of blocks size of 0 indicates the end of the data runs.
         if number_of_blocks_size == 0 {
@@ -134,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsDataRun::new();
 
         let test_data: Vec<u8> = get_test_data();

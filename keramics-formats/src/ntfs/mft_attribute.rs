@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::Ucs2String;
 
@@ -120,11 +119,10 @@ impl NtfsMftAttribute {
     }
 
     /// Merges the other attribute with the current one.
-    pub fn merge(&mut self, other: &mut Self) -> io::Result<()> {
+    pub fn merge(&mut self, other: &mut Self) -> Result<(), ErrorTrace> {
         if other.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported resident attribute",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident attribute"
             ));
         }
         if other.data_cluster_groups[0].first_vcn == 0 {
@@ -145,7 +143,7 @@ impl NtfsMftAttribute {
     }
 
     /// Reads the MFT attribute from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         let mut mft_attribute_header: NtfsMftAttributeHeader = NtfsMftAttributeHeader::new();
@@ -164,10 +162,10 @@ impl NtfsMftAttribute {
         let mut data_offset: usize = 16;
 
         if self.data_flags & 0x00ff > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported data flags: {}", self.data_flags),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported data flags: {}",
+                self.data_flags
+            )));
         }
         // TODO: check if compression type is 0 when cluster block size > 4096
         let mut resident_attribute: NtfsMftAttributeResident = NtfsMftAttributeResident::new();
@@ -215,10 +213,10 @@ impl NtfsMftAttribute {
             let name_offset: usize = mft_attribute_header.name_offset as usize;
 
             if name_offset < data_offset || name_offset >= data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid name offset: {} value out of bounds", name_offset),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid name offset: {} value out of bounds",
+                    name_offset
+                )));
             }
             // TODO: debug print unknown data
 
@@ -233,13 +231,10 @@ impl NtfsMftAttribute {
                 let resident_data_offset: usize = resident_attribute.data_offset as usize;
 
                 if resident_data_offset < data_offset || resident_data_offset >= data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid resident data offset: {} value out of bounds",
-                            mft_attribute_header.name_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid resident data offset: {} value out of bounds",
+                        mft_attribute_header.name_size
+                    )));
                 }
                 // TODO: debug print unknown data
 
@@ -247,13 +242,10 @@ impl NtfsMftAttribute {
                 let resident_data_end_offset: usize = resident_data_offset + resident_data_size;
 
                 if resident_data_end_offset > data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid resident data size: {} value out of bounds",
-                            mft_attribute_header.name_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid resident data size: {} value out of bounds",
+                        mft_attribute_header.name_size
+                    )));
                 }
                 if self.mediator.debug_output {
                     self.mediator.debug_print(format!(
@@ -276,13 +268,10 @@ impl NtfsMftAttribute {
             let data_runs_offset: usize = non_resident_attribute.data_runs_offset as usize;
 
             if data_runs_offset < data_offset || data_runs_offset >= data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid data runs offset: {} value out of bounds",
-                        data_runs_offset
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid data runs offset: {} value out of bounds",
+                    data_runs_offset
+                )));
             }
             // TODO: debug print unknown data
 
@@ -306,14 +295,19 @@ impl NtfsMftAttribute {
     }
 
     /// Reads the name from a buffer.
-    fn read_name(&mut self, data: &[u8], name_offset: usize, name_size: usize) -> io::Result<()> {
+    fn read_name(
+        &mut self,
+        data: &[u8],
+        name_offset: usize,
+        name_size: usize,
+    ) -> Result<(), ErrorTrace> {
         let name_end_offset: usize = name_offset + name_size;
 
         if name_end_offset > data.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid name size: {} value out of bounds", name_size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid name size: {} value out of bounds",
+                name_size
+            )));
         }
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
@@ -353,7 +347,7 @@ mod tests {
     // TODO: add tests for merge
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = NtfsMftAttribute::new();

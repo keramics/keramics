@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u16_le;
 
@@ -45,27 +44,25 @@ impl ExtExtentsHeader {
     }
 
     /// Reads the extents header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 12 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext extents header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext extents header data size"
             ));
         }
         if data[0..2] != EXT_EXTENTS_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported ext extents header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext extents header signature"
             ));
         }
         self.number_of_entries = bytes_to_u16_le!(data, 2);
         self.depth = bytes_to_u16_le!(data, 6);
 
         if self.depth > 5 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid depth: {} value out of bounds", self.depth,),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid depth: {} value out of bounds",
+                self.depth
+            )));
         }
         Ok(())
     }
@@ -82,7 +79,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtExtentsHeader::new();

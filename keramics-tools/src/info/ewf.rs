@@ -31,7 +31,7 @@ pub fn print_ewf_image(path: &PathBuf) -> ExitCode {
         match open_os_file_resolver(base_path.to_str().unwrap()) {
             Ok(file_resolver) => file_resolver,
             Err(error) => {
-                println!("Unable create file resolver with error: {}", error);
+                println!("Unable to create file resolver with error: {}", error);
                 return ExitCode::FAILURE;
             }
         };

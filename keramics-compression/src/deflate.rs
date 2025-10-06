@@ -15,8 +15,7 @@
 //!
 //! Provides decompression support for DEFLATE compressed data (RFC 1951).
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::Mediator;
 
 use super::huffman::HuffmanTree;
@@ -98,20 +97,18 @@ impl<'a> DeflateBitstream<'a> {
         output_data: &mut [u8],
         output_data_offset: usize,
         output_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let data_end_offset: usize = self.data_offset + read_size;
         let output_data_end_offset: usize = output_data_offset + read_size;
 
         if data_end_offset > self.data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         if output_data_end_offset > output_data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid uncompressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data value too small"
             ));
         }
         output_data[output_data_offset..output_data_end_offset]
@@ -229,7 +226,10 @@ impl DeflateBlockHeader {
     }
 
     /// Reads the block header from a bitstream.
-    pub fn read_from_bitstream(&mut self, bitstream: &mut DeflateBitstream) -> io::Result<()> {
+    pub fn read_from_bitstream(
+        &mut self,
+        bitstream: &mut DeflateBitstream,
+    ) -> Result<(), ErrorTrace> {
         let value_32bit: u32 = bitstream.get_value(3);
 
         self.last_block_flag = value_32bit & 0x00000001;
@@ -283,7 +283,7 @@ impl DeflateContext {
         bitstream: &mut DeflateBitstream,
         literals_huffman_tree: &mut HuffmanTree,
         distances_huffman_tree: &mut HuffmanTree,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut code_sizes: Vec<u8> = vec![0; 316];
 
         let mut value_32bit: u32 = bitstream.get_value(14);
@@ -291,26 +291,20 @@ impl DeflateContext {
         let number_of_literal_codes: usize = (value_32bit & 0x0000001f) as usize + 257;
 
         if number_of_literal_codes > 286 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Invalid number of literal codes: {} value out of bounds",
-                    number_of_literal_codes
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of literal codes: {} value out of bounds",
+                number_of_literal_codes
+            )));
         }
         value_32bit >>= 5;
 
         let number_of_distance_codes: usize = (value_32bit & 0x0000001f) as usize + 1;
 
         if number_of_distance_codes > 30 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Invalid number of distance codes: {} value out of bounds",
-                    number_of_distance_codes
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of distance codes: {} value out of bounds",
+                number_of_distance_codes
+            )));
         }
         value_32bit >>= 5;
 
@@ -364,19 +358,16 @@ impl DeflateContext {
                 continue;
             }
             if code_size_index == 0 && symbol == 16 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Invalid code size index: {} value out of bounds",
-                        code_size_index
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid code size index: {} value out of bounds",
+                    code_size_index
+                )));
             }
             if symbol > 18 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Invalid symbol: {} value out of bounds", symbol),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid symbol: {} value out of bounds",
+                    symbol
+                )));
             }
             let code_size: u8 = if symbol == 16 {
                 code_sizes[code_size_index - 1]
@@ -391,13 +382,10 @@ impl DeflateContext {
                 bitstream.get_value(7) + 11
             };
             if code_size_index + times_to_repeat as usize > number_of_codes {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Invalid times to repeat: {} value out of bounds",
-                        times_to_repeat
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid times to repeat: {} value out of bounds",
+                    times_to_repeat
+                )));
             }
             while times_to_repeat > 0 {
                 code_sizes[code_size_index] = code_size;
@@ -407,9 +395,8 @@ impl DeflateContext {
             }
         }
         if code_sizes[256] == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "End-of-block code value missing in literal codes",
+            return Err(keramics_core::error_trace_new!(
+                "End-of-block code value missing in literal codes"
             ));
         }
         literals_huffman_tree.build(&code_sizes[0..number_of_literal_codes])?;
@@ -419,7 +406,7 @@ impl DeflateContext {
     }
 
     /// Builds fixed (predefined) Huffman trees.
-    fn build_fixed_huffman_trees(&mut self) -> io::Result<()> {
+    fn build_fixed_huffman_trees(&mut self) -> Result<(), ErrorTrace> {
         let mut code_sizes: Vec<u8> = vec![0; 318];
 
         for symbol in 0..318 {
@@ -449,7 +436,7 @@ impl DeflateContext {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut bitstream: DeflateBitstream = DeflateBitstream::new(compressed_data, 0);
 
         self.decompress_bitstream(&mut bitstream, uncompressed_data)
@@ -460,7 +447,7 @@ impl DeflateContext {
         &mut self,
         bitstream: &mut DeflateBitstream,
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
@@ -481,13 +468,10 @@ impl DeflateContext {
                     let block_size_copy: usize = ((value_32bit >> 16) ^ 0xffff) as usize;
 
                     if block_size != block_size_copy {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Mismatch in uncompressed block size: {} and copy: {}",
-                                block_size, block_size_copy
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Mismatch in uncompressed block size: {} and copy: {}",
+                            block_size, block_size_copy
+                        )));
                     }
                     if block_size > 0 {
                         bitstream.copy_bytes(
@@ -531,10 +515,7 @@ impl DeflateContext {
                     )?;
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported block type",
-                    ));
+                    return Err(keramics_core::error_trace_new!("Unsupported block type"));
                 }
             }
             if block_header.last_block_flag != 0 {
@@ -555,7 +536,7 @@ impl DeflateContext {
         uncompressed_data: &mut [u8],
         uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
 
         let mediator = Mediator::current();
@@ -576,9 +557,8 @@ impl DeflateContext {
             }
             if symbol < 256 {
                 if data_offset >= uncompressed_data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid uncompressed data value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data value too small"
                     ));
                 }
                 uncompressed_data[data_offset] = symbol as u8;
@@ -613,22 +593,16 @@ impl DeflateContext {
                     ((DEFLATE_DISTANCE_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
 
                 if compression_offset > data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid compression offset: {} value out of bounds",
-                            compression_offset
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid compression offset: {} value out of bounds",
+                        compression_offset
+                    )));
                 }
                 if compression_size > uncompressed_data_size - data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid compression size: {} value out of bounds",
-                            compression_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid compression size: {} value out of bounds",
+                        compression_size
+                    )));
                 }
                 if mediator.debug_output {
                     mediator
@@ -644,10 +618,10 @@ impl DeflateContext {
                     compression_data_offset += 1;
                 }
             } else {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid symbol: {}", symbol),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid symbol: {}",
+                    symbol
+                )));
             }
         }
         if mediator.debug_output {
@@ -954,7 +928,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bitstream_copy_bytes() -> io::Result<()> {
+    fn test_bitstream_copy_bytes() -> Result<(), ErrorTrace> {
         let test_data: [u8; 16] = [
             0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8, 0x11, 0xfe, 0x7c, 0xfa, 0x15, 0xc4,
             0x7e, 0xb9,
@@ -1017,7 +991,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build_dynamic_huffman_trees() -> io::Result<()> {
+    fn test_build_dynamic_huffman_trees() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let mut test_context: DeflateContext = DeflateContext::new();
 
@@ -1039,7 +1013,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress() -> io::Result<()> {
+    fn test_decompress() -> Result<(), ErrorTrace> {
         let mut test_context: DeflateContext = DeflateContext::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -1047,7 +1021,15 @@ mod tests {
         test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, 11358);
 
-        let expected_data: Vec<u8> = fs::read("../LICENSE")?;
+        let expected_data: Vec<u8> = match fs::read("../LICENSE") {
+            Ok(data) => data,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable read test reference file",
+                    error
+                ));
+            }
+        };
         assert_eq!(&uncompressed_data, &expected_data);
 
         Ok(())

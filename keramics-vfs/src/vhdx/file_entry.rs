@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::Arc;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 
 use crate::enums::VfsFileType;
@@ -39,7 +38,7 @@ pub enum VhdxFileEntry {
 
 impl VhdxFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             VhdxFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
             VhdxFileEntry::Root { .. } => Ok(None),
@@ -63,7 +62,7 @@ impl VhdxFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             VhdxFileEntry::Layer { .. } => Ok(0),
             VhdxFileEntry::Root { image } => Ok(image.get_number_of_layers()),
@@ -74,20 +73,27 @@ impl VhdxFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<VhdxFileEntry> {
+    ) -> Result<VhdxFileEntry, ErrorTrace> {
         match self {
-            VhdxFileEntry::Layer { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
-            VhdxFileEntry::Root { image } => {
-                let vhdx_layer: VhdxImageLayer = image.get_layer_by_index(sub_file_entry_index)?;
-
-                Ok(VhdxFileEntry::Layer {
+            VhdxFileEntry::Layer { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
+            VhdxFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
+                Ok(vhdx_layer) => Ok(VhdxFileEntry::Layer {
                     index: sub_file_entry_index,
                     layer: vhdx_layer.clone(),
-                })
-            }
+                }),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve VHDX image layer: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            },
         }
     }
 }
@@ -98,7 +104,7 @@ mod tests {
 
     use keramics_core::{FileResolverReference, open_os_file_resolver};
 
-    fn get_image() -> io::Result<VhdxImage> {
+    fn get_image() -> Result<VhdxImage, ErrorTrace> {
         let mut image: VhdxImage = VhdxImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/vhdx")?;
@@ -110,7 +116,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
 
         let file_entry = VhdxFileEntry::Root {
@@ -124,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
 
         let file_entry = VhdxFileEntry::Root {
@@ -135,7 +141,6 @@ mod tests {
         assert!(name.is_none());
 
         let vhdx_layer: VhdxImageLayer = vhdx_image.get_layer_by_index(0)?;
-
         let file_entry = VhdxFileEntry::Layer {
             index: 0,
             layer: vhdx_layer.clone(),

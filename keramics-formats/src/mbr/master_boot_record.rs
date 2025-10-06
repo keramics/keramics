@@ -12,8 +12,8 @@
  */
 
 use std::collections::VecDeque;
-use std::io;
 
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
@@ -55,17 +55,15 @@ impl MbrMasterBootRecord {
     }
 
     /// Reads the master boot record from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported MBR master boot record data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported MBR master boot record data size"
             ));
         }
         if data[510..512] != MBR_BOOT_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported MBR master boot record signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported MBR master boot record signature"
             ));
         }
         self.disk_identity = bytes_to_u32_le!(data, 440);
@@ -133,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = MbrMasterBootRecord::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -165,7 +163,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

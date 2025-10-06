@@ -12,12 +12,11 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{ByteOrder, DataStreamReference};
+use keramics_core::{ByteOrder, DataStreamReference, ErrorTrace};
 use keramics_datetime::PosixTime32;
 
 use super::enums::EwfHeaderValueType;
@@ -43,7 +42,7 @@ impl EwfHeader2 {
         &mut self,
         data: &[u8],
         header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         // On average the uncompressed header will be more than twice as large
@@ -52,8 +51,14 @@ impl EwfHeader2 {
         let mut header2_data: Vec<u8> = vec![0; data_size * 4];
 
         let mut zlib_context: ZlibContext = ZlibContext::new();
-        zlib_context.decompress(data, &mut header2_data)?;
 
+        match zlib_context.decompress(data, &mut header2_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress header2 data");
+                return Err(error);
+            }
+        }
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "Uncompressed header2 data of size: {}\n",
@@ -86,16 +91,14 @@ impl EwfHeader2 {
                 // "3"
                 [0x0033] => 3,
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid header data - unsupported number of categories",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid header data - unsupported number of categories"
                     ));
                 }
             },
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid header data - missing number of categories",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - missing number of categories"
                 ));
             }
         };
@@ -107,34 +110,30 @@ impl EwfHeader2 {
                 // "main"
                 [0x006d, 0x0061, 0x0069, 0x006e] => {}
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid header data - unsupported category",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid header data - unsupported category"
                     ));
                 }
             },
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid header data - missing category",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - missing category"
                 ));
             }
         }
         let value_types_line: Vec<u16> = match object_storage.next_line() {
             Some(line) => line,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid header data - missing value types",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - missing value types"
                 ));
             }
         };
         let values_line: Vec<u16> = match object_storage.next_line() {
             Some(line) => line,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid header data - missing values",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - missing values"
                 ));
             }
         };
@@ -148,9 +147,8 @@ impl EwfHeader2 {
         let number_of_values: usize = values.len();
 
         if number_of_values != value_types.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid header data - number of value types does not match number of values",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid header data - number of value types does not match number of values"
             ));
         }
         for value_index in 0..number_of_values {
@@ -214,23 +212,18 @@ impl EwfHeader2 {
         data_size: u64,
         position: SeekFrom,
         header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
         if data_size < 2 || data_size > 16777216 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported header data size: {} value out of bounds",
-                    data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported header2 data size: {} value out of bounds",
+                data_size
+            )));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "EwfHeader2 data of size: {} at offset: {} (0x{:08x})\n",
@@ -269,7 +262,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfHeader2::new();
@@ -283,7 +276,7 @@ mod tests {
     // TODO: add test with invalid checksum.
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

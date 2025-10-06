@@ -11,11 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};
+use super::errors::ErrorTrace;
 
 /// Fake (or virtual) data stream.
 pub struct FakeDataStream {
@@ -42,12 +42,12 @@ impl FakeDataStream {
 
 impl DataStream for FakeDataStream {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.current_offset >= self.size {
             return Ok(0);
         }
@@ -68,7 +68,7 @@ impl DataStream for FakeDataStream {
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
@@ -118,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read() -> io::Result<()> {
+    fn test_read() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_size: u64 = test_data.len() as u64;
         let mut data_stream: FakeDataStream = FakeDataStream::new(&test_data, data_size);

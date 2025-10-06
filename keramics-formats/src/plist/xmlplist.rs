@@ -12,13 +12,13 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::str::FromStr;
 
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest_derive::Parser;
 
+use keramics_core::ErrorTrace;
 use keramics_encodings::Base64Stream;
 
 use super::object::PlistObject;
@@ -42,18 +42,20 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist.
-    pub fn parse(&mut self, string: &str) -> io::Result<()> {
+    pub fn parse(&mut self, string: &str) -> Result<(), ErrorTrace> {
         let mut iterator: Pairs<Rule> = match XmlPlistParser::parse(Rule::plist_document, string) {
             Ok(iterator) => iterator,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to parse XML plist",
+                    error
+                ));
+            }
         };
         let token_pair: Pair<Rule> = match iterator.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Missing plist document"),
-                ));
+                return Err(keramics_core::error_trace_new!("Missing plist document"));
             }
         };
         let mut root_object: PlistObject = PlistObject::None;
@@ -67,10 +69,10 @@ impl XmlPlist {
                 }
                 Rule::EOI | Rule::miscellaneous | Rule::plist_prolog => {}
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported plist document rule: {:?}", rule),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported plist document rule: {:?}",
+                        rule
+                    )));
                 }
             }
         }
@@ -84,7 +86,7 @@ impl XmlPlist {
     fn parse_plist_array_content(
         &self,
         mut inner_pairs: Pairs<Rule>,
-    ) -> io::Result<Vec<PlistObject>> {
+    ) -> Result<Vec<PlistObject>, ErrorTrace> {
         let mut array_values: Vec<PlistObject> = Vec::new();
 
         while let Some(token_pair) = inner_pairs.next() {
@@ -97,10 +99,10 @@ impl XmlPlist {
                     array_values.push(object);
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported plist array content rule: {:?}", rule),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported plist array content rule: {:?}",
+                        rule
+                    )));
                 }
             };
         }
@@ -108,16 +110,16 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist array element.
-    fn parse_plist_array_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_array_element(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<PlistObject, ErrorTrace> {
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing array element",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing array element"));
             }
         };
         let array_values: Vec<PlistObject> =
@@ -127,10 +129,7 @@ impl XmlPlist {
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported array element",
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported array element"));
             }
             None => {}
         };
@@ -141,7 +140,7 @@ impl XmlPlist {
     fn parse_plist_dict_content(
         &self,
         mut inner_pairs: Pairs<Rule>,
-    ) -> io::Result<HashMap<String, PlistObject>> {
+    ) -> Result<HashMap<String, PlistObject>, ErrorTrace> {
         let mut dict_values: HashMap<String, PlistObject> = HashMap::new();
 
         while let Some(token_pair) = inner_pairs.next() {
@@ -154,10 +153,10 @@ impl XmlPlist {
                     dict_values.insert(key, object);
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported plist dict content rule: {:?}", rule),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported plist dict content rule: {:?}",
+                        rule
+                    )));
                 }
             };
         }
@@ -165,15 +164,17 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist dict element.
-    fn parse_plist_dict_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_dict_element(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<PlistObject, ErrorTrace> {
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing plist dict element",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing plist dict element"
                 ));
             }
         };
@@ -184,9 +185,8 @@ impl XmlPlist {
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported plist dict element",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported plist dict element"
                 ));
             }
             None => {}
@@ -195,7 +195,7 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist content.
-    fn parse_plist_content(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_content(&self, mut inner_pairs: Pairs<Rule>) -> Result<PlistObject, ErrorTrace> {
         let mut object: PlistObject = PlistObject::None;
 
         while let Some(token_pair) = inner_pairs.next() {
@@ -206,26 +206,26 @@ impl XmlPlist {
                     object = self.parse_plist_object_element(token_pair.into_inner())?;
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported plist content rule: {:?}", rule),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported plist content rule: {:?}",
+                        rule
+                    )));
                 }
             };
         }
         Ok(object)
     }
     /// Parses a XML plist data element.
-    fn parse_plist_data_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_data_element(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<PlistObject, ErrorTrace> {
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data element",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data element"));
             }
         };
         let encoded_data: &[u8] = token_pair.as_str().as_bytes();
@@ -242,10 +242,7 @@ impl XmlPlist {
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported data element",
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported data element"));
             }
             None => {}
         };
@@ -253,17 +250,14 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist element.
-    fn parse_plist_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_element(&self, mut inner_pairs: Pairs<Rule>) -> Result<PlistObject, ErrorTrace> {
         // TODO: parser plist version.
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing plist element",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing plist element"));
             }
         };
         let object: PlistObject = self.parse_plist_content(token_pair.into_inner())?;
@@ -272,10 +266,7 @@ impl XmlPlist {
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported plist element",
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported plist element"));
             }
             None => {}
         };
@@ -286,29 +277,32 @@ impl XmlPlist {
     fn parse_plist_floating_point_element(
         &self,
         mut inner_pairs: Pairs<Rule>,
-    ) -> io::Result<PlistObject> {
+    ) -> Result<PlistObject, ErrorTrace> {
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing floating-point element",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing floating-point element"
                 ));
             }
         };
         let floating_point_value: f64 = match f64::from_str(token_pair.as_str()) {
             Ok(floating_point_value) => floating_point_value,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to parse floating-point value",
+                    error
+                ));
+            }
         };
         inner_pairs.next();
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported floating-point element",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported floating-point element"
                 ));
             }
             None => {}
@@ -317,29 +311,33 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist integer element.
-    fn parse_plist_integer_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_integer_element(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<PlistObject, ErrorTrace> {
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing integer element",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing integer element"));
             }
         };
         let integer_value: i64 = match i64::from_str_radix(token_pair.as_str(), 10) {
             Ok(integer_value) => integer_value,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to parse integer value",
+                    error
+                ));
+            }
         };
         inner_pairs.next();
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported integer element",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported integer element"
                 ));
             }
             None => {}
@@ -351,14 +349,11 @@ impl XmlPlist {
     fn parse_plist_key_and_object_element_pair(
         &self,
         mut inner_pairs: Pairs<Rule>,
-    ) -> io::Result<(String, PlistObject)> {
+    ) -> Result<(String, PlistObject), ErrorTrace> {
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing plist key element",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing plist key element"));
             }
         };
         let key: String = self.parse_plist_string_element(token_pair.into_inner())?;
@@ -372,24 +367,22 @@ impl XmlPlist {
                     object = self.parse_plist_object_element(token_pair.into_inner())?;
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported plist key and object rule: {:?}", rule),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported plist key and object rule: {:?}",
+                        rule
+                    )));
                 }
             };
         }
         if object == PlistObject::None {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Missing plist object element",
+            return Err(keramics_core::error_trace_new!(
+                "Missing plist object element"
             ));
         };
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported plist key and object element pair",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported plist key and object element pair"
                 ));
             }
             None => {}
@@ -398,13 +391,15 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist object element.
-    fn parse_plist_object_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<PlistObject> {
+    fn parse_plist_object_element(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<PlistObject, ErrorTrace> {
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing plist object element",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing plist object element"
                 ));
             }
         };
@@ -432,17 +427,16 @@ impl XmlPlist {
                 PlistObject::String(string_value)
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported plist object rule: {:?}", rule),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported plist object rule: {:?}",
+                    rule
+                )));
             }
         };
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported plist object element",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported plist object element"
                 ));
             }
             None => {}
@@ -451,7 +445,10 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist string content.
-    fn parse_plist_string_content(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<String> {
+    fn parse_plist_string_content(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<String, ErrorTrace> {
         let mut string_parts: Vec<&str> = Vec::new();
 
         while let Some(token_pair) = inner_pairs.next() {
@@ -461,10 +458,10 @@ impl XmlPlist {
                     string_parts.push(token_pair.as_str());
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Unsupported plist string content rule: {:?}", rule),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported plist string content rule: {:?}",
+                        rule
+                    )));
                 }
             };
         }
@@ -472,16 +469,16 @@ impl XmlPlist {
     }
 
     /// Parses a XML plist string element.
-    fn parse_plist_string_element(&self, mut inner_pairs: Pairs<Rule>) -> io::Result<String> {
+    fn parse_plist_string_element(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+    ) -> Result<String, ErrorTrace> {
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing string element",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing string element"));
             }
         };
         let string_value: String = self.parse_plist_string_content(token_pair.into_inner())?;
@@ -490,9 +487,8 @@ impl XmlPlist {
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported string element",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported string element"
                 ));
             }
             None => {}
@@ -506,7 +502,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_xml() -> io::Result<()> {
+    fn test_read_xml() -> Result<(), ErrorTrace> {
         let test_data: String = [
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
             "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
@@ -547,7 +543,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_xml_with_array() -> io::Result<()> {
+    fn test_read_xml_with_array() -> Result<(), ErrorTrace> {
         let test_data: String = [
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
             "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",

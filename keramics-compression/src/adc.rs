@@ -15,8 +15,7 @@
 //!
 //! Provides decompression support for ADC compressed data.
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::bytes_to_u16_be;
 
@@ -43,7 +42,7 @@ impl AdcContext {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut compressed_data_offset: usize = 0;
         let compressed_data_size: usize = compressed_data.len();
 
@@ -58,9 +57,8 @@ impl AdcContext {
                 break;
             }
             if compressed_data_offset >= compressed_data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid compressed data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
                 ));
             }
             let oppcode: u8 = compressed_data[compressed_data_offset];
@@ -74,15 +72,13 @@ impl AdcContext {
                 let literal_size: u8 = (oppcode & 0x7f) + 1;
 
                 if literal_size as usize > compressed_data_size - compressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Literal size value exceeds compressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Literal size value exceeds compressed data size"
                     ));
                 }
                 if literal_size as usize > uncompressed_data_size - uncompressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Literal size value exceeds uncompressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Literal size value exceeds uncompressed data size"
                     ));
                 }
                 let compressed_data_end_offset: usize =
@@ -110,9 +106,8 @@ impl AdcContext {
 
                 if (oppcode & 0x40) != 0 {
                     if 2 > compressed_data_size - compressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     match_size = (oppcode & 0x3f) + 4;
@@ -121,9 +116,8 @@ impl AdcContext {
                     compressed_data_offset += 2;
                 } else {
                     if compressed_data_offset >= compressed_data_size {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     match_size = ((oppcode & 0x3f) >> 2) + 3;
@@ -133,21 +127,18 @@ impl AdcContext {
                     compressed_data_offset += 1;
                 }
                 if uncompressed_data_offset < 1 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid uncompressed data offset value out of bounds",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data offset value out of bounds"
                     ));
                 }
                 if distance as usize >= uncompressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid distance value exceeds uncompressed data offset",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid distance value exceeds uncompressed data offset"
                     ));
                 }
                 if match_size as usize > uncompressed_data_size - uncompressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid match size value exceeds uncompressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid match size value exceeds uncompressed data size"
                     ));
                 }
                 let match_offset: usize = uncompressed_data_offset - distance as usize - 1;
@@ -183,7 +174,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_decompress() -> io::Result<()> {
+    fn test_decompress() -> Result<(), ErrorTrace> {
         let test_data: [u8; 10] = [0x83, 0xfe, 0xed, 0xfa, 0xce, 0x00, 0x00, 0x40, 0x00, 0x06];
         let mut test_context: AdcContext = AdcContext::new();
 

@@ -13,7 +13,6 @@
 
 use std::ffi::{OsStr, OsString};
 use std::fs::{File, Metadata, metadata};
-use std::io;
 use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::UNIX_EPOCH;
@@ -24,7 +23,7 @@ use std::os::unix::fs::MetadataExt;
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::{DateTime, PosixTime32, PosixTime64Ns};
 
 use crate::enums::VfsFileType;
@@ -90,12 +89,19 @@ impl OsFileEntry {
     }
 
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         if self.file_type != VfsFileType::File {
             return Ok(None);
         }
-        let file: File = File::open(self.path.as_os_str())?;
-
+        let file: File = match File::open(self.path.as_os_str()) {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to open file",
+                    error
+                ));
+            }
+        };
         Ok(Some(Arc::new(RwLock::new(file))))
     }
 
@@ -118,11 +124,18 @@ impl OsFileEntry {
 
     /// Opens the file entry.
     #[cfg(unix)]
-    pub(crate) fn open(&mut self, path: &OsStr) -> io::Result<()> {
+    pub(crate) fn open(&mut self, path: &OsStr) -> Result<(), ErrorTrace> {
         let os_path: &Path = Path::new(path);
 
-        let file_metadata: Metadata = metadata(os_path)?;
-
+        let file_metadata: Metadata = match metadata(os_path) {
+            Ok(file_metadata) => file_metadata,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to retrieve file metadata",
+                    error
+                ));
+            }
+        };
         let mode: u32 = file_metadata.mode();
 
         self.file_type = match mode & 0xf000 {
@@ -133,10 +146,7 @@ impl OsFileEntry {
             0x8000 => VfsFileType::File,
             0xa000 => VfsFileType::SymbolicLink,
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported file mode",
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported file mode"));
             }
         };
         self.modification_time = Some(get_posix_datetime_value(
@@ -159,7 +169,12 @@ impl OsFileEntry {
                     duration.as_secs() as i64,
                     duration.subsec_nanos(),
                 ))),
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to determine creation time",
+                        error
+                    ));
+                }
             },
             Err(_) => None,
         };
@@ -170,7 +185,7 @@ impl OsFileEntry {
 
     /// Opens the file entry.
     #[cfg(windows)]
-    pub(crate) fn open(&mut self, path: &OsStr) -> io::Result<()> {
+    pub(crate) fn open(&mut self, path: &OsStr) -> Result<(), ErrorTrace> {
         // TODO: add Windows support.
         todo!();
     }
@@ -181,7 +196,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_access_time() -> io::Result<()> {
+    fn test_get_access_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
@@ -194,7 +209,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn test_get_change_time() -> io::Result<()> {
+    fn test_get_change_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
@@ -207,7 +222,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn test_get_creation_time() -> io::Result<()> {
+    fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
@@ -219,7 +234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_data_stream() -> io::Result<()> {
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
@@ -228,16 +243,18 @@ mod tests {
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("Missing data stream"),
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
         let mut test_data: Vec<u8> = vec![0; 202];
         let read_count: usize = match data_stream.write() {
             Ok(mut data_stream) => data_stream.read(&mut test_data)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
+                ));
+            }
         };
         assert_eq!(read_count, 202);
 
@@ -254,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
@@ -266,7 +283,7 @@ mod tests {
 
     #[test]
     #[cfg(unix)]
-    fn test_get_modification_time() -> io::Result<()> {
+    fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
 
@@ -280,7 +297,7 @@ mod tests {
     // TODO: add tests for get_name
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
         os_file_entry.open(OsStr::new("../test_data/file.txt"))?;

@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
@@ -77,26 +76,24 @@ impl UdifFileFooter {
     }
 
     /// Reads the file footer from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported UDIF file footer data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported UDIF file footer data size"
             ));
         }
         if data[0..4] != UDIF_FILE_FOOTER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported UDIF file footer signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported UDIF file footer signature"
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 4 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported format version: {}", format_version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format version: {}",
+                format_version
+            )));
         }
         self.data_fork_offset = bytes_to_u64_be!(data, 24);
         self.data_fork_size = bytes_to_u64_be!(data, 32);
@@ -158,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = UdifFileFooter::new();
@@ -202,7 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::Arc;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 
 use crate::enums::VfsFileType;
@@ -39,7 +38,7 @@ pub enum QcowFileEntry {
 
 impl QcowFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             QcowFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
             QcowFileEntry::Root { .. } => Ok(None),
@@ -63,7 +62,7 @@ impl QcowFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             QcowFileEntry::Layer { .. } => Ok(0),
             QcowFileEntry::Root { image } => Ok(image.get_number_of_layers()),
@@ -74,20 +73,27 @@ impl QcowFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<QcowFileEntry> {
+    ) -> Result<QcowFileEntry, ErrorTrace> {
         match self {
-            QcowFileEntry::Layer { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
-            QcowFileEntry::Root { image } => {
-                let qcow_layer: QcowImageLayer = image.get_layer_by_index(sub_file_entry_index)?;
-
-                Ok(QcowFileEntry::Layer {
+            QcowFileEntry::Layer { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
+            QcowFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
+                Ok(qcow_layer) => Ok(QcowFileEntry::Layer {
                     index: sub_file_entry_index,
                     layer: qcow_layer.clone(),
-                })
-            }
+                }),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve QCOW image layer: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            },
         }
     }
 }
@@ -98,7 +104,7 @@ mod tests {
 
     use keramics_core::{FileResolverReference, open_os_file_resolver};
 
-    fn get_image() -> io::Result<QcowImage> {
+    fn get_image() -> Result<QcowImage, ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/qcow")?;
@@ -110,7 +116,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
 
         let file_entry = QcowFileEntry::Root {
@@ -124,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
 
         let file_entry = QcowFileEntry::Root {
@@ -135,7 +141,6 @@ mod tests {
         assert!(name.is_none());
 
         let qcow_layer: QcowImageLayer = qcow_image.get_layer_by_index(0)?;
-
         let file_entry = QcowFileEntry::Layer {
             index: 0,
             layer: qcow_layer.clone(),

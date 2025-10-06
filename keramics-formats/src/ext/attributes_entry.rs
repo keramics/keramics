@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
 
@@ -60,11 +59,10 @@ impl ExtAttributesEntry {
     }
 
     /// Reads the attributes entry from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext attributes entry data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext attributes entry data size"
             ));
         }
         self.name_size = data[0];
@@ -77,13 +75,12 @@ impl ExtAttributesEntry {
     }
 
     /// Reads the attributes entry name from a buffer.
-    pub fn read_name(&self, data: &[u8]) -> io::Result<ByteString> {
+    pub fn read_name(&self, data: &[u8]) -> Result<ByteString, ErrorTrace> {
         let data_end_offset: usize = self.name_size as usize;
 
         if data.len() < data_end_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext attributes entry name size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext attributes entry name size"
             ));
         }
         let name_prefix: &str = match self.name_index {
@@ -96,10 +93,10 @@ impl ExtAttributesEntry {
             7 => "system.",
             8 => "system.richacl",
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported attribute name index: {}", self.name_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported attribute name index: {}",
+                    self.name_index
+                )));
             }
         };
         let mut name: ByteString = ByteString::new();
@@ -123,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtAttributesEntry::new();
@@ -148,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_name() -> io::Result<()> {
+    fn test_read_name() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtAttributesEntry::new();

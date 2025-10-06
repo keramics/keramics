@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_be;
 
@@ -39,17 +38,15 @@ impl QcowFileHeaderCommon {
     }
 
     /// Reads the file header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported QCOW file header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header data size"
             ));
         }
         if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported QCOW file header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header signature"
             ));
         }
         self.format_version = bytes_to_u32_be!(data, 4);
@@ -67,7 +64,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = QcowFileHeaderCommon::new();

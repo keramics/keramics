@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
@@ -94,17 +93,15 @@ impl NtfsBootRecord {
     }
 
     /// Reads the boot record from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported NTFS boot record data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported NTFS boot record data size"
             ));
         }
         if data[3..11] != NTFS_FILE_SYSTEM_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported file system signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported file system signature"
             ));
         }
         self.bytes_per_sector = bytes_to_u16_le!(data, 11);
@@ -113,10 +110,10 @@ impl NtfsBootRecord {
         self.volume_serial_number = bytes_to_u64_le!(data, 72);
 
         if !SUPPORTED_BYTES_PER_SECTOR.contains(&self.bytes_per_sector) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported bytes per sector: {}", self.bytes_per_sector),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported bytes per sector: {}",
+                self.bytes_per_sector
+            )));
         }
         let sectors_per_cluster_block: u32 = data[13] as u32;
 
@@ -126,37 +123,28 @@ impl NtfsBootRecord {
             // The size is calculated as: 2 ^ ( 256 - value ).
             let exponent: u32 = 256 - sectors_per_cluster_block;
             if exponent > 12 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported sectors per cluster block: {} value out of bounds",
-                        sectors_per_cluster_block
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported sectors per cluster block: {} value out of bounds",
+                    sectors_per_cluster_block
+                )));
             }
             1 << exponent
         };
         self.cluster_block_size *= self.bytes_per_sector as u32;
 
         if !SUPPORTED_CLUSTER_BLOCK_SIZE.contains(&self.cluster_block_size) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported sectors per cluster block: {}",
-                    sectors_per_cluster_block
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported sectors per cluster block: {}",
+                sectors_per_cluster_block
+            )));
         }
         let mft_entry_size: u32 = bytes_to_u32_le!(data, 64);
 
         if mft_entry_size == 0 || mft_entry_size > 255 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported MFT entry size: {} value out of bounds",
-                    mft_entry_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT entry size: {} value out of bounds",
+                mft_entry_size
+            )));
         }
         self.mft_entry_size = if mft_entry_size < 128 {
             mft_entry_size * self.cluster_block_size
@@ -164,37 +152,28 @@ impl NtfsBootRecord {
             // The size is calculated as: 2 ^ ( 256 - value ).
             let exponent: u32 = 256 - mft_entry_size;
             if exponent > 32 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported MFT entry size: {} value out of bounds",
-                        mft_entry_size
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported MFT entry size: {} value out of bounds",
+                    mft_entry_size
+                )));
             }
             1 << exponent
         };
         // Note that 42 is the minimum MFT entry size and 65535 is chosen given the fix-up values
         // and attributes offsets of the MFT entry are 16-bit.
         if self.mft_entry_size < 42 || self.mft_entry_size > 65535 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported MFT entry size: {} value out of bounds",
-                    mft_entry_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT entry size: {} value out of bounds",
+                mft_entry_size
+            )));
         }
         let index_entry_size: u32 = bytes_to_u32_le!(data, 68);
 
         if index_entry_size == 0 || index_entry_size > 255 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported index entry size: {} value out of bounds",
-                    index_entry_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported index entry size: {} value out of bounds",
+                index_entry_size
+            )));
         }
         self.index_entry_size = if index_entry_size < 128 {
             index_entry_size * self.cluster_block_size
@@ -202,36 +181,27 @@ impl NtfsBootRecord {
             // The size is calculated as: 2 ^ ( 256 - value ).
             let exponent: u32 = 256 - index_entry_size;
             if exponent > 32 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported index entry size: {} value out of bounds",
-                        index_entry_size
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported index entry size: {} value out of bounds",
+                    index_entry_size
+                )));
             }
             1 << exponent
         };
         // Note that 32 is the minimum index entry size and 16777216 is an arbitrary chosen limit.
         if self.index_entry_size < 32 || self.index_entry_size > 16777216 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported index entry size: {} value out of bounds",
-                    index_entry_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported index entry size: {} value out of bounds",
+                index_entry_size
+            )));
         }
         let number_of_sectors: u64 = bytes_to_u64_le!(data, 40);
 
         if number_of_sectors > u64::MAX / (self.bytes_per_sector as u64) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported number of sectors: {} value out of bounds",
-                    number_of_sectors
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported number of sectors: {} value out of bounds",
+                number_of_sectors
+            )));
         }
         Ok(())
     }
@@ -288,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsBootRecord::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -409,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

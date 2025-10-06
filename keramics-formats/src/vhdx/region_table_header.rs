@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
@@ -48,30 +47,25 @@ impl VhdxRegionTableHeader {
     }
 
     /// Reads the region table header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported VHDX region table header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHDX region table header data size"
             ));
         }
         if data[0..4] != VHDX_REGION_TABLE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported VHDX region table header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHDX region table header signature"
             ));
         }
         self.checksum = bytes_to_u32_le!(data, 4);
         self.number_of_entries = bytes_to_u32_le!(data, 8);
 
         if self.number_of_entries > 2047 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of entries: {} value out of bounds",
-                    self.number_of_entries,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of entries: {} value out of bounds",
+                self.number_of_entries,
+            )));
         }
         Ok(())
     }
@@ -89,7 +83,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdxRegionTableHeader::new();

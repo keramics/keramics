@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::process::ExitCode;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
@@ -23,15 +22,12 @@ use keramics_types::ByteString;
 use super::bodyfile;
 
 /// Retrieves the string representation of a date and time value.
-fn get_date_time_string(date_time: &DateTime) -> io::Result<String> {
+fn get_date_time_string(date_time: &DateTime) -> Result<String, ErrorTrace> {
     match date_time {
         DateTime::NotSet => Ok("Not set (0)".to_string()),
         DateTime::PosixTime32(posix_time32) => Ok(posix_time32.to_iso8601_string()),
         DateTime::PosixTime64Ns(posix_time64ns) => Ok(posix_time64ns.to_iso8601_string()),
-        _ => Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Unsupported date time"),
-        )),
+        _ => return Err(keramics_core::error_trace_new!("Unsupported date time")),
     }
 }
 
@@ -303,7 +299,7 @@ pub fn print_ext_file_system(data_stream: &DataStreamReference) -> ExitCode {
 }
 
 /// Prints information about an Extended File System (ext) file entry.
-fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
+fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> Result<(), ErrorTrace> {
     println!("    Inode number\t\t\t: {}", file_entry.inode_number);
 
     match file_entry.get_name() {
@@ -363,7 +359,14 @@ fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
         "    File mode\t\t\t\t: {} (0o{:0o})",
         file_mode_string, file_mode
     );
-    match file_entry.get_device_identifier()? {
+    let result: Option<u16> = match file_entry.get_device_identifier() {
+        Ok(result) => result,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to retrieve device identifier");
+            return Err(error);
+        }
+    };
+    match result {
         Some(device_identifier) => {
             println!(
                 "    Device number\t\t\t: {},{}",
@@ -373,7 +376,14 @@ fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
         }
         None => {}
     };
-    match file_entry.get_symbolic_link_target()? {
+    let result: Option<&ByteString> = match file_entry.get_symbolic_link_target() {
+        Ok(result) => result,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to retrieve symbolic link target");
+            return Err(error);
+        }
+    };
+    match result {
         Some(symbolic_link_target) => {
             println!(
                 "    Symbolic link target\t\t: {}",
@@ -382,7 +392,16 @@ fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
         }
         None => {}
     };
-    let number_of_attributes: usize = file_entry.get_number_of_attributes()?;
+    let number_of_attributes: usize = match file_entry.get_number_of_attributes() {
+        Ok(number_of_attributes) => number_of_attributes,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to retrieve number of extended attributes"
+            );
+            return Err(error);
+        }
+    };
     if number_of_attributes > 0 {
         println!("    Extended attributes:");
 
@@ -398,14 +417,33 @@ fn print_ext_file_entry(file_entry: &mut ExtFileEntry) -> io::Result<()> {
 fn print_ext_file_entry_bodyfile(
     file_entry: &mut ExtFileEntry,
     path_components: &mut Vec<String>,
-) -> io::Result<()> {
+    calculate_md5: bool,
+) -> Result<(), ErrorTrace> {
     let file_mode: u16 = file_entry.get_file_mode();
 
-    // TODO: have flag control calculate md5
-    // String::from("0")
-    let md5: String = match file_entry.get_data_stream()? {
-        Some(data_stream) => bodyfile::calculate_md5(&data_stream)?,
-        None => String::from("00000000000000000000000000000000"),
+    let md5: String = if !calculate_md5 {
+        String::from("0")
+    } else {
+        let result: Option<DataStreamReference> = match file_entry.get_data_stream() {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        };
+        match result {
+            Some(data_stream) => match bodyfile::calculate_md5(&data_stream) {
+                Ok(md5_string) => md5_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to calculate MD5 of data stream"
+                    );
+                    return Err(error);
+                }
+            },
+            None => String::from("00000000000000000000000000000000"),
+        }
     };
     let path: String = if file_entry.inode_number == 2 {
         String::from("/")
@@ -417,7 +455,14 @@ fn print_ext_file_entry_bodyfile(
         path_components.push(name_string);
         format!("/{}", path_components.join("/"))
     };
-    let path_suffix: String = match file_entry.get_symbolic_link_target()? {
+    let result: Option<&ByteString> = match file_entry.get_symbolic_link_target() {
+        Ok(result) => result,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to retrieve symbolic link target");
+            return Err(error);
+        }
+    };
+    let path_suffix: String = match result {
         Some(symbolic_link_target) => format!(" -> {}", symbolic_link_target.to_string()),
         None => String::new(),
     };
@@ -427,12 +472,36 @@ fn print_ext_file_entry_bodyfile(
     let group_identifier: u32 = file_entry.get_group_identifier();
     let size: u64 = file_entry.get_size();
 
-    let access_time: String = bodyfile::format_as_timestamp(file_entry.get_access_time())?;
+    let access_time: String = match bodyfile::format_as_timestamp(file_entry.get_access_time()) {
+        Ok(timestamp_string) => timestamp_string,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to format access time");
+            return Err(error);
+        }
+    };
     let modification_time: String =
-        bodyfile::format_as_timestamp(file_entry.get_modification_time())?;
-    let change_time: String = bodyfile::format_as_timestamp(file_entry.get_change_time())?;
-    let creation_time: String = bodyfile::format_as_timestamp(file_entry.get_creation_time())?;
-
+        match bodyfile::format_as_timestamp(file_entry.get_modification_time()) {
+            Ok(timestamp_string) => timestamp_string,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to format modification time");
+                return Err(error);
+            }
+        };
+    let change_time: String = match bodyfile::format_as_timestamp(file_entry.get_change_time()) {
+        Ok(timestamp_string) => timestamp_string,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to format change time");
+            return Err(error);
+        }
+    };
+    let creation_time: String = match bodyfile::format_as_timestamp(file_entry.get_creation_time())
+    {
+        Ok(timestamp_string) => timestamp_string,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to format creation time");
+            return Err(error);
+        }
+    };
     println!(
         "{}|{}{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
         md5,
@@ -455,7 +524,7 @@ fn print_ext_file_entry_bodyfile(
 fn print_ext_file_entry_path(
     file_entry: &ExtFileEntry,
     path_components: &mut Vec<String>,
-) -> io::Result<()> {
+) -> Result<(), ErrorTrace> {
     let path: String = if file_entry.inode_number == 2 {
         String::from("/")
     } else {
@@ -560,18 +629,69 @@ fn print_hierarcy_ext_file_entry(
     file_entry: &mut ExtFileEntry,
     path_components: &mut Vec<String>,
     in_bodyfile_format: bool,
-) -> io::Result<()> {
+) -> Result<(), ErrorTrace> {
     if in_bodyfile_format {
-        print_ext_file_entry_bodyfile(file_entry, path_components)?;
+        match print_ext_file_entry_bodyfile(file_entry, path_components, true) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to print file entry in bodyfile format"
+                );
+                return Err(error);
+            }
+        }
     } else {
-        print_ext_file_entry_path(file_entry, path_components)?;
+        match print_ext_file_entry_path(file_entry, path_components) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to print file entry path");
+                return Err(error);
+            }
+        }
     }
-    let number_of_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+    let number_of_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
+        Ok(number_of_file_entries) => number_of_file_entries,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to retrieve number of sub file entries"
+            );
+            return Err(error);
+        }
+    };
     for sub_file_entry_index in 0..number_of_file_entries {
         let mut sub_file_entry: ExtFileEntry =
-            file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?;
-
-        print_hierarcy_ext_file_entry(&mut sub_file_entry, path_components, in_bodyfile_format)?;
+            match file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
+                Ok(sub_file_entry) => sub_file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        match print_hierarcy_ext_file_entry(
+            &mut sub_file_entry,
+            path_components,
+            in_bodyfile_format,
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to print hierarchy of sub file entry: {}",
+                        sub_file_entry_index
+                    )
+                );
+                return Err(error);
+            }
+        }
     }
     if file_entry.inode_number != 2 {
         path_components.pop();
@@ -622,7 +742,25 @@ pub fn print_path_ext_file_system(data_stream: &DataStreamReference, path: &Stri
 mod tests {
     use super::*;
 
-    // TODO: add tests for get_date_time_string
+    use keramics_datetime::{PosixTime32, PosixTime64Ns};
+
+    #[test]
+    fn test_get_date_time_string() -> Result<(), ErrorTrace> {
+        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(1281643591));
+        let timestamp: String = get_date_time_string(&date_time)?;
+        assert_eq!(timestamp, "2010-08-12T20:06:31");
+
+        let date_time: DateTime =
+            DateTime::PosixTime64Ns(PosixTime64Ns::new(1281643591, 987654321));
+        let timestamp: String = get_date_time_string(&date_time)?;
+        assert_eq!(timestamp, "2010-08-12T20:06:31.987654321");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let timestamp: String = get_date_time_string(&date_time)?;
+        assert_eq!(timestamp, "Not set (0)");
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_mode_string() {

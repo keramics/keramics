@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::udif::UdifFile;
 
 use crate::enums::VfsFileType;
@@ -36,7 +35,7 @@ pub enum UdifFileEntry {
 
 impl UdifFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             UdifFileEntry::Layer { file, .. } => Ok(Some(file.clone())),
             UdifFileEntry::Root { .. } => Ok(None),
@@ -60,7 +59,7 @@ impl UdifFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             UdifFileEntry::Layer { .. } => Ok(0),
             UdifFileEntry::Root { .. } => Ok(1),
@@ -71,18 +70,17 @@ impl UdifFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<UdifFileEntry> {
+    ) -> Result<UdifFileEntry, ErrorTrace> {
         match self {
-            UdifFileEntry::Layer { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
+            UdifFileEntry::Layer { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
             UdifFileEntry::Root { file } => {
                 if sub_file_entry_index != 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("No sub file entry with index: {}", sub_file_entry_index),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "No sub file entry with index: {}",
+                        sub_file_entry_index
+                    )));
                 }
                 Ok(UdifFileEntry::Layer { file: file.clone() })
             }
@@ -96,7 +94,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file() -> io::Result<UdifFile> {
+    fn get_file() -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
         let data_stream: DataStreamReference =
@@ -109,7 +107,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let udif_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(get_file()?));
 
         let file_entry = UdifFileEntry::Root {
@@ -123,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let udif_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(get_file()?));
 
         let file_entry = UdifFileEntry::Root {

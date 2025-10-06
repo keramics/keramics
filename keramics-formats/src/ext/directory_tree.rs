@@ -12,11 +12,10 @@
  */
 
 use std::collections::BTreeMap;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, bytes_to_u32_le};
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
@@ -46,7 +45,7 @@ impl ExtDirectoryTree {
         data_stream: &DataStreamReference,
         block_ranges: &Vec<ExtBlockRange>,
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         for block_range in block_ranges.iter() {
             if block_range.range_type != ExtBlockRangeType::InFile {
                 break;
@@ -67,7 +66,7 @@ impl ExtDirectoryTree {
         &mut self,
         data: &[u8],
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         if self.mediator.debug_output {
@@ -97,7 +96,7 @@ impl ExtDirectoryTree {
         mut data_offset: usize,
         data_size: usize,
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         while data_offset < data_size {
             let mut entry: ExtDirectoryEntry = ExtDirectoryEntry::new();
 
@@ -111,13 +110,10 @@ impl ExtDirectoryTree {
                 break;
             }
             if entry.size < 8 || (entry.size as usize) > data_size - data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Invalid directory entry size: {} value out of bounds",
-                        entry.size
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid directory entry size: {} value out of bounds",
+                    entry.size
+                )));
             }
             data_offset += 8;
 
@@ -149,13 +145,11 @@ impl ExtDirectoryTree {
         data_stream: &DataStreamReference,
         position: SeekFrom,
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.block_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "ExtDirectoryTreeNode data of size: {} at offset: {} (0x{:08x})\n",
@@ -257,7 +251,7 @@ mod tests {
     // TODO: add tests for read_inline_data
 
     #[test]
-    fn test_read_node_data() -> io::Result<()> {
+    fn test_read_node_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtDirectoryTree::new(1024);
@@ -271,7 +265,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

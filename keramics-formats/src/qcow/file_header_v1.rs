@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
@@ -62,26 +61,24 @@ impl QcowFileHeaderV1 {
     }
 
     /// Reads the file header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 48 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported QCOW file header version 1 data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header version 1 data size"
             ));
         }
         if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported QCOW file header version 1 signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header version 1 signature"
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported format version: {}", format_version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format version: {}",
+                format_version
+            )));
         }
         self.backing_file_name_offset = bytes_to_u64_be!(data, 8);
         self.backing_file_name_size = bytes_to_u32_be!(data, 16);
@@ -92,22 +89,16 @@ impl QcowFileHeaderV1 {
         self.level1_table_offset = bytes_to_u64_be!(data, 40);
 
         if self.number_of_cluster_block_bits > 63 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of cluster block bits: {} value out of bounds",
-                    self.number_of_cluster_block_bits
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of cluster block bits: {} value out of bounds",
+                self.number_of_cluster_block_bits
+            )));
         }
         if self.number_of_level2_table_bits > 63 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of level2 table bits: {} value out of bounds",
-                    self.number_of_level2_table_bits
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of level2 table bits: {} value out of bounds",
+                self.number_of_level2_table_bits
+            )));
         }
         Ok(())
     }
@@ -127,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = QcowFileHeaderV1::new();

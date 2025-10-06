@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
@@ -57,26 +56,24 @@ impl UdifBlockTableHeader {
     }
 
     /// Reads the block table header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 204 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported UDIF block table header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported UDIF block table header data size"
             ));
         }
         if data[0..4] != UDIF_BLOCK_TABLE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported UDIF block table header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported UDIF block table header signature"
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported format version: {}", format_version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format version: {}",
+                format_version
+            )));
         }
         self.start_sector = bytes_to_u64_be!(data, 8);
         self.number_of_sectors = bytes_to_u64_be!(data, 16);
@@ -111,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = UdifBlockTableHeader::new();

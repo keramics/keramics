@@ -15,7 +15,7 @@
 //!
 //! Provides decoding support for Base64 data.
 
-use std::io;
+use keramics_core::ErrorTrace;
 
 /// Base64 encoded data stream.
 pub struct Base64Stream<'a> {
@@ -57,7 +57,7 @@ impl<'a> Base64Stream<'a> {
     }
 
     /// Retrieves a byte value.
-    pub fn get_value(&mut self) -> io::Result<Option<u8>> {
+    pub fn get_value(&mut self) -> Result<Option<u8>, ErrorTrace> {
         while self.number_of_bits < 8 {
             if self.data_offset >= self.data_size || self.found_padding {
                 break;
@@ -75,20 +75,20 @@ impl<'a> Base64Stream<'a> {
                 }
                 0x09 | 0x0a | 0x0b | 0x0d | 0x20 => {
                     if !self.skip_white_space {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!("Invalid base64 character value: 0x{:02x}", byte_value),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Invalid base64 character value: 0x{:02x}",
+                            byte_value
+                        )));
                     }
                     self.data_offset += 1;
 
                     continue;
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid base64 character value: 0x{:02x}", byte_value),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid base64 character value: 0x{:02x}",
+                        byte_value
+                    )));
                 }
             };
             self.bits = (self.bits << 6) | (sixtet as u32);
@@ -125,7 +125,7 @@ impl Base64Context {
     }
 
     /// Decode data.
-    pub fn decode(&mut self, encoded_data: &[u8], data: &mut [u8]) -> io::Result<()> {
+    pub fn decode(&mut self, encoded_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
         let mut base64_stream: Base64Stream = Base64Stream::new(&encoded_data, 0, false);
         let mut data_offset: usize = 0;
 
@@ -141,22 +141,18 @@ impl Base64Context {
                 padding_size = 4 - padding_size;
             }
             if padding_size > base64_stream.data_size - base64_stream.data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid encoded data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid encoded data value too small"
                 ));
             }
             let mut padding_offset: usize = base64_stream.data_offset;
             for _ in 0..padding_size {
                 let byte_value: u8 = base64_stream.data[padding_offset];
                 if byte_value != 0x3d {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid base64 padding character value: 0x{:02x}",
-                            byte_value
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid base64 padding character value: 0x{:02x}",
+                        byte_value
+                    )));
                 }
                 padding_offset += 1;
             }
@@ -170,7 +166,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_value() -> io::Result<()> {
+    fn test_get_value() -> Result<(), ErrorTrace> {
         let test_encoded_data: [u8; 22] = [
             0x56, 0x47, 0x68, 0x70, 0x63, 0x79, 0x42, 0x70, 0x63, 0x79, 0x44, 0x44, 0x6f, 0x53,
             0x42, 0x30, 0x5a, 0x58, 0x4e, 0x30, 0x4c, 0x67,
@@ -184,7 +180,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decode() -> io::Result<()> {
+    fn test_decode() -> Result<(), ErrorTrace> {
         let mut test_context: Base64Context = Base64Context::new();
 
         let test_encoded_data: [u8; 22] = [
@@ -206,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decode_with_padding() -> io::Result<()> {
+    fn test_decode_with_padding() -> Result<(), ErrorTrace> {
         let mut test_context: Base64Context = Base64Context::new();
 
         let test_encoded_data: [u8; 25] = [

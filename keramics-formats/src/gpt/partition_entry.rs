@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Utf16String, Uuid, bytes_to_u64_le};
 
@@ -55,11 +54,10 @@ impl GptPartitionEntry {
     }
 
     /// Reads the partition entry from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 128 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported GPT partition entry data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported GPT partition entry data size"
             ));
         }
         self.type_identifier = Uuid::from_le_bytes(&data[0..16]);
@@ -93,7 +91,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = GptPartitionEntry::new(1);

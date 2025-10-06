@@ -15,9 +15,8 @@
 //!
 //! Provides decompression support for ZLIB compressed data (RFC 1950).
 
-use std::io;
-
 use keramics_checksums::Adler32Context;
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::bytes_to_u32_be;
 
@@ -73,11 +72,10 @@ impl ZlibDataHeader {
     }
 
     /// Reads the data header.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 2 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported zlib data header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported zlib data header data size"
             ));
         }
         let compression_data: u8 = data[0];
@@ -85,22 +83,19 @@ impl ZlibDataHeader {
         let compression_method: u8 = compression_data & 0x0f;
 
         if compression_method != 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported compression method: {}", compression_method),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported compression method: {}",
+                compression_method
+            )));
         }
         let compression_window_bits: u8 = (compression_data >> 4) + 8;
         let compression_window_size: u32 = 1u32 << compression_window_bits;
 
         if compression_window_size > 32768 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported compression window size: {}",
-                    compression_window_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported compression window size: {}",
+                compression_window_size
+            )));
         }
         self.header_size = 2;
 
@@ -108,9 +103,8 @@ impl ZlibDataHeader {
 
         if flags & 0x20 != 0 {
             if data.len() < 6 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported zlib data header data size"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported zlib data header data size"
                 ));
             }
             self.header_size += 4;
@@ -142,7 +136,7 @@ impl ZlibContext {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_header: ZlibDataHeader = ZlibDataHeader::new();
 
         if self.mediator.debug_output {
@@ -174,13 +168,10 @@ impl ZlibContext {
             let calculated_checksum: u32 = adler32_context.finalize();
 
             if stored_checksum != calculated_checksum {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} zlib data checksums",
-                        stored_checksum, calculated_checksum
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    stored_checksum, calculated_checksum
+                )));
             }
         }
         self.uncompressed_data_size = deflate_context.uncompressed_data_size;
@@ -481,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_header() -> io::Result<()> {
+    fn test_read_data_header() -> Result<(), ErrorTrace> {
         let mut data_header: ZlibDataHeader = ZlibDataHeader::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -493,7 +484,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress() -> io::Result<()> {
+    fn test_decompress() -> Result<(), ErrorTrace> {
         let mut test_context: ZlibContext = ZlibContext::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -501,7 +492,15 @@ mod tests {
         test_context.decompress(&test_data, &mut uncompressed_data)?;
         assert_eq!(test_context.uncompressed_data_size, 11358);
 
-        let expected_data: Vec<u8> = fs::read("../LICENSE")?;
+        let expected_data: Vec<u8> = match fs::read("../LICENSE") {
+            Ok(data) => data,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable read test reference file",
+                    error
+                ));
+            }
+        };
         assert_eq!(&uncompressed_data, &expected_data);
 
         Ok(())

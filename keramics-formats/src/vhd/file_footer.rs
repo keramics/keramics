@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_be, bytes_to_u64_be};
 
@@ -73,26 +72,24 @@ impl VhdFileFooter {
     }
 
     /// Reads the file footer from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported VHD file footer data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHD file footer data size"
             ));
         }
         if data[0..8] != VHD_FILE_FOOTER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported VHD file footer signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHD file footer signature"
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 12);
 
         if format_version != 0x00010000 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported format version: 0x{:08x}", format_version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format version: 0x{:08x}",
+                format_version
+            )));
         }
         self.next_offset = bytes_to_u64_be!(data, 16);
         self.data_size = bytes_to_u64_be!(data, 40);
@@ -102,23 +99,23 @@ impl VhdFileFooter {
         // TODO: calculate and compare checksum.
 
         if !VHD_DISK_TYPES.contains(&self.disk_type) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported disk type: {}", self.disk_type),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported disk type: {}",
+                self.disk_type
+            )));
         }
         if self.disk_type == VHD_DISK_TYPE_FIXED {
             if self.next_offset != 0xffffffffffffffff {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Unsupported next offset: 0x{:08x}", self.next_offset),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported next offset: 0x{:08x}",
+                    self.next_offset
+                )));
             }
         } else if self.next_offset < 512 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported next offset: 0x{:08x}", self.next_offset),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported next offset: 0x{:08x}",
+                self.next_offset
+            )));
         }
         Ok(())
     }
@@ -175,7 +172,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdFileFooter::new();
@@ -231,7 +228,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

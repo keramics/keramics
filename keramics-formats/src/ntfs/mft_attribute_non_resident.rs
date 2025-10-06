@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u64_le};
 
@@ -75,32 +74,27 @@ impl NtfsMftAttributeNonResident {
     }
 
     /// Reads the MFT non-resident attribute from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         if data_size < 48 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported MFT non-resident attribute data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported MFT non-resident attribute data size"
             ));
         }
         let compression_unit_size: u16 = bytes_to_u16_le!(data, 18);
 
         if compression_unit_size > 0 {
             if data_size < 56 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported MFT non-resident attribute data size"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported MFT non-resident attribute data size"
                 ));
             }
             // The size is calculated as: 2 ^ value
             if compression_unit_size > 31 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported compression unit size: {} value out of bounds",
-                        compression_unit_size
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported compression unit size: {} value out of bounds",
+                    compression_unit_size
+                )));
             }
             self.compression_unit_size = 1 << (compression_unit_size as u32);
         }
@@ -132,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsMftAttributeNonResident::new();
 
         let test_data: Vec<u8> = get_test_data();

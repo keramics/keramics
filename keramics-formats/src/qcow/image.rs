@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::FileResolverReference;
+use keramics_core::{DataStreamReference, ErrorTrace, FileResolverReference};
 
 use super::file::QcowFile;
 
@@ -38,13 +37,13 @@ impl QcowImage {
     }
 
     /// Retrieves a layer by index.
-    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<QcowImageLayer> {
+    pub fn get_layer_by_index(&self, layer_index: usize) -> Result<QcowImageLayer, ErrorTrace> {
         match self.files.get(layer_index) {
             Some(file) => Ok(file.clone()),
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("No layer with index: {}", layer_index),
-            )),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No layer with index: {}",
+                layer_index
+            ))),
         }
     }
 
@@ -53,34 +52,52 @@ impl QcowImage {
         &mut self,
         file_resolver: &FileResolverReference,
         file_name: &str,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut files: Vec<QcowFile> = Vec::new();
 
-        let mut file: QcowFile = QcowFile::new();
-
-        match file_resolver.get_data_stream(&mut vec![file_name])? {
-            Some(data_stream) => file.read_data_stream(&data_stream)?,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", file_name),
-                ));
-            }
-        };
-        while let Some(file_name) = file.get_backing_file_name() {
-            let mut backing_file: QcowFile = QcowFile::new();
-
-            let backing_file_name: String = file_name.to_string();
-
-            match file_resolver.get_data_stream(&mut vec![backing_file_name.as_str()])? {
-                Some(data_stream) => backing_file.read_data_stream(&data_stream)?,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("Missing backing file: {}", backing_file_name),
-                    ));
+        let result: Option<DataStreamReference> =
+            match file_resolver.get_data_stream(&mut vec![file_name]) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                    return Err(error);
                 }
             };
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No such file: {}",
+                    file_name
+                )));
+            }
+        };
+        let mut file: QcowFile = QcowFile::new();
+        file.read_data_stream(&data_stream)?;
+
+        while let Some(file_name) = file.get_backing_file_name() {
+            let backing_file_name: String = file_name.to_string();
+
+            let result: Option<DataStreamReference> =
+                match file_resolver.get_data_stream(&mut vec![backing_file_name.as_str()]) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open backing file");
+                        return Err(error);
+                    }
+                };
+            let data_stream: DataStreamReference = match result {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing backing file: {}",
+                        backing_file_name
+                    )));
+                }
+            };
+            let mut backing_file: QcowFile = QcowFile::new();
+            backing_file.read_data_stream(&data_stream)?;
+
             files.push(file);
 
             file = backing_file;
@@ -106,7 +123,7 @@ mod tests {
 
     use keramics_core::open_os_file_resolver;
 
-    fn get_image() -> io::Result<QcowImage> {
+    fn get_image() -> Result<QcowImage, ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/qcow")?;
@@ -116,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_layers() -> io::Result<()> {
+    fn test_get_number_of_layers() -> Result<(), ErrorTrace> {
         let image: QcowImage = get_image()?;
 
         assert_eq!(image.get_number_of_layers(), 1);
@@ -125,20 +142,25 @@ mod tests {
     }
 
     #[test]
-    fn test_get_layer_by_index() -> io::Result<()> {
+    fn test_get_layer_by_index() -> Result<(), ErrorTrace> {
         let image: QcowImage = get_image()?;
 
         let layer: QcowImageLayer = image.get_layer_by_index(0)?;
 
         match layer.read() {
             Ok(file) => assert_eq!(file.media_size, 4194304),
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on QCOW layer",
+                    error
+                ));
+            }
         };
         Ok(())
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/qcow")?;

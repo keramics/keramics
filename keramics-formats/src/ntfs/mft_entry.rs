@@ -11,11 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
 use super::fixup_values::apply_fixup_values;
@@ -72,16 +71,19 @@ impl NtfsMftEntry {
     }
 
     /// Reads the attributes.
-    pub fn read_attributes(&self, mft_attributes: &mut NtfsMftAttributes) -> io::Result<()> {
+    pub fn read_attributes(
+        &self,
+        mft_attributes: &mut NtfsMftAttributes,
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = self.attributes_offset as usize;
         let data_size: usize = self.data.len();
 
         loop {
             if data_offset > data_size - 4 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid data offset: {} value out of bounds", data_offset,),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid data offset: {} value out of bounds",
+                    data_offset
+                )));
             }
             let data_end_offset: usize = data_offset + 4;
             if self.data[data_offset..data_end_offset] == END_OF_ATTRIBUTES_MARKER {
@@ -98,7 +100,7 @@ impl NtfsMftEntry {
     }
 
     /// Reads the MFT entry from a buffer.
-    fn read_data(&mut self, data: &mut [u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &mut [u8]) -> Result<(), ErrorTrace> {
         if data[0..4] == [0; 4] {
             self.is_empty = true;
 
@@ -119,24 +121,18 @@ impl NtfsMftEntry {
         mft_entry_header.read_data(data)?;
 
         if mft_entry_header.mft_entry_size as usize != data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Mismatch between MFT entry size in header: {} and boot record: {}",
-                    mft_entry_header.mft_entry_size, data_size,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between MFT entry size in header: {} and boot record: {}",
+                mft_entry_header.mft_entry_size, data_size,
+            )));
         }
         if mft_entry_header.fixup_values_offset < 42
             || mft_entry_header.fixup_values_offset as usize > data_size
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid fix-up values offset: {} value out of bounds",
-                    mft_entry_header.fixup_values_offset,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid fix-up values offset: {} value out of bounds",
+                mft_entry_header.fixup_values_offset,
+            )));
         }
         // In NTFS 1.2 the fix-up values offset can point to wfixupPattern.
         let header_size: u16 = if mft_entry_header.fixup_values_offset == 42 {
@@ -147,22 +143,16 @@ impl NtfsMftEntry {
         if mft_entry_header.attributes_offset < header_size
             || mft_entry_header.attributes_offset as usize > data_size
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid attributes offset: {} value out of bounds",
-                    mft_entry_header.attributes_offset,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid attributes offset: {} value out of bounds",
+                mft_entry_header.attributes_offset,
+            )));
         }
         if mft_entry_header.fixup_values_offset >= mft_entry_header.attributes_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Fix-up values offset: {} exceeds attributes offset: {}",
-                    mft_entry_header.fixup_values_offset, mft_entry_header.attributes_offset,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Fix-up values offset: {} exceeds attributes offset: {}",
+                mft_entry_header.fixup_values_offset, mft_entry_header.attributes_offset,
+            )));
         }
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
         apply_fixup_values(
@@ -185,24 +175,19 @@ impl NtfsMftEntry {
         data_stream: &DataStreamReference,
         data_size: u32,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         // Note that 42 is the minimum MFT entry size and 65535 is chosen given the fix-up values
         // and attributes offsets of the MFT entry are 16-bit.
         if data_size < 42 || data_size > 65535 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported MFT entry data size: {} value out of bounds",
-                    data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT entry data size: {} value out of bounds",
+                data_size
+            )));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "NtfsMftEntry data of size: {} at offset: {} (0x{:08x})\n",
@@ -307,7 +292,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_attributes() -> io::Result<()> {
+    fn test_read_attributes() -> Result<(), ErrorTrace> {
         let mut test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = NtfsMftEntry::new();
@@ -333,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_data: Vec<u8> = get_test_data();
 
         assert_eq!(test_data[510..512], test_data[48..50]);
@@ -366,7 +351,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let test_data_size: u32 = test_data.len() as u32;
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);

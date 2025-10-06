@@ -11,11 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::fixup_values::apply_fixup_values;
 use super::index_entry_header::NtfsIndexEntryHeader;
@@ -39,7 +38,7 @@ impl NtfsIndexEntry {
     }
 
     /// Reads the index entry from a buffer.
-    pub(super) fn read_data(&mut self, data: &mut [u8]) -> io::Result<()> {
+    pub(super) fn read_data(&mut self, data: &mut [u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         let mut index_entry_header: NtfsIndexEntryHeader = NtfsIndexEntryHeader::new();
 
@@ -52,13 +51,10 @@ impl NtfsIndexEntry {
         if index_entry_header.fixup_values_offset < 32
             || index_entry_header.fixup_values_offset as usize > data_size
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid fix-up values offset: {} value out of bounds",
-                    index_entry_header.fixup_values_offset,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid fix-up values offset: {} value out of bounds",
+                index_entry_header.fixup_values_offset,
+            )));
         }
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
         apply_fixup_values(
@@ -77,24 +73,19 @@ impl NtfsIndexEntry {
         data_stream: &DataStreamReference,
         data_size: u32,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         // Note that 42 is the minimum index entry size and 65535 is chosen given the fix-up values
         // and attributes offsets of the index entry are 16-bit.
         if data_size < 42 || data_size > 65535 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported index entry data size: {} value out of bounds",
-                    data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported index entry data size: {} value out of bounds",
+                data_size
+            )));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "NtfsIndexEntry data of size: {} at offset: {} (0x{:08x})\n",
@@ -415,7 +406,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_data: Vec<u8> = get_test_data();
 
         assert_eq!(test_data[510..512], test_data[40..42]);
@@ -441,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let test_data_size: u32 = test_data.len() as u32;
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);

@@ -15,8 +15,7 @@
 //!
 //! Provides Huffman tree support.
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::traits::Bitstream;
@@ -53,17 +52,14 @@ impl HuffmanTree {
     }
 
     /// Builds the Huffman tree from code sizes.
-    pub fn build(&mut self, code_sizes: &[u8]) -> io::Result<()> {
+    pub fn build(&mut self, code_sizes: &[u8]) -> Result<(), ErrorTrace> {
         let number_of_code_sizes: usize = code_sizes.len();
 
         if number_of_code_sizes > u16::MAX as usize {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Invalid number of code sizes: {} value out of bounds",
-                    number_of_code_sizes
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of code sizes: {} value out of bounds",
+                number_of_code_sizes
+            )));
         }
         // Determine the code size frequencies.
         self.code_size_counts.fill(0);
@@ -72,21 +68,15 @@ impl HuffmanTree {
             let code_size: usize = code_sizes[symbol] as usize;
 
             if code_size > self.largest_code_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Invalid code size: {} value out of bounds: 0 - {}",
-                        code_size, self.largest_code_size
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid code size: {} value out of bounds: 0 - {}",
+                    code_size, self.largest_code_size
+                )));
             }
             self.code_size_counts[code_size] += 1;
         }
         if self.code_size_counts[0] == number_of_code_sizes as isize {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Huffman tree has no codes",
-            ));
+            return Err(keramics_core::error_trace_new!("Huffman tree has no codes"));
         }
         // Check if the set of code sizes is incomplete or over-subscribed
         let mut left_value: isize = 1;
@@ -95,17 +85,15 @@ impl HuffmanTree {
             left_value = (left_value << 1) - self.code_size_counts[bit_index];
 
             if left_value < 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Code sizes are over-subscribed",
+                return Err(keramics_core::error_trace_new!(
+                    "Code sizes are over-subscribed"
                 ));
             }
         }
         /* TODO
         if left_value > 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Code sizes are incomplete",
+            return Err(keramics_core::error_trace_new!(
+                "Code sizes are incomplete"
             ));
         }
         */
@@ -131,13 +119,10 @@ impl HuffmanTree {
                 let code_offset: isize = symbol_offsets[code_size];
 
                 if code_offset < 0 || code_offset > number_of_code_sizes as isize {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!(
-                            "Invalid symbol: {} code offset: {} value out bounds",
-                            symbol, code_offset
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid symbol: {} code offset: {} value out bounds",
+                        symbol, code_offset
+                    )));
                 }
                 symbol_offsets[code_size] += 1;
 
@@ -157,7 +142,7 @@ impl HuffmanTree {
     }
 
     /// Decodes a symbol from a bitstream.
-    pub fn decode_symbol(&self, bitstream: &mut dyn Bitstream) -> io::Result<u16> {
+    pub fn decode_symbol(&self, bitstream: &mut dyn Bitstream) -> Result<u16, ErrorTrace> {
         let mut first_huffman_code: isize = 0;
         let mut huffman_code: isize = 0;
         let mut first_index: isize = 0;
@@ -177,10 +162,10 @@ impl HuffmanTree {
             first_huffman_code <<= 1;
             first_index += code_size_count;
         }
-        Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Invalid Huffman code: 0x{:x}", huffman_code),
-        ))
+        Err(keramics_core::error_trace_new!(format!(
+            "Invalid Huffman code: 0x{:x}",
+            huffman_code
+        )))
     }
 }
 
@@ -210,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn test_huffman_tree_build() -> io::Result<()> {
+    fn test_huffman_tree_build() -> Result<(), ErrorTrace> {
         let code_sizes: Vec<u8> = get_code_sizes();
 
         let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
@@ -221,7 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_huffman_tree_decode_symbol() -> io::Result<()> {
+    fn test_huffman_tree_decode_symbol() -> Result<(), ErrorTrace> {
         let code_sizes: Vec<u8> = get_code_sizes();
 
         let mut test_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);

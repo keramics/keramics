@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_checksums::Adler32Context;
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::error2_entry::EwfError2Entry;
 use super::error2_footer::EwfError2Footer;
@@ -41,7 +40,7 @@ impl EwfError2 {
     }
 
     /// Reads the error2 from a buffer.
-    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut error2_header: EwfError2Header = EwfError2Header::new();
 
         if self.mediator.debug_output {
@@ -71,13 +70,10 @@ impl EwfError2 {
         let calculated_checksum: u32 = adler32_context.finalize();
 
         if error2_footer.checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} EWF error2 entries checksums",
-                    error2_footer.checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                error2_footer.checksum, calculated_checksum
+            )));
         }
         for _ in 0..error2_header.number_of_entries {
             let data_end_offset: usize = data_offset + 8;
@@ -103,23 +99,18 @@ impl EwfError2 {
         data_stream: &DataStreamReference,
         data_size: u64,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
         if data_size < 28 || data_size > 16777216 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported error2 data size: {} value out of bounds",
-                    data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported error2 data size: {} value out of bounds",
+                data_size
+            )));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "EwfError2 data of size: {} at offset: {} (0x{:08x})\n",
@@ -183,7 +174,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfError2::new();
@@ -205,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

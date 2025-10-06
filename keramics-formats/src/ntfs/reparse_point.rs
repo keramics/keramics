@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::Mediator;
 
 use super::constants::*;
@@ -58,7 +57,7 @@ impl NtfsReparsePoint {
     }
 
     /// Reads the reparse data from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         match self {
             NtfsReparsePoint::SymbolicLink { reparse_data } => reparse_data.read_data(data),
             NtfsReparsePoint::WindowsOverlayFilter { reparse_data } => reparse_data.read_data(data),
@@ -67,20 +66,16 @@ impl NtfsReparsePoint {
     }
 
     /// Reads a reparse point from a MFT attribute.
-    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> io::Result<Self> {
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
         if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_REPARSE_POINT {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported attribute type: 0x{:08x}.",
-                    mft_attribute.attribute_type
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute type: 0x{:08x}",
+                mft_attribute.attribute_type
+            )));
         }
         if !mft_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported non-resident $REPARSE_POINT attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported non-resident $REPARSE_POINT attribute"
             ));
         }
         let mediator = Mediator::current();
@@ -128,7 +123,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsReparsePoint::new(0x80000017);
 
         let test_data: Vec<u8> = vec![

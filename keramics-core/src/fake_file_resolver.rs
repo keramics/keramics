@@ -11,9 +11,8 @@
  * under the License.
  */
 
-use std::io;
-
 use super::data_stream::DataStreamReference;
+use super::errors::ErrorTrace;
 use super::file_resolver::FileResolver;
 
 pub struct FakeFileResolver {}
@@ -30,7 +29,7 @@ impl FileResolver for FakeFileResolver {
     fn get_data_stream<'a>(
         &'a self,
         _path_components: &mut Vec<&'a str>,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         Ok(None)
     }
 }
@@ -40,7 +39,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_data_stream() -> io::Result<()> {
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let file_resolver: FakeFileResolver = FakeFileResolver::new();
 
         let mut path_components: Vec<&str> = vec!["file.txt"];

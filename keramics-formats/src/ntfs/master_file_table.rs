@@ -12,10 +12,9 @@
  */
 
 use std::collections::HashSet;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
 
@@ -55,7 +54,7 @@ impl NtfsMasterFileTable {
     }
 
     /// Adds a cluster group to the master file table.
-    fn add_cluster_group(&mut self, cluster_group: &NtfsClusterGroup) -> io::Result<()> {
+    fn add_cluster_group(&mut self, cluster_group: &NtfsClusterGroup) -> Result<(), ErrorTrace> {
         let mut virtual_cluster_number: u64 = cluster_group.first_vcn;
         let mut virtual_cluster_offset: u64 =
             cluster_group.first_vcn * (self.cluster_block_size as u64);
@@ -64,23 +63,17 @@ impl NtfsMasterFileTable {
             let range_size: u64 = data_run.number_of_blocks * (self.cluster_block_size as u64);
 
             if range_size % (self.mft_entry_size as u64) != 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported data run - size: {} not a multitude of MFT entry size: {}.",
-                        range_size, self.mft_entry_size,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported data run - size: {} not a multitude of MFT entry size: {}",
+                    range_size, self.mft_entry_size,
+                )));
             }
             self.number_of_entries += range_size / (self.mft_entry_size as u64);
 
             let range_type: NtfsBlockRangeType = match &data_run.run_type {
                 NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported data run type.",
-                    ));
+                    return Err(keramics_core::error_trace_new!("Unsupported data run type"));
                 }
             };
             let block_range: NtfsBlockRange = NtfsBlockRange::new(
@@ -94,7 +87,12 @@ impl NtfsMasterFileTable {
                 .insert_value(virtual_cluster_offset, range_size, block_range)
             {
                 Ok(_) => {}
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to insert block range into block tree",
+                        error
+                    ));
+                }
             };
             virtual_cluster_number += data_run.number_of_blocks;
             virtual_cluster_offset += range_size;
@@ -102,13 +100,10 @@ impl NtfsMasterFileTable {
         if cluster_group.last_vcn != 0xffffffffffffffff
             && cluster_group.last_vcn + 1 != virtual_cluster_number
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Cluster group last VNC: {} does not match expected value.",
-                    cluster_group.last_vcn
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Cluster group last VNC: {} does not match expected value",
+                cluster_group.last_vcn
+            )));
         }
         Ok(())
     }
@@ -118,16 +113,16 @@ impl NtfsMasterFileTable {
         &self,
         data_stream: &DataStreamReference,
         entry_number: u64,
-    ) -> io::Result<NtfsMftEntry> {
+    ) -> Result<NtfsMftEntry, ErrorTrace> {
         let virtual_cluster_offset: u64 = entry_number * (self.mft_entry_size as u64);
 
         let block_range: &NtfsBlockRange = match self.block_tree.get_value(virtual_cluster_offset) {
             Some(value) => value,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Missing block range for MFT entry: {}", entry_number),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for MFT entry: {}",
+                    entry_number
+                )));
             }
         };
         let range_relative_offset: u64 =
@@ -153,21 +148,19 @@ impl NtfsMasterFileTable {
         mft_entry_size: u32,
         data_stream: &DataStreamReference,
         mft_block_number: u64,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut mft_entry: NtfsMftEntry = NtfsMftEntry::new();
         let mft_offset: u64 = mft_block_number * (cluster_block_size as u64);
 
         mft_entry.read_at_position(data_stream, mft_entry_size, SeekFrom::Start(mft_offset))?;
         if mft_entry.is_bad {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported marked bad MFT entry: 0.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported marked bad MFT entry: 0"
             ));
         }
         if !mft_entry.is_allocated {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported unallocated MFT entry: 0.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported unallocated MFT entry: 0"
             ));
         }
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
@@ -177,22 +170,19 @@ impl NtfsMasterFileTable {
             match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => mft_attribute,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Missing $Data attribute in MFT entry: 0.",
+                    return Err(keramics_core::error_trace_new!(
+                        "Missing $Data attribute in MFT entry: 0"
                     ));
                 }
             };
         if data_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported resident $DATA attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident $DATA attribute"
             ));
         }
         if data_attribute.is_compressed() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported compressed $DATA attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compressed $DATA attribute"
             ));
         }
         let block_tree_size: u64 =
@@ -258,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn test_add_cluster_group() -> io::Result<()> {
+    fn test_add_cluster_group() -> Result<(), ErrorTrace> {
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         data_attribute.read_data(&test_mft_attribute_data)?;

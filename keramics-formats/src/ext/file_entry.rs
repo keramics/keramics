@@ -13,11 +13,10 @@
 
 use std::cmp::max;
 use std::collections::BTreeMap;
-use std::io;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStream, DataStreamReference, FakeDataStream};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_types::{ByteString, bytes_to_u16_le};
 
@@ -97,18 +96,15 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the device identifier.
-    pub fn get_device_identifier(&mut self) -> io::Result<Option<u16>> {
+    pub fn get_device_identifier(&mut self) -> Result<Option<u16>, ErrorTrace> {
         if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_CHARACTER_DEVICE
             || self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_BLOCK_DEVICE
         {
             if self.inode.data_size > 2 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid device identifier data size: {} value out of bounds",
-                        self.inode.data_size,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid device identifier data size: {} value out of bounds",
+                    self.inode.data_size,
+                )));
             }
             let device_identifier: u16 = bytes_to_u16_le!(&self.inode.data_reference, 0);
             return Ok(Some(device_identifier));
@@ -157,18 +153,15 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the symbolic link target.
-    pub fn get_symbolic_link_target(&mut self) -> io::Result<Option<&ByteString>> {
+    pub fn get_symbolic_link_target(&mut self) -> Result<Option<&ByteString>, ErrorTrace> {
         if self.symbolic_link_target.is_none()
             && self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_SYMBOLIC_LINK
         {
             if self.inode.data_size > (self.inode_table.block_size as u64) {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid symbolic link target data size: {} value out of bounds",
-                        self.inode.data_size,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid symbolic link target data size: {} value out of bounds",
+                    self.inode.data_size,
+                )));
             }
             // TODO: move read from data_reference into block_stream?
             let byte_string: ByteString = if self.inode.data_size < 60 {
@@ -189,8 +182,16 @@ impl ExtFileEntry {
                 )?;
 
                 let mut data: Vec<u8> = vec![0; self.inode.data_size as usize];
-                block_stream.read_exact(&mut data)?;
-
+                match block_stream.read_exact(&mut data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read symbolic link target data from block stream"
+                        );
+                        return Err(error);
+                    }
+                }
                 ByteString::from_bytes(&data)
             };
             self.symbolic_link_target = Some(byte_string);
@@ -199,14 +200,14 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the number of attributes.
-    pub fn get_number_of_attributes(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_attributes(&mut self) -> Result<usize, ErrorTrace> {
         Ok(self.inode.attributes.len())
     }
 
     // TODO: add get extended_attributes iterator
 
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
             return Ok(None);
         }
@@ -233,7 +234,7 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
@@ -244,7 +245,7 @@ impl ExtFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<ExtFileEntry> {
+    ) -> Result<ExtFileEntry, ErrorTrace> {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
@@ -252,10 +253,10 @@ impl ExtFileEntry {
             match self.directory_entries.iter().nth(sub_file_entry_index) {
                 Some(key_and_value) => key_and_value,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Missing directory entry: {}", sub_file_entry_index),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing directory entry: {}",
+                        sub_file_entry_index
+                    )));
                 }
             };
         let inode: ExtInode = self
@@ -278,7 +279,7 @@ impl ExtFileEntry {
     pub fn get_sub_file_entry_by_name(
         &mut self,
         sub_file_entry_name: &ByteString,
-    ) -> io::Result<Option<ExtFileEntry>> {
+    ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
         if !self.read_directory_entries {
             self.read_directory_entries()?;
         }
@@ -302,7 +303,7 @@ impl ExtFileEntry {
     }
 
     /// Reads the directory entries.
-    fn read_directory_entries(&mut self) -> io::Result<()> {
+    fn read_directory_entries(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY {
             let mut directory_tree: ExtDirectoryTree =
                 ExtDirectoryTree::new(self.inode_table.block_size);
@@ -335,7 +336,7 @@ mod tests {
     use crate::ext::file_system::ExtFileSystem;
     use crate::ext::path::ExtPath;
 
-    fn get_file_system() -> io::Result<ExtFileSystem> {
+    fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
@@ -345,7 +346,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_access_time() -> io::Result<()> {
+    fn test_get_access_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -363,7 +364,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_change_time() -> io::Result<()> {
+    fn test_get_change_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -381,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_creation_time() -> io::Result<()> {
+    fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -394,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_device_identifier() -> io::Result<()> {
+    fn test_get_device_identifier() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -410,7 +411,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_mode() -> io::Result<()> {
+    fn test_get_file_mode() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -423,7 +424,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_group_identifier() -> io::Result<()> {
+    fn test_get_group_identifier() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -436,7 +437,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_deletion_time() -> io::Result<()> {
+    fn test_get_deletion_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -449,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_modification_time() -> io::Result<()> {
+    fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -467,7 +468,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_name() -> io::Result<()> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -481,7 +482,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_links() -> io::Result<()> {
+    fn test_get_number_of_links() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -494,7 +495,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_owner_identifier() -> io::Result<()> {
+    fn test_get_owner_identifier() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -507,7 +508,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_size() -> io::Result<()> {
+    fn test_get_size() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -520,7 +521,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_symbolic_link_target() -> io::Result<()> {
+    fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -535,10 +536,22 @@ mod tests {
 
         Ok(())
     }
-    // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_number_of_attributes() -> io::Result<()> {
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        ext_file_entry.get_data_stream()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_attributes() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
@@ -554,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_sub_file_entries() -> io::Result<()> {
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");

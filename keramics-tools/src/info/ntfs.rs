@@ -12,10 +12,9 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::process::ExitCode;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::ntfs::constants::*;
 use keramics_formats::ntfs::{
@@ -30,14 +29,11 @@ pub const FILE_ATTRIBUTE_FLAG_READ_ONLY: u32 = 0x00000001;
 pub const FILE_ATTRIBUTE_FLAG_SYSTEM: u32 = 0x00000004;
 
 /// Retrieves the string representation of a date and time value.
-fn get_date_time_string(date_time: &DateTime) -> io::Result<String> {
+fn get_date_time_string(date_time: &DateTime) -> Result<String, ErrorTrace> {
     match date_time {
         DateTime::NotSet => Ok("Not set (0)".to_string()),
         DateTime::Filetime(filetime) => Ok(filetime.to_iso8601_string()),
-        _ => Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("Unsupported date time"),
-        )),
+        _ => return Err(keramics_core::error_trace_new!("Unsupported date time")),
     }
 }
 
@@ -57,94 +53,133 @@ fn get_file_mode_string(file_attribute_flags: u32) -> String {
     string_parts.join("")
 }
 
-/// Prints the file attribute flags.
-fn print_attribute_flags(flags: u32) {
+/// Retrieves string representations of file attribute flags.
+fn get_file_attribute_flags_strings(flags: u32) -> Vec<String> {
+    let mut flags_strings: Vec<String> = Vec::new();
     if flags & 0x00000001 != 0 {
-        println!("        0x00000001: Is read-only (FILE_ATTRIBUTE_READ_ONLY)");
+        let flag_string: String =
+            String::from("0x00000001: Is read-only (FILE_ATTRIBUTE_READ_ONLY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000002 != 0 {
-        println!("        0x00000002: Is hidden (FILE_ATTRIBUTE_HIDDEN)");
+        let flag_string: String = String::from("0x00000002: Is hidden (FILE_ATTRIBUTE_HIDDEN)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000004 != 0 {
-        println!("        0x00000004: Is system (FILE_ATTRIBUTE_SYSTEM)");
+        let flag_string: String = String::from("0x00000004: Is system (FILE_ATTRIBUTE_SYSTEM)");
+        flags_strings.push(flag_string);
     }
 
     if flags & 0x00000010 != 0 {
-        println!("        0x00000010: Is directory (FILE_ATTRIBUTE_DIRECTORY)");
+        let flag_string: String =
+            String::from("0x00000010: Is directory (FILE_ATTRIBUTE_DIRECTORY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000020 != 0 {
-        println!("        0x00000020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)");
+        let flag_string: String =
+            String::from("0x00000020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000040 != 0 {
-        println!("        0x00000040: Is device (FILE_ATTRIBUTE_DEVICE)");
+        let flag_string: String = String::from("0x00000040: Is device (FILE_ATTRIBUTE_DEVICE)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000080 != 0 {
-        println!("        0x00000080: Is normal (FILE_ATTRIBUTE_NORMAL)");
+        let flag_string: String = String::from("0x00000080: Is normal (FILE_ATTRIBUTE_NORMAL)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000100 != 0 {
-        println!("        0x00000100: Is temporary (FILE_ATTRIBUTE_TEMPORARY)");
+        let flag_string: String =
+            String::from("0x00000100: Is temporary (FILE_ATTRIBUTE_TEMPORARY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000200 != 0 {
-        println!("        0x00000200: Is a sparse file (FILE_ATTRIBUTE_SPARSE_FILE)");
+        let flag_string: String =
+            String::from("0x00000200: Is a sparse file (FILE_ATTRIBUTE_SPARSE_FILE)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000400 != 0 {
-        println!(
-            "        0x00000400: Is a reparse point or symbolic link (FILE_ATTRIBUTE_FLAG_REPARSE_POINT)"
+        let flag_string: String = String::from(
+            "0x00000400: Is a reparse point or symbolic link (FILE_ATTRIBUTE_FLAG_REPARSE_POINT)",
         );
+        flags_strings.push(flag_string);
     }
     if flags & 0x00000800 != 0 {
-        println!("        0x00000800: Is compressed (FILE_ATTRIBUTE_COMPRESSED)");
+        let flag_string: String =
+            String::from("0x00000800: Is compressed (FILE_ATTRIBUTE_COMPRESSED)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00001000 != 0 {
-        println!("        0x00001000: Is offline (FILE_ATTRIBUTE_OFFLINE)");
+        let flag_string: String = String::from("0x00001000: Is offline (FILE_ATTRIBUTE_OFFLINE)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x00002000 != 0 {
-        println!(
-            "        0x00002000: Content should not be indexed (FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)"
+        let flag_string: String = String::from(
+            "0x00002000: Content should not be indexed (FILE_ATTRIBUTE_NOT_CONTENT_INDEXED)",
         );
+        flags_strings.push(flag_string);
     }
     if flags & 0x00004000 != 0 {
-        println!("        0x00004000: Is encrypted (FILE_ATTRIBUTE_ENCRYPTED)");
+        let flag_string: String =
+            String::from("0x00004000: Is encrypted (FILE_ATTRIBUTE_ENCRYPTED)");
+        flags_strings.push(flag_string);
     }
 
     if flags & 0x00010000 != 0 {
-        println!("        0x00010000: Is virtual (FILE_ATTRIBUTE_VIRTUAL)");
+        let flag_string: String = String::from("0x00010000: Is virtual (FILE_ATTRIBUTE_VIRTUAL)");
+        flags_strings.push(flag_string);
     }
 
     if flags & 0x20000000 != 0 {
-        println!("        0x20000000: UNKNOWN (Is index view)");
+        let flag_string: String = String::from("0x20000000: UNKNOWN (Is index view)");
+        flags_strings.push(flag_string);
     }
-    println!("");
+    flags_strings
 }
 
-/// Prints the volume flags.
-fn print_ntfs_volume_flags(flags: u16) {
+/// Retrieves string representations of NTFS volume flags.
+fn get_ntfs_volume_flags_strings(flags: u16) -> Vec<String> {
+    let mut flags_strings: Vec<String> = Vec::new();
     if flags & 0x0001 != 0 {
-        println!("        0x0001: Is dirty (VOLUME_IS_DIRTY)");
+        let flag_string: String = String::from("0x0001: Is dirty (VOLUME_IS_DIRTY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x0002 != 0 {
-        println!("        0x0002: Re-size journal ($LogFile) (VOLUME_RESIZE_LOG_FILE)");
+        let flag_string: String =
+            String::from("0x0002: Re-size journal ($LogFile) (VOLUME_RESIZE_LOG_FILE)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x0004 != 0 {
-        println!("        0x0004: Mounted on Windows NT 4 (VOLUME_MOUNTED_ON_NT4)");
+        let flag_string: String =
+            String::from("0x0004: Mounted on Windows NT 4 (VOLUME_MOUNTED_ON_NT4)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x0008 != 0 {
-        println!("        0x0008: Is dirty (VOLUME_IS_DIRTY)");
+        let flag_string: String = String::from("0x0008: Is dirty (VOLUME_IS_DIRTY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x0010 != 0 {
-        println!("        0x0010: Delete USN in progress (VOLUME_DELETE_USN_UNDERWAY)");
+        let flag_string: String =
+            String::from("0x0010: Delete USN in progress (VOLUME_DELETE_USN_UNDERWAY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x0020 != 0 {
-        println!("        0x0020: Repair object identifiers (VOLUME_REPAIR_OBJECT_ID)");
+        let flag_string: String =
+            String::from("0x0020: Repair object identifiers (VOLUME_REPAIR_OBJECT_ID)");
+        flags_strings.push(flag_string);
     }
 
     if flags & 0x4000 != 0 {
-        println!("        0x4000: chkdsk in progress (VOLUME_CHKDSK_UNDERWAY)");
+        let flag_string: String =
+            String::from("0x4000: chkdsk in progress (VOLUME_CHKDSK_UNDERWAY)");
+        flags_strings.push(flag_string);
     }
     if flags & 0x8000 != 0 {
-        println!("        0x8000: Modified by chkdsk (VOLUME_MODIFIED_BY_CHKDSK)");
+        let flag_string: String =
+            String::from("0x8000: Modified by chkdsk (VOLUME_MODIFIED_BY_CHKDSK)");
+        flags_strings.push(flag_string);
     }
-    println!("");
+    flags_strings
 }
 
 /// Prints information about a New Technologies File System (NTFS).
@@ -157,7 +192,7 @@ pub fn print_ntfs_file_system(data_stream: &DataStreamReference) -> ExitCode {
             println!("Unable to open NTFS file system with error: {}", error);
             return ExitCode::FAILURE;
         }
-    };
+    }
     println!("New Technologies File System (NTFS) information:");
 
     match ntfs_file_system.get_format_version() {
@@ -168,13 +203,13 @@ pub fn print_ntfs_file_system(data_stream: &DataStreamReference) -> ExitCode {
             );
         }
         None => {}
-    };
+    }
     match ntfs_file_system.get_volume_label() {
         Some(volume_label) => {
             println!("    Volume label\t\t\t: {}", volume_label.to_string());
         }
         None => {}
-    };
+    }
     println!(
         "    Volume serial number\t\t: 0x{:x}",
         ntfs_file_system.volume_serial_number,
@@ -182,10 +217,18 @@ pub fn print_ntfs_file_system(data_stream: &DataStreamReference) -> ExitCode {
     match ntfs_file_system.get_volume_flags() {
         Some(volume_flags) => {
             println!("    Volume flags\t\t\t: 0x{:04x}", volume_flags);
-            print_ntfs_volume_flags(volume_flags);
+            let flags_strings: Vec<String> = get_ntfs_volume_flags_strings(volume_flags);
+            println!(
+                "{}",
+                flags_strings
+                    .iter()
+                    .map(|string| format!("        {}", string))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
         }
         None => {}
-    };
+    }
     println!(
         "    Bytes per sector\t\t\t: {} bytes",
         ntfs_file_system.bytes_per_sector
@@ -306,7 +349,7 @@ pub fn print_entry_ntfs_file_system(
 }
 
 /// Prints information about a New Technologies File System (NTFS) attribute.
-fn print_ntfs_attribute(attribute: &NtfsAttribute) -> io::Result<()> {
+fn print_ntfs_attribute(attribute: &NtfsAttribute) -> Result<(), ErrorTrace> {
     let attribute_types = HashMap::<u32, &'static str>::from([
         (
             NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION,
@@ -420,9 +463,18 @@ fn print_ntfs_attribute(attribute: &NtfsAttribute) -> io::Result<()> {
                 "    File attribute flags\t\t: 0x{:08x}",
                 file_name.file_attribute_flags
             );
-            print_attribute_flags(file_name.file_attribute_flags);
+            let flags_strings: Vec<String> =
+                get_file_attribute_flags_strings(file_name.file_attribute_flags);
+            println!(
+                "{}",
+                flags_strings
+                    .iter()
+                    .map(|string| format!("        {}", string))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
         }
-        // $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
+        // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
         NtfsAttribute::Generic { mft_attribute } => {
             match &mft_attribute.name {
                 Some(name) => println!("    Attribute name\t\t\t: {}", name.to_string()),
@@ -485,7 +537,16 @@ fn print_ntfs_attribute(attribute: &NtfsAttribute) -> io::Result<()> {
                 "    File attribute flags\t\t: 0x{:08x}",
                 standard_information.file_attribute_flags
             );
-            print_attribute_flags(standard_information.file_attribute_flags);
+            let flags_strings: Vec<String> =
+                get_file_attribute_flags_strings(standard_information.file_attribute_flags);
+            println!(
+                "{}",
+                flags_strings
+                    .iter()
+                    .map(|string| format!("        {}", string))
+                    .collect::<Vec<String>>()
+                    .join("\n")
+            );
         }
         NtfsAttribute::VolumeInformation { volume_information } => {
             println!(
@@ -502,7 +563,7 @@ fn print_ntfs_attribute(attribute: &NtfsAttribute) -> io::Result<()> {
             println!("    Volume name\t\t\t\t: {}", volume_name.to_string());
             println!("");
         }
-    };
+    }
     Ok(())
 }
 
@@ -536,6 +597,7 @@ pub fn print_hierarcy_ntfs_file_system(
         }
     };
     let mut path_components: Vec<String> = Vec::new();
+
     match print_hierarcy_ntfs_file_entry(&mut file_entry, &mut path_components, in_bodyfile_format)
     {
         Ok(_) => {}
@@ -543,12 +605,12 @@ pub fn print_hierarcy_ntfs_file_system(
             println!("{}", error);
             return ExitCode::FAILURE;
         }
-    };
+    }
     ExitCode::SUCCESS
 }
 
 /// Prints information about a New Technologies File System (NTFS) file entry.
-fn print_ntfs_file_entry(file_entry: &mut NtfsFileEntry) -> io::Result<()> {
+fn print_ntfs_file_entry(file_entry: &mut NtfsFileEntry) -> Result<(), ErrorTrace> {
     println!(
         "    File reference\t\t\t: {}-{}",
         file_entry.mft_entry_number, file_entry.sequence_number
@@ -592,8 +654,15 @@ fn print_ntfs_file_entry(file_entry: &mut NtfsFileEntry) -> io::Result<()> {
         "    File attribute flags\t\t: 0x{:08x}",
         file_attribute_flags
     );
-    print_attribute_flags(file_attribute_flags);
-
+    let flags_strings: Vec<String> = get_file_attribute_flags_strings(file_attribute_flags);
+    println!(
+        "{}",
+        flags_strings
+            .iter()
+            .map(|string| format!("        {}", string))
+            .collect::<Vec<String>>()
+            .join("\n")
+    );
     println!("");
 
     // TODO: print information about reparse point
@@ -605,7 +674,8 @@ fn print_ntfs_file_entry(file_entry: &mut NtfsFileEntry) -> io::Result<()> {
 fn print_ntfs_file_entry_bodyfile(
     file_entry: &mut NtfsFileEntry,
     path_components: &mut Vec<String>,
-) -> io::Result<()> {
+    calculate_md5: bool,
+) -> Result<(), ErrorTrace> {
     let file_attribute_flags: u32 = file_entry.get_file_attribute_flags();
 
     let path: String = if file_entry.mft_entry_number == 5 {
@@ -627,19 +697,49 @@ fn print_ntfs_file_entry_bodyfile(
     // TODO: add support for group_identifier.
     let size: u64 = file_entry.get_size();
 
-    let access_time: String = bodyfile::format_as_timestamp(file_entry.get_access_time())?;
+    let access_time: String = match bodyfile::format_as_timestamp(file_entry.get_access_time()) {
+        Ok(timestamp_string) => timestamp_string,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to format access time");
+            return Err(error);
+        }
+    };
     let modification_time: String =
-        bodyfile::format_as_timestamp(file_entry.get_modification_time())?;
-    let change_time: String = bodyfile::format_as_timestamp(file_entry.get_change_time())?;
-    let creation_time: String = bodyfile::format_as_timestamp(file_entry.get_creation_time())?;
-
-    let number_of_data_forks: usize = file_entry.get_number_of_data_forks()?;
-
+        match bodyfile::format_as_timestamp(file_entry.get_modification_time()) {
+            Ok(timestamp_string) => timestamp_string,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to format modification time");
+                return Err(error);
+            }
+        };
+    let change_time: String = match bodyfile::format_as_timestamp(file_entry.get_change_time()) {
+        Ok(timestamp_string) => timestamp_string,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to format change time");
+            return Err(error);
+        }
+    };
+    let creation_time: String = match bodyfile::format_as_timestamp(file_entry.get_creation_time())
+    {
+        Ok(timestamp_string) => timestamp_string,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to format creation time");
+            return Err(error);
+        }
+    };
+    let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
+        Ok(number_of_data_forks) => number_of_data_forks,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to retrieve number of data forks");
+            return Err(error);
+        }
+    };
     if number_of_data_forks == 0 {
-        // TODO: have flag control calculate md5
-        // String::from("0")
-        let md5: String = String::from("00000000000000000000000000000000");
-
+        let md5: String = if !calculate_md5 {
+            String::from("0")
+        } else {
+            String::from("00000000000000000000000000000000")
+        };
         println!(
             "{}|{}{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
             md5,
@@ -656,15 +756,45 @@ fn print_ntfs_file_entry_bodyfile(
             creation_time
         );
     } else {
-        for data_fork in 0..number_of_data_forks {
-            let data_fork: NtfsDataFork = file_entry.get_data_fork_by_index(data_fork)?;
+        for data_fork_index in 0..number_of_data_forks {
+            let data_fork: NtfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
+                Ok(number_of_data_forks) => number_of_data_forks,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve data fork: {}", data_fork_index)
+                    );
+                    return Err(error);
+                }
+            };
+            let md5: String = if !calculate_md5 {
+                String::from("0")
+            } else {
+                let data_stream: DataStreamReference = match data_fork.get_data_stream() {
+                    Ok(data_stream) => data_stream,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve data stream from data fork: {}",
+                                data_fork_index
+                            )
+                        );
 
-            // TODO: have flag control calculate md5
-            // String::from("0")
-            let data_stream: DataStreamReference = data_fork.get_data_stream()?;
-
-            let md5: String = bodyfile::calculate_md5(&data_stream)?;
-
+                        return Err(error);
+                    }
+                };
+                match bodyfile::calculate_md5(&data_stream) {
+                    Ok(md5_string) => md5_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to calculate MD5 of data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+            };
             let data_fork_name: String = match data_fork.get_name() {
                 Some(name) => format!(":{}", name.to_string()),
                 None => String::new(),
@@ -697,7 +827,7 @@ fn print_ntfs_file_entry_bodyfile(
 fn print_ntfs_file_entry_path(
     file_entry: &NtfsFileEntry,
     path_components: &mut Vec<String>,
-) -> io::Result<()> {
+) -> Result<(), ErrorTrace> {
     let path: String = if file_entry.mft_entry_number == 5 {
         String::from("/")
     } else {
@@ -708,10 +838,24 @@ fn print_ntfs_file_entry_path(
         path_components.push(name_string);
         format!("/{}", path_components.join("/"))
     };
-    let number_of_data_forks: usize = file_entry.get_number_of_data_forks()?;
-
-    for data_fork in 0..number_of_data_forks {
-        let data_fork: NtfsDataFork = file_entry.get_data_fork_by_index(data_fork)?;
+    let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
+        Ok(number_of_data_forks) => number_of_data_forks,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to retrieve number of data forks");
+            return Err(error);
+        }
+    };
+    for data_fork_index in 0..number_of_data_forks {
+        let data_fork: NtfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
+            Ok(number_of_data_forks) => number_of_data_forks,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve data fork: {}", data_fork_index)
+                );
+                return Err(error);
+            }
+        };
         match data_fork.get_name() {
             Some(name) => println!("{}:{}", path, name.to_string()),
             None => println!("{}", path),
@@ -727,18 +871,70 @@ fn print_hierarcy_ntfs_file_entry(
     file_entry: &mut NtfsFileEntry,
     path_components: &mut Vec<String>,
     in_bodyfile_format: bool,
-) -> io::Result<()> {
+) -> Result<(), ErrorTrace> {
     if in_bodyfile_format {
-        print_ntfs_file_entry_bodyfile(file_entry, path_components)?;
+        match print_ntfs_file_entry_bodyfile(file_entry, path_components, true) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to print file entry in bodyfile format"
+                );
+                return Err(error);
+            }
+        }
     } else {
-        print_ntfs_file_entry_path(file_entry, path_components)?;
+        match print_ntfs_file_entry_path(file_entry, path_components) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to print file entry path");
+                return Err(error);
+            }
+        }
     }
-    let number_of_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+    let number_of_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
+        Ok(number_of_file_entries) => number_of_file_entries,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to retrieve number of sub file entries"
+            );
+            return Err(error);
+        }
+    };
     for sub_file_entry_index in 0..number_of_file_entries {
         let mut sub_file_entry: NtfsFileEntry =
-            file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?;
+            match file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
+                Ok(sub_file_entry) => sub_file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        match print_hierarcy_ntfs_file_entry(
+            &mut sub_file_entry,
+            path_components,
+            in_bodyfile_format,
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to print hierarchy of sub file entry: {}",
+                        sub_file_entry_index
+                    )
+                );
 
-        print_hierarcy_ntfs_file_entry(&mut sub_file_entry, path_components, in_bodyfile_format)?;
+                return Err(error);
+            }
+        }
     }
     if file_entry.mft_entry_number != 5 {
         path_components.pop();
@@ -789,7 +985,20 @@ pub fn print_path_ntfs_file_system(data_stream: &DataStreamReference, path: &Str
 mod tests {
     use super::*;
 
-    // TODO: add tests for get_date_time_string
+    use keramics_datetime::Filetime;
+
+    #[test]
+    fn test_get_date_time_string() -> Result<(), ErrorTrace> {
+        let date_time: DateTime = DateTime::Filetime(Filetime::new(0x01cb3a623d0a17ce));
+        let timestamp: String = get_date_time_string(&date_time)?;
+        assert_eq!(timestamp, "2010-08-12T21:06:31.5468750");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let timestamp: String = get_date_time_string(&date_time)?;
+        assert_eq!(timestamp, "Not set (0)");
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_mode_string() {
@@ -800,8 +1009,21 @@ mod tests {
         assert_eq!(string, "-r-xr-xr-x");
     }
 
-    // TODO: add tests for print_attribute_flags
-    // TODO: add tests for print_ntfs_volume_flags
+    #[test]
+    fn test_get_file_attribute_flags_strings() {
+        let flags_strings: Vec<String> = get_file_attribute_flags_strings(0x00000001);
+        assert_eq!(
+            flags_strings,
+            ["0x00000001: Is read-only (FILE_ATTRIBUTE_READ_ONLY)"]
+        );
+    }
+
+    #[test]
+    fn test_get_ntfs_volume_flags_strings() {
+        let flags_strings: Vec<String> = get_ntfs_volume_flags_strings(0x0001);
+        assert_eq!(flags_strings, ["0x0001: Is dirty (VOLUME_IS_DIRTY)"],);
+    }
+
     // TODO: add tests for print_ntfs_file_system
     // TODO: add tests for print_entry_ntfs_file_system
     // TODO: add tests for print_hierarcy_ntfs_file_system

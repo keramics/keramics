@@ -12,10 +12,9 @@
  */
 
 use std::cmp::min;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
 
@@ -62,11 +61,10 @@ impl NtfsBlockStream {
         &mut self,
         data_stream: &DataStreamReference,
         data_attribute: &NtfsMftAttribute,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if data_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported resident $DATA attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident $DATA attribute"
             ));
         }
         let block_tree_size: u64 = data_attribute
@@ -82,13 +80,10 @@ impl NtfsBlockStream {
 
             for cluster_group in data_attribute.data_cluster_groups.iter() {
                 if cluster_group.first_vcn != virtual_cluster_number {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "$DATA attribute cluster group first VNC: {} does not match expected value: {}.",
-                            cluster_group.first_vcn, virtual_cluster_number
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "$DATA attribute cluster group first VNC: {} does not match expected value: {}",
+                        cluster_group.first_vcn, virtual_cluster_number
+                    )));
                 }
                 for data_run in cluster_group.data_runs.iter() {
                     let range_size: u64 =
@@ -98,9 +93,8 @@ impl NtfsBlockStream {
                         NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
                         NtfsDataRunType::Sparse => NtfsBlockRangeType::Sparse,
                         _ => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Unsupported data run type.",
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported data run type"
                             ));
                         }
                     };
@@ -116,7 +110,12 @@ impl NtfsBlockStream {
                         block_range,
                     ) {
                         Ok(_) => {}
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to insert block range into block tree",
+                                error
+                            ));
+                        }
                     };
                     virtual_cluster_number += data_run.number_of_blocks as u64;
                     virtual_cluster_offset += range_size;
@@ -124,13 +123,10 @@ impl NtfsBlockStream {
                 if cluster_group.last_vcn != 0xffffffffffffffff
                     && cluster_group.last_vcn + 1 != virtual_cluster_number
                 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Cluster group last VNC: {} does not match expected value.",
-                            cluster_group.last_vcn
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Cluster group last VNC: {} does not match expected value",
+                        cluster_group.last_vcn
+                    )));
                 }
             }
         }
@@ -147,7 +143,7 @@ impl NtfsBlockStream {
     }
 
     /// Reads data based on the block ranges.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = self.current_offset;
@@ -170,10 +166,10 @@ impl NtfsBlockStream {
                 let block_range: &NtfsBlockRange = match self.block_tree.get_value(current_offset) {
                     Some(value) => value,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("Missing block range for offset: {}", current_offset),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing block range for offset: {}",
+                            current_offset
+                        )));
                     }
                 };
                 let range_logical_offset: u64 = block_range.virtual_cluster_offset;
@@ -193,25 +189,23 @@ impl NtfsBlockStream {
 
                 let data_end_offset: usize = data_offset + range_read_size;
                 match block_range.range_type {
-                    NtfsBlockRangeType::InFile => match self.data_stream.as_ref() {
-                        Some(data_stream) => match data_stream.write() {
-                            Ok(mut data_stream) => {
-                                let range_physical_offset: u64 = block_range.cluster_block_number
-                                    * (self.cluster_block_size as u64);
-                                data_stream.read_at_position(
-                                    &mut data[data_offset..data_end_offset],
-                                    SeekFrom::Start(range_physical_offset + range_relative_offset),
-                                )?
+                    NtfsBlockRangeType::InFile => {
+                        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                            Some(data_stream) => data_stream,
+                            None => {
+                                return Err(keramics_core::error_trace_new!("Missing data stream"));
                             }
-                            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                        },
-                        None => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidInput,
-                                "Missing data stream",
-                            ));
-                        }
-                    },
+                        };
+                        let range_physical_offset: u64 =
+                            block_range.cluster_block_number * (self.cluster_block_size as u64);
+
+                        let read_count: usize = keramics_core::data_stream_read_at_position!(
+                            data_stream,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(range_physical_offset + range_relative_offset)
+                        );
+                        read_count
+                    }
                     NtfsBlockRangeType::Sparse => {
                         data[data_offset..data_end_offset].fill(0);
 
@@ -231,12 +225,12 @@ impl NtfsBlockStream {
 
 impl DataStream for NtfsBlockStream {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.current_offset >= self.size {
             return Ok(0);
         }
@@ -246,15 +240,20 @@ impl DataStream for NtfsBlockStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = self.read_data_from_blocks(&mut buf[..read_size])?;
-
+        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                return Err(error);
+            }
+        };
         self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
@@ -290,7 +289,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -307,7 +306,7 @@ mod tests {
     // TODO: add tests for read_data_from_blocks
 
     #[test]
-    fn test_seek_from_start() -> io::Result<()> {
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -324,7 +323,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_end() -> io::Result<()> {
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -341,7 +340,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_current() -> io::Result<()> {
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -361,7 +360,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_file_size() -> io::Result<()> {
+    fn test_seek_beyond_file_size() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -378,7 +377,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read() -> io::Result<()> {
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -439,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -457,4 +456,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_size.
 }

@@ -11,10 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
+use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::gpt::GptVolumeSystem;
 
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
@@ -43,7 +43,7 @@ impl GptFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
@@ -62,15 +62,15 @@ impl GptFileSystem {
                     None => Ok(false),
                 }
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS path type",
-            )),
+            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(&self, vfs_path: &VfsPath) -> io::Result<Option<GptFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        vfs_path: &VfsPath,
+    ) -> Result<Option<GptFileEntry>, ErrorTrace> {
         match vfs_path {
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
@@ -86,23 +86,26 @@ impl GptFileSystem {
 
                     return Ok(Some(gpt_file_entry));
                 }
-                match self.get_partition_index(&string_path_components[1]) {
-                    Some(partition_index) => {
-                        let gpt_partition: GptPartition =
-                            self.volume_system.get_partition_by_index(partition_index)?;
-
-                        Ok(Some(GptFileEntry::Partition {
-                            index: partition_index,
-                            partition: Arc::new(RwLock::new(gpt_partition)),
-                        }))
+                let partition_index: usize =
+                    match self.get_partition_index(&string_path_components[1]) {
+                        Some(partition_index) => partition_index,
+                        None => return Ok(None),
+                    };
+                match self.volume_system.get_partition_by_index(partition_index) {
+                    Ok(gpt_partition) => Ok(Some(GptFileEntry::Partition {
+                        index: partition_index,
+                        partition: Arc::new(RwLock::new(gpt_partition)),
+                    })),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve GPT partition: {}", partition_index)
+                        );
+                        return Err(error);
                     }
-                    None => Ok(None),
                 }
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS path type",
-            )),
+            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
         }
     }
 
@@ -124,7 +127,7 @@ impl GptFileSystem {
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> io::Result<GptFileEntry> {
+    pub fn get_root_file_entry(&self) -> Result<GptFileEntry, ErrorTrace> {
         Ok(GptFileEntry::Root {
             volume_system: self.volume_system.clone(),
         })
@@ -135,35 +138,51 @@ impl GptFileSystem {
         &mut self,
         parent_file_system: Option<&VfsFileSystemReference>,
         vfs_location: &VfsLocation,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let file_system: &VfsFileSystemReference = match parent_file_system {
             Some(file_system) => file_system,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing parent file system",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
                 ));
             }
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
-        match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-            Some(data_stream) => match Arc::get_mut(&mut self.volume_system) {
-                Some(volume_system) => {
-                    volume_system.read_data_stream(&data_stream)?;
 
-                    self.number_of_partitions = volume_system.get_number_of_partitions();
+        let result: Option<DataStreamReference> =
+            match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
                 }
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Missing volume system",
-                    ));
-                }
-            },
+            };
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", vfs_path.to_string()),
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing data stream: {}",
+                    vfs_path.to_string()
+                )));
+            }
+        };
+        match Arc::get_mut(&mut self.volume_system) {
+            Some(volume_system) => {
+                match volume_system.read_data_stream(&data_stream) {
+                    Ok(()) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read GPT volume system from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+                self.number_of_partitions = volume_system.get_number_of_partitions();
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to GPT volume system"
                 ));
             }
         }
@@ -179,7 +198,7 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
-    fn get_file_system() -> io::Result<GptFileSystem> {
+    fn get_file_system() -> Result<GptFileSystem, ErrorTrace> {
         let mut gpt_file_system: GptFileSystem = GptFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
@@ -191,7 +210,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
+    fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/");
@@ -210,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/");
@@ -245,7 +264,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_partition_index() -> io::Result<()> {
+    fn test_get_partition_index() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
         let file_name: String = "gpt1".to_string();
@@ -264,7 +283,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_root_file_entry() -> io::Result<()> {
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
         let gpt_file_entry: GptFileEntry = gpt_file_system.get_root_file_entry()?;
@@ -276,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut gpt_file_system: GptFileSystem = GptFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =

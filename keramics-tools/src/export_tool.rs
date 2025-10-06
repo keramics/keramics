@@ -11,13 +11,13 @@
  * under the License.
  */
 
-use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_vfs::{
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
     new_os_vfs_location,
@@ -64,28 +64,71 @@ struct PathCommandArguments {
     name: Option<String>,
 }
 
-/// Export data stream from a scan node.
-fn export_data_stream_from_scan_node(
-    data_stream_writer: &mut writer::DataStreamWriter,
-    vfs_scan_node: &VfsScanNode,
-    path: &String,
-    name: Option<&str>,
-) -> io::Result<()> {
-    if vfs_scan_node.is_empty() {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
+/// Tool for extracting data streams from a storage media image.
+struct ExportTool {}
 
-        let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.as_str());
-        match vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, name)? {
-            // TODO: pass sanitized file entry path and data stream name.
-            Some(data_stream) => data_stream_writer.write_data_stream(&data_stream)?,
-            None => {}
-        };
-    } else {
-        for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
-            export_data_stream_from_scan_node(data_stream_writer, sub_scan_node, path, name)?;
-        }
+impl ExportTool {
+    /// Creates a new tool.
+    fn new() -> Self {
+        Self {}
     }
-    Ok(())
+
+    /// Export data stream from a scan node.
+    fn export_data_stream_from_scan_node(
+        &self,
+        data_stream_writer: &mut writer::DataStreamWriter,
+        vfs_scan_node: &VfsScanNode,
+        path: &String,
+        name: Option<&str>,
+    ) -> Result<(), ErrorTrace> {
+        if vfs_scan_node.is_empty() {
+            let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+            let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.as_str());
+            let result: Option<DataStreamReference> =
+                match vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, name) {
+                    Ok(result) => result,
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to retrieve data stream",
+                            error
+                        ));
+                    }
+                };
+            match result {
+                // TODO: pass sanitized file entry path and data stream name.
+                Some(data_stream) => match data_stream_writer.write_data_stream(&data_stream) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to export data stream"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => {}
+            };
+        } else {
+            for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
+                match self.export_data_stream_from_scan_node(
+                    data_stream_writer,
+                    sub_scan_node,
+                    path,
+                    name,
+                ) {
+                    Ok(number_of_file_entries) => number_of_file_entries,
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to retrieve number of sub file entries",
+                            error
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 fn main() -> ExitCode {
@@ -98,6 +141,8 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let export_tool: ExportTool = ExportTool::new();
+
     let vfs_location: VfsLocation = new_os_vfs_location(source);
 
     // TODO: add scanner options (such as offset).
@@ -116,7 +161,7 @@ fn main() -> ExitCode {
     match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
         Ok(_) => {}
         Err(error) => {
-            println!("Unable to scan: {} with error: {}", source, error);
+            println!("Unable to scan: {} with error:\n{}", source, error);
             return ExitCode::FAILURE;
         }
     };
@@ -128,7 +173,7 @@ fn main() -> ExitCode {
         }
     };
     if root_scan_node.is_empty() {
-        println!("No file system found in source.");
+        println!("No file system found in source");
         return ExitCode::FAILURE;
     }
     Mediator {
@@ -148,7 +193,7 @@ fn main() -> ExitCode {
                 Some(ref name) => Some(name.as_str()),
                 None => None,
             };
-            match export_data_stream_from_scan_node(
+            match export_tool.export_data_stream_from_scan_node(
                 &mut data_stream_writer,
                 root_scan_node,
                 &command_arguments.path,
@@ -157,8 +202,8 @@ fn main() -> ExitCode {
                 Ok(_) => {}
                 Err(error) => {
                     println!(
-                        "Unable to export data stream from root scan node with error: {}",
-                        error
+                        "Unable to export data stream from: {} with error:\n{}",
+                        source, error
                     );
                     return ExitCode::FAILURE;
                 }
@@ -166,7 +211,7 @@ fn main() -> ExitCode {
         }
     };
     if data_stream_writer.number_of_streams_written == 0 {
-        println!("No data streams exported.");
+        println!("No data streams exported");
     }
     ExitCode::SUCCESS
 }

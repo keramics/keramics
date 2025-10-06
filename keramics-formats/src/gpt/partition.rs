@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
 /// GUID Partition Table (GPT) partition.
@@ -62,7 +61,7 @@ impl GptPartition {
     }
 
     /// Opens a partition.
-    pub(super) fn open(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub(super) fn open(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -71,19 +70,16 @@ impl GptPartition {
 
 impl DataStream for GptPartition {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
         if self.current_offset >= self.size {
@@ -95,20 +91,18 @@ impl DataStream for GptPartition {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_at_position(
-                &mut buf[0..read_size],
-                SeekFrom::Start(self.offset + self.current_offset),
-            )?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let read_count: usize = keramics_core::data_stream_read_at_position!(
+            data_stream,
+            &mut buf[0..read_size],
+            SeekFrom::Start(self.offset + self.current_offset)
+        );
         self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
@@ -133,7 +127,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let identifier: Uuid = Uuid::new();
         let type_identifier: Uuid = Uuid::new();
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);

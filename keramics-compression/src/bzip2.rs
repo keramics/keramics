@@ -15,10 +15,10 @@
 //!
 //! Provides decompression support for bzip2 compressed data.
 
-use std::cmp;
-use std::io;
+use std::cmp::max;
 
 use keramics_checksums::Crc32Context;
+use keramics_core::ErrorTrace;
 use keramics_core::formatters::debug_format_array;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_layout_map::LayoutMap;
@@ -158,29 +158,24 @@ impl Bzip2StreamHeader {
     }
 
     /// Reads the stream header.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 4 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported bzip2 stream header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported bzip2 stream header data size"
             ));
         }
         if data[0..2] != BZIP2_DATA_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported bzip2 header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported bzip2 header signature"
             ));
         }
         let compression_level: u8 = data[3];
 
         if compression_level < 0x31 || compression_level > 0x39 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported compression level: {}",
-                    compression_level as char
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported compression level: {}",
+                compression_level as char
+            )));
         }
         Ok(())
     }
@@ -212,7 +207,10 @@ impl Bzip2BlockHeader {
     }
 
     /// Reads the block header from a bitstream.
-    pub fn read_from_bitstream(&mut self, bitstream: &mut Bzip2Bitstream) -> io::Result<()> {
+    pub fn read_from_bitstream(
+        &mut self,
+        bitstream: &mut Bzip2Bitstream,
+    ) -> Result<(), ErrorTrace> {
         self.signature = ((bitstream.get_value(24) as u64) << 24) | bitstream.get_value(24) as u64;
 
         if self.signature == 0x177245385090 {
@@ -224,10 +222,10 @@ impl Bzip2BlockHeader {
             self.randomized_flag = bitstream.get_value(1);
             self.origin_pointer = bitstream.get_value(24);
         } else {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported bzip2 signature: 0x{:12x}", self.signature),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported bzip2 signature: 0x{:12x}",
+                self.signature
+            )));
         }
         let mediator = Mediator::current();
         if mediator.debug_output {
@@ -274,13 +272,12 @@ impl Bzip2Context {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let compressed_data_size: usize = compressed_data.len();
 
         if compressed_data_size < 14 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         let mut data_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
@@ -309,7 +306,7 @@ impl Bzip2Context {
         &mut self,
         bitstream: &mut Bzip2Bitstream,
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut block_data: [u8; BZIP2_BLOCK_SIZE] = [0; BZIP2_BLOCK_SIZE];
         let mut selectors: [u8; 32769] = [0; 32769]; // ( 1 << 15 ) + 1 = 32769
         let mut symbol_stack: [u8; 256] = [0; 256];
@@ -324,13 +321,10 @@ impl Bzip2Context {
                 break;
             }
             if (block_header.origin_pointer as usize) >= BZIP2_BLOCK_SIZE {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid origin pointer: 0x{:06x} value out of bounds",
-                        block_header.origin_pointer
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid origin pointer: 0x{:06x} value out of bounds",
+                    block_header.origin_pointer
+                )));
             }
             let number_of_symbols: usize = self.read_symbol_stack(bitstream, &mut symbol_stack)?;
             let number_of_trees: u32 = bitstream.get_value(3);
@@ -387,13 +381,10 @@ impl Bzip2Context {
         let calculated_checksum: u32 = crc32_context.finalize();
 
         if block_header.checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} bzip2 block checksums",
-                    block_header.checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} bzip2 block checksums",
+                block_header.checksum, calculated_checksum
+            )));
         }
         self.uncompressed_data_size = uncompressed_data_offset;
 
@@ -411,7 +402,7 @@ impl Bzip2Context {
         symbol_stack: &mut [u8],
         number_of_symbols: usize,
         block_data: &mut [u8],
-    ) -> io::Result<usize> {
+    ) -> Result<usize, ErrorTrace> {
         let end_of_block_symbol: u16 = (number_of_symbols - 1) as u16;
         let mut block_data_offset: usize = 0;
         let mut number_of_run_length_symbols: u64 = 0;
@@ -424,10 +415,10 @@ impl Bzip2Context {
         }
         loop {
             if tree_index >= number_of_trees {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid tree index: {} value out of bounds", tree_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid tree index: {} value out of bounds",
+                    tree_index
+                )));
             }
             let huffman_tree: &HuffmanTree = &huffman_trees[tree_index];
             let symbol: u16 = huffman_tree.decode_symbol(bitstream)?;
@@ -441,10 +432,10 @@ impl Bzip2Context {
                         .debug_print(format!("    0-byte run-length: {}\n", run_length,));
                 }
                 if (run_length as usize) > BZIP2_BLOCK_SIZE - block_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid run length: {} value out of bounds", run_length),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid run length: {} value out of bounds",
+                        run_length
+                    )));
                 }
                 number_of_run_length_symbols = 0;
                 run_length_value = 0;
@@ -489,22 +480,19 @@ impl Bzip2Context {
                         .debug_print(format!("    symbol: {} (MTF: {})\n", symbol, stack_value));
                 }
                 if block_data_offset >= BZIP2_BLOCK_SIZE {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid block data offset: {} value out of bounds",
-                            block_data_offset
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid block data offset: {} value out of bounds",
+                        block_data_offset
+                    )));
                 }
                 block_data[block_data_offset] = stack_value;
 
                 block_data_offset += 1;
             } else {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid symbol: {} value out of bounds", symbol),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid symbol: {} value out of bounds",
+                    symbol
+                )));
             }
             symbol_index += 1;
 
@@ -512,13 +500,10 @@ impl Bzip2Context {
                 let selector_index: usize = symbol_index / 50;
 
                 if selector_index > number_of_selectors {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid selector index: {} value out of bounds",
-                            selector_index
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid selector index: {} value out of bounds",
+                        selector_index
+                    )));
                 }
                 tree_index = selectors[selector_index] as usize;
             }
@@ -535,7 +520,7 @@ impl Bzip2Context {
         bitstream: &mut Bzip2Bitstream,
         huffman_tree: &mut HuffmanTree,
         number_of_symbols: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut code_size: u32 = bitstream.get_value(5);
         let mut code_size_array: [u8; 258] = [0; 258];
         let mut largest_code_size: u32 = code_size;
@@ -554,23 +539,20 @@ impl Bzip2Context {
                 }
             }
             if code_size >= 20 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid code size: {} value out of bounds", code_size),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid code size: {} value out of bounds",
+                    code_size
+                )));
             }
             code_size_array[symbol_index] = code_size as u8;
 
-            largest_code_size = cmp::max(code_size, largest_code_size);
+            largest_code_size = max(code_size, largest_code_size);
         }
         if largest_code_size > 32 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid largest code size: {} value out of bounds",
-                    largest_code_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid largest code size: {} value out of bounds",
+                largest_code_size
+            )));
         }
         let mut check_value: u32 = 1 << largest_code_size;
 
@@ -579,10 +561,10 @@ impl Bzip2Context {
             check_value -= 1 << (largest_code_size - code_size);
         }
         if check_value != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Invalid check value: {} value out of bounds", check_value),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid check value: {} value out of bounds",
+                check_value
+            )));
         }
         huffman_tree.build(&code_size_array[0..number_of_symbols])
     }
@@ -594,7 +576,7 @@ impl Bzip2Context {
         selectors: &mut [u8],
         number_of_selectors: usize,
         number_of_trees: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut selector_index: usize = 0;
         let mut stack: [u8; 7] = [0, 1, 2, 3, 4, 5, 6];
 
@@ -609,10 +591,10 @@ impl Bzip2Context {
                 tree_index += 1;
             }
             if tree_index >= number_of_trees {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid tree index: {} value out of bounds", tree_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid tree index: {} value out of bounds",
+                    tree_index
+                )));
             }
             // Inverse move-to-front transform.
             let selector_value: u8 = stack[tree_index];
@@ -647,7 +629,7 @@ impl Bzip2Context {
         &self,
         bitstream: &mut Bzip2Bitstream,
         symbol_stack: &mut [u8],
-    ) -> io::Result<usize> {
+    ) -> Result<usize, ErrorTrace> {
         let level1_value: u32 = bitstream.get_value(16);
         let mut level1_bitmask: u32 = 0x00008000;
         let mut symbol_index: usize = 0;
@@ -672,13 +654,10 @@ impl Bzip2Context {
                 for level2_bit_index in 0..16 {
                     if level2_value & level2_bitmask != 0 {
                         if symbol_index > 256 {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                format!(
-                                    "Invalid symbol index: {} value out of bounds",
-                                    symbol_index
-                                ),
-                            ));
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Invalid symbol index: {} value out of bounds",
+                                symbol_index
+                            )));
                         }
                         symbol_stack[symbol_index] = (16 * level1_bit_index) + level2_bit_index;
 
@@ -712,7 +691,7 @@ impl Bzip2Context {
         uncompressed_data: &mut [u8],
         uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
         let mut distribution_value: usize = 0;
         let mut distributions: [usize; 256] = [0; 256];
@@ -742,9 +721,8 @@ impl Bzip2Context {
 
             if number_of_last_byte_values == 4 {
                 if byte_value as usize > uncompressed_data_size - data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid uncompressed data value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data value too small"
                     ));
                 }
                 while byte_value > 0 {
@@ -763,9 +741,8 @@ impl Bzip2Context {
                 number_of_last_byte_values += 1;
 
                 if data_offset >= uncompressed_data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid uncompressed data value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data value too small"
                     ));
                 }
                 uncompressed_data[data_offset] = byte_value;
@@ -837,7 +814,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_stream_header() -> io::Result<()> {
+    fn test_read_stream_header() -> Result<(), ErrorTrace> {
         let mut stream_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -847,7 +824,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_block_header() -> io::Result<()> {
+    fn test_read_block_header() -> Result<(), ErrorTrace> {
         let mut block_header: Bzip2BlockHeader = Bzip2BlockHeader::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -863,7 +840,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_symbol_stack() -> io::Result<()> {
+    fn test_read_symbol_stack() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let test_context: Bzip2Context = Bzip2Context::new();
@@ -887,7 +864,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_selectors() -> io::Result<()> {
+    fn test_read_selectors() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let test_context: Bzip2Context = Bzip2Context::new();
@@ -916,7 +893,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_huffman_tree() -> io::Result<()> {
+    fn test_read_huffman_tree() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let test_context: Bzip2Context = Bzip2Context::new();
@@ -946,7 +923,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_block_data() -> io::Result<()> {
+    fn test_read_block_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let test_context: Bzip2Context = Bzip2Context::new();
@@ -1005,7 +982,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reverse_burrows_wheeler_transform() -> io::Result<()> {
+    fn test_reverse_burrows_wheeler_transform() -> Result<(), ErrorTrace> {
         let test_context: Bzip2Context = Bzip2Context::new();
 
         let block_data: [u8; 35] = [
@@ -1035,7 +1012,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress_bitstream() -> io::Result<()> {
+    fn test_decompress_bitstream() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_context: Bzip2Context = Bzip2Context::new();
@@ -1063,7 +1040,7 @@ mod tests {
     }
 
     #[test]
-    fn test1_decompress() -> io::Result<()> {
+    fn test1_decompress() -> Result<(), ErrorTrace> {
         let mut test_context: Bzip2Context = Bzip2Context::new();
 
         let test_data: Vec<u8> = get_test_data();
@@ -1089,7 +1066,7 @@ mod tests {
     }
 
     #[test]
-    fn test2_decompress() -> io::Result<()> {
+    fn test2_decompress() -> Result<(), ErrorTrace> {
         let mut test_context: Bzip2Context = Bzip2Context::new();
 
         let test_data: [u8; 122] = [

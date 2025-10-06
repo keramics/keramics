@@ -11,14 +11,12 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStreamReference, open_os_data_stream};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, String)> {
+fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), ErrorTrace> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut offset: u64 = 0;
@@ -33,7 +31,12 @@ fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, Strin
 
             offset += read_count as u64;
         },
-        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to obtain write lock on data stream",
+                error
+            ));
+        }
     };
     let hash_value: Vec<u8> = md5_context.finalize();
     let hash_string: String = format_as_string(&hash_value);
@@ -41,7 +44,7 @@ fn read_data_stream(data_stream: &DataStreamReference) -> io::Result<(u64, Strin
     Ok((offset, hash_string))
 }
 
-fn read_path(file_system: &ExtFileSystem, path: &str) -> io::Result<(u64, String)> {
+fn read_path(file_system: &ExtFileSystem, path: &str) -> Result<(u64, String), ErrorTrace> {
     let path: ExtPath = ExtPath::from(path);
     let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
@@ -50,7 +53,7 @@ fn read_path(file_system: &ExtFileSystem, path: &str) -> io::Result<(u64, String
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(path: &str) -> io::Result<ExtFileSystem> {
+fn open_file_system(path: &str) -> Result<ExtFileSystem, ErrorTrace> {
     let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
     let data_stream: DataStreamReference = open_os_data_stream(path)?;
@@ -60,7 +63,7 @@ fn open_file_system(path: &str) -> io::Result<ExtFileSystem> {
 }
 
 #[test]
-fn read_ext2_file_empty() -> io::Result<()> {
+fn read_ext2_file_empty() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
@@ -71,7 +74,7 @@ fn read_ext2_file_empty() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext2_file_regular() -> io::Result<()> {
+fn read_ext2_file_regular() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
@@ -82,7 +85,7 @@ fn read_ext2_file_regular() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext2_file_with_initial_sparse_extent() -> io::Result<()> {
+fn read_ext2_file_with_initial_sparse_extent() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/initial_sparse1")?;
@@ -93,7 +96,7 @@ fn read_ext2_file_with_initial_sparse_extent() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext2_file_with_trailing_sparse_extent() -> io::Result<()> {
+fn read_ext2_file_with_trailing_sparse_extent() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/trailing_sparse1")?;
@@ -104,7 +107,7 @@ fn read_ext2_file_with_trailing_sparse_extent() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext4_file_empty() -> io::Result<()> {
+fn read_ext4_file_empty() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
@@ -115,7 +118,7 @@ fn read_ext4_file_empty() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext4_file_regular() -> io::Result<()> {
+fn read_ext4_file_regular() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
@@ -126,7 +129,7 @@ fn read_ext4_file_regular() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext4_file_with_inline_data() -> io::Result<()> {
+fn read_ext4_file_with_inline_data() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/testfile1")?;
@@ -137,7 +140,7 @@ fn read_ext4_file_with_inline_data() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext4_file_with_initial_sparse_extent() -> io::Result<()> {
+fn read_ext4_file_with_initial_sparse_extent() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/initial_sparse1")?;
@@ -148,7 +151,7 @@ fn read_ext4_file_with_initial_sparse_extent() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext4_file_with_trailing_sparse_extent() -> io::Result<()> {
+fn read_ext4_file_with_trailing_sparse_extent() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/trailing_sparse1")?;
@@ -159,7 +162,7 @@ fn read_ext4_file_with_trailing_sparse_extent() -> io::Result<()> {
 }
 
 #[test]
-fn read_ext4_file_with_uninitialized_extent() -> io::Result<()> {
+fn read_ext4_file_with_uninitialized_extent() -> Result<(), ErrorTrace> {
     let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/uninitialized1")?;

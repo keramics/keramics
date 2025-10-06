@@ -13,11 +13,10 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::io;
 use std::rc::Rc;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, bytes_to_u64_le};
 
 use super::constants::*;
@@ -69,16 +68,13 @@ impl NtfsDirectoryIndex {
     }
 
     /// Initializes the directory index.
-    pub fn initialize(&mut self, mft_attributes: &NtfsMftAttributes) -> io::Result<()> {
+    pub fn initialize(&mut self, mft_attributes: &NtfsMftAttributes) -> Result<(), ErrorTrace> {
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
         let i30_attribute_group: &NtfsMftAttributeGroup =
             match mft_attributes.get_attribute_group(&i30_index_name) {
                 Some(attribute_group) => attribute_group,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Missing $I30 attributes."),
-                    ));
+                    return Err(keramics_core::error_trace_new!("Missing $I30 attributes"));
                 }
             };
         let i30_index_root_attribute: &NtfsMftAttribute = match mft_attributes
@@ -86,16 +82,14 @@ impl NtfsDirectoryIndex {
         {
             Some(mft_attribute) => mft_attribute,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Missing $I30 $INDEX_ROOT attribute."),
+                return Err(keramics_core::error_trace_new!(
+                    "Missing $I30 $INDEX_ROOT attribute"
                 ));
             }
         };
         if !i30_index_root_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported non-resident $I30 $INDEX_ROOT attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported non-resident $I30 $INDEX_ROOT attribute"
             ));
         }
         let mut index_root_header: NtfsIndexRootHeader = NtfsIndexRootHeader::new();
@@ -109,33 +103,24 @@ impl NtfsDirectoryIndex {
         index_root_header.read_data(&i30_index_root_attribute.resident_data)?;
 
         if index_root_header.attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported $I30 $INDEX_ROOT attribute type: 0x{:08x}.",
-                    index_root_header.attribute_type
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported $I30 $INDEX_ROOT attribute type: 0x{:08x}",
+                index_root_header.attribute_type
+            )));
         }
         if index_root_header.collation_type != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported $I30 $INDEX_ROOT collation type: 0x{:08x}.",
-                    index_root_header.collation_type
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported $I30 $INDEX_ROOT collation type: 0x{:08x}",
+                index_root_header.collation_type
+            )));
         }
         // Note that 2097152 is an arbitrary chosen limit, given 2048 KiB is the largest known
         // cluster block size.
         if index_root_header.index_entry_size < 20 || index_root_header.index_entry_size > 2097152 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported $I30 index entry size: {} value out of bounds",
-                    index_root_header.index_entry_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported $I30 index entry size: {} value out of bounds",
+                index_root_header.index_entry_size
+            )));
         }
         match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
             Some(mft_attribute) => {
@@ -174,11 +159,10 @@ impl NtfsDirectoryIndex {
         &self,
         data_stream: &DataStreamReference,
         name: &Ucs2String,
-    ) -> io::Result<Option<NtfsDirectoryEntry>> {
+    ) -> Result<Option<NtfsDirectoryEntry>, ErrorTrace> {
         if !self.is_initialized {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Directory index was not initialized",
+            return Err(keramics_core::error_trace_new!(
+                "Directory index was not initialized"
             ));
         }
         if self.use_case_folding {
@@ -209,7 +193,7 @@ impl NtfsDirectoryIndex {
         index_node_offset: usize,
         data_stream: &DataStreamReference,
         name: &Ucs2String,
-    ) -> io::Result<Option<NtfsDirectoryEntry>> {
+    ) -> Result<Option<NtfsDirectoryEntry>, ErrorTrace> {
         let (index_node_size, index_values_offset): (usize, usize) =
             self.read_index_node_header(data, index_node_offset)?;
 
@@ -236,13 +220,10 @@ impl NtfsDirectoryIndex {
                 let key_data_end_offset: usize = key_data_offset + key_data_size;
 
                 if key_data_end_offset > index_values_end_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid index value key data size: {} value out of bounds",
-                            key_data_size,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid index value key data size: {} value out of bounds",
+                        key_data_size,
+                    )));
                 }
                 index_value_offset = key_data_end_offset;
             }
@@ -253,10 +234,7 @@ impl NtfsDirectoryIndex {
                 break;
             }
             if key_data_size == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing key data",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing key data"));
             }
             let file_name: NtfsFileName =
                 self.read_index_key(data, key_data_offset, key_data_size)?;
@@ -321,11 +299,10 @@ impl NtfsDirectoryIndex {
         &self,
         data_stream: &DataStreamReference,
         entries: &mut NtfsDirectoryEntries,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if !self.is_initialized {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Directory index was not initialized",
+            return Err(keramics_core::error_trace_new!(
+                "Directory index was not initialized"
             ));
         }
         self.get_directory_entries_from_node(&self.root_node_data, 16, data_stream, entries)
@@ -338,7 +315,7 @@ impl NtfsDirectoryIndex {
         index_node_offset: usize,
         data_stream: &DataStreamReference,
         entries: &mut NtfsDirectoryEntries,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let (index_node_size, index_values_offset): (usize, usize) =
             self.read_index_node_header(data, index_node_offset)?;
 
@@ -362,13 +339,10 @@ impl NtfsDirectoryIndex {
                 let key_data_end_offset: usize = key_data_offset + key_data_size;
 
                 if key_data_end_offset > index_values_end_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid index value key data size: {} value out of bounds",
-                            key_data_size,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid index value key data size: {} value out of bounds",
+                        key_data_size,
+                    )));
                 }
                 index_value_offset = key_data_end_offset;
             }
@@ -420,7 +394,7 @@ impl NtfsDirectoryIndex {
         data: &[u8],
         index_value_offset: usize,
         value_data_size: usize,
-    ) -> io::Result<u64> {
+    ) -> Result<u64, ErrorTrace> {
         let index_value_end_offset: usize = index_value_offset + value_data_size;
 
         if self.mediator.debug_output {
@@ -432,13 +406,10 @@ impl NtfsDirectoryIndex {
                 .debug_print_data(&data[index_value_offset..index_value_end_offset], true);
         }
         if value_data_size < 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid index branch value data size: {} value out of bounds",
-                    value_data_size,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid index branch value data size: {} value out of bounds",
+                value_data_size,
+            )));
         }
         let sub_node_vcn: u64 = bytes_to_u64_le!(data, index_value_end_offset - 8);
 
@@ -451,7 +422,7 @@ impl NtfsDirectoryIndex {
         data: &[u8],
         key_data_offset: usize,
         key_data_size: usize,
-    ) -> io::Result<NtfsFileName> {
+    ) -> Result<NtfsFileName, ErrorTrace> {
         let key_data_end_offset: usize = key_data_offset + key_data_size;
 
         if self.mediator.debug_output {
@@ -478,7 +449,7 @@ impl NtfsDirectoryIndex {
         &self,
         data: &[u8],
         index_node_offset: usize,
-    ) -> io::Result<(usize, usize)> {
+    ) -> Result<(usize, usize), ErrorTrace> {
         if self.mediator.debug_output {
             self.mediator
                 .debug_print(NtfsIndexNodeHeader::debug_read_data(
@@ -491,25 +462,19 @@ impl NtfsDirectoryIndex {
         let index_node_size: usize = index_node_header.size as usize;
 
         if index_node_size > data.len() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid index node size: {} value out of bounds",
-                    index_node_header.size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid index node size: {} value out of bounds",
+                index_node_header.size
+            )));
         }
         // The index values offset is relative to the start of the index node header.
         let index_values_offset: usize = index_node_header.index_values_offset as usize;
 
         if index_values_offset < 16 || index_values_offset >= index_node_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid index values offset: {} value out of bounds",
-                    index_node_header.index_values_offset
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid index values offset: {} value out of bounds",
+                index_node_header.index_values_offset
+            )));
         }
         Ok((index_node_size, index_values_offset))
     }
@@ -520,13 +485,12 @@ impl NtfsDirectoryIndex {
         data: &[u8],
         index_value_offset: usize,
         index_values_end_offset: usize,
-    ) -> io::Result<NtfsIndexValue> {
+    ) -> Result<NtfsIndexValue, ErrorTrace> {
         let index_value_end_offset: usize = index_value_offset + 16;
 
         if index_value_end_offset > index_values_end_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid index value offset value out of bounds",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid index value offset value out of bounds"
             ));
         }
         if self.mediator.debug_output {
@@ -547,13 +511,10 @@ impl NtfsDirectoryIndex {
         let value_data_size: usize = index_value.size as usize;
 
         if value_data_size > data.len() - index_value_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid index value size: {} value out of bounds",
-                    index_value.size,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid index value size: {} value out of bounds",
+                index_value.size,
+            )));
         }
         Ok(index_value)
     }
@@ -6543,7 +6504,7 @@ mod tests {
     // TODO: add tests for read_directory_entries
 
     #[test]
-    fn test_get_directory_entries_from_node() -> io::Result<()> {
+    fn test_get_directory_entries_from_node() -> Result<(), ErrorTrace> {
         let mut test_data: Vec<u8> = vec![
             0x49, 0x4e, 0x44, 0x58, 0x28, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00,
