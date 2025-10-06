@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 use std::rc::Rc;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
@@ -110,27 +109,26 @@ impl ExtFileSystem {
     }
 
     /// Retrieves the file entry for a specific identifier (inode number).
-    pub fn get_file_entry_by_identifier(&self, inode_number: u32) -> io::Result<ExtFileEntry> {
+    pub fn get_file_entry_by_identifier(
+        &self,
+        inode_number: u32,
+    ) -> Result<ExtFileEntry, ErrorTrace> {
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
         if self.features.is_unsupported() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Ext file system has unsupported features"),
+            return Err(keramics_core::error_trace_new!(
+                "Ext file system has unsupported features"
             ));
         }
         if inode_number == 0 || inode_number > self.number_of_inodes {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Invalid inode number: {} value out of bounds", inode_number),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid inode number: {} value out of bounds",
+                inode_number
+            )));
         }
         let inode: ExtInode = self.inode_table.get_inode(data_stream, inode_number)?;
 
@@ -140,7 +138,10 @@ impl ExtFileSystem {
     }
 
     /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(&self, path: &ExtPath) -> io::Result<Option<ExtFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        path: &ExtPath,
+    ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
         if path.is_empty() || path.components[0].len() != 0 {
             return Ok(None);
         }
@@ -157,12 +158,15 @@ impl ExtFileSystem {
     }
 
     /// Retrieves the root directory (file entry).
-    pub fn get_root_directory(&self) -> io::Result<ExtFileEntry> {
+    pub fn get_root_directory(&self) -> Result<ExtFileEntry, ErrorTrace> {
         self.get_file_entry_by_identifier(EXT_ROOT_DIRECTORY_IDENTIFIER)
     }
 
     /// Reads a file system from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_block_groups(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -171,7 +175,7 @@ impl ExtFileSystem {
     }
 
     /// Reads the block groups.
-    fn read_block_groups(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_block_groups(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut block_group_number: u32 = 0;
         let mut block_group_offset: u64 = 0;
         let mut block_group_size: u64 = 0;
@@ -368,9 +372,8 @@ impl ExtFileSystem {
                 &mut group_descriptors,
             )?,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Unable to initialize inode table"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to initialize inode table"
                 ));
             }
         };
@@ -386,7 +389,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file_system() -> io::Result<ExtFileSystem> {
+    fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
@@ -396,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_format_version() -> io::Result<()> {
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let format_version: u8 = file_system.get_format_version();
@@ -406,7 +409,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_feature_flags() -> io::Result<()> {
+    fn test_get_feature_flags() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let feature_flags: u32 = file_system.get_compatible_feature_flags();
@@ -424,7 +427,7 @@ mod tests {
     // TODO: add tests for get_volume_label
 
     #[test]
-    fn test_get_file_entry_by_identifier() -> io::Result<()> {
+    fn test_get_file_entry_by_identifier() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(12)?;
@@ -438,7 +441,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let ext_path: ExtPath = ExtPath::from("/emptyfile");
@@ -458,7 +461,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_root_directory() -> io::Result<()> {
+    fn test_get_root_directory() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let file_entry: ExtFileEntry = file_system.get_root_directory()?;
@@ -469,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
@@ -482,7 +485,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_block_groups() -> io::Result<()> {
+    fn test_read_block_groups() -> Result<(), ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::io;
+use keramics_core::ErrorTrace;
 
 use crate::file_entry::VfsFileEntry;
 
@@ -39,7 +39,7 @@ impl<'a> VfsFileEntriesIterator<'a> {
 }
 
 impl<'a> Iterator for VfsFileEntriesIterator<'a> {
-    type Item = io::Result<VfsFileEntry>;
+    type Item = Result<VfsFileEntry, ErrorTrace>;
 
     /// Retrieves the next file entry.
     fn next(&mut self) -> Option<Self::Item> {
@@ -54,4 +54,9 @@ impl<'a> Iterator for VfsFileEntriesIterator<'a> {
     }
 }
 
-// TODO: add tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests
+}

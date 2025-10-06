@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u16_le;
 
@@ -49,17 +48,15 @@ impl NtfsIndexEntryHeader {
     }
 
     /// Reads the index entry header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 24 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported NTFS index entry header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported NTFS index entry header data size"
             ));
         }
         if data[0..4] != NTFS_INDEX_ENTRY_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported NTFS index entry header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported NTFS index entry header signature"
             ));
         }
         self.fixup_values_offset = bytes_to_u16_le!(data, 4);
@@ -81,7 +78,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsIndexEntryHeader::new();
 
         let test_data: Vec<u8> = get_test_data();

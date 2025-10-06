@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
@@ -37,11 +36,10 @@ impl EwfError2Footer {
     }
 
     /// Reads the error2 footer from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 4 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported EWF error2 footer data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF error2 footer data size"
             ));
         }
         self.checksum = bytes_to_u32_le!(data, 0);
@@ -59,7 +57,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfError2Footer::new();

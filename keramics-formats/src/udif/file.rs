@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
 use crate::lru_cache::LruCache;
@@ -80,7 +79,10 @@ impl UdifFile {
     }
 
     /// Reads a file from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_metadata(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -89,7 +91,7 @@ impl UdifFile {
     }
 
     /// Reads the file footer and XML plist.
-    fn read_metadata(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut file_footer: UdifFileFooter = UdifFileFooter::new();
 
         file_footer.read_at_position(data_stream, SeekFrom::End(-512))?;
@@ -103,45 +105,51 @@ impl UdifFile {
             self.has_block_ranges = false;
             self.media_size = file_footer.data_fork_size;
         } else {
-            let string: String = match data_stream.write() {
-                Ok(mut data_stream) => {
-                    if file_footer.plist_size == 0 || file_footer.plist_size > 65536 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported plist data size",
-                        ));
-                    }
-                    let mut data: Vec<u8> = vec![0; file_footer.plist_size as usize];
+            if file_footer.plist_size == 0 || file_footer.plist_size > 65536 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported plist data size"
+                ));
+            }
+            let mut data: Vec<u8> = vec![0; file_footer.plist_size as usize];
 
-                    data_stream
-                        .read_at_position(&mut data, SeekFrom::Start(file_footer.plist_offset))?;
-
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "Plist data of size: {} at offset: {} (0x{:08x})\n",
-                            file_footer.plist_size,
-                            file_footer.plist_offset,
-                            file_footer.plist_offset,
-                        ));
-                        self.mediator.debug_print_data(&data, true);
-                    }
-                    match String::from_utf8(data) {
-                        Ok(string) => string,
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    }
+            keramics_core::data_stream_read_at_position!(
+                data_stream,
+                &mut data,
+                SeekFrom::Start(file_footer.plist_offset)
+            );
+            if self.mediator.debug_output {
+                self.mediator.debug_print(format!(
+                    "Plist data of size: {} at offset: {} (0x{:08x})\n",
+                    file_footer.plist_size, file_footer.plist_offset, file_footer.plist_offset,
+                ));
+                self.mediator.debug_print_data(&data, true);
+            }
+            let string: String = match String::from_utf8(data) {
+                Ok(string) => string,
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to convert plist data into UTF-8 string",
+                        error
+                    ));
                 }
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
             };
             let mut xml_plist: XmlPlist = XmlPlist::new();
-            xml_plist.parse(string.as_str())?;
 
+            match xml_plist.parse(string.as_str()) {
+                Ok(_) => {}
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to parse plist",
+                        error
+                    ));
+                }
+            }
             let resource_fork_object: &PlistObject =
                 match xml_plist.root_object.get_object_by_key("resource-fork") {
                     Some(string) => string,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unable to retrieve resource-fork value from plist",
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve resource-fork value from plist"
                         ));
                     }
                 };
@@ -149,9 +157,8 @@ impl UdifFile {
             {
                 Some(string) => string,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unable to retrieve blkx value from plist",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to retrieve blkx value from plist"
                     ));
                 }
             };
@@ -164,13 +171,10 @@ impl UdifFile {
                 let data: &[u8] = match blkx_array_entry.get_bytes_by_key("Data") {
                     Some(data) => data,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Unable to retrieve Data value from blkx array entry: {}",
-                                table_index
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unable to retrieve Data value from blkx array entry: {}",
+                            table_index
+                        )));
                     }
                 };
                 if self.mediator.debug_output {
@@ -187,13 +191,10 @@ impl UdifFile {
                 block_table.read_data(&data)?;
 
                 if block_table.start_sector != media_sector {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported block table: {} start sector value out of bounds",
-                            table_index,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported block table: {} start sector value out of bounds",
+                        table_index,
+                    )));
                 }
                 for (entry_index, block_table_entry) in block_table.entries.iter().enumerate() {
                     if block_table_entry.entry_type == 0xffffffff {
@@ -206,46 +207,34 @@ impl UdifFile {
                         > MAXIMUM_NUMBER_OF_SECTORS - block_table.start_sector
                         || block_table.start_sector + block_table_entry.start_sector != media_sector
                     {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Unsupported block table: {} entry: {} start sector value out of bounds",
-                                table_index, entry_index,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported block table: {} entry: {} start sector value out of bounds",
+                            table_index, entry_index,
+                        )));
                     }
                     if block_table_entry.number_of_sectors == 0
                         || block_table_entry.number_of_sectors > MAXIMUM_NUMBER_OF_SECTORS
                     {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Unsupported block table: {} entry: {} number of sectors value out of bounds",
-                                table_index, entry_index,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported block table: {} entry: {} number of sectors value out of bounds",
+                            table_index, entry_index,
+                        )));
                     }
                     if block_table_entry.data_offset < file_footer.data_fork_offset
                         || block_table_entry.data_offset >= data_fork_end_offset
                     {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Unsupported block table: {} entry: {} data offset value out of bounds",
-                                table_index, entry_index,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported block table: {} entry: {} data offset value out of bounds",
+                            table_index, entry_index,
+                        )));
                     }
                     if block_table_entry.data_size
                         > data_fork_end_offset - block_table_entry.data_offset
                     {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Unsupported block table: {} entry: {} data size value out of bounds",
-                                table_index, entry_index,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported block table: {} entry: {} data size value out of bounds",
+                            table_index, entry_index,
+                        )));
                     }
                     let media_size: u64 =
                         block_table_entry.number_of_sectors * self.bytes_per_sector as u64;
@@ -267,20 +256,16 @@ impl UdifFile {
                         ),
                         0x80000004..0x80000008 => {
                             if block_table_entry.number_of_sectors > 2048 {
-                                return Err(io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    format!(
-                                        "Unsupported compressed block table: {} entry: {} number of sectors value out of bounds",
-                                        table_index, entry_index,
-                                    ),
-                                ));
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Unsupported compressed block table: {} entry: {} number of sectors value out of bounds",
+                                    table_index, entry_index,
+                                )));
                             }
                             if compressed_entry_type == 0 {
                                 compressed_entry_type = block_table_entry.entry_type;
                             } else if block_table_entry.entry_type != compressed_entry_type {
-                                return Err(io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    "Unsupported mixed compression methods",
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unsupported mixed compression methods"
                                 ));
                             }
                             UdifBlockRange::new(
@@ -292,13 +277,10 @@ impl UdifFile {
                             )
                         }
                         _ => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                format!(
-                                    "Unsupported block table entry type: 0x{:08x}",
-                                    block_table_entry.entry_type
-                                ),
-                            ));
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported block table entry type: 0x{:08x}",
+                                block_table_entry.entry_type
+                            )));
                         }
                     };
                     block_ranges.push(block_range);
@@ -333,7 +315,12 @@ impl UdifFile {
                     block_range,
                 ) {
                     Ok(_) => {}
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to insert block range into block tree",
+                            error
+                        ));
+                    }
                 };
             }
         }
@@ -341,7 +328,7 @@ impl UdifFile {
     }
 
     /// Reads media data based on the block ranges in the block tree.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.media_offset;
@@ -355,10 +342,10 @@ impl UdifFile {
             let block_range: &UdifBlockRange = match block_tree_value {
                 Some(value) => value,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Missing block range for offset: {}", media_offset),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing block range for offset: {}",
+                        media_offset
+                    )));
                 }
             };
             let range_relative_offset: u64 = media_offset - block_range.media_offset;
@@ -386,10 +373,9 @@ impl UdifFile {
                     {
                         Some(data) => data,
                         None => {
-                            return Err(io::Error::new(
-                                io::ErrorKind::Other,
-                                format!("Unable to retrieve data from cache."),
-                            ));
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unable to retrieve data from cache"
+                            )));
                         }
                     };
                     data[data_offset..data_end_offset]
@@ -397,21 +383,20 @@ impl UdifFile {
 
                     range_read_size
                 }
-                UdifBlockRangeType::InFile => match self.data_stream.as_ref() {
-                    Some(data_stream) => match data_stream.write() {
-                        Ok(mut data_stream) => data_stream.read_at_position(
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                        )?,
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    },
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
-                    }
-                },
+                UdifBlockRangeType::InFile => {
+                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                        Some(data_stream) => data_stream,
+                        None => {
+                            return Err(keramics_core::error_trace_new!("Missing data stream"));
+                        }
+                    };
+                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(block_range.data_offset + range_relative_offset)
+                    );
+                    read_count
+                }
                 UdifBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
 
@@ -432,24 +417,20 @@ impl UdifFile {
         &self,
         block_range: &UdifBlockRange,
         data: &mut Vec<u8>,
-    ) -> io::Result<()> {
-        let mut compressed_data: Vec<u8> = vec![0; block_range.compressed_data_size as usize];
-
-        match self.data_stream.as_ref() {
-            Some(data_stream) => match data_stream.write() {
-                Ok(mut data_stream) => data_stream.read_exact_at_position(
-                    &mut compressed_data,
-                    SeekFrom::Start(block_range.data_offset),
-                )?,
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            },
+    ) -> Result<(), ErrorTrace> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
+        let mut compressed_data: Vec<u8> = vec![0; block_range.compressed_data_size as usize];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut compressed_data,
+            SeekFrom::Start(block_range.data_offset)
+        );
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "Compressed data of size: {} at offset: {} (0x{:08x})\n",
@@ -460,15 +441,45 @@ impl UdifFile {
         match self.compression_method {
             UdifCompressionMethod::Adc => {
                 let mut adc_context: AdcContext = AdcContext::new();
-                adc_context.decompress(&compressed_data, data)?;
+
+                match adc_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress ADC data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             UdifCompressionMethod::Bzip2 => {
                 let mut bzip2_context: Bzip2Context = Bzip2Context::new();
-                bzip2_context.decompress(&compressed_data, data)?;
+
+                match bzip2_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress bzip2 data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             UdifCompressionMethod::Lzfse => {
                 let mut lzfse_context: LzfseContext = LzfseContext::new();
-                lzfse_context.decompress(&compressed_data, data)?;
+
+                match lzfse_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress LZFSE data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             UdifCompressionMethod::Lzma => {
                 // TODO: add support for UdifCompressionMethod::Lzma,
@@ -476,12 +487,21 @@ impl UdifFile {
             }
             UdifCompressionMethod::Zlib => {
                 let mut zlib_context: ZlibContext = ZlibContext::new();
-                zlib_context.decompress(&compressed_data, data)?;
+
+                match zlib_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress zlib data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unsupported compression method",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported compression method"
                 ));
             }
         };
@@ -491,12 +511,12 @@ impl UdifFile {
 
 impl DataStream for UdifFile {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.media_size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.media_offset >= self.media_size {
             return Ok(0);
         }
@@ -507,27 +527,27 @@ impl DataStream for UdifFile {
             read_size = remaining_media_size as usize;
         }
         let read_count: usize = if self.has_block_ranges {
-            self.read_data_from_blocks(&mut buf[..read_size])?
-        } else {
-            match self.data_stream.as_ref() {
-                Some(data_stream) => match data_stream.write() {
-                    Ok(mut data_stream) => {
-                        let data_fork_offset: u64 = self.data_fork_offset + self.media_offset;
-
-                        data_stream.read_at_position(
-                            &mut buf[0..read_size],
-                            SeekFrom::Start(data_fork_offset),
-                        )?
-                    }
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                },
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Missing data stream",
-                    ));
+            match self.read_data_from_blocks(&mut buf[..read_size]) {
+                Ok(read_count) => read_count,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                    return Err(error);
                 }
             }
+        } else {
+            let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing data stream"));
+                }
+            };
+            let data_fork_offset: u64 = self.data_fork_offset + self.media_offset;
+            let read_count: usize = keramics_core::data_stream_read_at_position!(
+                data_stream,
+                &mut buf[0..read_size],
+                SeekFrom::Start(data_fork_offset)
+            );
+            read_count
         };
         self.media_offset += read_count as u64;
 
@@ -535,7 +555,7 @@ impl DataStream for UdifFile {
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.media_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.media_offset as i64;
@@ -559,7 +579,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file() -> io::Result<UdifFile> {
+    fn get_file() -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
         let data_stream: DataStreamReference =
@@ -570,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
         let data_stream: DataStreamReference =
@@ -584,7 +604,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_metadata() -> io::Result<()> {
+    fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
         let data_stream: DataStreamReference =
@@ -601,7 +621,7 @@ mod tests {
     // TODO: add tests for read_compressed_block
 
     #[test]
-    fn test_seek_from_start() -> io::Result<()> {
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::Start(1024))?;
@@ -611,7 +631,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_end() -> io::Result<()> {
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(-512))?;
@@ -621,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_current() -> io::Result<()> {
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = get_file()?;
 
         let offset = file.seek(SeekFrom::Start(1024))?;
@@ -634,7 +654,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_media_size() -> io::Result<()> {
+    fn test_seek_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(512))?;
@@ -644,7 +664,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read() -> io::Result<()> {
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = get_file()?;
         file.seek(SeekFrom::Start(1024))?;
 
@@ -697,7 +717,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = get_file()?;
         file.seek(SeekFrom::End(512))?;
 

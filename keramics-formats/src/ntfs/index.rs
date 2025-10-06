@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
 
@@ -50,16 +49,16 @@ impl NtfsIndex {
         &self,
         data_stream: &DataStreamReference,
         virtual_cluster_number: u64,
-    ) -> io::Result<NtfsIndexEntry> {
+    ) -> Result<NtfsIndexEntry, ErrorTrace> {
         let virtual_cluster_offset: u64 = virtual_cluster_number * (self.cluster_block_size as u64);
 
         let block_range: &NtfsBlockRange = match self.block_tree.get_value(virtual_cluster_offset) {
             Some(value) => value,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Missing block range for VCN: {}", virtual_cluster_number),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for VCN: {}",
+                    virtual_cluster_number
+                )));
             }
         };
         let range_relative_offset: u64 =
@@ -72,13 +71,10 @@ impl NtfsIndex {
             * (self.cluster_block_size as u64))
             - range_relative_offset;
         if remaining_range_size < (self.index_entry_size as u64) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Block range too small for index entry of size: {}",
-                    self.index_entry_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Block range too small for index entry of size: {}",
+                self.index_entry_size
+            )));
         }
         let mut index_entry: NtfsIndexEntry = NtfsIndexEntry::new();
 
@@ -95,17 +91,15 @@ impl NtfsIndex {
         &mut self,
         index_entry_size: u32,
         index_allocation_attribute: &NtfsMftAttribute,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if index_allocation_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported resident $INDEX_ALLOCATION attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident $INDEX_ALLOCATION attribute"
             ));
         }
         if index_allocation_attribute.is_compressed() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported compressed $INDEX_ALLOCATION attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compressed $INDEX_ALLOCATION attribute"
             ));
         }
         let block_tree_size: u64 = (index_allocation_attribute.allocated_data_size
@@ -119,13 +113,10 @@ impl NtfsIndex {
 
         for cluster_group in index_allocation_attribute.data_cluster_groups.iter() {
             if cluster_group.first_vcn != virtual_cluster_number {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "$INDEX_ALLOCATION attribute cluster group first VNC: {} does not match expected value: {}.",
-                        cluster_group.first_vcn, virtual_cluster_number
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "$INDEX_ALLOCATION attribute cluster group first VNC: {} does not match expected value: {}",
+                    cluster_group.first_vcn, virtual_cluster_number
+                )));
             }
             for data_run in cluster_group.data_runs.iter() {
                 let range_size: u64 = data_run.number_of_blocks * (self.cluster_block_size as u64);
@@ -133,10 +124,7 @@ impl NtfsIndex {
                 let range_type: NtfsBlockRangeType = match &data_run.run_type {
                     NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
                     _ => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported data run type.",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Unsupported data run type"));
                     }
                 };
                 let block_range: NtfsBlockRange = NtfsBlockRange::new(
@@ -150,7 +138,12 @@ impl NtfsIndex {
                     .insert_value(virtual_cluster_offset, range_size, block_range)
                 {
                     Ok(_) => {}
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to insert block range into block tree",
+                            error
+                        ));
+                    }
                 };
                 virtual_cluster_number += data_run.number_of_blocks as u64;
                 virtual_cluster_offset += range_size;
@@ -158,13 +151,10 @@ impl NtfsIndex {
             if cluster_group.last_vcn != 0xffffffffffffffff
                 && cluster_group.last_vcn + 1 != virtual_cluster_number
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Cluster group last VNC: {} does not match expected value.",
-                        cluster_group.last_vcn
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Cluster group last VNC: {} does not match expected value",
+                    cluster_group.last_vcn
+                )));
             }
         }
         self.index_entry_size = index_entry_size;

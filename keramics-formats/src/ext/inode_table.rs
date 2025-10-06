@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
 
@@ -70,7 +69,7 @@ impl ExtInodeTable {
         inode_size: u16,
         number_of_inodes_per_block_group: u32,
         group_descriptors: &mut Vec<ExtGroupDescriptor>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         self.format_version = features.get_format_version();
         self.metadata_checksum_seed = features.get_metadata_checksum_seed();
         self.block_size = block_size;
@@ -91,7 +90,12 @@ impl ExtInodeTable {
                 .insert_value(inode_table_offset, group_size, group_descriptor)
             {
                 Ok(_) => {}
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to insert block range into block tree",
+                        error
+                    ));
+                }
             };
             inode_table_offset += group_size;
         }
@@ -103,17 +107,17 @@ impl ExtInodeTable {
         &self,
         data_stream: &DataStreamReference,
         inode_number: u32,
-    ) -> io::Result<ExtInode> {
+    ) -> Result<ExtInode, ErrorTrace> {
         let inode_table_offset: u64 = (inode_number as u64) * (self.inode_size as u64);
 
         let group_descriptor: &ExtGroupDescriptor =
             match self.block_tree.get_value(inode_table_offset) {
                 Some(value) => value,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Missing group descriptor for inode: {}", inode_number),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing group descriptor for inode: {}",
+                        inode_number
+                    )));
                 }
             };
         let inode_group_index: u32 = (inode_number - 1) % self.number_of_inodes_per_block_group;
@@ -124,12 +128,11 @@ impl ExtInodeTable {
         let inode_size: usize = self.inode_size as usize;
         let mut data: Vec<u8> = vec![0; inode_size];
 
-        match data_stream.write() {
-            Ok(mut data_stream) => {
-                data_stream.read_exact_at_position(&mut data, SeekFrom::Start(inode_data_offset))?
-            }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut data,
+            SeekFrom::Start(inode_data_offset)
+        );
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "ExtInode data of size: {} at offset: {} (0x{:08x})\n",
@@ -166,13 +169,10 @@ impl ExtInodeTable {
                 calculated_checksum = 0xffffffff - calculated_checksum;
 
                 if inode.checksum != 0 && (inode.checksum as u32) != calculated_checksum {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!(
-                            "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} ext inode table checksums",
-                            inode.checksum, calculated_checksum
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
+                        inode.checksum, calculated_checksum
+                    )));
                 }
             }
             None => {}

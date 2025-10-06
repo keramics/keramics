@@ -11,9 +11,8 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_checksums::ReversedCrc32Context;
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
@@ -70,34 +69,32 @@ impl GptPartitionTableHeader {
     }
 
     /// Reads the partition table header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 92 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported GPT partition table header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported GPT partition table header data size"
             ));
         }
         if data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported GPT partition table header signature"),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported GPT partition table header signature"
+            )));
         }
         let format_version: u32 = bytes_to_u32_le!(data, 8);
 
         if format_version != 0x00010000 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported format version: 0x{:08x}", format_version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format version: 0x{:08x}",
+                format_version
+            )));
         }
         let header_data_size: u32 = bytes_to_u32_le!(data, 12);
 
         if header_data_size != 92 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported header data size: {}", header_data_size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported header data size: {}",
+                header_data_size
+            )));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 16);
 
@@ -109,13 +106,10 @@ impl GptPartitionTableHeader {
         let calculated_checksum: u32 = crc32_context.finalize();
 
         if stored_checksum != 0 && stored_checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} GPT partitiohn table header checksums",
-                    stored_checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                stored_checksum, calculated_checksum
+            )));
         }
         self.backup_header_block_number = bytes_to_u64_le!(data, 32);
         self.area_start_block_number = bytes_to_u64_le!(data, 40);
@@ -147,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = GptPartitionTableHeader::new();

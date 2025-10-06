@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
 use super::partition::GptPartition;
@@ -62,16 +61,16 @@ impl GptVolumeSystem {
     }
 
     /// Retrieves a partition by index.
-    pub fn get_partition_by_index(&self, partition_index: usize) -> io::Result<GptPartition> {
+    pub fn get_partition_by_index(
+        &self,
+        partition_index: usize,
+    ) -> Result<GptPartition, ErrorTrace> {
         match self.partition_entries.get(partition_index) {
             Some(partition_entry) => {
                 let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
                     Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Missing data stream"));
                     }
                 };
                 let partition_offset: u64 =
@@ -93,10 +92,10 @@ impl GptVolumeSystem {
                 Ok(partition)
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("No partition with index: {}", partition_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No partition with index: {}",
+                    partition_index
+                )));
             }
         }
     }
@@ -104,7 +103,10 @@ impl GptVolumeSystem {
     // TODO: add get_partition_index_by_identifier
 
     /// Reads the volume system from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_partition_table(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -113,7 +115,10 @@ impl GptVolumeSystem {
     }
 
     /// Reads the partition table.
-    fn read_partition_table(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_partition_table(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         let mut partition_table_header = GptPartitionTableHeader::new();
 
         if self.bytes_per_sector != 0 {
@@ -132,9 +137,8 @@ impl GptVolumeSystem {
                 }
             }
             if self.bytes_per_sector == 0 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported bytes per sector: 0"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported bytes per sector: 0"
                 ));
             }
         }
@@ -147,7 +151,7 @@ impl GptVolumeSystem {
             match backup_partition_table_header
                 .read_at_position(data_stream, SeekFrom::Start(backup_partition_table_offset))
             {
-                Ok(_) => {}
+                Ok(read_count) => read_count,
                 Err(_) => {
                     if self.mediator.debug_output {
                         self.mediator.debug_print(format!(
@@ -167,42 +171,34 @@ impl GptVolumeSystem {
             self.disk_identifier = partition_table_header.disk_identifier;
         }
         if partition_table_header.entry_data_size != 128 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported partition table entry data size: {}",
-                    partition_table_header.entry_data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported partition table entry data size: {}",
+                partition_table_header.entry_data_size
+            )));
         }
         let maximum_number_of_entries: u32 =
             (32 * self.bytes_per_sector as u32) / partition_table_header.entry_data_size;
 
         if partition_table_header.number_of_entries > maximum_number_of_entries {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Number of partition entries: {} value out of bounds: {}",
-                    partition_table_header.number_of_entries, maximum_number_of_entries
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Number of partition entries: {} value out of bounds: {}",
+                partition_table_header.number_of_entries, maximum_number_of_entries
+            )));
         }
-        let entries_start_offset: u64 =
-            partition_table_header.entries_start_block_number * self.bytes_per_sector as u64;
-
-        match data_stream.write() {
-            Ok(mut data_stream) => data_stream.seek(SeekFrom::Start(entries_start_offset))?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);
 
+        let mut entry_data_offset: u64 =
+            partition_table_header.entries_start_block_number * self.bytes_per_sector as u64;
         let mut entry_data: Vec<u8> = vec![0; partition_table_header.entry_data_size as usize];
 
         for entry_index in 0..partition_table_header.number_of_entries {
-            match data_stream.write() {
-                Ok(mut data_stream) => data_stream.read_exact(&mut entry_data)?,
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            };
+            keramics_core::data_stream_read_exact_at_position!(
+                data_stream,
+                &mut entry_data,
+                SeekFrom::Start(entry_data_offset)
+            );
+            entry_data_offset += partition_table_header.entry_data_size as u64;
+
             crc32_context.update(&entry_data);
 
             let mut partition_entry = GptPartitionEntry::new(entry_index as usize);
@@ -213,28 +209,22 @@ impl GptVolumeSystem {
                 if partition_entry.start_block_number
                     < partition_table_header.area_start_block_number
                 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Partition entry: {} start block number: {} value out of bounds: {} - {}",
-                            entry_index,
-                            partition_entry.start_block_number,
-                            partition_table_header.area_start_block_number,
-                            partition_table_header.area_end_block_number,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Partition entry: {} start block number: {} value out of bounds: {} - {}",
+                        entry_index,
+                        partition_entry.start_block_number,
+                        partition_table_header.area_start_block_number,
+                        partition_table_header.area_end_block_number,
+                    )));
                 }
                 if partition_entry.end_block_number < partition_entry.start_block_number {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Partition entry: {} end block number: {} value out of bounds: {} - {}",
-                            entry_index,
-                            partition_entry.end_block_number,
-                            partition_entry.start_block_number,
-                            partition_table_header.area_end_block_number,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Partition entry: {} end block number: {} value out of bounds: {} - {}",
+                        entry_index,
+                        partition_entry.end_block_number,
+                        partition_entry.start_block_number,
+                        partition_table_header.area_end_block_number,
+                    )));
                 }
                 self.partition_entries.push(partition_entry);
             }
@@ -244,24 +234,21 @@ impl GptVolumeSystem {
         if partition_table_header.entries_data_checksum != 0
             && partition_table_header.entries_data_checksum != calculated_checksum
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} GPT partition table entries checksums",
-                    partition_table_header.entries_data_checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                partition_table_header.entries_data_checksum, calculated_checksum
+            )));
         }
         Ok(())
     }
 
     /// Sets the number of bytes per sector.
-    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> io::Result<()> {
+    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> Result<(), ErrorTrace> {
         if !SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported bytes per sector: {}", bytes_per_sector),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported bytes per sector: {}",
+                bytes_per_sector
+            )));
         }
         self.bytes_per_sector = bytes_per_sector;
 
@@ -275,7 +262,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_volume_system() -> io::Result<GptVolumeSystem> {
+    fn get_volume_system() -> Result<GptVolumeSystem, ErrorTrace> {
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/gpt/gpt.raw")?;
@@ -285,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_partitions() -> io::Result<()> {
+    fn test_get_number_of_partitions() -> Result<(), ErrorTrace> {
         let volume_system: GptVolumeSystem = get_volume_system()?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
@@ -294,7 +281,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_partition_by_index() -> io::Result<()> {
+    fn test_get_partition_by_index() -> Result<(), ErrorTrace> {
         let volume_system: GptVolumeSystem = get_volume_system()?;
 
         let partition: GptPartition = volume_system.get_partition_by_index(0)?;
@@ -306,7 +293,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/gpt/gpt.raw")?;
@@ -318,7 +305,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_partition_table() -> io::Result<()> {
+    fn test_read_partition_table() -> Result<(), ErrorTrace> {
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/gpt/gpt.raw")?;

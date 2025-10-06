@@ -17,6 +17,7 @@ use std::fmt;
 /// The error returned for issues while inserting a value.
 #[derive(Debug)]
 pub struct InsertError {
+    /// The error message.
     message: String,
 }
 
@@ -29,12 +30,7 @@ impl InsertError {
     }
 }
 
-impl Error for InsertError {
-    /// Retrieves the description.
-    fn description(&self) -> &str {
-        &self.message
-    }
-}
+impl Error for InsertError {}
 
 impl fmt::Display for InsertError {
     /// Formats the error as a string.

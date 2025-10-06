@@ -11,19 +11,30 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, DataStreamReference, open_os_data_stream};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::qcow::QcowFile;
 use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_media_from_file(file: &mut QcowFile) -> io::Result<(u64, String)> {
+fn read_media_from_file(file: &mut QcowFile) -> Result<(u64, String), ErrorTrace> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
-    while let Ok(read_count) = file.read(&mut data) {
+    loop {
+        let read_count = match file.read(&mut data) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read from QCOW file at offset {} (0x{:08x})",
+                        media_offset, media_offset
+                    )
+                );
+                return Err(error);
+            }
+        };
         if read_count == 0 {
             break;
         }
@@ -37,17 +48,26 @@ fn read_media_from_file(file: &mut QcowFile) -> io::Result<(u64, String)> {
     Ok((media_offset, hash_string))
 }
 
-fn open_file(path: &str) -> io::Result<QcowFile> {
+fn open_file(path: &str) -> Result<QcowFile, ErrorTrace> {
     let mut file: QcowFile = QcowFile::new();
 
     let data_stream: DataStreamReference = open_os_data_stream(path)?;
-    file.read_data_stream(&data_stream)?;
 
+    match file.read_data_stream(&data_stream) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to read QCOW file from data stream"
+            );
+            return Err(error);
+        }
+    }
     Ok(file)
 }
 
 #[test]
-fn read_media() -> io::Result<()> {
+fn read_media() -> Result<(), ErrorTrace> {
     let mut file: QcowFile = open_file("../test_data/qcow/ext2.qcow2")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;

@@ -12,11 +12,10 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
 use super::metadata_table_entry::VhdxMetadataTableEntry;
@@ -41,7 +40,7 @@ impl VhdxMetadataTable {
     }
 
     /// Reads the metadata table from a buffer.
-    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut metadata_table_header: VhdxMetadataTableHeader = VhdxMetadataTableHeader::new();
 
         if self.mediator.debug_output {
@@ -79,13 +78,11 @@ impl VhdxMetadataTable {
         &mut self,
         data_stream: &DataStreamReference,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 65536];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "VhdxMetadataTable data of size: {} at offset: {} (0x{:08x})\n",
@@ -4791,7 +4788,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdxMetadataTable::new();

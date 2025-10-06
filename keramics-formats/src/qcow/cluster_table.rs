@@ -11,11 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::Mediator;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u64_be;
 
@@ -39,11 +38,10 @@ impl QcowClusterTableEntry {
     }
 
     /// Reads the cluster table entry from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported QCOW cluster table entry data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW cluster table entry data size"
             ));
         }
         self.reference = bytes_to_u64_be!(data, 0);
@@ -78,25 +76,21 @@ impl QcowClusterTable {
         &self,
         data_stream: &DataStreamReference,
         entry_index: u32,
-    ) -> io::Result<QcowClusterTableEntry> {
+    ) -> Result<QcowClusterTableEntry, ErrorTrace> {
         if entry_index >= self.number_of_entries {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported entry index: {} value out of bounds",
-                    entry_index
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported entry index: {} value out of bounds",
+                entry_index
+            )));
         }
         let entry_offset: u64 = self.offset + (entry_index as u64 * 8);
         let mut data: [u8; 8] = [0; 8];
 
-        match data_stream.write() {
-            Ok(mut data_stream) => {
-                data_stream.read_exact_at_position(&mut data, SeekFrom::Start(entry_offset))?
-            }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut data,
+            SeekFrom::Start(entry_offset)
+        );
         let mut entry: QcowClusterTableEntry = QcowClusterTableEntry::new();
 
         let mediator = Mediator::current();
@@ -131,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = QcowClusterTableEntry::new();
@@ -155,7 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_entry() -> io::Result<()> {
+    fn test_read_entry() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

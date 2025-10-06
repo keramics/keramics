@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
@@ -79,50 +78,42 @@ impl QcowFileHeaderV3 {
     }
 
     /// Reads the file header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 104 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported QCOW file header version 3 data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header version 3 data size"
             ));
         }
         if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported QCOW file header version 3 signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header version 3 signature"
             ));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);
 
         if format_version != 3 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported format version: {}", format_version),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format version: {}",
+                format_version
+            )));
         }
         let supported_flags: u64 = 1;
 
         let incompatible_feature_flags: u64 = bytes_to_u64_be!(data, 72);
 
         if incompatible_feature_flags & !(supported_flags) != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported incompatible feature flags: 0x{:016x}",
-                    incompatible_feature_flags
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported incompatible feature flags: 0x{:016x}",
+                incompatible_feature_flags
+            )));
         }
         let compatible_feature_flags: u64 = bytes_to_u64_be!(data, 80);
 
         if compatible_feature_flags & !(supported_flags) != 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported compatible feature flags: 0x{:016x}",
-                    compatible_feature_flags
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported compatible feature flags: 0x{:016x}",
+                compatible_feature_flags
+            )));
         }
         self.backing_file_name_offset = bytes_to_u64_be!(data, 8);
         self.backing_file_name_size = bytes_to_u32_be!(data, 16);
@@ -137,19 +128,16 @@ impl QcowFileHeaderV3 {
         self.compression_method = data[104];
 
         if self.number_of_cluster_block_bits <= 8 || self.number_of_cluster_block_bits > 63 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of cluster block bits: {} value out of bounds",
-                    self.number_of_cluster_block_bits
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of cluster block bits: {} value out of bounds",
+                self.number_of_cluster_block_bits
+            )));
         }
         if self.header_size != 104 && self.header_size != 112 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported header size: {}", self.header_size),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported header size: {}",
+                self.header_size
+            )));
         }
         Ok(())
     }
@@ -173,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = QcowFileHeaderV3::new();

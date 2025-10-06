@@ -11,9 +11,8 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_checksums::Adler32Context;
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Uuid, bytes_to_u32_le};
 
@@ -94,11 +93,10 @@ impl EwfE01Volume {
     }
 
     /// Reads the volume from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 1052 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported EWF-E01 volume data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF-E01 volume data size"
             ));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 1048);
@@ -108,13 +106,10 @@ impl EwfE01Volume {
         let calculated_checksum: u32 = adler32_context.finalize();
 
         if stored_checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} EWF-E01 volume checksums",
-                    stored_checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                stored_checksum, calculated_checksum
+            )));
         }
         self.media_type = data[0];
         self.number_of_chunks = bytes_to_u32_le!(data, 4);
@@ -174,11 +169,10 @@ impl EwfS01Volume {
     }
 
     /// Reads the volume from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 94 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported EWF-S01 volume data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF-S01 volume data size"
             ));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 90);
@@ -188,13 +182,10 @@ impl EwfS01Volume {
         let calculated_checksum: u32 = adler32_context.finalize();
 
         if stored_checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} EWF-S01 volume checksums",
-                    stored_checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                stored_checksum, calculated_checksum
+            )));
         }
         self.number_of_chunks = bytes_to_u32_le!(data, 4);
         self.sectors_per_chunk = bytes_to_u32_le!(data, 8);
@@ -307,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_e01() -> io::Result<()> {
+    fn test_read_data_e01() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_e01();
 
         let mut test_struct = EwfE01Volume::new();
@@ -348,7 +339,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position_e01() -> io::Result<()> {
+    fn test_read_at_position_e01() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_e01();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -371,7 +362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_s01() -> io::Result<()> {
+    fn test_read_data_s01() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_s01();
 
         let mut test_struct = EwfS01Volume::new();
@@ -405,7 +396,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position_s01() -> io::Result<()> {
+    fn test_read_at_position_s01() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_s01();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

@@ -12,13 +12,10 @@
  */
 
 use std::fs::File;
-use std::io;
 use std::io::Write;
 use std::path::PathBuf;
 
-use keramics_core::DataStreamReference;
-
-const READ_BUFFER_SIZE: usize = 65536;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 /// Writes a data stream to a file.
 pub struct DataStreamWriter<'a> {
@@ -30,6 +27,8 @@ pub struct DataStreamWriter<'a> {
 }
 
 impl<'a> DataStreamWriter<'a> {
+    const READ_BUFFER_SIZE: usize = 65536;
+
     /// Creates a new data stream writer.
     pub fn new(target: &'a PathBuf) -> Self {
         Self {
@@ -39,26 +38,63 @@ impl<'a> DataStreamWriter<'a> {
     }
 
     /// Writes a data stream to a file.
-    pub fn write_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn write_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         let mut output_path = self.target.clone();
         output_path.push("keramics.bin");
 
-        let mut output_file: File = File::create(output_path)?;
-
-        let mut data: [u8; READ_BUFFER_SIZE] = [0; READ_BUFFER_SIZE];
+        let mut output_file: File = match File::create(output_path) {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to create output file",
+                    error
+                ));
+            }
+        };
+        let mut data: [u8; DataStreamWriter::READ_BUFFER_SIZE] =
+            [0; DataStreamWriter::READ_BUFFER_SIZE];
 
         match data_stream.write() {
             Ok(mut data_stream) => {
                 loop {
-                    let read_count = data_stream.read(&mut data)?;
+                    let read_count = match data_stream.read(&mut data) {
+                        Ok(read_count) => read_count,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to read data stream",
+                                error
+                            ));
+                        }
+                    };
                     if read_count == 0 {
                         break;
                     }
-                    output_file.write(&data[..read_count])?;
+                    let write_count: usize = match output_file.write(&data[..read_count]) {
+                        Ok(write_count) => write_count,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to write to output file",
+                                error
+                            ));
+                        }
+                    };
+                    if write_count != read_count {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to write all data to output file"
+                        ));
+                    }
                 }
                 self.number_of_streams_written += 1;
             }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
+                ));
+            }
         };
         Ok(())
     }

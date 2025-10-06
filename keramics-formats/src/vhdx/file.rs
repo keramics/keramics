@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
 use crate::block_tree::BlockTree;
@@ -129,7 +128,10 @@ impl VhdxFile {
     }
 
     /// Reads a file from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_metadata(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -138,7 +140,7 @@ impl VhdxFile {
     }
 
     /// Reads the file header, image headers and region tables.
-    fn read_metadata(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut file_header: VhdxFileHeader = VhdxFileHeader::new();
         file_header.read_at_position(data_stream, SeekFrom::Start(0))?;
 
@@ -173,21 +175,15 @@ impl VhdxFile {
         {
             Some(region_table_entry) => {
                 if region_table_entry.data_size < 65536 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported metadata region size: {}",
-                            region_table_entry.data_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported metadata region size: {}",
+                        region_table_entry.data_size
+                    )));
                 }
                 region_table_entry
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing metadata region",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing metadata region"));
             }
         };
         self.read_metadata_values(data_stream, metadata_region)?;
@@ -198,9 +194,8 @@ impl VhdxFile {
         {
             Some(region_table_entry) => region_table_entry,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing block allocation table region",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing block allocation table region"
                 ));
             }
         };
@@ -219,13 +214,10 @@ impl VhdxFile {
 
         if self.media_size > block_tree_data_size {
             let calculated_number_of_blocks: u64 = self.media_size.div_ceil(self.block_size as u64);
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Number of blocks: {} in block allocation table too small for virtual disk size: {} ({} blocks)",
-                    number_of_entries, self.media_size, calculated_number_of_blocks,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Number of blocks: {} in block allocation table too small for virtual disk size: {} ({} blocks)",
+                number_of_entries, self.media_size, calculated_number_of_blocks,
+            )));
         }
         self.block_tree = BlockTree::<VhdxBlockRange>::new(
             block_tree_data_size,
@@ -240,7 +232,7 @@ impl VhdxFile {
         &mut self,
         data_stream: &DataStreamReference,
         metadata_region: &VhdxRegionTableEntry,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut metadata_table: VhdxMetadataTable = VhdxMetadataTable::new();
 
         metadata_table
@@ -255,23 +247,20 @@ impl VhdxFile {
         {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 8 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported file parameters metadata item size: {}",
-                            metadata_table_entry.item_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported file parameters metadata item size: {}",
+                        metadata_table_entry.item_size
+                    )));
                 }
                 let mut data: [u8; 8] = [0; 8];
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.write() {
-                    Ok(mut data_stream) => data_stream
-                        .read_at_position(&mut data, SeekFrom::Start(metadata_item_offset))?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                keramics_core::data_stream_read_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(metadata_item_offset)
+                );
                 let file_parameters_flags: u32 = bytes_to_u32_le!(data, 4);
 
                 self.block_size = bytes_to_u32_le!(data, 0);
@@ -292,19 +281,15 @@ impl VhdxFile {
                     ));
                 }
                 if self.block_size < 1024 * 1024 || self.block_size > 256 * 1024 * 1024 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid block size: {} value out of bounds",
-                            self.block_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid block size: {} value out of bounds",
+                        self.block_size
+                    )));
                 }
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing file parameters metadata item",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing file parameters metadata item"
                 ));
             }
         };
@@ -314,23 +299,20 @@ impl VhdxFile {
         {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 8 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported virtual disk size metadata item size: {}",
-                            metadata_table_entry.item_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported virtual disk size metadata item size: {}",
+                        metadata_table_entry.item_size
+                    )));
                 }
                 let mut data: [u8; 8] = [0; 8];
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.write() {
-                    Ok(mut data_stream) => data_stream
-                        .read_at_position(&mut data, SeekFrom::Start(metadata_item_offset))?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                keramics_core::data_stream_read_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(metadata_item_offset)
+                );
                 self.media_size = bytes_to_u64_le!(data, 0);
 
                 if self.mediator.debug_output {
@@ -339,9 +321,8 @@ impl VhdxFile {
                 }
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing virtual disk size metadata item",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing virtual disk size metadata item"
                 ));
             }
         };
@@ -351,23 +332,20 @@ impl VhdxFile {
         {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 4 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported logical sector size metadata item size: {}",
-                            metadata_table_entry.item_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported logical sector size metadata item size: {}",
+                        metadata_table_entry.item_size
+                    )));
                 }
                 let mut data: [u8; 4] = [0; 4];
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.write() {
-                    Ok(mut data_stream) => data_stream
-                        .read_at_position(&mut data, SeekFrom::Start(metadata_item_offset))?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                keramics_core::data_stream_read_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(metadata_item_offset)
+                );
                 let logical_sector_size: u32 = bytes_to_u32_le!(data, 0);
 
                 if self.mediator.debug_output {
@@ -377,20 +355,16 @@ impl VhdxFile {
                     ));
                 }
                 if logical_sector_size != 512 && logical_sector_size != 4096 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid logical sector size: {} value out of bounds",
-                            logical_sector_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid logical sector size: {} value out of bounds",
+                        logical_sector_size
+                    )));
                 }
                 self.bytes_per_sector = logical_sector_size as u16;
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing logical sector size metadata item",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing logical sector size metadata item"
                 ));
             }
         };
@@ -400,23 +374,20 @@ impl VhdxFile {
         {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 4 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported physical sector size metadata item size: {}",
-                            metadata_table_entry.item_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported physical sector size metadata item size: {}",
+                        metadata_table_entry.item_size
+                    )));
                 }
                 let mut data: [u8; 4] = [0; 4];
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.write() {
-                    Ok(mut data_stream) => data_stream
-                        .read_at_position(&mut data, SeekFrom::Start(metadata_item_offset))?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                keramics_core::data_stream_read_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(metadata_item_offset)
+                );
                 let physical_sector_size: u32 = bytes_to_u32_le!(data, 0);
 
                 if self.mediator.debug_output {
@@ -426,13 +397,10 @@ impl VhdxFile {
                     ));
                 }
                 if physical_sector_size != 512 && physical_sector_size != 4096 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid physical sector size: {} value out of bounds",
-                            physical_sector_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid physical sector size: {} value out of bounds",
+                        physical_sector_size
+                    )));
                 }
             }
             None => {}
@@ -443,23 +411,20 @@ impl VhdxFile {
         {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 16 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported virtual disk identifier metadata item size: {}",
-                            metadata_table_entry.item_size
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported virtual disk identifier metadata item size: {}",
+                        metadata_table_entry.item_size
+                    )));
                 }
                 let mut data: [u8; 16] = [0; 16];
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                match data_stream.write() {
-                    Ok(mut data_stream) => data_stream
-                        .read_at_position(&mut data, SeekFrom::Start(metadata_item_offset))?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                keramics_core::data_stream_read_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(metadata_item_offset)
+                );
                 let virtual_disk_identifier: Uuid = Uuid::from_le_bytes(&data);
 
                 if self.mediator.debug_output {
@@ -470,9 +435,8 @@ impl VhdxFile {
                 }
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing virtual disk identifier metadata item",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing virtual disk identifier metadata item"
                 ));
             }
         };
@@ -501,7 +465,12 @@ impl VhdxFile {
 
                         match parent_identifier.from_string(uuid_string.as_str()) {
                             Ok(_) => {}
-                            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                            Err(error) => {
+                                return Err(keramics_core::error_trace_new_with_error!(
+                                    "Unable to parse parent identifier",
+                                    error
+                                ));
+                            }
                         }
                         self.parent_identifier = Some(parent_identifier);
                     }
@@ -536,14 +505,11 @@ impl VhdxFile {
     }
 
     /// Reads a specific block allocation entry and fills the block tree.
-    fn read_block_allocation_entry(&mut self, block_number: u64) -> io::Result<()> {
+    fn read_block_allocation_entry(&mut self, block_number: u64) -> Result<(), ErrorTrace> {
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
         let table_entry: u64 = if self.disk_type == VhdxDiskType::Fixed {
@@ -583,21 +549,27 @@ impl VhdxFile {
                 block_range,
             ) {
                 Ok(_) => {}
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to insert block range into block tree",
+                        error
+                    ));
+                }
             };
         }
         Ok(())
     }
 
     /// Reads a specific sector bitmap and fills the block tree.
-    fn read_sector_bitmap(&mut self, block_number: u64, block_offset: u64) -> io::Result<()> {
+    fn read_sector_bitmap(
+        &mut self,
+        block_number: u64,
+        block_offset: u64,
+    ) -> Result<(), ErrorTrace> {
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
         let table_entry: u64 =
@@ -639,7 +611,12 @@ impl VhdxFile {
                 .insert_value(range_media_offset, bitmap_range.size, block_range)
             {
                 Ok(_) => {}
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to insert block range into block tree",
+                        error
+                    ));
+                }
             };
             range_media_offset += bitmap_range.size;
             range_data_offset += bitmap_range.size;
@@ -648,7 +625,7 @@ impl VhdxFile {
     }
 
     /// Reads media data based on the block ranges in the block tree.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.media_offset;
@@ -669,10 +646,10 @@ impl VhdxFile {
             let block_range: &VhdxBlockRange = match block_tree_value {
                 Some(value) => value,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Missing block range for offset: {}", media_offset),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing block range for offset: {}",
+                        media_offset
+                    )));
                 }
             };
             let range_relative_offset: u64 = media_offset - block_range.media_offset;
@@ -685,37 +662,34 @@ impl VhdxFile {
             }
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
-                VhdxBlockRangeType::InFile => match self.data_stream.as_ref() {
-                    Some(data_stream) => match data_stream.write() {
-                        Ok(mut data_stream) => data_stream.read_at_position(
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                        )?,
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    },
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
-                    }
-                },
-                VhdxBlockRangeType::InParent => match &self.parent_file {
-                    Some(parent_file) => match parent_file.write() {
-                        Ok(mut file) => {
-                            file.seek(SeekFrom::Start(media_offset))?;
-
-                            file.read(&mut data[data_offset..data_end_offset])?
+                VhdxBlockRangeType::InFile => {
+                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                        Some(data_stream) => data_stream,
+                        None => {
+                            return Err(keramics_core::error_trace_new!("Missing data stream"));
                         }
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    },
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file",
-                        ));
-                    }
-                },
+                    };
+                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(block_range.data_offset + range_relative_offset)
+                    );
+                    read_count
+                }
+                VhdxBlockRangeType::InParent => {
+                    let parent_file: &Arc<RwLock<VhdxFile>> = match self.parent_file.as_ref() {
+                        Some(parent_file) => parent_file,
+                        None => {
+                            return Err(keramics_core::error_trace_new!("Missing parent file"));
+                        }
+                    };
+                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                        parent_file,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(media_offset)
+                    );
+                    read_count
+                }
                 VhdxBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
 
@@ -734,30 +708,29 @@ impl VhdxFile {
     }
 
     /// Sets the parent file.
-    pub fn set_parent(&mut self, parent_file: &Arc<RwLock<VhdxFile>>) -> io::Result<()> {
+    pub fn set_parent(&mut self, parent_file: &Arc<RwLock<VhdxFile>>) -> Result<(), ErrorTrace> {
         let parent_identifier: &Uuid = match &self.parent_identifier {
             Some(parent_identifier) => parent_identifier,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Missing parent identifier",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing parent identifier"));
             }
         };
         match parent_file.read() {
             Ok(file) => {
                 if *parent_identifier != file.identifier {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Parent identifier: {} does not match identifier of parent file: {}",
-                            parent_identifier.to_string(),
-                            file.identifier.to_string(),
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Parent identifier: {} does not match identifier of parent file: {}",
+                        parent_identifier.to_string(),
+                        file.identifier.to_string(),
+                    )));
                 }
             }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on parent file",
+                    error
+                ));
+            }
         }
         self.parent_file = Some(parent_file.clone());
 
@@ -767,12 +740,12 @@ impl VhdxFile {
 
 impl DataStream for VhdxFile {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.media_size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.media_offset >= self.media_size {
             return Ok(0);
         }
@@ -782,15 +755,20 @@ impl DataStream for VhdxFile {
         if (read_size as u64) > remaining_media_size {
             read_size = remaining_media_size as usize;
         }
-        let read_count: usize = self.read_data_from_blocks(&mut buf[..read_size])?;
-
+        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                return Err(error);
+            }
+        };
         self.media_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.media_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.media_offset as i64;
@@ -814,7 +792,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file() -> io::Result<VhdxFile> {
+    fn get_file() -> Result<VhdxFile, ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/vhdx/ext2.vhdx")?;
@@ -824,7 +802,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_parent_file_name() -> io::Result<()> {
+    fn test_get_parent_file_name() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
         let data_stream: DataStreamReference =
@@ -838,7 +816,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
         let data_stream: DataStreamReference =
@@ -863,7 +841,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_metadata() -> io::Result<()> {
+    fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
         let data_stream: DataStreamReference =
@@ -894,7 +872,7 @@ mod tests {
     // TODO: add tests for set_parent
 
     #[test]
-    fn test_seek_from_start() -> io::Result<()> {
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::Start(1024))?;
@@ -904,7 +882,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_end() -> io::Result<()> {
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(-512))?;
@@ -914,7 +892,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_current() -> io::Result<()> {
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = get_file()?;
 
         let offset = file.seek(SeekFrom::Start(1024))?;
@@ -927,7 +905,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_media_size() -> io::Result<()> {
+    fn test_seek_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(512))?;
@@ -937,7 +915,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read() -> io::Result<()> {
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = get_file()?;
         file.seek(SeekFrom::Start(1024))?;
 
@@ -990,7 +968,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = get_file()?;
         file.seek(SeekFrom::End(512))?;
 

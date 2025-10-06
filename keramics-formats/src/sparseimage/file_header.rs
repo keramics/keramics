@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_be;
 
@@ -52,30 +51,25 @@ impl SparseImageFileHeader {
     }
 
     /// Reads the file header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 64 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported sparse image file header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported sparse image file header data size"
             ));
         }
         if data[0..4] != SPARSEIMAGE_FILE_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported sparse image file header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported sparse image file header signature"
             ));
         }
         self.sectors_per_band = bytes_to_u32_be!(data, 8);
         self.number_of_sectors = bytes_to_u32_be!(data, 16);
 
         if self.sectors_per_band == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid sectors per band: {} value out of bounds",
-                    self.sectors_per_band
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid sectors per band: {} value out of bounds",
+                self.sectors_per_band
+            )));
         }
         Ok(())
     }
@@ -96,7 +90,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = SparseImageFileHeader::new();

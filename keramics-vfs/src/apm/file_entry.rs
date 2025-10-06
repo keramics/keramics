@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::apm::{ApmPartition, ApmVolumeSystem};
 
 use crate::enums::VfsFileType;
@@ -39,7 +38,7 @@ pub enum ApmFileEntry {
 
 impl ApmFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             ApmFileEntry::Partition { partition, .. } => Ok(Some(partition.clone())),
             ApmFileEntry::Root { .. } => Ok(None),
@@ -63,7 +62,7 @@ impl ApmFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             ApmFileEntry::Partition { .. } => Ok(0),
             ApmFileEntry::Root { volume_system } => Ok(volume_system.get_number_of_partitions()),
@@ -74,20 +73,25 @@ impl ApmFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<ApmFileEntry> {
+    ) -> Result<ApmFileEntry, ErrorTrace> {
         match self {
-            ApmFileEntry::Partition { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
+            ApmFileEntry::Partition { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
             ApmFileEntry::Root { volume_system } => {
-                let apm_partition: ApmPartition =
-                    volume_system.get_partition_by_index(sub_file_entry_index)?;
-
-                Ok(ApmFileEntry::Partition {
-                    index: sub_file_entry_index,
-                    partition: Arc::new(RwLock::new(apm_partition)),
-                })
+                match volume_system.get_partition_by_index(sub_file_entry_index) {
+                    Ok(apm_partition) => Ok(ApmFileEntry::Partition {
+                        index: sub_file_entry_index,
+                        partition: Arc::new(RwLock::new(apm_partition)),
+                    }),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve APM partition: {}", sub_file_entry_index)
+                        );
+                        return Err(error);
+                    }
+                }
             }
         }
     }
@@ -99,19 +103,34 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_volume_system() -> io::Result<ApmVolumeSystem> {
+    fn get_volume_system() -> Result<ApmVolumeSystem, ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
-        volume_system.read_data_stream(&data_stream)?;
-
+        let data_stream: DataStreamReference = match open_os_data_stream("../test_data/apm/apm.dmg")
+        {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                return Err(error);
+            }
+        };
+        match volume_system.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read APM volume system from data stream"
+                );
+                return Err(error);
+            }
+        }
         Ok(volume_system)
     }
 
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = ApmFileEntry::Root {
@@ -125,7 +144,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = ApmFileEntry::Root {
@@ -136,7 +155,6 @@ mod tests {
         assert!(name.is_none());
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
-
         let file_entry = ApmFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(apm_partition)),

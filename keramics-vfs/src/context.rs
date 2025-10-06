@@ -12,10 +12,9 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::sync::Weak;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::enums::VfsType;
 use super::file_entry::VfsFileEntry;
@@ -47,7 +46,7 @@ impl VfsContext {
         &mut self,
         vfs_location: &VfsLocation,
         name: Option<&str>,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let file_system: VfsFileSystemReference = self.open_file_system(vfs_location)?;
 
         let vfs_path: &VfsPath = vfs_location.get_path();
@@ -58,7 +57,7 @@ impl VfsContext {
     pub fn get_file_entry_by_path(
         &mut self,
         vfs_location: &VfsLocation,
-    ) -> io::Result<Option<VfsFileEntry>> {
+    ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         let file_system: VfsFileSystemReference = self.open_file_system(vfs_location)?;
 
         let vfs_path: &VfsPath = vfs_location.get_path();
@@ -69,13 +68,12 @@ impl VfsContext {
     pub fn open_file_system(
         &mut self,
         vfs_location: &VfsLocation,
-    ) -> io::Result<VfsFileSystemReference> {
+    ) -> Result<VfsFileSystemReference, ErrorTrace> {
         let vfs_type: &VfsType = vfs_location.get_type();
         match vfs_type {
             VfsType::Fake => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported type: VfsType::Fake",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported type: VfsType::Fake"
                 ));
             }
             _ => {}
@@ -126,7 +124,7 @@ mod tests {
     use crate::location::new_os_vfs_location;
 
     #[test]
-    fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
+    fn test_get_data_stream_by_path_and_name() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
@@ -143,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
@@ -158,7 +156,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open_file_system() -> io::Result<()> {
+    fn test_open_file_system() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation = new_os_vfs_location("/");

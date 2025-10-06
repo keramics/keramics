@@ -11,10 +11,8 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_core::mediator::Mediator;
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use super::attribute_list_entry::NtfsAttributeListEntry;
 use super::block_stream::NtfsBlockStream;
@@ -36,7 +34,7 @@ impl NtfsAttributeList {
     }
 
     /// Reads the attribute list from a buffer.
-    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = 0;
         let data_size: usize = data.len();
 
@@ -66,20 +64,16 @@ impl NtfsAttributeList {
         data_attribute: &NtfsMftAttribute,
         data_stream: &DataStreamReference,
         cluster_block_size: u32,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if data_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported attribute type: 0x{:08x}.",
-                    data_attribute.attribute_type
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute type: 0x{:08x}",
+                data_attribute.attribute_type
+            )));
         }
         if data_attribute.is_compressed() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported compressed $ATTRIBUTE_LIST attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compressed $ATTRIBUTE_LIST attribute"
             ));
         }
         if data_attribute.is_resident() {
@@ -90,11 +84,20 @@ impl NtfsAttributeList {
 
             let mut cluster_block: Vec<u8> = vec![0; cluster_block_size as usize];
             loop {
-                let read_size: usize = block_stream.read(&mut cluster_block)?;
-                if read_size == 0 {
+                let read_count: usize = match block_stream.read(&mut cluster_block) {
+                    Ok(read_count) => read_count,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read attribute list from block stream"
+                        );
+                        return Err(error);
+                    }
+                };
+                if read_count == 0 {
                     break;
                 }
-                self.read_data(&cluster_block[..read_size])?;
+                self.read_data(&cluster_block[..read_count])?;
             }
         };
         Ok(())

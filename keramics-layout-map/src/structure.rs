@@ -808,13 +808,14 @@ impl StructureLayout {
                 &mut self,
                 data_stream: &keramics_core::DataStreamReference,
                 position: std::io::SeekFrom,
-            ) -> std::io::Result<()> {
+            ) -> Result<(), keramics_core::ErrorTrace> {
                 let mut data: Vec<u8> = vec![0; #data_size_literal];
 
-                let offset: u64 = match data_stream.write() {
-                    Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut data,
+                    position
+                );
                 let mediator = keramics_core::mediator::Mediator::current();
                 if mediator.debug_output {
                     mediator.debug_print(format!(
@@ -1273,13 +1274,14 @@ mod tests {
                 &mut self,
                 data_stream: &keramics_core::DataStreamReference,
                 position: std::io::SeekFrom,
-            ) -> std::io::Result<()> {
+            ) -> Result<(), keramics_core::ErrorTrace> {
                 let mut data: Vec<u8> = vec![0; 16];
 
-                let offset: u64 = match data_stream.write() {
-                    Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-                    Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                };
+                let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut data,
+                    position
+                );
                 let mediator = keramics_core::mediator::Mediator::current();
                 if mediator.debug_output {
                     mediator.debug_print(format!(

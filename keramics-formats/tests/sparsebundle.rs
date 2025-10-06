@@ -11,19 +11,30 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, FileResolverReference, open_os_file_resolver};
+use keramics_core::{DataStream, ErrorTrace, FileResolverReference, open_os_file_resolver};
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, String)> {
+fn read_media_from_image(image: &mut SparseBundleImage) -> Result<(u64, String), ErrorTrace> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
-    while let Ok(read_count) = image.read(&mut data) {
+    loop {
+        let read_count = match image.read(&mut data) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read from sparsebundle image at offset {} (0x{:08x})",
+                        media_offset, media_offset
+                    )
+                );
+                return Err(error);
+            }
+        };
         if read_count == 0 {
             break;
         }
@@ -37,13 +48,25 @@ fn read_media_from_image(image: &mut SparseBundleImage) -> io::Result<(u64, Stri
     Ok((media_offset, hash_string))
 }
 
-#[test]
-fn read_media() -> io::Result<()> {
-    let mut image = SparseBundleImage::new();
+fn open_image(base_location: &str) -> Result<SparseBundleImage, ErrorTrace> {
+    let file_resolver: FileResolverReference = open_os_file_resolver(base_location)?;
 
-    let file_resolver: FileResolverReference =
-        open_os_file_resolver("../test_data/sparsebundle/hfsplus.sparsebundle")?;
-    image.open(&file_resolver)?;
+    let mut image: SparseBundleImage = SparseBundleImage::new();
+
+    match image.open(&file_resolver) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open sparsebundle image");
+            return Err(error);
+        }
+    }
+    Ok(image)
+}
+
+#[test]
+fn read_media() -> Result<(), ErrorTrace> {
+    let mut image: SparseBundleImage =
+        open_image("../test_data/sparsebundle/hfsplus.sparsebundle")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
     assert_eq!(media_offset, image.media_size);

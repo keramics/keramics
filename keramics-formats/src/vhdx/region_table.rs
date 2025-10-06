@@ -12,12 +12,11 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
 use super::region_table_entry::VhdxRegionTableEntry;
@@ -42,7 +41,7 @@ impl VhdxRegionTable {
     }
 
     /// Reads the region table from a buffer.
-    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut region_table_header: VhdxRegionTableHeader = VhdxRegionTableHeader::new();
 
         if self.mediator.debug_output {
@@ -63,13 +62,10 @@ impl VhdxRegionTable {
 
         if region_table_header.checksum != 0 && region_table_header.checksum != calculated_checksum
         {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} VHDX region table checksums",
-                    region_table_header.checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                region_table_header.checksum, calculated_checksum
+            )));
         }
         for _ in 0..region_table_header.number_of_entries {
             let data_end_offset: usize = data_offset + 32;
@@ -98,13 +94,11 @@ impl VhdxRegionTable {
         &mut self,
         data_stream: &DataStreamReference,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 65536];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "VhdxRegionTable data of size: {} at offset: {} (0x{:08x})\n",
@@ -4810,7 +4804,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = VhdxRegionTable::new();

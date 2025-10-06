@@ -15,8 +15,7 @@
 //!
 //! Provides decompression support for LZVN compressed data.
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 
 /// LZVN oppcode type.
@@ -318,7 +317,7 @@ impl LzvnContext {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut compressed_data_offset: usize = 0;
         let compressed_data_size: usize = compressed_data.len();
 
@@ -336,9 +335,8 @@ impl LzvnContext {
                 break;
             }
             if compressed_data_offset >= compressed_data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid compressed data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
                 ));
             }
             let oppcode: u8 = compressed_data[compressed_data_offset];
@@ -354,9 +352,8 @@ impl LzvnContext {
             match &LZVN_OPPCODE_TYPES[oppcode as usize] {
                 LzvnOppcodeType::DistanceLarge => {
                     if 2 > compressed_data_size - compressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     let oppcode_value: u8 = compressed_data[compressed_data_offset];
@@ -371,9 +368,8 @@ impl LzvnContext {
                 }
                 LzvnOppcodeType::DistanceMedium => {
                     if 2 > compressed_data_size - compressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     let oppcode_value: u8 = compressed_data[compressed_data_offset];
@@ -393,9 +389,8 @@ impl LzvnContext {
                 }
                 LzvnOppcodeType::DistanceSmall => {
                     if compressed_data_offset >= compressed_data_size {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     literal_size = (oppcode as u16 & 0xc0) >> 6;
@@ -407,9 +402,8 @@ impl LzvnContext {
                 }
                 LzvnOppcodeType::LiteralLarge => {
                     if compressed_data_offset >= compressed_data_size {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     literal_size = compressed_data[compressed_data_offset] as u16 + 16;
@@ -421,9 +415,8 @@ impl LzvnContext {
                 }
                 LzvnOppcodeType::MatchLarge => {
                     if compressed_data_offset >= compressed_data_size {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     match_size = compressed_data[compressed_data_offset] as u16 + 16;
@@ -438,10 +431,10 @@ impl LzvnContext {
                 }
                 LzvnOppcodeType::None => {}
                 LzvnOppcodeType::Invalid => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Invalid oppcode: 0x{:02x}", oppcode),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid oppcode: 0x{:02x}",
+                        oppcode
+                    )));
                 }
             };
             if self.mediator.debug_output {
@@ -454,15 +447,13 @@ impl LzvnContext {
             }
             if literal_size > 0 {
                 if literal_size as usize > compressed_data_size - compressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Literal size value exceeds compressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Literal size value exceeds compressed data size"
                     ));
                 }
                 if literal_size as usize > uncompressed_data_size - uncompressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Literal size value exceeds uncompressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Literal size value exceeds uncompressed data size"
                     ));
                 }
                 let compressed_data_end_offset: usize =
@@ -487,15 +478,13 @@ impl LzvnContext {
             }
             if match_size > 0 {
                 if distance as usize > uncompressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid distance value exceeds uncompressed data offset",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid distance value exceeds uncompressed data offset"
                     ));
                 }
                 if match_size as usize > uncompressed_data_size - uncompressed_data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid match size value exceeds uncompressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid match size value exceeds uncompressed data size"
                     ));
                 }
                 let match_offset: usize = uncompressed_data_offset - distance as usize;
@@ -531,7 +520,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_decompress() -> io::Result<()> {
+    fn test_decompress() -> Result<(), ErrorTrace> {
         let test_data: [u8; 29] = [
             0xe0, 0x03, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73, 0x65,
             0x64, 0x20, 0x66, 0x69, 0x6c, 0x65, 0x0a, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

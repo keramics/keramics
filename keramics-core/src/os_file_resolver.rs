@@ -11,10 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::path::MAIN_SEPARATOR_STR;
 
 use super::data_stream::DataStreamReference;
+use super::errors::ErrorTrace;
 use super::file_resolver::{FileResolver, FileResolverReference};
 use super::os_data_stream::open_os_data_stream;
 
@@ -37,19 +37,27 @@ impl FileResolver for OsFileResolver {
     fn get_data_stream<'a>(
         &'a self,
         path_components: &mut Vec<&'a str>,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let mut components: Vec<&str> = vec![self.base_path.as_str()];
         components.append(path_components);
 
         let path: String = components.join(MAIN_SEPARATOR_STR);
-        let data_stream: DataStreamReference = open_os_data_stream(path.as_str())?;
-
+        let data_stream: DataStreamReference = match open_os_data_stream(path.as_str()) {
+            Ok(data_stream) => data_stream,
+            Err(error) => {
+                return Err(ErrorTrace::new(format!(
+                    "{}: Unable to retrieve data stream with error: {}",
+                    crate::error_trace_function!(),
+                    error.to_string(),
+                )));
+            }
+        };
         Ok(Some(data_stream))
     }
 }
 
 /// Opens a new operating system file resolver.
-pub fn open_os_file_resolver(base_path: &str) -> io::Result<FileResolverReference> {
+pub fn open_os_file_resolver(base_path: &str) -> Result<FileResolverReference, ErrorTrace> {
     let file_resolver: OsFileResolver = OsFileResolver::new(base_path);
     Ok(FileResolverReference::new(Box::new(file_resolver)))
 }
@@ -59,7 +67,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_data_stream() -> io::Result<()> {
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let file_resolver: OsFileResolver = OsFileResolver::new("../test_data/");
 
         let mut path_components: Vec<&str> = vec!["file.txt"];
@@ -72,7 +80,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open_os_file_resolver() -> io::Result<()> {
+    fn test_open_os_file_resolver() -> Result<(), ErrorTrace> {
         let _ = open_os_file_resolver("../test_data/")?;
 
         Ok(())

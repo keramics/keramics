@@ -11,9 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Ucs2String;
 
 use super::mft_attribute::NtfsMftAttribute;
@@ -51,17 +49,24 @@ impl<'a> NtfsDataFork<'a> {
     }
 
     /// Retrieves the data stream.
-    pub fn get_data_stream(&self) -> io::Result<DataStreamReference> {
-        match self.mft_attributes.get_data_stream_by_name(
+    pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
+        let result: Option<DataStreamReference> = match self.mft_attributes.get_data_stream_by_name(
             &self.data_attribute.name,
             &self.data_stream,
             self.cluster_block_size,
-        )? {
+        ) {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve data stream from MFT attributes"
+                );
+                return Err(error);
+            }
+        };
+        match result {
             Some(data_stream) => Ok(data_stream),
-            None => Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Missing data stream",
-            )),
+            None => Err(keramics_core::error_trace_new!("Missing data stream")),
         }
     }
 
@@ -71,4 +76,9 @@ impl<'a> NtfsDataFork<'a> {
     }
 }
 
-// TODO: add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests.
+}

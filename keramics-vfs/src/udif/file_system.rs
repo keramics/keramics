@@ -11,9 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::udif::UdifFile;
 
 use crate::location::VfsLocation;
@@ -43,7 +43,7 @@ impl UdifFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
@@ -63,15 +63,15 @@ impl UdifFileSystem {
                     Ok(false)
                 }
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS path type",
-            )),
+            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(&self, vfs_path: &VfsPath) -> io::Result<Option<UdifFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        vfs_path: &VfsPath,
+    ) -> Result<Option<UdifFileEntry>, ErrorTrace> {
         match vfs_path {
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
@@ -96,15 +96,12 @@ impl UdifFileSystem {
                     Ok(None)
                 }
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS path type",
-            )),
+            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
         }
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> io::Result<UdifFileEntry> {
+    pub fn get_root_file_entry(&self) -> Result<UdifFileEntry, ErrorTrace> {
         Ok(UdifFileEntry::Root {
             file: self.file.clone(),
         })
@@ -115,30 +112,52 @@ impl UdifFileSystem {
         &mut self,
         parent_file_system: Option<&VfsFileSystemReference>,
         vfs_location: &VfsLocation,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let file_system: &VfsFileSystemReference = match parent_file_system {
             Some(file_system) => file_system,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing parent file system",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
                 ));
             }
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
-        match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-            Some(data_stream) => match self.file.write() {
-                Ok(mut file) => {
-                    file.read_data_stream(&data_stream)?;
 
-                    self.number_of_layers = 1;
+        let result: Option<DataStreamReference> =
+            match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
                 }
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            },
+            };
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", vfs_location.to_string()),
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing data stream: {}",
+                    vfs_path.to_string()
+                )));
+            }
+        };
+        match self.file.write() {
+            Ok(mut file) => {
+                match file.read_data_stream(&data_stream) {
+                    Ok(()) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read UDIF file from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+                self.number_of_layers = 1;
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on UDIF file",
+                    error
                 ));
             }
         }
@@ -154,7 +173,7 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
-    fn get_file_system() -> io::Result<UdifFileSystem> {
+    fn get_file_system() -> Result<UdifFileSystem, ErrorTrace> {
         let mut udif_file_system: UdifFileSystem = UdifFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
@@ -167,7 +186,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
+    fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let udif_file_system: UdifFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/");
@@ -186,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let udif_file_system: UdifFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/");
@@ -221,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_root_file_entry() -> io::Result<()> {
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
         let udif_file_system: UdifFileSystem = get_file_system()?;
 
         let udif_file_entry: UdifFileEntry = udif_file_system.get_root_file_entry()?;
@@ -233,7 +252,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut udif_file_system: UdifFileSystem = UdifFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =

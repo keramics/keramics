@@ -14,27 +14,46 @@
 use std::error::Error;
 use std::fmt;
 
-/// The error returned for issues while parsing a value.
+/// Error with traceback information.
 #[derive(Debug)]
-pub struct ParseError {
-    /// The error message.
-    message: String,
+pub struct ErrorTrace {
+    /// The error messages.
+    messages: Vec<String>,
 }
 
-impl ParseError {
+impl ErrorTrace {
     /// Creates a new error.
     pub fn new(message_string: String) -> Self {
         Self {
-            message: message_string,
+            messages: vec![message_string],
         }
+    }
+
+    /// Adds an additional message to the trace.
+    pub fn add_frame(&mut self, message_string: String) {
+        self.messages.push(message_string);
+    }
+
+    /// Retrieves a string representation of the error.
+    pub fn to_string(&self) -> String {
+        self.messages.join("\n")
     }
 }
 
-impl Error for ParseError {}
+impl Error for ErrorTrace {}
 
-impl fmt::Display for ParseError {
+impl fmt::Display for ErrorTrace {
     /// Formats the error as a string.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.message)
+        write!(
+            formatter,
+            "{}",
+            self.messages
+                .iter()
+                .enumerate()
+                .map(|(frame_index, message_string)| format!("#{} {}", frame_index, message_string))
+                .collect::<Vec<String>>()
+                .join("\n")
+        )
     }
 }

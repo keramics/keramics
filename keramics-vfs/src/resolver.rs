@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::context::VfsContext;
 use super::file_entry::VfsFileEntry;
@@ -45,10 +44,15 @@ impl VfsResolver {
         &self,
         vfs_location: &VfsLocation,
         name: Option<&str>,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.context.write() {
             Ok(mut context) => context.get_data_stream_by_path_and_name(vfs_location, name),
-            Err(error) => Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on context",
+                    error
+                ));
+            }
         }
     }
 
@@ -56,10 +60,15 @@ impl VfsResolver {
     pub fn get_file_entry_by_path(
         &self,
         vfs_location: &VfsLocation,
-    ) -> io::Result<Option<VfsFileEntry>> {
+    ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         match self.context.write() {
             Ok(mut context) => context.get_file_entry_by_path(vfs_location),
-            Err(error) => Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on context",
+                    error
+                ));
+            }
         }
     }
 
@@ -67,10 +76,15 @@ impl VfsResolver {
     pub fn open_file_system(
         &self,
         vfs_location: &VfsLocation,
-    ) -> io::Result<VfsFileSystemReference> {
+    ) -> Result<VfsFileSystemReference, ErrorTrace> {
         match self.context.write() {
             Ok(mut context) => context.open_file_system(vfs_location),
-            Err(error) => Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on context",
+                    error
+                ));
+            }
         }
     }
 }
@@ -87,7 +101,7 @@ mod tests {
     use crate::location::new_os_vfs_location;
 
     #[test]
-    fn test_get_data_stream_by_path_and_name() -> io::Result<()> {
+    fn test_get_data_stream_by_path_and_name() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
@@ -104,7 +118,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
@@ -119,7 +133,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open_file_system() -> io::Result<()> {
+    fn test_open_file_system() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_location: VfsLocation = new_os_vfs_location("/");

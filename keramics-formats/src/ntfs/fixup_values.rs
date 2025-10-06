@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::Mediator;
 use keramics_types::bytes_to_u16_le;
 
@@ -21,30 +20,24 @@ pub fn apply_fixup_values(
     buffer: &mut [u8],
     fixup_values_offset: u16,
     number_of_fixup_values: u16,
-) -> io::Result<()> {
+) -> Result<(), ErrorTrace> {
     let buffer_size: usize = buffer.len();
 
     if fixup_values_offset as usize >= buffer_size {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "Invalid fix-up values offset: {} value out of bounds",
-                fixup_values_offset,
-            ),
-        ));
+        return Err(keramics_core::error_trace_new!(format!(
+            "Invalid fix-up values offset: {} value out of bounds",
+            fixup_values_offset,
+        )));
     }
     let mut fixup_value_offset: usize = fixup_values_offset as usize;
     let fixup_values_size: usize = 2 + (number_of_fixup_values as usize) * 2;
     let fixup_values_end_offset: usize = fixup_value_offset + fixup_values_size;
 
     if fixup_values_end_offset > buffer_size {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "Invalid number of fix-up values: {} value out of bounds",
-                number_of_fixup_values,
-            ),
-        ));
+        return Err(keramics_core::error_trace_new!(format!(
+            "Invalid number of fix-up values: {} value out of bounds",
+            number_of_fixup_values,
+        )));
     }
     let fixup_value_end_offset: usize = fixup_value_offset + 2;
 
@@ -85,13 +78,10 @@ pub fn apply_fixup_values(
                 // TODO: flag corruption
                 let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
                 let fixup_value: u16 = bytes_to_u16_le!(buffer, fixup_value_offset);
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "corruption detected - mismatch between placeholder: {} and value: {} at offset: {} (0x{:08x})",
-                        placeholder_value, fixup_value, fixup_value_offset, fixup_value_offset,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "corruption detected - mismatch between placeholder: {} and value: {} at offset: {} (0x{:08x})",
+                    placeholder_value, fixup_value, fixup_value_offset, fixup_value_offset,
+                )));
             }
             buffer.copy_within(fixup_value_offset..fixup_value_end_offset, buffer_offset);
         }
@@ -185,7 +175,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_fixup_values() -> io::Result<()> {
+    fn test_apply_fixup_values() -> Result<(), ErrorTrace> {
         let mut test_data: Vec<u8> = get_test_data();
 
         assert_eq!(test_data[510..512], test_data[48..50]);

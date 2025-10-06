@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
@@ -41,29 +40,24 @@ impl ExtAttributesBlockHeader {
     }
 
     /// Reads the attributes block header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext attributes block header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext attributes block header data size"
             ));
         }
         if data[0..4] != EXT_ATTRIBUTES_HEADER_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported ext attributes block header signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext attributes block header signature"
             ));
         }
         let number_of_blocks: u32 = bytes_to_u32_le!(data, 8);
 
         if number_of_blocks != 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of blocks: {} value out of bounds",
-                    number_of_blocks
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of blocks: {} value out of bounds",
+                number_of_blocks
+            )));
         }
         Ok(())
     }
@@ -82,7 +76,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtAttributesBlockHeader::new();

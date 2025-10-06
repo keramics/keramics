@@ -11,11 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::Mediator;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 /// Virtual Hard Disk (VHD) sector bitmap range.
 pub struct VhdSectorBitmapRange {
@@ -59,7 +58,7 @@ impl VhdSectorBitmap {
     }
 
     /// Reads the sector bitmap from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut offset: u64 = 0;
         let mut range_offset: u64 = 0;
         let mut range_bit_value: u8 = data[0] >> 7;
@@ -98,13 +97,11 @@ impl VhdSectorBitmap {
         &mut self,
         data_stream: &DataStreamReference,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.size];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         let mediator = Mediator::current();
         if mediator.debug_output {
             mediator.debug_print(format!(
@@ -135,7 +132,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_checksums::Adler32Context;
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::table_entry::EwfTableEntry;
 use super::table_footer::EwfTableFooter;
@@ -45,7 +44,7 @@ impl EwfTable {
     }
 
     /// Reads the table from a buffer.
-    fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let mut table_header: EwfTableHeader = EwfTableHeader::new();
 
         if self.mediator.debug_output {
@@ -77,13 +76,10 @@ impl EwfTable {
         let calculated_checksum: u32 = adler32_context.finalize();
 
         if table_footer.checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} EWF table entries checksums",
-                    table_footer.checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                table_footer.checksum, calculated_checksum
+            )));
         }
         for _ in 0..table_header.number_of_entries {
             let data_end_offset: usize = data_offset + 4;
@@ -109,23 +105,18 @@ impl EwfTable {
         data_stream: &DataStreamReference,
         data_size: u64,
         position: SeekFrom,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         // Note that 16777216 is an arbitrary chosen limit.
         if data_size < 28 || data_size > 16777216 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported table data size: {} value out of bounds",
-                    data_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported table data size: {} value out of bounds",
+                data_size
+            )));
         }
         let mut data: Vec<u8> = vec![0; data_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "EwfTable data of size: {} at offset: {} (0x{:08x})\n",
@@ -188,7 +179,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfTable::new();
@@ -211,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_at_position() -> io::Result<()> {
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 

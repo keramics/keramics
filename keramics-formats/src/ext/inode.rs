@@ -12,9 +12,8 @@
  */
 
 use std::cmp::max;
-use std::io;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le};
@@ -90,11 +89,10 @@ impl Ext2Inode {
     }
 
     /// Reads the inode from a buffer.
-    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 128 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext inode data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext inode data size"
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -180,11 +178,10 @@ impl Ext3Inode {
     }
 
     /// Reads the inode from a buffer.
-    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 128 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext inode data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext inode data size"
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -277,7 +274,7 @@ impl Ext4Inode {
     }
 
     /// Reads the inode from a buffer.
-    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         let extra_size: u16 = if data_size < 132 {
@@ -286,9 +283,8 @@ impl Ext4Inode {
             bytes_to_u16_le!(data, 128)
         };
         if data_size < 128 + (extra_size as usize) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext inode data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext inode data size"
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -464,7 +460,7 @@ impl ExtInode {
     }
 
     /// Reads the inode from a buffer.
-    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> Result<(), ErrorTrace> {
         match format_version {
             4 => {
                 let inode: Ext4Inode = Ext4Inode::new();
@@ -487,7 +483,7 @@ impl ExtInode {
         format_version: u8,
         data_stream: &DataStreamReference,
         block_size: u32,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let file_mode_type: u16 = self.file_mode & 0xf000;
 
         if format_version == 4 && self.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
@@ -581,7 +577,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_datetime_value() -> io::Result<()> {
+    fn test_get_datetime_value() -> Result<(), ErrorTrace> {
         let datetime: DateTime = get_datetime_value(-1, 0);
         assert_eq!(
             datetime,
@@ -725,7 +721,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_ext2() -> io::Result<()> {
+    fn test_read_data_ext2() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtInode::new();
 
         let test_data: Vec<u8> = get_test_data_ext2();
@@ -746,7 +742,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_ext3() -> io::Result<()> {
+    fn test_read_data_ext3() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtInode::new();
 
         let test_data: Vec<u8> = get_test_data_ext3();
@@ -769,7 +765,7 @@ mod tests {
     // TODO: add test for ext3 inode > 128 bytes
 
     #[test]
-    fn test_read_data_ext4() -> io::Result<()> {
+    fn test_read_data_ext4() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtInode::new();
 
         let test_data: Vec<u8> = get_test_data_ext4();

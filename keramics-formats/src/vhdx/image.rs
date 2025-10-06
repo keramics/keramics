@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::FileResolverReference;
+use keramics_core::{DataStreamReference, ErrorTrace, FileResolverReference};
 
 use super::file::VhdxFile;
 
@@ -38,13 +37,13 @@ impl VhdxImage {
     }
 
     /// Retrieves a layer by index.
-    pub fn get_layer_by_index(&self, layer_index: usize) -> io::Result<VhdxImageLayer> {
+    pub fn get_layer_by_index(&self, layer_index: usize) -> Result<VhdxImageLayer, ErrorTrace> {
         match self.files.get(layer_index) {
             Some(file) => Ok(file.clone()),
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("No layer with index: {}", layer_index),
-            )),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No layer with index: {}",
+                layer_index
+            ))),
         }
     }
 
@@ -55,41 +54,56 @@ impl VhdxImage {
         &mut self,
         file_resolver: &FileResolverReference,
         file_name: &str,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut files: Vec<VhdxFile> = Vec::new();
 
-        let mut file: VhdxFile = VhdxFile::new();
-
-        match file_resolver.get_data_stream(&mut vec![file_name])? {
-            Some(data_stream) => file.read_data_stream(&data_stream)?,
+        let result: Option<DataStreamReference> =
+            match file_resolver.get_data_stream(&mut vec![file_name]) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                    return Err(error);
+                }
+            };
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", file_name),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No such file: {}",
+                    file_name
+                )));
             }
         };
+        let mut file: VhdxFile = VhdxFile::new();
+        file.read_data_stream(&data_stream)?;
+
         while file.parent_identifier.is_some() {
             let parent_file_name: String = match file.get_parent_file_name() {
                 Some(file_name) => file_name.to_string(),
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Missing parent file_name",
-                    ));
+                    return Err(keramics_core::error_trace_new!("Missing parent file name"));
+                }
+            };
+            let result: Option<DataStreamReference> =
+                match file_resolver.get_data_stream(&mut vec![parent_file_name.as_str()]) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open parent file");
+                        return Err(error);
+                    }
+                };
+            let data_stream: DataStreamReference = match result {
+                Some(data_stream) => data_stream,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing parent file: {}",
+                        parent_file_name
+                    )));
                 }
             };
             let mut parent_file: VhdxFile = VhdxFile::new();
+            parent_file.read_data_stream(&data_stream)?;
 
-            match file_resolver.get_data_stream(&mut vec![parent_file_name.as_str()])? {
-                Some(data_stream) => parent_file.read_data_stream(&data_stream)?,
-                None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("Missing parent file: {}", parent_file_name),
-                    ));
-                }
-            };
             files.push(file);
 
             file = parent_file;
@@ -115,7 +129,7 @@ mod tests {
 
     use keramics_core::open_os_file_resolver;
 
-    fn get_image() -> io::Result<VhdxImage> {
+    fn get_image() -> Result<VhdxImage, ErrorTrace> {
         let mut image: VhdxImage = VhdxImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/vhdx")?;
@@ -125,7 +139,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_layer_by_index() -> io::Result<()> {
+    fn test_get_layer_by_index() -> Result<(), ErrorTrace> {
         let image: VhdxImage = get_image()?;
 
         let layer: VhdxImageLayer = image.get_layer_by_index(0)?;
@@ -138,13 +152,18 @@ mod tests {
                     "7584f8fb-36d3-4091-afb5-b1afe587bfa8"
                 );
             }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on VHDX layer",
+                    error
+                ));
+            }
         };
         Ok(())
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut image: VhdxImage = VhdxImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/vhdx")?;

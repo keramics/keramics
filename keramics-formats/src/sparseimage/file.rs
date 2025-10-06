@@ -11,11 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
 use crate::block_tree::BlockTree;
@@ -62,7 +61,10 @@ impl SparseImageFile {
     }
 
     /// Reads a file from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_header_block(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -71,15 +73,14 @@ impl SparseImageFile {
     }
 
     /// Reads the header block containing the file header and bands array.
-    fn read_header_block(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_header_block(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut data: [u8; 4096] = [0; 4096];
 
-        match data_stream.write() {
-            Ok(mut data_stream) => {
-                data_stream.read_exact_at_position(&mut data, SeekFrom::Start(0))?
-            }
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut data,
+            SeekFrom::Start(0)
+        );
         let mut file_header: SparseImageFileHeader = SparseImageFileHeader::new();
 
         if self.mediator.debug_output {
@@ -97,13 +98,10 @@ impl SparseImageFile {
             .div_ceil(file_header.sectors_per_band);
 
         if number_of_bands > (4096 - 64) / 4 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of bands: {} value out of bounds",
-                    number_of_bands
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of bands: {} value out of bounds",
+                number_of_bands
+            )));
         }
         if self.mediator.debug_output {
             let data_size: usize = (number_of_bands as usize) * 4;
@@ -117,13 +115,10 @@ impl SparseImageFile {
                 .debug_print_data(&data[64..data_end_offset], true);
         }
         if file_header.sectors_per_band > u32::MAX / 512 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid sectors per band: {} value out of bounds",
-                    file_header.sectors_per_band
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid sectors per band: {} value out of bounds",
+                file_header.sectors_per_band
+            )));
         }
         self.bytes_per_sector = 512;
         self.block_size = file_header.sectors_per_band * (self.bytes_per_sector as u32);
@@ -170,7 +165,12 @@ impl SparseImageFile {
                 block_range,
             ) {
                 Ok(_) => {}
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to insert block range into block tree",
+                        error
+                    ));
+                }
             };
         }
         if self.mediator.debug_output {
@@ -184,7 +184,7 @@ impl SparseImageFile {
     }
 
     /// Reads media data based on the block ranges in the block tree.
-    fn read_data_from_bands(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_bands(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.media_offset;
@@ -208,21 +208,20 @@ impl SparseImageFile {
                 self.block_tree.get_value(media_offset);
 
             let range_read_count: usize = match block_tree_value {
-                Some(block_range) => match self.data_stream.as_ref() {
-                    Some(data_stream) => match data_stream.write() {
-                        Ok(mut data_stream) => data_stream.read_at_position(
-                            &mut data[data_offset..data_end_offset],
-                            SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                        )?,
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    },
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
-                    }
-                },
+                Some(block_range) => {
+                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                        Some(data_stream) => data_stream,
+                        None => {
+                            return Err(keramics_core::error_trace_new!("Missing data stream"));
+                        }
+                    };
+                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(block_range.data_offset + range_relative_offset)
+                    );
+                    read_count
+                }
                 None => {
                     data[data_offset..data_end_offset].fill(0);
 
@@ -244,12 +243,12 @@ impl SparseImageFile {
 
 impl DataStream for SparseImageFile {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.media_size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.media_offset >= self.media_size {
             return Ok(0);
         }
@@ -259,15 +258,20 @@ impl DataStream for SparseImageFile {
         if (read_size as u64) > remaining_media_size {
             read_size = remaining_media_size as usize;
         }
-        let read_count: usize = self.read_data_from_bands(&mut buf[..read_size])?;
-
+        let read_count: usize = match self.read_data_from_bands(&mut buf[..read_size]) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from bands");
+                return Err(error);
+            }
+        };
         self.media_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.media_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.media_offset as i64;
@@ -291,7 +295,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file() -> io::Result<SparseImageFile> {
+    fn get_file() -> Result<SparseImageFile, ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
         let data_stream: DataStreamReference =
@@ -302,7 +306,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
         let data_stream: DataStreamReference =
@@ -317,7 +321,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_header_block() -> io::Result<()> {
+    fn test_read_header_block() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
         let data_stream: DataStreamReference =
@@ -334,7 +338,7 @@ mod tests {
     // TODO: add test for read_data_from_bands
 
     #[test]
-    fn test_seek_from_start() -> io::Result<()> {
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::Start(1024))?;
@@ -344,7 +348,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_end() -> io::Result<()> {
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(-512))?;
@@ -354,7 +358,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_current() -> io::Result<()> {
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
 
         let offset = file.seek(SeekFrom::Start(1024))?;
@@ -367,7 +371,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_media_size() -> io::Result<()> {
+    fn test_seek_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(512))?;
@@ -377,7 +381,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read() -> io::Result<()> {
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
         file.seek(SeekFrom::Start(1024))?;
 
@@ -430,7 +434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_media_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
         file.seek(SeekFrom::End(512))?;
 

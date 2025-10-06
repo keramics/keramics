@@ -15,9 +15,9 @@
 //!
 //! Provides decompression support for LZFSE compressed data.
 
-use std::cmp;
-use std::io;
+use std::cmp::min;
 
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
@@ -218,11 +218,10 @@ impl LzfseBlockV1Header {
     }
 
     /// Reads the block header from a buffer.
-    pub fn read_data(&mut self, data: &[u8], decoder: &mut LzfseDecoder) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8], decoder: &mut LzfseDecoder) -> Result<(), ErrorTrace> {
         if data.len() != 42 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported LZFSE version 1 block header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported LZFSE version 1 block header data size"
             ));
         }
         decoder.number_of_literals = bytes_to_u32_le!(data, 4);
@@ -285,11 +284,10 @@ impl LzfseBlockV2Header {
     }
 
     /// Reads the block header from a buffer.
-    pub fn read_data(&mut self, data: &[u8], decoder: &mut LzfseDecoder) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8], decoder: &mut LzfseDecoder) -> Result<(), ErrorTrace> {
         if data.len() < 24 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported LZFSE version 2 block header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported LZFSE version 2 block header data size"
             ));
         }
         let bit_fields1: u64 = bytes_to_u64_le!(data, 0);
@@ -315,13 +313,10 @@ impl LzfseBlockV2Header {
         decoder.d_value_state = ((bit_fields3 >> 52) & 0x000003ff) as u16;
 
         if self.header_size < 32 || self.header_size > 720 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid header size: {} value out of bounds",
-                    self.header_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid header size: {} value out of bounds",
+                self.header_size
+            )));
         }
         Ok(())
     }
@@ -477,15 +472,12 @@ impl LzfseContext {
         number_of_symbols: i16,
         frequency_table: &[u16],
         decoder_table: &mut Vec<LzfseDecoderEntry>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if number_of_symbols > 256 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of symbols: {} value out of bounds",
-                    number_of_symbols,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of symbols: {} value out of bounds",
+                number_of_symbols,
+            )));
         }
         let number_of_leading_zeros: u32 = number_of_states.leading_zeros();
         let mut sum_of_frequencies: i16 = 0;
@@ -500,13 +492,10 @@ impl LzfseContext {
             sum_of_frequencies += frequency as i16;
 
             if sum_of_frequencies > number_of_states {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid sum of frequencies: {} value out of bounds",
-                        sum_of_frequencies,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid sum of frequencies: {} value out of bounds",
+                    sum_of_frequencies,
+                )));
             }
             let number_of_bits: u32 = frequency.leading_zeros() - number_of_leading_zeros;
             let base_decoder_weight: i16 =
@@ -540,15 +529,12 @@ impl LzfseContext {
         value_bits_table: &[u8],
         value_base_table: &[i32],
         value_decoder_table: &mut Vec<LzfseValueDecoderEntry>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if number_of_symbols > 256 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of symbols: {} value out of bounds",
-                    number_of_symbols,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of symbols: {} value out of bounds",
+                number_of_symbols,
+            )));
         }
         let number_of_leading_zeros: u32 = number_of_states.leading_zeros();
         let mut sum_of_frequencies: i16 = 0;
@@ -563,13 +549,10 @@ impl LzfseContext {
             sum_of_frequencies += frequency as i16;
 
             if sum_of_frequencies > number_of_states {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid sum of frequencies: {} value out of bounds",
-                        sum_of_frequencies,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid sum of frequencies: {} value out of bounds",
+                    sum_of_frequencies,
+                )));
             }
             let number_of_bits: u32 = frequency.leading_zeros() - number_of_leading_zeros;
             let base_decoder_weight: i16 =
@@ -604,7 +587,7 @@ impl LzfseContext {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut frequency_table: [u16; 360] = [0; 360];
 
         let mut compressed_data_offset: usize = 0;
@@ -618,9 +601,8 @@ impl LzfseContext {
                 break;
             }
             if 4 > compressed_data_size - compressed_data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid compressed data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
                 ));
             }
             let block_marker: u32 = bytes_to_u32_le!(compressed_data, compressed_data_offset);
@@ -687,18 +669,17 @@ impl LzfseContext {
                         self.mediator
                             .debug_print(format!("    block_marker: 0x{:08x}\n", block_marker));
                     }
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Unsupported block marker: 0x{:08x}", block_marker),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported block marker: 0x{:08x}",
+                        block_marker
+                    )));
                 }
             };
             compressed_data_offset += 4;
 
             if 4 > compressed_data_size - compressed_data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid compressed data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid compressed data value too small"
                 ));
             }
             let uncompressed_block_size: u32 =
@@ -713,9 +694,8 @@ impl LzfseContext {
             }
             if uncompressed_block_size as usize > uncompressed_data_size - uncompressed_data_offset
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Invalid uncompressed data value too small",
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid uncompressed data value too small"
                 ));
             }
             match block_marker {
@@ -723,9 +703,8 @@ impl LzfseContext {
                     if uncompressed_block_size as usize
                         > compressed_data_size - compressed_data_offset
                     {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     let compressed_data_end_offset: usize =
@@ -811,9 +790,8 @@ impl LzfseContext {
                 }
                 LZFSE_COMPRESSED_BLOCK_LZVN_MARKER => {
                     if 4 > compressed_data_size - compressed_data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     let compressed_block_size: u32 =
@@ -823,9 +801,8 @@ impl LzfseContext {
                     if compressed_block_size as usize
                         > compressed_data_size - compressed_data_offset
                     {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     let compressed_data_end_offset: usize =
@@ -860,13 +837,12 @@ impl LzfseContext {
         uncompressed_data: &mut [u8],
         uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *compressed_data_offset;
 
         if decoder.literals_data_size as usize > compressed_data_size - data_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         let data_end_offset: usize = data_offset + decoder.literals_data_size as usize;
@@ -879,9 +855,8 @@ impl LzfseContext {
         data_offset = data_end_offset;
 
         if decoder.lmd_values_data_size as usize > compressed_data_size - data_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         let data_end_offset: usize = data_offset + decoder.lmd_values_data_size as usize;
@@ -908,13 +883,12 @@ impl LzfseContext {
         compressed_data_size: usize,
         decoder: &mut LzfseDecoder,
         frequency_table: &mut [u16],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *compressed_data_offset;
 
         if 762 > compressed_data_size - data_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         let mut block_header: LzfseBlockV1Header = LzfseBlockV1Header::new();
@@ -983,16 +957,15 @@ impl LzfseContext {
         compressed_data_size: usize,
         decoder: &mut LzfseDecoder,
         frequency_table: &mut [u16],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *compressed_data_offset;
 
         let mut block_header: LzfseBlockV2Header = LzfseBlockV2Header::new();
         let mut data_end_offset: usize = data_offset + 24;
 
         if data_end_offset > compressed_data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         if self.mediator.debug_output {
@@ -1009,9 +982,8 @@ impl LzfseContext {
         }
         block_header.read_data(&compressed_data[data_offset..data_end_offset], decoder)?;
         if block_header.header_size as usize > compressed_data_size - data_offset {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         data_offset = data_end_offset;
@@ -1081,24 +1053,18 @@ impl LzfseContext {
         decoder: &LzfseDecoder,
         bitstream: &mut LzfseBitstream,
         literal_values: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if decoder.number_of_literals as usize > LZFSE_MAXIMUM_NUMBER_OF_LITERALS {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of literals: {} value out of bounds",
-                    decoder.number_of_literals,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of literals: {} value out of bounds",
+                decoder.number_of_literals,
+            )));
         }
         if decoder.literal_bits < -32 || decoder.literal_bits > 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid literal bits: {} value out of bounds",
-                    decoder.literal_bits,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid literal bits: {} value out of bounds",
+                decoder.literal_bits,
+            )));
         }
         let mut literal_states: [u16; 4] = [0; 4];
         literal_states.copy_from_slice(&decoder.literal_states);
@@ -1112,26 +1078,21 @@ impl LzfseContext {
 
                 // TODO: refactor to decoder.get_literal?
                 if literal_state > LZFSE_NUMBER_OF_LITERAL_STATES as u16 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Invalid literal state: {} value out of bounds",
-                            literal_state,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid literal state: {} value out of bounds",
+                        literal_state,
+                    )));
                 }
-                let decoder_entry: &LzfseDecoderEntry = match decoder
-                    .literal_decoder_table
-                    .get(literal_state as usize)
-                {
-                    Some(value) => value,
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!("Missing decoder entry for literal state: {}", literal_state,),
-                        ));
-                    }
-                };
+                let decoder_entry: &LzfseDecoderEntry =
+                    match decoder.literal_decoder_table.get(literal_state as usize) {
+                        Some(value) => value,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing decoder entry for literal state: {}",
+                                literal_state
+                            )));
+                        }
+                    };
                 let value: u32 = bitstream.get_value(decoder_entry.number_of_bits as usize);
                 let literal_state: i32 = (decoder_entry.delta as i32) + (value as i32);
                 let literal_values_index: usize = literal_index as usize + literal_states_index;
@@ -1167,15 +1128,12 @@ impl LzfseContext {
         uncompressed_data: &mut [u8],
         uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if decoder.lmd_values_bits < -32 || decoder.lmd_values_bits > 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid L, M and D values bits: {} value out of bounds",
-                    decoder.lmd_values_bits,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid L, M and D values bits: {} value out of bounds",
+                decoder.lmd_values_bits,
+            )));
         }
         let mut data_offset: usize = *uncompressed_data_offset;
         let mut remaining_data_size: usize = uncompressed_data_size - data_offset;
@@ -1193,25 +1151,19 @@ impl LzfseContext {
         for _ in 0..decoder.number_of_lmd_values {
             // TODO: refactor to decoder.get_l_value?
             if l_value_state > LZFSE_NUMBER_OF_L_VALUE_STATES as i32 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid L value state: {} value out of bounds",
-                        l_value_state,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid L value state: {} value out of bounds",
+                    l_value_state,
+                )));
             }
             let value_decoder_entry: &LzfseValueDecoderEntry =
                 match decoder.l_value_decoder_table.get(l_value_state as usize) {
                     Some(value) => value,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Missing value decoder entry for L value state: {}",
-                                l_value_state,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing value decoder entry for L value state: {}",
+                            l_value_state,
+                        )));
                     }
                 };
             let value: u32 = bitstream.get_value(value_decoder_entry.number_of_bits as usize);
@@ -1228,25 +1180,19 @@ impl LzfseContext {
             }
             // TODO: refactor to decoder.get_m_value?
             if m_value_state > LZFSE_NUMBER_OF_M_VALUE_STATES as i32 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid M value state: {} value out of bounds",
-                        m_value_state,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid M value state: {} value out of bounds",
+                    m_value_state,
+                )));
             }
             let value_decoder_entry: &LzfseValueDecoderEntry =
                 match decoder.m_value_decoder_table.get(m_value_state as usize) {
                     Some(value) => value,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Missing value decoder entry for M value state: {}",
-                                m_value_state,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing value decoder entry for M value state: {}",
+                            m_value_state,
+                        )));
                     }
                 };
             let value: u32 = bitstream.get_value(value_decoder_entry.number_of_bits as usize);
@@ -1263,25 +1209,19 @@ impl LzfseContext {
             }
             // TODO: refactor to decoder.get_d_value?
             if d_value_state > LZFSE_NUMBER_OF_D_VALUE_STATES as i32 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid D value state: {} value out of bounds",
-                        d_value_state,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid D value state: {} value out of bounds",
+                    d_value_state,
+                )));
             }
             let value_decoder_entry: &LzfseValueDecoderEntry =
                 match decoder.d_value_decoder_table.get(d_value_state as usize) {
                     Some(value) => value,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!(
-                                "Missing value decoder entry for D value state: {}",
-                                d_value_state,
-                            ),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing value decoder entry for D value state: {}",
+                            d_value_state,
+                        )));
                     }
                 };
             let value: u32 = bitstream.get_value(value_decoder_entry.number_of_bits as usize);
@@ -1300,15 +1240,15 @@ impl LzfseContext {
                 active_d_value = d_value;
             }
             let maximum_l_value: usize =
-                cmp::min(LZFSE_MAXIMUM_NUMBER_OF_LITERALS - 1, remaining_data_size);
+                min(LZFSE_MAXIMUM_NUMBER_OF_LITERALS - 1, remaining_data_size);
             if l_value < 0
                 || l_value as usize > maximum_l_value
                 || literal_value_index > (LZFSE_MAXIMUM_NUMBER_OF_LITERALS as i32) - l_value
             {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid L value: {} value out of bounds", l_value,),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid L value: {} value out of bounds",
+                    l_value
+                )));
             }
             for _ in 0..l_value {
                 uncompressed_data[data_offset] = literal_values[literal_value_index as usize];
@@ -1319,16 +1259,16 @@ impl LzfseContext {
             remaining_data_size -= l_value as usize;
 
             if m_value < 0 || m_value > remaining_data_size as i32 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid M value: {} value out of bounds", m_value,),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid M value: {} value out of bounds",
+                    m_value
+                )));
             }
             if active_d_value < 0 || active_d_value as usize > data_offset {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Invalid D value: {} value out of bounds", active_d_value,),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid D value: {} value out of bounds",
+                    active_d_value
+                )));
             }
             let mut compression_offset: usize = data_offset - active_d_value as usize;
 
@@ -1405,7 +1345,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decompress() -> io::Result<()> {
+    fn test_decompress() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let mut test_context: LzfseContext = LzfseContext::new();
 

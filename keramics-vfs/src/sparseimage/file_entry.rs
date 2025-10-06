@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::sparseimage::SparseImageFile;
 
 use crate::enums::VfsFileType;
@@ -36,7 +35,7 @@ pub enum SparseImageFileEntry {
 
 impl SparseImageFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             SparseImageFileEntry::Layer { file, .. } => Ok(Some(file.clone())),
             SparseImageFileEntry::Root { .. } => Ok(None),
@@ -60,7 +59,7 @@ impl SparseImageFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             SparseImageFileEntry::Layer { .. } => Ok(0),
             SparseImageFileEntry::Root { .. } => Ok(1),
@@ -71,18 +70,17 @@ impl SparseImageFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<SparseImageFileEntry> {
+    ) -> Result<SparseImageFileEntry, ErrorTrace> {
         match self {
-            SparseImageFileEntry::Layer { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
+            SparseImageFileEntry::Layer { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
             SparseImageFileEntry::Root { file } => {
                 if sub_file_entry_index != 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("No sub file entry with index: {}", sub_file_entry_index),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "No sub file entry with index: {}",
+                        sub_file_entry_index
+                    )));
                 }
                 Ok(SparseImageFileEntry::Layer { file: file.clone() })
             }
@@ -96,7 +94,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file() -> io::Result<SparseImageFile> {
+    fn get_file() -> Result<SparseImageFile, ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
         let data_stream: DataStreamReference =
@@ -109,7 +107,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let sparseimage_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(get_file()?));
 
         let file_entry = SparseImageFileEntry::Root {
@@ -123,7 +121,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let sparseimage_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(get_file()?));
 
         let file_entry = SparseImageFileEntry::Root {

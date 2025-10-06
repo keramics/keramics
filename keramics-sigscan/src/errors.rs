@@ -17,6 +17,7 @@ use std::fmt;
 /// The error returned for issues while building a scan tree.
 #[derive(Debug)]
 pub struct BuildError {
+    /// The error message.
     message: String,
 }
 
@@ -29,12 +30,7 @@ impl BuildError {
     }
 }
 
-impl Error for BuildError {
-    /// Retrieves the description.
-    fn description(&self) -> &str {
-        &self.message
-    }
-}
+impl Error for BuildError {}
 
 impl fmt::Display for BuildError {
     /// Formats the error as a string.

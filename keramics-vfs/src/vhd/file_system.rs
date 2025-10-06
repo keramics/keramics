@@ -11,11 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::Arc;
 
-use keramics_core::FileResolverReference;
-use keramics_formats::vhd::{VhdImage, VhdImageLayer};
+use keramics_core::{ErrorTrace, FileResolverReference};
+use keramics_formats::vhd::VhdImage;
 
 use crate::file_resolver::open_vfs_file_resolver;
 use crate::location::VfsLocation;
@@ -45,7 +44,7 @@ impl VhdFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
@@ -64,15 +63,15 @@ impl VhdFileSystem {
                     None => Ok(false),
                 }
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS path type",
-            )),
+            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(&self, vfs_path: &VfsPath) -> io::Result<Option<VhdFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        vfs_path: &VfsPath,
+    ) -> Result<Option<VhdFileEntry>, ErrorTrace> {
         match vfs_path {
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
@@ -88,23 +87,25 @@ impl VhdFileSystem {
 
                     return Ok(Some(vhd_file_entry));
                 }
-                match self.get_layer_index(&string_path_components[1]) {
-                    Some(layer_index) => {
-                        let vhd_layer: VhdImageLayer =
-                            self.image.get_layer_by_index(layer_index)?;
-
-                        Ok(Some(VhdFileEntry::Layer {
-                            index: layer_index,
-                            layer: vhd_layer.clone(),
-                        }))
+                let layer_index: usize = match self.get_layer_index(&string_path_components[1]) {
+                    Some(layer_index) => layer_index,
+                    None => return Ok(None),
+                };
+                match self.image.get_layer_by_index(layer_index) {
+                    Ok(vhd_layer) => Ok(Some(VhdFileEntry::Layer {
+                        index: layer_index,
+                        layer: vhd_layer.clone(),
+                    })),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve VHD layer: {}", layer_index)
+                        );
+                        return Err(error);
                     }
-                    None => Ok(None),
                 }
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS path type",
-            )),
+            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
         }
     }
 
@@ -126,7 +127,7 @@ impl VhdFileSystem {
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> io::Result<VhdFileEntry> {
+    pub fn get_root_file_entry(&self) -> Result<VhdFileEntry, ErrorTrace> {
         Ok(VhdFileEntry::Root {
             image: self.image.clone(),
         })
@@ -137,27 +138,36 @@ impl VhdFileSystem {
         &mut self,
         parent_file_system: Option<&VfsFileSystemReference>,
         vfs_location: &VfsLocation,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let vfs_path: &VfsPath = vfs_location.get_path();
+
         let file_resolver: FileResolverReference = match parent_file_system {
             Some(file_system) => {
                 let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
                 open_vfs_file_resolver(file_system, parent_vfs_path)?
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing parent file system",
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
                 ));
             }
         };
         match Arc::get_mut(&mut self.image) {
             Some(image) => {
-                image.open(&file_resolver, vfs_path.get_file_name())?;
-
+                match image.open(&file_resolver, vfs_path.get_file_name()) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
+                        return Err(error);
+                    }
+                }
                 self.number_of_layers = image.get_number_of_layers();
             }
-            None => return Err(io::Error::new(io::ErrorKind::InvalidInput, "Missing image")),
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to VHD image"
+                ));
+            }
         }
         Ok(())
     }
@@ -171,7 +181,7 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
-    fn get_file_system() -> io::Result<VhdFileSystem> {
+    fn get_file_system() -> Result<VhdFileSystem, ErrorTrace> {
         let mut vhd_file_system: VhdFileSystem = VhdFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
@@ -184,7 +194,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
+    fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let vhd_file_system: VhdFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
@@ -203,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> io::Result<()> {
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let vhd_file_system: VhdFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
@@ -238,7 +248,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_layer_index() -> io::Result<()> {
+    fn test_get_layer_index() -> Result<(), ErrorTrace> {
         let vhd_file_system: VhdFileSystem = get_file_system()?;
 
         let file_name: String = "vhd1".to_string();
@@ -257,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_root_file_entry() -> io::Result<()> {
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
         let vhd_file_system: VhdFileSystem = get_file_system()?;
 
         let vhd_file_entry: VhdFileEntry = vhd_file_system.get_root_file_entry()?;
@@ -269,7 +279,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let mut vhd_file_system: VhdFileSystem = VhdFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =

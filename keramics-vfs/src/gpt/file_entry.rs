@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
 use keramics_types::Uuid;
 
@@ -40,7 +39,7 @@ pub enum GptFileEntry {
 
 impl GptFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             GptFileEntry::Partition { partition, .. } => Ok(Some(partition.clone())),
             GptFileEntry::Root { .. } => Ok(None),
@@ -75,7 +74,7 @@ impl GptFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             GptFileEntry::Partition { .. } => Ok(0),
             GptFileEntry::Root { volume_system } => Ok(volume_system.get_number_of_partitions()),
@@ -86,20 +85,25 @@ impl GptFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<GptFileEntry> {
+    ) -> Result<GptFileEntry, ErrorTrace> {
         match self {
-            GptFileEntry::Partition { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
+            GptFileEntry::Partition { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
             GptFileEntry::Root { volume_system } => {
-                let gpt_partition: GptPartition =
-                    volume_system.get_partition_by_index(sub_file_entry_index)?;
-
-                Ok(GptFileEntry::Partition {
-                    index: sub_file_entry_index,
-                    partition: Arc::new(RwLock::new(gpt_partition)),
-                })
+                match volume_system.get_partition_by_index(sub_file_entry_index) {
+                    Ok(gpt_partition) => Ok(GptFileEntry::Partition {
+                        index: sub_file_entry_index,
+                        partition: Arc::new(RwLock::new(gpt_partition)),
+                    }),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve GPT partition: {}", sub_file_entry_index)
+                        );
+                        return Err(error);
+                    }
+                }
             }
         }
     }
@@ -111,7 +115,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_volume_system() -> io::Result<GptVolumeSystem> {
+    fn get_volume_system() -> Result<GptVolumeSystem, ErrorTrace> {
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/gpt/gpt.raw")?;
@@ -123,7 +127,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = GptFileEntry::Root {
@@ -137,7 +141,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = GptFileEntry::Root {
@@ -148,7 +152,6 @@ mod tests {
         assert!(name.is_none());
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
-
         let file_entry = GptFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(gpt_partition)),

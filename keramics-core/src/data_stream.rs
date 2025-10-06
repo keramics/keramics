@@ -11,57 +11,59 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
+
+use super::errors::ErrorTrace;
 
 pub type DataStreamReference = Arc<RwLock<dyn DataStream>>;
 
 /// Data stream trait.
 pub trait DataStream {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64>;
+    fn get_size(&mut self) -> Result<u64, ErrorTrace>;
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize>;
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace>;
 
     /// Reads data at a specific position.
     #[inline(always)]
-    fn read_at_position(&mut self, buf: &mut [u8], position: SeekFrom) -> io::Result<usize> {
-        self.seek(position)?;
+    fn read_at_position(&mut self, buf: &mut [u8], pos: SeekFrom) -> Result<usize, ErrorTrace> {
+        self.seek(pos)?;
         self.read(buf)
     }
 
     /// Reads an exact amount of data at the current position.
-    fn read_exact(&mut self, buf: &mut [u8]) -> io::Result<()> {
+    #[inline(always)]
+    fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ErrorTrace> {
         let read_size: usize = buf.len();
         let read_count: usize = self.read(buf)?;
 
         if read_count != read_size {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Unable to read the exact amount",
-            ));
+            return Err(ErrorTrace::new(format!(
+                "{}: Unable to read the exact amount",
+                crate::error_trace_function!(),
+            )));
         }
         Ok(())
     }
 
     /// Reads an exact amount of data at a specific position.
     #[inline(always)]
-    fn read_exact_at_position(&mut self, buf: &mut [u8], position: SeekFrom) -> io::Result<u64> {
-        let offset: u64 = self.seek(position)?;
+    fn read_exact_at_position(&mut self, buf: &mut [u8], pos: SeekFrom) -> Result<u64, ErrorTrace> {
+        let offset: u64 = self.seek(pos)?;
         let read_size: usize = buf.len();
         let read_count: usize = self.read(buf)?;
 
         if read_count != read_size {
-            return Err(io::Error::new(
-                io::ErrorKind::UnexpectedEof,
-                "Unable to read the exact amount",
-            ));
+            return Err(ErrorTrace::new(format!(
+                "{}: Unable to read the exact amount",
+                crate::error_trace_function!(),
+            )));
         }
         Ok(offset)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64>;
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace>;
 }

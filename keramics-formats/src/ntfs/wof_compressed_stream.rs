@@ -12,13 +12,12 @@
  */
 
 use std::cmp::min;
-use std::io;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_compression::{LzxContext, LzxpressHuffmanContext};
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
 use crate::lru_cache::LruCache;
@@ -82,22 +81,26 @@ impl NtfsWofCompressedStream {
         data_stream: &DataStreamReference,
         wof_data_attribute: &NtfsMftAttribute,
         size: u64,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if wof_data_attribute.is_compressed() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported compressed WofCompressedData $DATA attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compressed WofCompressedData $DATA attribute"
             ));
         }
         if wof_data_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported resident WofCompressedData $DATA attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident WofCompressedData $DATA attribute"
             ));
         }
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
-        block_stream.open(data_stream, wof_data_attribute)?;
 
+        match block_stream.open(data_stream, wof_data_attribute) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(Arc::new(RwLock::new(block_stream)));
         self.compressed_size = wof_data_attribute.valid_data_size;
         self.compression_unit_size = match self.compression_method {
@@ -106,13 +109,10 @@ impl NtfsWofCompressedStream {
             2 => 8192,
             3 => 16384,
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported compression method: {}",
-                        self.compression_method
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported compression method: {}",
+                    self.compression_method
+                )));
             }
         };
         self.size = size;
@@ -121,7 +121,7 @@ impl NtfsWofCompressedStream {
     }
 
     /// Reads media data based on the compressed blocks.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.size > 0 && self.block_offsets.len() == 0 {
             self.read_compressed_block_offsets()?;
         };
@@ -156,23 +156,19 @@ impl NtfsWofCompressedStream {
             let data_end_offset: usize = data_offset + block_read_size;
 
             if range_size == (block_size as u64) {
-                match self.data_stream.as_ref() {
-                    Some(data_stream) => match data_stream.write() {
-                        Ok(mut data_stream) => {
-                            data_stream.read_exact_at_position(
-                                &mut data[data_offset..data_end_offset],
-                                SeekFrom::Start(block_offset + block_relative_offset),
-                            )?;
-                        }
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    },
+                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Missing data stream"));
                     }
                 };
+                let read_offset: u64 = block_offset + block_relative_offset;
+
+                keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut data[data_offset..data_end_offset],
+                    SeekFrom::Start(read_offset)
+                );
             } else {
                 if !self.block_cache.contains(&block_offset) {
                     let mut data: Vec<u8> = vec![0; self.compression_unit_size];
@@ -184,9 +180,8 @@ impl NtfsWofCompressedStream {
                 let block_data: &Vec<u8> = match self.block_cache.get(&block_offset) {
                     Some(data) => data,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::Other,
-                            format!("Unable to retrieve data from cache."),
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve data from cache"
                         ));
                     }
                 };
@@ -208,22 +203,20 @@ impl NtfsWofCompressedStream {
         block_offset: u64,
         block_size: usize,
         data: &mut Vec<u8>,
-    ) -> io::Result<()> {
-        let mut compressed_data: Vec<u8> = vec![0; block_size];
-
-        match self.data_stream.as_ref() {
-            Some(data_stream) => match data_stream.write() {
-                Ok(mut data_stream) => data_stream
-                    .read_exact_at_position(&mut compressed_data, SeekFrom::Start(block_offset))?,
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            },
+    ) -> Result<(), ErrorTrace> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
+        let mut compressed_data: Vec<u8> = vec![0; block_size];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut compressed_data,
+            SeekFrom::Start(block_offset)
+        );
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "Compressed data of size: {} at offset: {} (0x{:08x})\n",
@@ -234,27 +227,44 @@ impl NtfsWofCompressedStream {
         match self.compression_method {
             0 | 2 | 3 => {
                 let mut lzxpress_context: LzxpressHuffmanContext = LzxpressHuffmanContext::new();
-                lzxpress_context.decompress(&compressed_data, data)?;
+
+                match lzxpress_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress LZXPRESS Huffman data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             1 => {
                 let mut lzx_context: LzxContext = LzxContext::new();
-                lzx_context.decompress(&compressed_data, data)?;
+
+                match lzx_context.decompress(&compressed_data, data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress LZX data"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported compression method: {}",
-                        self.compression_method
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported compression method: {}",
+                    self.compression_method
+                )));
             }
         }
         Ok(())
     }
 
     /// Reads the compressed block offsets.
-    fn read_compressed_block_offsets(&mut self) -> io::Result<()> {
+    fn read_compressed_block_offsets(&mut self) -> Result<(), ErrorTrace> {
         let block_offset_data_size: usize = if self.compressed_size > u32::MAX as u64 {
             8
         } else {
@@ -267,22 +277,19 @@ impl NtfsWofCompressedStream {
         // Given that the first block offset is directly after the block offsets table.
         let data_size: usize = (number_of_block_offsets - 1) * block_offset_data_size;
 
-        let mut data: Vec<u8> = vec![0; data_size];
-
-        match self.data_stream.as_ref() {
-            Some(data_stream) => match data_stream.write() {
-                Ok(mut data_stream) => {
-                    data_stream.read_exact_at_position(&mut data, SeekFrom::Start(0))?
-                }
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-            },
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
+        let mut data: Vec<u8> = vec![0; data_size];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut data,
+            SeekFrom::Start(0)
+        );
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "Block offsets data of size: {} at offset: 0 (0x00000000)\n",
@@ -301,13 +308,10 @@ impl NtfsWofCompressedStream {
             block_offset += data_size as u64;
 
             if block_offset > self.compressed_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!(
-                        "Invalid block offset: {} (0x{:08x}) value out of bounds.",
-                        block_offset, block_offset
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid block offset: {} (0x{:08x}) value out of bounds",
+                    block_offset, block_offset
+                )));
             }
             self.block_offsets.push(block_offset);
         }
@@ -317,12 +321,12 @@ impl NtfsWofCompressedStream {
 
 impl DataStream for NtfsWofCompressedStream {
     /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.current_offset >= self.size {
             return Ok(0);
         }
@@ -332,15 +336,20 @@ impl DataStream for NtfsWofCompressedStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = self.read_data_from_blocks(&mut buf[..read_size])?;
-
+        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                return Err(error);
+            }
+        };
         self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;
@@ -1075,7 +1084,7 @@ mod tests {
     }
 
     #[test]
-    fn test_open() -> io::Result<()> {
+    fn test_open() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1095,7 +1104,7 @@ mod tests {
     // TODO: add tests for read_compressed_block_offsets
 
     #[test]
-    fn test_seek_from_start() -> io::Result<()> {
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1113,7 +1122,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_end() -> io::Result<()> {
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1131,7 +1140,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_from_current() -> io::Result<()> {
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1152,7 +1161,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_file_size() -> io::Result<()> {
+    fn test_seek_beyond_file_size() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1170,7 +1179,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read() -> io::Result<()> {
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1232,7 +1241,7 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_and_read_beyond_size() -> io::Result<()> {
+    fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(test_data);
 
@@ -1251,4 +1260,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_size.
 }

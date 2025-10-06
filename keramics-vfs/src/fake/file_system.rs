@@ -12,8 +12,9 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::rc::Rc;
+
+use keramics_core::ErrorTrace;
 
 use crate::path::VfsPath;
 
@@ -34,12 +35,15 @@ impl FakeFileSystem {
     }
 
     /// Adds a new file entry.
-    pub fn add_file_entry(&mut self, path: &str, file_entry: FakeFileEntry) -> io::Result<()> {
+    pub fn add_file_entry(
+        &mut self,
+        path: &str,
+        file_entry: FakeFileEntry,
+    ) -> Result<(), ErrorTrace> {
         match self.paths.insert(path.to_string(), Rc::new(file_entry)) {
             Some(_) => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unable to add file entry given path is already set",
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to add file entry given path is already set"
                 ));
             }
             None => {}
@@ -48,7 +52,7 @@ impl FakeFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         // TODO: use string path components as key
         let path: String = vfs_path.to_string();
 
@@ -59,7 +63,7 @@ impl FakeFileSystem {
     pub fn get_file_entry_by_path(
         &self,
         vfs_path: &VfsPath,
-    ) -> io::Result<Option<Rc<FakeFileEntry>>> {
+    ) -> Result<Option<Rc<FakeFileEntry>>, ErrorTrace> {
         // TODO: use string path components as key
         let path: String = vfs_path.to_string();
 
@@ -77,7 +81,7 @@ mod tests {
 
     use crate::VfsType;
 
-    fn get_file_system() -> io::Result<FakeFileSystem> {
+    fn get_file_system() -> Result<FakeFileSystem, ErrorTrace> {
         let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
 
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
@@ -88,7 +92,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists() -> io::Result<()> {
+    fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let fake_file_system: FakeFileSystem = get_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/file.txt");

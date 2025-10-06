@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_datetime::{DateTime, Filetime};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{Ucs2String, bytes_to_u32_le, bytes_to_u64_le};
@@ -93,12 +92,11 @@ impl NtfsFileName {
     }
 
     /// Reads the file name from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         if data_size < 66 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported NTFS file name data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported NTFS file name data size"
             ));
         }
         self.parent_file_reference = bytes_to_u64_le!(data, 0);
@@ -144,9 +142,8 @@ impl NtfsFileName {
             let data_end_offset: usize = 66 + (self.name_size as usize) * 2;
 
             if data_end_offset > data_size {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Unsupported NTFS file name data size"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported NTFS file name data size"
                 ));
             }
             Ucs2String::read_elements_le(&mut self.name.elements, &data[66..data_end_offset]);
@@ -155,20 +152,16 @@ impl NtfsFileName {
     }
 
     /// Reads the file name from a MFT attribute.
-    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> io::Result<Self> {
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
         if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported attribute type: 0x{:08x}.",
-                    mft_attribute.attribute_type
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute type: 0x{:08x}",
+                mft_attribute.attribute_type
+            )));
         }
         if !mft_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported non-resident $FILE_NAME attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported non-resident $FILE_NAME attribute"
             ));
         }
         let mut file_name: NtfsFileName = NtfsFileName::new();
@@ -194,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsFileName::new();
 
         let test_data: Vec<u8> = get_test_data();

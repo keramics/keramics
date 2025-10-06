@@ -16,8 +16,8 @@
 //! Provides decompression support for LZX compressed data.
 
 use std::cmp::min;
-use std::io;
 
+use keramics_core::ErrorTrace;
 use keramics_core::formatters::debug_format_array;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le};
@@ -78,20 +78,18 @@ impl<'a> LzxBitstream<'a> {
         output_data: &mut [u8],
         output_data_offset: usize,
         output_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let data_end_offset: usize = self.data_offset + read_size;
         let output_data_end_offset: usize = output_data_offset + read_size;
 
         if data_end_offset > self.data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid compressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid compressed data value too small"
             ));
         }
         if output_data_end_offset > output_data_size {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid uncompressed data value too small",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data value too small"
             ));
         }
         output_data[output_data_offset..output_data_end_offset]
@@ -204,7 +202,7 @@ impl LzxContext {
         &mut self,
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut bitstream: LzxBitstream = LzxBitstream::new(compressed_data, 0);
 
         let mut uncompressed_data_offset: usize = 0;
@@ -297,9 +295,8 @@ impl LzxContext {
                 }
                 3 => {
                     if 12 > bitstream.data_size - bitstream.data_offset {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Invalid compressed data value too small",
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid compressed data value too small"
                         ));
                     }
                     recent_distances[0] = bytes_to_u32_le!(&bitstream.data, bitstream.data_offset);
@@ -312,22 +309,13 @@ impl LzxContext {
                     bitstream.data_offset += 4;
 
                     if recent_distances[0] == 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported R0 value",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Unsupported R0 value"));
                     }
                     if recent_distances[1] == 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported R1 value",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Unsupported R1 value"));
                     }
                     if recent_distances[2] == 0 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "Unsupported R2 value",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Unsupported R2 value"));
                     }
                     if self.mediator.debug_output {
                         self.mediator
@@ -350,10 +338,10 @@ impl LzxContext {
                     uncompressed_data_offset += uncompressed_block_size;
                 }
                 _ => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Unsupported block type: {}", block_type),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported block type: {}",
+                        block_type
+                    )));
                 }
             };
         }
@@ -369,11 +357,10 @@ impl LzxContext {
         &self,
         uncompressed_data: &mut [u8],
         uncompressed_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if uncompressed_data_size < 6 || uncompressed_data_size > (i32::MAX as usize) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Invalid uncompressed data size value out of bounds",
+            return Err(keramics_core::error_trace_new!(
+                "Invalid uncompressed data size value out of bounds"
             ));
         }
         let mut data_offset: usize = 0;
@@ -414,7 +401,7 @@ impl LzxContext {
         uncompressed_data: &mut [u8],
         uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
         let data_end_offset: usize = data_offset + (block_size as usize);
 
@@ -427,9 +414,8 @@ impl LzxContext {
             }
             if symbol < 256 {
                 if data_offset >= uncompressed_data_size {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid uncompressed data value too small",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data value too small"
                     ));
                 }
                 uncompressed_data[data_offset] = symbol as u8;
@@ -499,15 +485,13 @@ impl LzxContext {
                         .debug_print(format!("    uncompressed_data_offset: {},\n", data_offset));
                 }
                 if distance as usize > data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid distance value exceeds uncompressed data offset",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid distance value exceeds uncompressed data offset"
                     ));
                 }
                 if match_size as usize > uncompressed_data_size - data_offset {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Invalid match size value exceeds uncompressed data size",
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid match size value exceeds uncompressed data size"
                     ));
                 }
                 let match_offset: usize = data_offset - distance as usize;
@@ -539,7 +523,7 @@ impl LzxContext {
         bitstream: &mut LzxBitstream,
         code_sizes: &mut [u8],
         number_of_code_sizes: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut pre_code_sizes: [u8; 20] = [0; 20];
 
         for code_size_index in 0..20 {
@@ -596,10 +580,10 @@ impl LzxContext {
                     18 => bitstream.get_value(5) + 20,
                     19 => bitstream.get_value(1) + 4,
                     _ => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!("Unsupported symbol: {}", symbol),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported symbol: {}",
+                            symbol
+                        )));
                     }
                 };
                 if self.mediator.debug_output {
@@ -614,10 +598,10 @@ impl LzxContext {
                     let symbol: u16 = codes_huffman_tree.decode_symbol(bitstream)?;
 
                     if symbol > 17 {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!("Unsupported symbol: {}", symbol),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported symbol: {}",
+                            symbol
+                        )));
                     }
                     let mut code_size: i32 = (code_sizes[code_size_index] as i32) - (symbol as i32);
                     if code_size < 0 {
@@ -656,7 +640,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_bitstream_copy_bytes() -> io::Result<()> {
+    fn test_bitstream_copy_bytes() -> Result<(), ErrorTrace> {
         let test_data: [u8; 16] = [
             0x78, 0xda, 0xbd, 0x59, 0x6d, 0x8f, 0xdb, 0xb8, 0x11, 0xfe, 0x7c, 0xfa, 0x15, 0xc4,
             0x7e, 0xb9,
@@ -720,7 +704,7 @@ mod tests {
 
     #[test]
     /// Test decompress on LZX verbatim block.
-    fn test1_decompress() -> io::Result<()> {
+    fn test1_decompress() -> Result<(), ErrorTrace> {
         let test_data: [u8; 7520] = [
             0x00, 0x27, 0x00, 0x00, 0x53, 0x07, 0x24, 0x22, 0x00, 0x70, 0x00, 0x00, 0xfd, 0x6f,
             0x75, 0x77, 0x3d, 0x75, 0x29, 0x57, 0x43, 0x29, 0x09, 0x23, 0x99, 0x40, 0xea, 0x58,
@@ -3324,7 +3308,7 @@ mod tests {
 
     #[test]
     /// Test decompress on LZX aligned block.
-    fn test2_decompress() -> io::Result<()> {
+    fn test2_decompress() -> Result<(), ErrorTrace> {
         let test_data: [u8; 8054] = [
             0xa0, 0x42, 0x14, 0x07, 0x40, 0x71, 0x00, 0x00, 0x42, 0x06, 0x60, 0x13, 0x00, 0x00,
             0x5f, 0x00, 0xdb, 0xfd, 0x6c, 0x6c, 0x61, 0xd8, 0x86, 0x97, 0x95, 0x5e, 0x09, 0x7a,
@@ -4686,7 +4670,7 @@ mod tests {
 
     #[test]
     /// Test decompress on LZX uncompressed block.
-    fn test3_decompress() -> io::Result<()> {
+    fn test3_decompress() -> Result<(), ErrorTrace> {
         let test_data: [u8; 3839] = [
             0x85, 0x71, 0xf4, 0x79, 0xb1, 0xa4, 0x02, 0x77, 0xc4, 0x8d, 0x56, 0x6f, 0xe8, 0x8c,
             0x0c, 0x9e, 0x05, 0x46, 0xa5, 0x11, 0x4e, 0x17, 0xca, 0x0d, 0x0e, 0x71, 0xf8, 0x7e,

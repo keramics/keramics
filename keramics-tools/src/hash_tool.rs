@@ -12,7 +12,6 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::io::{BufReader, Stdin};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -21,7 +20,7 @@ use clap::{Parser, ValueEnum};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
-use keramics_core::{DataStreamReference, open_os_data_stream};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
@@ -130,31 +129,41 @@ impl HashTool {
         &self,
         data_fork: &VfsDataFork,
         path_components: &Vec<VfsString>,
-    ) -> io::Result<String> {
-        let data_stream: DataStreamReference = data_fork.get_data_stream()?;
-
+    ) -> Result<String, ErrorTrace> {
+        let data_stream: DataStreamReference = match data_fork.get_data_stream() {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve data stream from data fork"
+                );
+                return Err(error);
+            }
+        };
         let hash_string: String = match self.calculate_hash_from_data_stream(&data_stream) {
             Ok(hash) => hash,
-            Err(error) => {
+            Err(mut error) => {
                 if self.stop_on_error {
                     let path: String = self.get_path(path_components);
-                    let escaped_path: String = self.get_escaped_path(&path);
 
-                    let error_message: String = match data_fork.get_name() {
+                    let escaped_path_and_name: String = match data_fork.get_name() {
                         Some(fork_name) => {
                             let name: String = fork_name.to_string();
                             let escaped_name: String = self.get_escaped_path(&name);
-                            format!(
-                                "Unable to calculate hash of data stream: {}:{} with error: {}",
-                                escaped_path, escaped_name, error
-                            )
+                            let escaped_path: String = self.get_escaped_path(&path);
+
+                            [escaped_path, escaped_name].join(":")
                         }
-                        None => format!(
-                            "Unable to calculate hash of data stream: {} with error: {}",
-                            escaped_path, error
-                        ),
+                        None => self.get_escaped_path(&path),
                     };
-                    return Err(io::Error::new(io::ErrorKind::InvalidData, error_message));
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to calculate hash of data stream: {}",
+                            escaped_path_and_name
+                        )
+                    );
+                    return Err(error);
                 }
                 String::from("N/A (error)")
             }
@@ -166,7 +175,7 @@ impl HashTool {
     fn calculate_hash_from_data_stream(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<String> {
+    ) -> Result<String, ErrorTrace> {
         let mut hash_context: Box<dyn DigestHashContext> = match &self.hash_type {
             HashType::Md5 => Box::new(Md5Context::new()),
             HashType::Sha1 => Box::new(Sha1Context::new()),
@@ -178,13 +187,24 @@ impl HashTool {
 
         match data_stream.write() {
             Ok(mut data_stream) => loop {
-                let read_count = data_stream.read(&mut data)?;
+                let read_count = match data_stream.read(&mut data) {
+                    Ok(read_count) => read_count,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read data stream");
+                        return Err(error);
+                    }
+                };
                 if read_count == 0 {
                     break;
                 }
                 hash_context.update(&data[0..read_count]);
             },
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
+                ));
+            }
         };
         let hash: Vec<u8> = hash_context.finalize();
 
@@ -197,12 +217,28 @@ impl HashTool {
         file_entry: &VfsFileEntry,
         file_system_display_path: &String,
         path_components: &Vec<VfsString>,
-    ) -> io::Result<()> {
-        let number_of_data_forks: usize = file_entry.get_number_of_data_forks()?;
-
+    ) -> Result<(), ErrorTrace> {
+        let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
+            Ok(number_of_data_forks) => number_of_data_forks,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of data forks"
+                );
+                return Err(error);
+            }
+        };
         for data_fork_index in 0..number_of_data_forks {
-            let data_fork: VfsDataFork = file_entry.get_data_fork_by_index(data_fork_index)?;
-
+            let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
+                Ok(data_fork) => data_fork,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve data fork: {}", data_fork_index)
+                    );
+                    return Err(error);
+                }
+            };
             let name: Option<String> = match data_fork.get_name() {
                 Some(fork_name) => Some(fork_name.to_string()),
                 None => None,
@@ -237,7 +273,7 @@ impl HashTool {
     }
 
     /// Calculates a digest hash from a scan node.
-    fn calculate_hash_from_scan_node(&self, vfs_scan_node: &VfsScanNode) -> io::Result<()> {
+    fn calculate_hash_from_scan_node(&self, vfs_scan_node: &VfsScanNode) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
             match vfs_scan_node.get_type() {
@@ -247,7 +283,13 @@ impl HashTool {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
             let file_system: VfsFileSystemReference =
-                vfs_resolver.open_file_system(&vfs_scan_node.location)?;
+                match vfs_resolver.open_file_system(&vfs_scan_node.location) {
+                    Ok(file_system) => file_system,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                        return Err(error);
+                    }
+                };
 
             let display_path: String = match vfs_scan_node.location.get_parent() {
                 Some(parent_path) => self.get_display_path(parent_path)?,
@@ -260,7 +302,13 @@ impl HashTool {
                         &display_path,
                         &path_components,
                     )?,
-                    Err(error) => return Err(error),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve file entry from finder"
+                        );
+                        return Err(error);
+                    }
                 };
             }
         } else {
@@ -315,7 +363,7 @@ impl HashTool {
     }
 
     /// Retrieves a human readable path representation of a VFS location.
-    fn get_display_path(&self, vfs_location: &VfsLocation) -> io::Result<String> {
+    fn get_display_path(&self, vfs_location: &VfsLocation) -> Result<String, ErrorTrace> {
         match &self.volume_path_type {
             VolumePathType::Identifier => self.get_identifier_display_path(vfs_location),
             VolumePathType::Index => self.get_index_display_path(vfs_location),
@@ -338,19 +386,25 @@ impl HashTool {
     }
 
     /// Retrieves an identifier-based a human readable path representation of a VFS location.
-    fn get_identifier_display_path(&self, vfs_location: &VfsLocation) -> io::Result<String> {
+    fn get_identifier_display_path(
+        &self,
+        vfs_location: &VfsLocation,
+    ) -> Result<String, ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
-        let display_path: Option<String> =
-            match vfs_resolver.get_file_entry_by_path(vfs_location)? {
-                Some(file_entry) => match file_entry {
-                    VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
-                        Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),
-                        _ => None,
-                    },
-                    _ => None,
-                },
-                None => None,
-            };
+        let result: Option<VfsFileEntry> = match vfs_resolver.get_file_entry_by_path(vfs_location) {
+            Ok(file_entry) => file_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
+            }
+        };
+        let display_path: Option<String> = match result {
+            Some(VfsFileEntry::Gpt(gpt_file_entry)) => match gpt_file_entry.get_identifier() {
+                Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),
+                _ => None,
+            },
+            _ => None,
+        };
         match display_path {
             Some(display_path) => Ok(display_path),
             None => self.get_index_display_path(vfs_location),
@@ -358,7 +412,7 @@ impl HashTool {
     }
 
     /// Retrieves an index-based a string representation of a VFS location.
-    fn get_index_display_path(&self, vfs_location: &VfsLocation) -> io::Result<String> {
+    fn get_index_display_path(&self, vfs_location: &VfsLocation) -> Result<String, ErrorTrace> {
         let display_path: String = match vfs_location {
             VfsLocation::Layer {
                 path,
@@ -411,19 +465,18 @@ fn main() -> ExitCode {
     );
     match arguments.source {
         None => {
-            let mut reader: BufReader<Stdin> = BufReader::new(io::stdin());
+            let mut reader: BufReader<Stdin> = BufReader::new(std::io::stdin());
 
-            let hash: Vec<u8> = match hash_tool
+            let hash_string: String = match hash_tool
                 .digest_hasher
                 .calculate_hash_from_reader(&mut reader)
             {
                 Ok(hash) => hash,
                 Err(error) => {
-                    println!("Unable to calculate hash from stdin with error: {}", error);
+                    println!("Unable to calculate hash from stdin with error:\n{}", error);
                     return ExitCode::FAILURE;
                 }
             };
-            let hash_string: String = format_as_string(&hash);
             println!("{}  -", hash_string);
         }
         Some(source_argument) => {
@@ -450,7 +503,7 @@ fn main() -> ExitCode {
             match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
                 Ok(_) => {}
                 Err(error) => {
-                    println!("Unable to scan: {} with error: {}", source, error);
+                    println!("Unable to scan: {} with error:\n{}", source, error);
                     return ExitCode::FAILURE;
                 }
             };
@@ -465,7 +518,7 @@ fn main() -> ExitCode {
                 let data_stream: DataStreamReference = match open_os_data_stream(source) {
                     Ok(data_stream) => data_stream,
                     Err(error) => {
-                        println!("Unable to open file: {} with error: {}", source, error);
+                        println!("Unable to open file: {} with error:\n{}", source, error);
                         return ExitCode::FAILURE;
                     }
                 };
@@ -475,7 +528,7 @@ fn main() -> ExitCode {
                         Err(error) => {
                             if hash_tool.stop_on_error {
                                 println!(
-                                    "Unable to calculate hash of data stream: {} with error: {}",
+                                    "Unable to calculate hash of: {} with error:\n{}",
                                     source, error
                                 );
                                 return ExitCode::FAILURE;
@@ -488,7 +541,10 @@ fn main() -> ExitCode {
                 match hash_tool.calculate_hash_from_scan_node(root_scan_node) {
                     Ok(_) => {}
                     Err(error) => {
-                        println!("{}", error);
+                        println!(
+                            "Unable to calculate hash of: {} with error:\n{}",
+                            source, error
+                        );
                         return ExitCode::FAILURE;
                     }
                 };
@@ -496,4 +552,41 @@ fn main() -> ExitCode {
         }
     };
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
+
+    #[test]
+    fn test_calculate_md5() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = vec![
+            0x41, 0x20, 0x63, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x20, 0x69, 0x73, 0x20, 0x61,
+            0x6e, 0x79, 0x20, 0x6f, 0x66, 0x20, 0x74, 0x68, 0x65, 0x20, 0x76, 0x61, 0x72, 0x69,
+            0x6f, 0x75, 0x73, 0x20, 0x68, 0x61, 0x72, 0x64, 0x2c, 0x20, 0x62, 0x72, 0x69, 0x74,
+            0x74, 0x6c, 0x65, 0x2c, 0x20, 0x68, 0x65, 0x61, 0x74, 0x2d, 0x72, 0x65, 0x73, 0x69,
+            0x73, 0x74, 0x61, 0x6e, 0x74, 0x2c, 0x20, 0x61, 0x6e, 0x64, 0x20, 0x63, 0x6f, 0x72,
+            0x72, 0x6f, 0x73, 0x69, 0x6f, 0x6e, 0x2d, 0x72, 0x65, 0x73, 0x69, 0x73, 0x74, 0x61,
+            0x6e, 0x74, 0x20, 0x6d, 0x61, 0x74, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x73, 0x20, 0x6d,
+            0x61, 0x64, 0x65, 0x20, 0x62, 0x79, 0x20, 0x73, 0x68, 0x61, 0x70, 0x69, 0x6e, 0x67,
+            0x20, 0x61, 0x6e, 0x64, 0x20, 0x74, 0x68, 0x65, 0x6e, 0x20, 0x66, 0x69, 0x72, 0x69,
+            0x6e, 0x67, 0x20, 0x61, 0x6e, 0x20, 0x69, 0x6e, 0x6f, 0x72, 0x67, 0x61, 0x6e, 0x69,
+            0x63, 0x2c, 0x20, 0x6e, 0x6f, 0x6e, 0x6d, 0x65, 0x74, 0x61, 0x6c, 0x6c, 0x69, 0x63,
+            0x20, 0x6d, 0x61, 0x74, 0x65, 0x72, 0x69, 0x61, 0x6c, 0x2c, 0x20, 0x73, 0x75, 0x63,
+            0x68, 0x20, 0x61, 0x73, 0x20, 0x63, 0x6c, 0x61, 0x79, 0x2c, 0x20, 0x61, 0x74, 0x20,
+            0x61, 0x20, 0x68, 0x69, 0x67, 0x68, 0x20, 0x74, 0x65, 0x6d, 0x70, 0x65, 0x72, 0x61,
+            0x74, 0x75, 0x72, 0x65, 0x2e, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+
+        let hash_tool: HashTool = HashTool::new(&HashType::Md5, &VolumePathType::Index, true);
+        let md5: String = hash_tool.calculate_hash_from_data_stream(&data_stream)?;
+        assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
+
+        Ok(())
+    }
+
+    // TODO: add more tests
 }

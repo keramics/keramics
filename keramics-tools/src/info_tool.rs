@@ -12,15 +12,14 @@
  */
 
 use std::collections::HashSet;
-use std::io;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::{Arc, RwLock};
 
 use clap::{Args, Parser, Subcommand};
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::Mediator;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::{FormatIdentifier, FormatScanner};
 
 mod formatters;
@@ -81,7 +80,9 @@ struct PathCommandArguments {
 }
 
 /// Scans a data stream for format signatures.
-fn scan_for_formats(data_stream: &DataStreamReference) -> io::Result<Option<FormatIdentifier>> {
+fn scan_for_formats(
+    data_stream: &DataStreamReference,
+) -> Result<Option<FormatIdentifier>, ErrorTrace> {
     let mut format_scanner: FormatScanner = FormatScanner::new();
     format_scanner.add_apm_signatures();
     format_scanner.add_ext_signatures();
@@ -97,19 +98,28 @@ fn scan_for_formats(data_stream: &DataStreamReference) -> io::Result<Option<Form
 
     match format_scanner.build() {
         Ok(_) => {}
-        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-    };
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to build format scanner",
+                error
+            ));
+        }
+    }
     let mut scan_results: HashSet<FormatIdentifier> =
-        format_scanner.scan_data_stream(data_stream)?;
-
+        match format_scanner.scan_data_stream(data_stream) {
+            Ok(scan_results) => scan_results,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve scan results");
+                return Err(error);
+            }
+        };
     if scan_results.len() > 1 {
         // Ignore VHD footer if additional format was detected.
         scan_results.remove(&FormatIdentifier::Vhd);
 
         if scan_results.len() > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Found multiple known format signatures"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported multiple known format signatures"
             ));
         }
     }
@@ -120,15 +130,27 @@ fn scan_for_formats(data_stream: &DataStreamReference) -> io::Result<Option<Form
 
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
         let mut scan_results: HashSet<FormatIdentifier> =
-            format_scanner.scan_data_stream(data_stream)?;
-
+            match format_scanner.scan_data_stream(data_stream) {
+                Ok(scan_results) => scan_results,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for known format signatures"
+                    );
+                    return Err(error);
+                }
+            };
         if scan_results.len() > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Found multiple known format signatures"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported multiple known format signatures"
             ));
         }
         result = scan_results.drain().next();
@@ -153,7 +175,7 @@ fn main() -> ExitCode {
     match file_range_stream.open(source) {
         Ok(_) => {}
         Err(error) => {
-            println!("Unable to open file with error: {}", error);
+            println!("Unable to open file with error:\n{}", error);
             return ExitCode::FAILURE;
         }
     };
@@ -163,7 +185,7 @@ fn main() -> ExitCode {
         Ok(result) => result,
         Err(error) => {
             println!(
-                "Unable to scan data stream for known format signatures with error: {}",
+                "Unable to scan data stream for known format signatures with error:\n{}",
                 error
             );
             return ExitCode::FAILURE;

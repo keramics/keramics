@@ -12,10 +12,9 @@
  */
 
 use std::fs::{File, Metadata};
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStream;
+use keramics_core::{DataStream, ErrorTrace};
 
 /// Data stream of a specific range within a file.
 pub struct FileRangeDataStream {
@@ -44,10 +43,25 @@ impl FileRangeDataStream {
     }
 
     /// Opens a data stream.
-    pub fn open(&mut self, path: &str) -> io::Result<()> {
-        let file: File = File::open(path)?;
-        let metadata: Metadata = file.metadata()?;
-
+    pub fn open(&mut self, path: &str) -> Result<(), ErrorTrace> {
+        let file: File = match File::open(path) {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to open file",
+                    error
+                ));
+            }
+        };
+        let metadata: Metadata = match file.metadata() {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to retrieve file metadata",
+                    error
+                ));
+            }
+        };
         self.file = Some(file);
         self.range_size = metadata.len() - self.range_offset;
 
@@ -57,15 +71,19 @@ impl FileRangeDataStream {
 
 impl DataStream for FileRangeDataStream {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.range_size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         let file: &mut File = match self.file.as_mut() {
             Some(file) => file,
-            None => return Err(io::Error::new(io::ErrorKind::InvalidInput, "Missing file")),
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to file"
+                ));
+            }
         };
         if self.current_offset >= self.range_size {
             return Ok(0);
@@ -76,17 +94,31 @@ impl DataStream for FileRangeDataStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        file.seek(SeekFrom::Start(self.range_offset + self.current_offset))?;
-
-        let read_count: usize = file.read(&mut buf[0..read_size])?;
-
+        match file.seek(SeekFrom::Start(self.range_offset + self.current_offset)) {
+            Ok(offset) => offset,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to seek position",
+                    error
+                ));
+            }
+        };
+        let read_count: usize = match file.read(&mut buf[0..read_size]) {
+            Ok(read_count) => read_count,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to read data",
+                    error
+                ));
+            }
+        };
         self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;

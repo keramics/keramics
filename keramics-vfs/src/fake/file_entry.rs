@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, FakeDataStream};
+use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 
 use crate::enums::VfsFileType;
@@ -87,16 +86,15 @@ impl FakeFileEntry {
     }
 
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         if self.file_type != VfsFileType::File {
             return Ok(None);
         }
         match self.data_stream.as_ref() {
             Some(data_stream) => Ok(Some(data_stream.clone())),
-            None => Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("Missing data stream"),
-            )),
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
         }
     }
 
@@ -142,25 +140,22 @@ mod tests {
     // TODO: add tests for FakeFileEntry::get_modification_time
 
     #[test]
-    fn test_get_data_stream() -> io::Result<()> {
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
 
         let result: Option<DataStreamReference> = fake_file_entry.get_data_stream()?;
+        assert!(result.is_some());
 
-        let data_stream: DataStreamReference = match result {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("Missing data stream"),
+        let mut test_data: Vec<u8> = vec![0; 202];
+        let read_count: usize = match result.unwrap().write() {
+            Ok(mut data_stream) => data_stream.read(&mut test_data)?,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
                 ));
             }
-        };
-        let mut test_data: Vec<u8> = vec![0; 202];
-        let read_count: usize = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read(&mut test_data)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
         };
         assert_eq!(read_count, 202);
 

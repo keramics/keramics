@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::mbr::{MbrPartition, MbrVolumeSystem};
 
 use crate::enums::VfsFileType;
@@ -39,7 +38,7 @@ pub enum MbrFileEntry {
 
 impl MbrFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             MbrFileEntry::Partition { partition, .. } => Ok(Some(partition.clone())),
             MbrFileEntry::Root { .. } => Ok(None),
@@ -63,7 +62,7 @@ impl MbrFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             MbrFileEntry::Partition { .. } => Ok(0),
             MbrFileEntry::Root { volume_system } => Ok(volume_system.get_number_of_partitions()),
@@ -74,20 +73,25 @@ impl MbrFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<MbrFileEntry> {
+    ) -> Result<MbrFileEntry, ErrorTrace> {
         match self {
-            MbrFileEntry::Partition { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
+            MbrFileEntry::Partition { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
             MbrFileEntry::Root { volume_system } => {
-                let mbr_partition: MbrPartition =
-                    volume_system.get_partition_by_index(sub_file_entry_index)?;
-
-                Ok(MbrFileEntry::Partition {
-                    index: sub_file_entry_index,
-                    partition: Arc::new(RwLock::new(mbr_partition)),
-                })
+                match volume_system.get_partition_by_index(sub_file_entry_index) {
+                    Ok(mbr_partition) => Ok(MbrFileEntry::Partition {
+                        index: sub_file_entry_index,
+                        partition: Arc::new(RwLock::new(mbr_partition)),
+                    }),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve MBR partition: {}", sub_file_entry_index)
+                        );
+                        return Err(error);
+                    }
+                }
             }
         }
     }
@@ -99,7 +103,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_volume_system() -> io::Result<MbrVolumeSystem> {
+    fn get_volume_system() -> Result<MbrVolumeSystem, ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
@@ -111,7 +115,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = MbrFileEntry::Root {
@@ -125,7 +129,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = MbrFileEntry::Root {
@@ -136,7 +140,6 @@ mod tests {
         assert!(name.is_none());
 
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-
         let file_entry = MbrFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(mbr_partition)),

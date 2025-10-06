@@ -12,7 +12,8 @@
  */
 
 use std::collections::HashMap;
-use std::io;
+
+use keramics_core::ErrorTrace;
 
 use super::constants::*;
 use super::directory_entry::NtfsDirectoryEntry;
@@ -39,20 +40,17 @@ impl NtfsDirectoryEntries {
     }
 
     /// Adds an entry.
-    pub fn add(&mut self, file_reference: u64, file_name: NtfsFileName) -> io::Result<()> {
+    pub fn add(&mut self, file_reference: u64, file_name: NtfsFileName) -> Result<(), ErrorTrace> {
         // TODO: preserve self $FILE_NAME entry.
         if file_name.name_size == 1 && file_name.name.elements[0] == 0x002e {
             // Ignore "."
         } else if file_name.name_space == NTFS_NAME_SPACE_DOS {
             if self.short_names.contains_key(&file_reference) {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Invalid directory entry: {}-{} - DOS file name already set",
-                        file_reference & 0x0000ffffffffffff,
-                        file_reference >> 48,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid directory entry: {}-{} - DOS file name already set",
+                    file_reference & 0x0000ffffffffffff,
+                    file_reference >> 48,
+                )));
             }
             self.short_names.insert(file_reference, file_name);
         } else {
@@ -69,7 +67,7 @@ impl NtfsDirectoryEntries {
     }
 
     /// Retrieves a specific entry.
-    pub fn get_entry_by_index(&mut self, index: usize) -> io::Result<&NtfsDirectoryEntry> {
+    pub fn get_entry_by_index(&mut self, index: usize) -> Result<&NtfsDirectoryEntry, ErrorTrace> {
         match self.entries.get_mut(index) {
             Some(directory_entry) => {
                 if directory_entry.file_name.name_space == NTFS_NAME_SPACE_WINDOWS
@@ -85,10 +83,10 @@ impl NtfsDirectoryEntries {
                 }
                 Ok(directory_entry)
             }
-            None => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Missing directory entry: {}", index),
-            )),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing directory entry: {}",
+                index
+            ))),
         }
     }
 }

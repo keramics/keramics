@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
 use super::partition::ApmPartition;
@@ -48,16 +47,16 @@ impl ApmVolumeSystem {
     }
 
     /// Retrieves a partition by index.
-    pub fn get_partition_by_index(&self, partition_index: usize) -> io::Result<ApmPartition> {
+    pub fn get_partition_by_index(
+        &self,
+        partition_index: usize,
+    ) -> Result<ApmPartition, ErrorTrace> {
         match self.partition_map_entries.get(partition_index) {
             Some(partition_entry) => {
                 let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
                     Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
+                        return Err(keramics_core::error_trace_new!("Missing data stream"));
                     }
                 };
                 let partition_offset: u64 =
@@ -77,16 +76,19 @@ impl ApmVolumeSystem {
                 Ok(partition)
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("No partition with index: {}", partition_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No partition with index: {}",
+                    partition_index
+                )));
             }
         }
     }
 
     /// Reads the volume system from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_partition_map(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -95,7 +97,7 @@ impl ApmVolumeSystem {
     }
 
     /// Reads the partition map.
-    fn read_partition_map(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_partition_map(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut number_of_entries: u32 = 0;
         let mut partition_map_entry_index: u32 = 0;
         let mut partition_map_entry_offset: u64 = 512;
@@ -109,23 +111,17 @@ impl ApmVolumeSystem {
                 .read_at_position(data_stream, SeekFrom::Start(partition_map_entry_offset))?;
             if partition_map_entry_index == 0 {
                 if partition_map_entry.type_identifier.elements != APM_PARTITION_MAP_TYPE {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!(
-                            "Unsupported partition map entry: {} unsupported partition type",
-                            partition_map_entry_index,
-                        ),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported partition map entry: {} unsupported partition type",
+                        partition_map_entry_index,
+                    )));
                 }
                 number_of_entries = partition_map_entry.number_of_entries;
             } else if partition_map_entry.number_of_entries != number_of_entries {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!(
-                        "Unsupported partition map entry: {} number of entries: {} value out of bounds",
-                        partition_map_entry_index, partition_map_entry.number_of_entries,
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported partition map entry: {} number of entries: {} value out of bounds",
+                    partition_map_entry_index, partition_map_entry.number_of_entries,
+                )));
             } else {
                 self.partition_map_entries.push(partition_map_entry);
             }
@@ -146,7 +142,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_volume_system() -> io::Result<ApmVolumeSystem> {
+    fn get_volume_system() -> Result<ApmVolumeSystem, ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
@@ -156,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_partitions() -> io::Result<()> {
+    fn test_get_number_of_partitions() -> Result<(), ErrorTrace> {
         let volume_system: ApmVolumeSystem = get_volume_system()?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
@@ -165,7 +161,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_partition_by_index() -> io::Result<()> {
+    fn test_get_partition_by_index() -> Result<(), ErrorTrace> {
         let volume_system: ApmVolumeSystem = get_volume_system()?;
 
         let partition: ApmPartition = volume_system.get_partition_by_index(0)?;
@@ -177,7 +173,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
@@ -189,7 +185,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_partition_map() -> io::Result<()> {
+    fn test_read_partition_map() -> Result<(), ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;

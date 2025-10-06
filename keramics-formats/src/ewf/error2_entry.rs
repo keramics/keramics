@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
@@ -44,11 +43,10 @@ impl EwfError2Entry {
     }
 
     /// Reads the error2 entry from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 8 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported EWF error2 entry data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF error2 entry data size"
             ));
         }
         self.start_sector = bytes_to_u32_le!(data, 0);
@@ -67,7 +65,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfError2Entry::new();

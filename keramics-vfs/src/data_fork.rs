@@ -11,9 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::ntfs::NtfsDataFork;
 
 use super::string::VfsString;
@@ -26,7 +24,7 @@ pub enum VfsDataFork<'a> {
 
 impl<'a> VfsDataFork<'a> {
     /// Retrieves the data stream.
-    pub fn get_data_stream(&self) -> io::Result<DataStreamReference> {
+    pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
         match self {
             VfsDataFork::Ext(data_stream) => Ok(data_stream.clone()),
             VfsDataFork::Ntfs(data_fork) => data_fork.get_data_stream(),
@@ -48,6 +46,40 @@ impl<'a> VfsDataFork<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::enums::VfsType;
+    use crate::file_entry::VfsFileEntry;
+    use crate::file_system::VfsFileSystem;
+    use crate::location::{VfsLocation, new_os_vfs_location};
+    use crate::path::VfsPath;
+    use crate::types::VfsFileSystemReference;
+
+    fn get_parent_file_system() -> VfsFileSystemReference {
+        VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os))
+    }
+
+    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/ext/ext2.raw");
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
 
     // TODO: add tests
 }

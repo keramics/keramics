@@ -12,9 +12,8 @@
  */
 
 use std::collections::HashSet;
-use std::io;
 
-use keramics_core::{DataStreamReference, FileResolverReference};
+use keramics_core::{DataStreamReference, ErrorTrace, FileResolverReference};
 use keramics_sigscan::BuildError;
 
 use keramics_formats::apm::ApmVolumeSystem;
@@ -125,7 +124,7 @@ impl VfsScanner {
         &self,
         scan_context: &mut VfsScanContext<'a>,
         vfs_location: &'a VfsLocation,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut scan_node: VfsScanNode = VfsScanNode::new(vfs_location.clone());
 
         let file_system: VfsFileSystemReference = self.resolver.open_file_system(vfs_location)?;
@@ -134,26 +133,20 @@ impl VfsScanner {
         let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(vfs_path)? {
             Some(file_entry) => file_entry,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", vfs_location.to_string()),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No such file: {}",
+                    vfs_location.to_string()
+                )));
             }
         };
         let file_type: VfsFileType = file_entry.get_file_type();
         match file_type {
             VfsFileType::BlockDevice | VfsFileType::CharacterDevice | VfsFileType::Device => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Devices are not supported",
-                ));
+                return Err(keramics_core::error_trace_new!("Devices are not supported"));
             }
             VfsFileType::File => {}
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported file type",
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported file type"));
             }
         };
         self.scan_for_sub_nodes(&file_system, vfs_location, &mut scan_node)?;
@@ -168,7 +161,7 @@ impl VfsScanner {
         &self,
         file_system: &VfsFileSystem,
         vfs_location: &VfsLocation,
-    ) -> io::Result<Option<VfsType>> {
+    ) -> Result<Option<VfsType>, ErrorTrace> {
         let vfs_path: &VfsPath = vfs_location.get_path();
         let result: Option<DataStreamReference> =
             file_system.get_data_stream_by_path_and_name(vfs_path, None)?;
@@ -176,10 +169,10 @@ impl VfsScanner {
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::NotFound,
-                    format!("No such file: {}", vfs_location.to_string()),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "No such file: {}",
+                    vfs_location.to_string()
+                )));
             }
         };
         match vfs_location.get_type() {
@@ -210,9 +203,8 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            _ => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "Unsupported VFS location type",
+            _ => Err(keramics_core::error_trace_new!(
+                "Unsupported VFS location type"
             )),
         }
     }
@@ -221,23 +213,29 @@ impl VfsScanner {
     fn scan_for_file_system_format(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<Option<VfsType>> {
+    ) -> Result<Option<VfsType>, ErrorTrace> {
         let scan_results: HashSet<FormatIdentifier> =
-            self.file_system_scanner.scan_data_stream(data_stream)?;
-
+            match self.file_system_scanner.scan_data_stream(data_stream) {
+                Ok(scan_results) => scan_results,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for known file system format signatures"
+                    );
+                    return Err(error);
+                }
+            };
         if scan_results.len() > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Found multiple known file system format signatures"),
+            return Err(keramics_core::error_trace_new!(
+                "Found multiple known file system format signatures"
             ));
         }
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
                 FormatIdentifier::Ext => Ok(Some(VfsType::Ext)),
                 FormatIdentifier::Ntfs => Ok(Some(VfsType::Ntfs)),
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Found unsupported file system format signature"),
+                _ => Err(keramics_core::error_trace_new!(
+                    "Found unsupported file system format signature"
                 )),
             },
             None => Ok(None),
@@ -248,15 +246,23 @@ impl VfsScanner {
     fn scan_for_storage_media_image_format(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<Option<VfsType>> {
-        let scan_results: HashSet<FormatIdentifier> = self
+    ) -> Result<Option<VfsType>, ErrorTrace> {
+        let scan_results: HashSet<FormatIdentifier> = match self
             .storage_media_image_scanner
-            .scan_data_stream(data_stream)?;
-
+            .scan_data_stream(data_stream)
+        {
+            Ok(scan_results) => scan_results,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for known storage media image format signatures"
+                );
+                return Err(error);
+            }
+        };
         if scan_results.len() > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Found multiple known storage media image format signatures"),
+            return Err(keramics_core::error_trace_new!(
+                "Found multiple known storage media image format signatures"
             ));
         }
         match scan_results.iter().next() {
@@ -267,9 +273,8 @@ impl VfsScanner {
                 FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
                 FormatIdentifier::Vhd => Ok(Some(VfsType::Vhd)),
                 FormatIdentifier::Vhdx => Ok(Some(VfsType::Vhdx)),
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Found unsupported storage media image format signature"),
+                _ => Err(keramics_core::error_trace_new!(
+                    "Found unsupported storage media image format signature"
                 )),
             },
             // TODO: handle (split) RAW images.
@@ -284,7 +289,7 @@ impl VfsScanner {
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
         number_of_layers: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if number_of_layers == 0 {
             return Ok(());
         }
@@ -318,23 +323,46 @@ impl VfsScanner {
         file_system: &VfsFileSystemReference,
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let vfs_path: &VfsPath = vfs_location.get_path();
-        // TODO: handle image with both gpt and mbr volume systems
+
+        // TODO: handle image with both GPT and MBR volume systems.
         match scan_node.get_type() {
             VfsType::Apm { .. } => {
-                let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
-
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => apm_volume_system.read_data_stream(&data_stream)?,
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing data stream: {}",
+                            vfs_path.to_string()
+                        )));
                     }
                 };
+                let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
+
+                match apm_volume_system.read_data_stream(&data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read APM volume system from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
                 let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
+
                 self.scan_for_volume_system_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -350,8 +378,13 @@ impl VfsScanner {
                 let file_resolver: FileResolverReference =
                     open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                ewf_image.open(&file_resolver, vfs_path.get_file_name())?;
-
+                match ewf_image.open(&file_resolver, vfs_path.get_file_name()) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
+                        return Err(error);
+                    }
+                }
                 self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -360,18 +393,40 @@ impl VfsScanner {
                 )?;
             }
             VfsType::Gpt { .. } => {
-                let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
-
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => gpt_volume_system.read_data_stream(&data_stream)?,
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing data stream: {}",
+                            vfs_path.to_string()
+                        )));
                     }
                 };
+                let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
+
+                match gpt_volume_system.read_data_stream(&data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read GPT volume system from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
                 let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
+
                 self.scan_for_volume_system_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -380,18 +435,40 @@ impl VfsScanner {
                 )?;
             }
             VfsType::Mbr { .. } => {
-                let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
-
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => mbr_volume_system.read_data_stream(&data_stream)?,
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing data stream: {}",
+                            vfs_path.to_string()
+                        )));
                     }
                 };
+                let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
+
+                match mbr_volume_system.read_data_stream(&data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read MBR volume system from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
                 let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
+
                 self.scan_for_volume_system_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -417,9 +494,15 @@ impl VfsScanner {
                 let file_resolver: FileResolverReference =
                     open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                qcow_image.open(&file_resolver, vfs_path.get_file_name())?;
-
+                match qcow_image.open(&file_resolver, vfs_path.get_file_name()) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
+                        return Err(error);
+                    }
+                }
                 let number_of_layers: usize = qcow_image.get_number_of_layers();
+
                 self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -428,17 +511,38 @@ impl VfsScanner {
                 )?;
             }
             VfsType::SparseImage { .. } => {
-                let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
-
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => sparseimage_file.read_data_stream(&data_stream)?,
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing data stream: {}",
+                            vfs_path.to_string()
+                        )));
                     }
                 };
+                let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
+
+                match sparseimage_file.read_data_stream(&data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read sparseimage file from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
                 self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -447,17 +551,38 @@ impl VfsScanner {
                 )?;
             }
             VfsType::Udif { .. } => {
-                let mut udif_file: UdifFile = UdifFile::new();
-
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => udif_file.read_data_stream(&data_stream)?,
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing data stream: {}",
+                            vfs_path.to_string()
+                        )));
                     }
                 };
+                let mut udif_file: UdifFile = UdifFile::new();
+
+                match udif_file.read_data_stream(&data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read UDIF file from data stream"
+                        );
+                        return Err(error);
+                    }
+                }
                 self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -472,9 +597,15 @@ impl VfsScanner {
                 let file_resolver: FileResolverReference =
                     open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                vhd_image.open(&file_resolver, vfs_path.get_file_name())?;
-
+                match vhd_image.open(&file_resolver, vfs_path.get_file_name()) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
+                        return Err(error);
+                    }
+                }
                 let number_of_layers: usize = vhd_image.get_number_of_layers();
+
                 self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -489,9 +620,15 @@ impl VfsScanner {
                 let file_resolver: FileResolverReference =
                     open_vfs_file_resolver(file_system, parent_vfs_path)?;
 
-                vhdx_image.open(&file_resolver, vfs_path.get_file_name())?;
-
+                match vhdx_image.open(&file_resolver, vfs_path.get_file_name()) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
+                        return Err(error);
+                    }
+                }
                 let number_of_layers: usize = vhdx_image.get_number_of_layers();
+
                 self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
@@ -500,9 +637,8 @@ impl VfsScanner {
                 )?;
             }
             _ => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS location type",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported VFS location type"
                 ));
             }
         };
@@ -513,66 +649,83 @@ impl VfsScanner {
     fn scan_for_volume_system_format(
         &self,
         data_stream: &DataStreamReference,
-    ) -> io::Result<Option<VfsType>> {
-        let scan_results: HashSet<FormatIdentifier> = self
+    ) -> Result<Option<VfsType>, ErrorTrace> {
+        let scan_results: HashSet<FormatIdentifier> = match self
             .phase1_volume_system_scanner
-            .scan_data_stream(data_stream)?;
-
+            .scan_data_stream(data_stream)
+        {
+            Ok(scan_results) => scan_results,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for known volume system format signatures"
+                );
+                return Err(error);
+            }
+        };
         if scan_results.len() > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Found multiple known non-overlapping volume system format signatures"),
+            return Err(keramics_core::error_trace_new!(
+                "Found multiple known non-overlapping volume system format signatures"
             ));
         }
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
                 FormatIdentifier::Apm => Ok(Some(VfsType::Apm)),
                 FormatIdentifier::Gpt => Ok(Some(VfsType::Gpt)),
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Found unsupported non-overlapping volume system format signature"),
+                _ => Err(keramics_core::error_trace_new!(
+                    "Found unsupported non-overlapping volume system format signature"
                 )),
             },
             None => {
-                let scan_results: HashSet<FormatIdentifier> = self
+                let scan_results: HashSet<FormatIdentifier> = match self
                     .phase2_volume_system_scanner
-                    .scan_data_stream(data_stream)?;
-
+                    .scan_data_stream(data_stream)
+                {
+                    Ok(scan_results) => scan_results,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan data stream for known volume system format signatures"
+                        );
+                        return Err(error);
+                    }
+                };
                 if scan_results.len() > 1 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        format!("Found multiple exclusion volume system format signatures"),
+                    return Err(keramics_core::error_trace_new!(
+                        "Found multiple exclusion volume system format signatures"
                     ));
                 }
                 match scan_results.iter().next() {
                     Some(format_identifier) => match format_identifier {
                         FormatIdentifier::Ntfs => Ok(None),
-                        _ => Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            format!("Found unsupported exclusion volume system format signature"),
+                        _ => Err(keramics_core::error_trace_new!(
+                            "Found unsupported exclusion volume system format signature"
                         )),
                     },
                     None => {
-                        let scan_results: HashSet<FormatIdentifier> = self
+                        let scan_results: HashSet<FormatIdentifier> = match self
                             .phase3_volume_system_scanner
-                            .scan_data_stream(data_stream)?;
-
+                            .scan_data_stream(data_stream)
+                        {
+                            Ok(scan_results) => scan_results,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to scan data stream for known volume system format signatures"
+                                );
+                                return Err(error);
+                            }
+                        };
                         if scan_results.len() > 1 {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                format!(
-                                    "Found multiple overlapping volume system format signatures"
-                                ),
+                            return Err(keramics_core::error_trace_new!(
+                                "Found multiple overlapping volume system format signatures"
                             ));
                         }
                         match scan_results.iter().next() {
                             Some(format_identifier) => match format_identifier {
                                 FormatIdentifier::Mbr => Ok(Some(VfsType::Mbr)),
-                                _ => Err(io::Error::new(
-                                    io::ErrorKind::InvalidData,
-                                    format!(
-                                        "Found unsupported overlapping volume system format signature"
-                                    ),
+                                _ => Err(keramics_core::error_trace_new!(
+                                    "Found unsupported overlapping volume system format signature"
                                 )),
                             },
                             None => Ok(None),
@@ -590,7 +743,7 @@ impl VfsScanner {
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
         number_of_volumes: usize,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let vfs_type: &VfsType = scan_node.get_type();
         let node_file_system_path: VfsLocation = vfs_location.new_child(vfs_type, "/");
         let node_file_system: VfsFileSystemReference =
@@ -632,20 +785,20 @@ mod tests {
     use crate::context::VfsContext;
     use crate::location::new_os_vfs_location;
 
-    fn get_data_stream(path: &str) -> io::Result<DataStreamReference> {
+    fn get_data_stream(path: &str) -> Result<DataStreamReference, ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation = new_os_vfs_location(path);
         match vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)? {
             Some(data_stream) => Ok(data_stream),
-            None => Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                format!("No such file: {}", vfs_location.to_string()),
-            )),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file: {}",
+                vfs_location.to_string()
+            ))),
         }
     }
 
-    fn get_file_system() -> io::Result<VfsFileSystemReference> {
+    fn get_file_system() -> Result<VfsFileSystemReference, ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_file_system_path: VfsLocation = new_os_vfs_location("/");
@@ -659,11 +812,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan() -> io::Result<()> {
+    fn test_scan() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
         let mut scan_context: VfsScanContext = VfsScanContext::new();
@@ -688,11 +846,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_format() -> io::Result<()> {
+    fn test_scan_for_format() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let vfs_file_system: VfsFileSystemReference = get_file_system()?;
 
@@ -707,11 +870,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_format_with_storage_media_image() -> io::Result<()> {
+    fn test_scan_for_format_with_storage_media_image() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -731,11 +899,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_format_with_volume_system() -> io::Result<()> {
+    fn test_scan_for_format_with_volume_system() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -757,11 +930,16 @@ mod tests {
     // TODO: add test for scan_for_format with unsupported path type
 
     #[test]
-    fn test_scan_for_file_system_format_with_ext() -> io::Result<()> {
+    fn test_scan_for_file_system_format_with_ext() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/ext/ext2.raw")?;
         let vfs_type: VfsType = format_scanner
@@ -774,11 +952,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_with_ewf() -> io::Result<()> {
+    fn test_scan_for_storage_media_image_format_with_ewf() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/ewf/ext2.E01")?;
         let vfs_type: VfsType = format_scanner
@@ -791,11 +974,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_file_system_format_with_ntfs() -> io::Result<()> {
+    fn test_scan_for_file_system_format_with_ntfs() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/ntfs/ntfs.raw")?;
         let vfs_type: VfsType = format_scanner
@@ -808,11 +996,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_with_qcow() -> io::Result<()> {
+    fn test_scan_for_storage_media_image_format_with_qcow() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/qcow/ext2.qcow2")?;
         let vfs_type: VfsType = format_scanner
@@ -825,11 +1018,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_with_sparseimage() -> io::Result<()> {
+    fn test_scan_for_storage_media_image_format_with_sparseimage() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/sparseimage/hfsplus.sparseimage")?;
@@ -843,11 +1041,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_with_udif() -> io::Result<()> {
+    fn test_scan_for_storage_media_image_format_with_udif() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
@@ -861,11 +1064,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_with_vhd() -> io::Result<()> {
+    fn test_scan_for_storage_media_image_format_with_vhd() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
@@ -879,11 +1087,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_storage_media_image_format_with_vhdx() -> io::Result<()> {
+    fn test_scan_for_storage_media_image_format_with_vhdx() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference =
             get_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
@@ -900,11 +1113,16 @@ mod tests {
     // TODO: add tests for scan_for_sub_nodes
 
     #[test]
-    fn test_scan_for_volume_system_format_with_apm() -> io::Result<()> {
+    fn test_scan_for_volume_system_format_with_apm() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/apm/apm.dmg")?;
 
@@ -918,11 +1136,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_volume_system_format_with_gpt() -> io::Result<()> {
+    fn test_scan_for_volume_system_format_with_gpt() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/gpt/gpt.raw")?;
 
@@ -936,11 +1159,16 @@ mod tests {
     }
 
     #[test]
-    fn test_scan_for_volume_system_format_with_mbr() -> io::Result<()> {
+    fn test_scan_for_volume_system_format_with_mbr() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         match format_scanner.build() {
             Ok(_) => {}
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
         }
         let data_stream: DataStreamReference = get_data_stream("../test_data/mbr/mbr.raw")?;
 

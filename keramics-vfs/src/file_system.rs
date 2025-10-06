@@ -12,17 +12,17 @@
  */
 
 use std::ffi::OsStr;
-use std::io;
 use std::path::Path;
+use std::rc::Rc;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
 use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
 
 use super::apm::{ApmFileEntry, ApmFileSystem};
 use super::enums::VfsType;
 use super::ewf::{EwfFileEntry, EwfFileSystem};
-use super::fake::FakeFileSystem;
+use super::fake::{FakeFileEntry, FakeFileSystem};
 use super::file_entry::VfsFileEntry;
 use super::gpt::{GptFileEntry, GptFileSystem};
 use super::location::VfsLocation;
@@ -74,55 +74,190 @@ impl VfsFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> io::Result<bool> {
+    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match self {
-            VfsFileSystem::Apm(apm_file_system) => apm_file_system.file_entry_exists(vfs_path),
+            VfsFileSystem::Apm(apm_file_system) => {
+                match apm_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if APM file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             VfsFileSystem::Ext(ext_file_system) => match vfs_path {
                 VfsPath::Ext(ext_path) => {
-                    match ext_file_system.get_file_entry_by_path(&ext_path)? {
+                    let result: Option<ExtFileEntry> =
+                        match ext_file_system.get_file_entry_by_path(&ext_path) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve ext file entry"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    match result {
                         Some(_) => Ok(true),
                         None => Ok(false),
                     }
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS path type",
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported ext VFS path type"
                 )),
             },
-            VfsFileSystem::Ewf(ewf_file_system) => ewf_file_system.file_entry_exists(vfs_path),
-            VfsFileSystem::Fake(fake_file_system) => fake_file_system.file_entry_exists(vfs_path),
-            VfsFileSystem::Gpt(gpt_file_system) => gpt_file_system.file_entry_exists(vfs_path),
-            VfsFileSystem::Mbr(mbr_file_system) => mbr_file_system.file_entry_exists(vfs_path),
+            VfsFileSystem::Ewf(ewf_file_system) => {
+                match ewf_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if EWF file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsFileSystem::Fake(fake_file_system) => {
+                match fake_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if fake file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsFileSystem::Gpt(gpt_file_system) => {
+                match gpt_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if GPT file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsFileSystem::Mbr(mbr_file_system) => {
+                match mbr_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if MBR file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             VfsFileSystem::Ntfs(ntfs_file_system) => match vfs_path {
                 VfsPath::Ntfs(ntfs_path) => {
-                    match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+                    let result: Option<NtfsFileEntry> =
+                        match ntfs_file_system.get_file_entry_by_path(&ntfs_path) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve NTFS file entry"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    match result {
                         Some(_) => Ok(true),
                         None => Ok(false),
                     }
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS path type",
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported NTFS VFS path type"
                 )),
             },
             VfsFileSystem::Os => match vfs_path {
                 VfsPath::Os(string_path) => {
                     let os_path: &Path = Path::new(&string_path);
 
-                    os_path.try_exists()
+                    match os_path.try_exists() {
+                        Ok(result) => Ok(result),
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to determine if OS file entry exists",
+                                error
+                            ));
+                        }
+                    }
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS location type",
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported OS VFS path type"
                 )),
             },
-            VfsFileSystem::Qcow(qcow_file_system) => qcow_file_system.file_entry_exists(vfs_path),
-            VfsFileSystem::SparseImage(sparseimage_file_system) => {
-                sparseimage_file_system.file_entry_exists(vfs_path)
+            VfsFileSystem::Qcow(qcow_file_system) => {
+                match qcow_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if QCOW file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
             }
-            VfsFileSystem::Udif(udif_file_system) => udif_file_system.file_entry_exists(vfs_path),
-            VfsFileSystem::Vhd(vhd_file_system) => vhd_file_system.file_entry_exists(vfs_path),
-            VfsFileSystem::Vhdx(vhdx_file_system) => vhdx_file_system.file_entry_exists(vfs_path),
+            VfsFileSystem::SparseImage(sparseimage_file_system) => {
+                match sparseimage_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if sparseimage file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsFileSystem::Udif(udif_file_system) => {
+                match udif_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if UDIF file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsFileSystem::Vhd(vhd_file_system) => {
+                match vhd_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if VHD file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            VfsFileSystem::Vhdx(vhdx_file_system) => {
+                match vhdx_file_system.file_entry_exists(vfs_path) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine if VHDX file entry exists"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
         }
     }
 
@@ -132,7 +267,7 @@ impl VfsFileSystem {
         &self,
         vfs_path: &VfsPath,
         name: Option<&str>,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.get_file_entry_by_path(vfs_path)? {
             // TODO: replace by get_data_fork_by_name
             Some(file_entry) => file_entry.get_data_stream_by_name(name),
@@ -141,93 +276,205 @@ impl VfsFileSystem {
     }
 
     /// Retrieves a file entry with the specified path.
-    pub fn get_file_entry_by_path(&self, vfs_path: &VfsPath) -> io::Result<Option<VfsFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        vfs_path: &VfsPath,
+    ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         match self {
             VfsFileSystem::Apm(apm_file_system) => {
-                match apm_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<ApmFileEntry> =
+                    match apm_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve APM file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(apm_file_entry) => Ok(Some(VfsFileEntry::Apm(apm_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Ext(ext_file_system) => match vfs_path {
                 VfsPath::Ext(ext_path) => {
-                    let result: Option<VfsFileEntry> =
-                        match ext_file_system.get_file_entry_by_path(&ext_path)? {
-                            Some(file_entry) => Some(VfsFileEntry::Ext(file_entry)),
-                            None => None,
+                    let result: Option<ExtFileEntry> =
+                        match ext_file_system.get_file_entry_by_path(&ext_path) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve ext file entry"
+                                );
+                                return Err(error);
+                            }
                         };
-                    Ok(result)
+                    match result {
+                        Some(file_entry) => Ok(Some(VfsFileEntry::Ext(file_entry))),
+                        None => Ok(None),
+                    }
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS path type",
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported ext VFS path type"
                 )),
             },
             VfsFileSystem::Ewf(ewf_file_system) => {
-                match ewf_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<EwfFileEntry> =
+                    match ewf_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve EWF file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(ewf_file_entry) => Ok(Some(VfsFileEntry::Ewf(ewf_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Fake(fake_file_system) => {
-                match fake_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<Rc<FakeFileEntry>> =
+                    match fake_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve fake file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(file_entry) => Ok(Some(VfsFileEntry::Fake(file_entry.clone()))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Gpt(gpt_file_system) => {
-                match gpt_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<GptFileEntry> =
+                    match gpt_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve GPT file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(gpt_file_entry) => Ok(Some(VfsFileEntry::Gpt(gpt_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Mbr(mbr_file_system) => {
-                match mbr_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<MbrFileEntry> =
+                    match mbr_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve MBR file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(mbr_file_entry) => Ok(Some(VfsFileEntry::Mbr(mbr_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Ntfs(ntfs_file_system) => match vfs_path {
                 VfsPath::Ntfs(ntfs_path) => {
-                    let result: Option<VfsFileEntry> =
-                        match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
-                            Some(file_entry) => Some(VfsFileEntry::Ntfs(file_entry)),
-                            None => None,
+                    let result: Option<NtfsFileEntry> =
+                        match ntfs_file_system.get_file_entry_by_path(&ntfs_path) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve NTFS file entry"
+                                );
+                                return Err(error);
+                            }
                         };
-                    Ok(result)
+                    match result {
+                        Some(file_entry) => Ok(Some(VfsFileEntry::Ntfs(file_entry))),
+                        None => Ok(None),
+                    }
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS path type",
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported NTFS VFS path type"
                 )),
             },
             VfsFileSystem::Os => match vfs_path {
                 VfsPath::Os(string_path) => {
                     let os_path: &Path = Path::new(&string_path);
 
-                    let result: Option<VfsFileEntry> = match os_path.try_exists()? {
-                        false => None,
-                        true => {
-                            let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-                            os_file_entry.open(OsStr::new(string_path.as_str()))?;
-                            Some(VfsFileEntry::Os(os_file_entry))
+                    let result: bool = match os_path.try_exists() {
+                        Ok(result) => result,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to determine if OS file entry exists",
+                                error
+                            ));
                         }
                     };
-                    Ok(result)
+                    match result {
+                        false => Ok(None),
+                        true => {
+                            let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+                            match os_file_entry.open(OsStr::new(string_path.as_str())) {
+                                Ok(_) => {}
+                                Err(error) => {
+                                    return Err(keramics_core::error_trace_new_with_error!(
+                                        "Unable to open OS file entry",
+                                        error
+                                    ));
+                                }
+                            }
+                            Ok(Some(VfsFileEntry::Os(os_file_entry)))
+                        }
+                    }
                 }
-                _ => Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Unsupported VFS path type",
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported OS VFS path type"
                 )),
             },
             VfsFileSystem::Qcow(qcow_file_system) => {
-                match qcow_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<QcowFileEntry> =
+                    match qcow_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve QCOW file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(qcow_file_entry) => Ok(Some(VfsFileEntry::Qcow(qcow_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
-                match sparseimage_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<SparseImageFileEntry> =
+                    match sparseimage_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve sparseimage file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(sparseimage_file_entry) => {
                         Ok(Some(VfsFileEntry::SparseImage(sparseimage_file_entry)))
                     }
@@ -235,19 +482,52 @@ impl VfsFileSystem {
                 }
             }
             VfsFileSystem::Udif(udif_file_system) => {
-                match udif_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<UdifFileEntry> =
+                    match udif_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve UDIF file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(udif_file_entry) => Ok(Some(VfsFileEntry::Udif(udif_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Vhd(vhd_file_system) => {
-                match vhd_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<VhdFileEntry> =
+                    match vhd_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve VHD file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(vhd_file_entry) => Ok(Some(VfsFileEntry::Vhd(vhd_file_entry))),
                     None => Ok(None),
                 }
             }
             VfsFileSystem::Vhdx(vhdx_file_system) => {
-                match vhdx_file_system.get_file_entry_by_path(vfs_path)? {
+                let result: Option<VhdxFileEntry> =
+                    match vhdx_file_system.get_file_entry_by_path(vfs_path) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve VHDX file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                match result {
                     Some(vhdx_file_entry) => Ok(Some(VfsFileEntry::Vhdx(vhdx_file_entry))),
                     None => Ok(None),
                 }
@@ -256,53 +536,152 @@ impl VfsFileSystem {
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> io::Result<Option<VfsFileEntry>> {
+    pub fn get_root_file_entry(&self) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         match self {
             VfsFileSystem::Apm(apm_file_system) => {
-                let apm_file_entry: ApmFileEntry = apm_file_system.get_root_file_entry()?;
+                let apm_file_entry: ApmFileEntry = match apm_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve APM root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Apm(apm_file_entry)))
             }
             VfsFileSystem::Ext(ext_file_system) => {
-                let ext_file_entry: ExtFileEntry = ext_file_system.get_root_directory()?;
+                let ext_file_entry: ExtFileEntry = match ext_file_system.get_root_directory() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve ext root directory"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Ext(ext_file_entry)))
             }
             VfsFileSystem::Ewf(ewf_file_system) => {
-                let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry()?;
+                let ewf_file_entry: EwfFileEntry = match ewf_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve EWF root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Ewf(ewf_file_entry)))
             }
             VfsFileSystem::Fake(_) => todo!(),
             VfsFileSystem::Gpt(gpt_file_system) => {
-                let gpt_file_entry: GptFileEntry = gpt_file_system.get_root_file_entry()?;
+                let gpt_file_entry: GptFileEntry = match gpt_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve GPT root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Gpt(gpt_file_entry)))
             }
             VfsFileSystem::Mbr(mbr_file_system) => {
-                let mbr_file_entry: MbrFileEntry = mbr_file_system.get_root_file_entry()?;
+                let mbr_file_entry: MbrFileEntry = match mbr_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve MBR root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Mbr(mbr_file_entry)))
             }
             VfsFileSystem::Ntfs(ntfs_file_system) => {
-                let ntfs_file_entry: NtfsFileEntry = ntfs_file_system.get_root_directory()?;
+                let ntfs_file_entry: NtfsFileEntry = match ntfs_file_system.get_root_directory() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve NTFS root directory"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Ntfs(ntfs_file_entry)))
             }
             VfsFileSystem::Os => todo!(),
             VfsFileSystem::Qcow(qcow_file_system) => {
-                let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry()?;
+                let qcow_file_entry: QcowFileEntry = match qcow_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve QCOW root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Qcow(qcow_file_entry)))
             }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 let sparseimage_file_entry: SparseImageFileEntry =
-                    sparseimage_file_system.get_root_file_entry()?;
+                    match sparseimage_file_system.get_root_file_entry() {
+                        Ok(file_entry) => file_entry,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve sparseimage root file entry"
+                            );
+                            return Err(error);
+                        }
+                    };
                 Ok(Some(VfsFileEntry::SparseImage(sparseimage_file_entry)))
             }
             VfsFileSystem::Udif(udif_file_system) => {
-                let udif_file_entry: UdifFileEntry = udif_file_system.get_root_file_entry()?;
+                let udif_file_entry: UdifFileEntry = match udif_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve UDIF root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Udif(udif_file_entry)))
             }
             VfsFileSystem::Vhd(vhd_file_system) => {
-                let vhd_file_entry: VhdFileEntry = vhd_file_system.get_root_file_entry()?;
+                let vhd_file_entry: VhdFileEntry = match vhd_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve VHD root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Vhd(vhd_file_entry)))
             }
             VfsFileSystem::Vhdx(vhdx_file_system) => {
-                let vhdx_file_entry: VhdxFileEntry = vhdx_file_system.get_root_file_entry()?;
+                let vhdx_file_entry: VhdxFileEntry = match vhdx_file_system.get_root_file_entry() {
+                    Ok(file_entry) => file_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve VHDX root file entry"
+                        );
+                        return Err(error);
+                    }
+                };
                 Ok(Some(VfsFileEntry::Vhdx(vhdx_file_entry)))
             }
         }
@@ -313,87 +692,209 @@ impl VfsFileSystem {
         &mut self,
         parent_file_system: Option<&VfsFileSystemReference>,
         vfs_location: &VfsLocation,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         match self {
             VfsFileSystem::Apm(apm_file_system) => {
-                apm_file_system.open(parent_file_system, vfs_location)
+                match apm_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open APM file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Ext(ext_file_system) => {
                 let file_system: &VfsFileSystemReference = match parent_file_system {
                     Some(file_system) => file_system,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
+                        return Err(keramics_core::error_trace_new!(
+                            "Missing parent file system"
                         ));
                     }
                 };
                 let vfs_path: &VfsPath = vfs_location.get_path();
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => ext_file_system.read_data_stream(&data_stream),
+
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "No such file: {}",
+                            vfs_location.to_string()
+                        )));
+                    }
+                };
+                match ext_file_system.read_data_stream(&data_stream) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read ext file system from data stream"
+                        );
+                        return Err(error);
                     }
                 }
             }
             VfsFileSystem::Ewf(ewf_file_system) => {
-                ewf_file_system.open(parent_file_system, vfs_location)
+                match ewf_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open EWF file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Fake(_) | VfsFileSystem::Os => {
                 if parent_file_system.is_some() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        "Unsupported parent file system",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported parent file system"
                     ));
                 }
-                Ok(())
             }
             VfsFileSystem::Gpt(gpt_file_system) => {
-                gpt_file_system.open(parent_file_system, vfs_location)
+                match gpt_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open GPT file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Mbr(mbr_file_system) => {
-                mbr_file_system.open(parent_file_system, vfs_location)
+                match mbr_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open MBR file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Ntfs(ntfs_file_system) => {
                 let file_system: &VfsFileSystemReference = match parent_file_system {
                     Some(file_system) => file_system,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing parent file system",
+                        return Err(keramics_core::error_trace_new!(
+                            "Missing parent file system"
                         ));
                     }
                 };
                 let vfs_path: &VfsPath = vfs_location.get_path();
-                match file_system.get_data_stream_by_path_and_name(vfs_path, None)? {
-                    Some(data_stream) => ntfs_file_system.read_data_stream(&data_stream),
+
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("No such file: {}", vfs_location.to_string()),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "No such file: {}",
+                            vfs_location.to_string()
+                        )));
+                    }
+                };
+                match ntfs_file_system.read_data_stream(&data_stream) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read NTFS file system from data stream"
+                        );
+                        return Err(error);
                     }
                 }
             }
             VfsFileSystem::Qcow(qcow_file_system) => {
-                qcow_file_system.open(parent_file_system, vfs_location)
+                match qcow_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open QCOW file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
-                sparseimage_file_system.open(parent_file_system, vfs_location)
+                match sparseimage_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open sparseimage file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Udif(udif_file_system) => {
-                udif_file_system.open(parent_file_system, vfs_location)
+                match udif_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open UDIF file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Vhd(vhd_file_system) => {
-                vhd_file_system.open(parent_file_system, vfs_location)
+                match vhd_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open VHD file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsFileSystem::Vhdx(vhdx_file_system) => {
-                vhdx_file_system.open(parent_file_system, vfs_location)
+                match vhdx_file_system.open(parent_file_system, vfs_location) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open VHDX file system"
+                        );
+                        return Err(error);
+                    }
+                }
             }
         }
+        Ok(())
     }
 }
 
@@ -405,7 +906,7 @@ mod tests {
     use crate::fake::FakeFileEntry;
     use crate::location::new_os_vfs_location;
 
-    fn get_apm_file_system() -> io::Result<VfsFileSystem> {
+    fn get_apm_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apm);
 
         let parent_file_system: VfsFileSystemReference =
@@ -416,7 +917,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_ext_file_system() -> io::Result<VfsFileSystem> {
+    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
 
         let parent_file_system: VfsFileSystemReference =
@@ -427,7 +928,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_ewf_file_system() -> io::Result<VfsFileSystem> {
+    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
 
         let parent_file_system: VfsFileSystemReference =
@@ -438,7 +939,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_fake_file_system() -> io::Result<VfsFileSystem> {
+    fn get_fake_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);
         if let VfsFileSystem::Fake(fake_file_system) = &mut vfs_file_system {
             let data: [u8; 4] = [1, 2, 3, 4];
@@ -452,7 +953,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_gpt_file_system() -> io::Result<VfsFileSystem> {
+    fn get_gpt_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Gpt);
 
         let parent_file_system: VfsFileSystemReference =
@@ -463,7 +964,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_mbr_file_system() -> io::Result<VfsFileSystem> {
+    fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
 
         let parent_file_system: VfsFileSystemReference =
@@ -476,7 +977,7 @@ mod tests {
 
     // TODO: add get_ntfs_file_system
 
-    fn get_qcow_file_system() -> io::Result<VfsFileSystem> {
+    fn get_qcow_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Qcow);
 
         let parent_file_system: VfsFileSystemReference =
@@ -487,7 +988,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_sparseimage_file_system() -> io::Result<VfsFileSystem> {
+    fn get_sparseimage_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseImage);
 
         let parent_file_system: VfsFileSystemReference =
@@ -499,7 +1000,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_udif_file_system() -> io::Result<VfsFileSystem> {
+    fn get_udif_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Udif);
 
         let parent_file_system: VfsFileSystemReference =
@@ -510,7 +1011,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_vhd_file_system() -> io::Result<VfsFileSystem> {
+    fn get_vhd_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
 
         let parent_file_system: VfsFileSystemReference =
@@ -522,7 +1023,7 @@ mod tests {
         Ok(vfs_file_system)
     }
 
-    fn get_vhdx_file_system() -> io::Result<VfsFileSystem> {
+    fn get_vhdx_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhdx);
 
         let parent_file_system: VfsFileSystemReference =
@@ -535,7 +1036,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_apm() -> io::Result<()> {
+    fn test_file_entry_exists_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm2");
@@ -548,7 +1049,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_ext() -> io::Result<()> {
+    fn test_file_entry_exists_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/testdir1/testfile1");
@@ -561,7 +1062,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_ewf() -> io::Result<()> {
+    fn test_file_entry_exists_with_ewf() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/ewf1");
@@ -574,7 +1075,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_fake() -> io::Result<()> {
+    fn test_file_entry_exists_with_fake() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake2");
@@ -587,7 +1088,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_gpt() -> io::Result<()> {
+    fn test_file_entry_exists_with_gpt() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/gpt2");
@@ -600,7 +1101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_mbr() -> io::Result<()> {
+    fn test_file_entry_exists_with_mbr() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/mbr2");
@@ -615,7 +1116,7 @@ mod tests {
     // TODO: add test_file_entry_exists_with_ntfs
 
     #[test]
-    fn test_file_entry_exists_with_os() -> io::Result<()> {
+    fn test_file_entry_exists_with_os() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "../test_data/file.txt");
@@ -628,7 +1129,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_qcow() -> io::Result<()> {
+    fn test_file_entry_exists_with_qcow() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
@@ -641,7 +1142,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_sparseimage() -> io::Result<()> {
+    fn test_file_entry_exists_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/sparseimage1");
@@ -654,7 +1155,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_udif() -> io::Result<()> {
+    fn test_file_entry_exists_with_udif() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/udif1");
@@ -667,7 +1168,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_vhd() -> io::Result<()> {
+    fn test_file_entry_exists_with_vhd() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/vhd2");
@@ -680,7 +1181,7 @@ mod tests {
     }
 
     #[test]
-    fn test_file_entry_exists_with_vhdx() -> io::Result<()> {
+    fn test_file_entry_exists_with_vhdx() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/vhdx2");
@@ -695,7 +1196,7 @@ mod tests {
     // TODO: add test for get_data_stream_by_path_and_name
 
     #[test]
-    fn test_get_file_entry_by_path_with_apm_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_apm_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/bogus2");
@@ -707,7 +1208,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_apm_partition() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_apm_partition() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm2");
@@ -720,7 +1221,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_apm_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_apm_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/");
@@ -733,7 +1234,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ext_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_ext_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/bogus");
@@ -745,7 +1246,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ext_partition() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_ext_partition() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/testdir1/testfile1");
@@ -758,7 +1259,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ext_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_ext_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/");
@@ -771,7 +1272,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ewf_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_ewf_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/bogus");
@@ -783,7 +1284,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ewf_layer() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_ewf_layer() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/ewf1");
@@ -796,7 +1297,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ewf_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_ewf_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/");
@@ -809,7 +1310,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_fake_file() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_fake_file() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake2");
@@ -822,7 +1323,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_fake_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_fake_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/bogus");
@@ -836,7 +1337,7 @@ mod tests {
     // TODO: add tests fir get_file_entry of fake root
 
     #[test]
-    fn test_get_file_entry_by_path_with_gpt_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_gpt_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/bogus2");
@@ -848,7 +1349,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_gpt_partition() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_gpt_partition() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/gpt2");
@@ -861,7 +1362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_gpt_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_gpt_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/");
@@ -874,7 +1375,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_mbr_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_mbr_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/bogus2");
@@ -886,7 +1387,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_mbr_partition() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_mbr_partition() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/mbr2");
@@ -899,7 +1400,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_mbr_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_mbr_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/");
@@ -916,7 +1417,7 @@ mod tests {
     // TODO: add test_get_file_entry_by_path_with_ntfs_root
 
     #[test]
-    fn test_get_file_entry_by_path_with_qcow_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_qcow_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/bogus1");
@@ -928,7 +1429,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_qcow_layer() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_qcow_layer() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
@@ -941,7 +1442,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_qcow_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_qcow_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
@@ -954,7 +1455,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_sparseimage_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_sparseimage_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/bogus1");
@@ -966,7 +1467,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_sparseimage_layer() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_sparseimage_layer() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/sparseimage1");
@@ -979,7 +1480,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_sparseimage_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_sparseimage_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/");
@@ -992,7 +1493,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_udif_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_udif_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/bogus1");
@@ -1004,7 +1505,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_udif_layer() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_udif_layer() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/udif1");
@@ -1017,7 +1518,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_udif_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_udif_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/");
@@ -1030,7 +1531,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_vhd_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_vhd_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/bogus2");
@@ -1042,7 +1543,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_vhd_layer() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_vhd_layer() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/vhd2");
@@ -1055,7 +1556,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_vhd_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_vhd_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
@@ -1068,7 +1569,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_vhdx_non_existing() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_vhdx_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/bogus2");
@@ -1080,7 +1581,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_vhdx_layer() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_vhdx_layer() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/vhdx2");
@@ -1093,7 +1594,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_vhdx_root() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_vhdx_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/");
@@ -1106,7 +1607,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_unsupported_location_type() -> io::Result<()> {
+    fn test_get_file_entry_by_path_with_unsupported_location_type() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/");

@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::ewf::EwfImage;
 
 use crate::enums::VfsFileType;
@@ -36,7 +35,7 @@ pub enum EwfFileEntry {
 
 impl EwfFileEntry {
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> io::Result<Option<DataStreamReference>> {
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
             EwfFileEntry::Layer { image, .. } => Ok(Some(image.clone())),
             EwfFileEntry::Root { .. } => Ok(None),
@@ -60,7 +59,7 @@ impl EwfFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> io::Result<usize> {
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         match self {
             EwfFileEntry::Layer { .. } => Ok(0),
             EwfFileEntry::Root { .. } => Ok(1),
@@ -71,18 +70,17 @@ impl EwfFileEntry {
     pub fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
-    ) -> io::Result<EwfFileEntry> {
+    ) -> Result<EwfFileEntry, ErrorTrace> {
         match self {
-            EwfFileEntry::Layer { .. } => Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "No sub file entries",
-            )),
+            EwfFileEntry::Layer { .. } => {
+                Err(keramics_core::error_trace_new!("No sub file entries"))
+            }
             EwfFileEntry::Root { image } => {
                 if sub_file_entry_index != 0 {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("No sub file entry with index: {}", sub_file_entry_index),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "No sub file entry with index: {}",
+                        sub_file_entry_index
+                    )));
                 }
                 Ok(EwfFileEntry::Layer {
                     image: image.clone(),
@@ -98,7 +96,7 @@ mod tests {
 
     use keramics_core::{FileResolverReference, open_os_file_resolver};
 
-    fn get_image() -> io::Result<EwfImage> {
+    fn get_image() -> Result<EwfImage, ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
         let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/ewf")?;
@@ -110,7 +108,7 @@ mod tests {
     // TODO: add tests for get_data_stream
 
     #[test]
-    fn test_get_file_type() -> io::Result<()> {
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
         let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
 
         let file_entry = EwfFileEntry::Root {
@@ -124,7 +122,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> io::Result<()> {
+    fn test_name() -> Result<(), ErrorTrace> {
         let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
 
         let file_entry = EwfFileEntry::Root {

@@ -11,19 +11,30 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, FileResolverReference, open_os_file_resolver};
+use keramics_core::{DataStream, ErrorTrace, FileResolverReference, open_os_file_resolver};
 use keramics_formats::ewf::EwfImage;
 use keramics_hashes::{DigestHashContext, Md5Context};
 
-fn read_media_from_image(image: &mut EwfImage) -> io::Result<(u64, String)> {
+fn read_media_from_image(image: &mut EwfImage) -> Result<(u64, String), ErrorTrace> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
     let mut media_offset: u64 = 0;
 
-    while let Ok(read_count) = image.read(&mut data) {
+    loop {
+        let read_count = match image.read(&mut data) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read from EWF image at offset {} (0x{:08x})",
+                        media_offset, media_offset
+                    )
+                );
+                return Err(error);
+            }
+        };
         if read_count == 0 {
             break;
         }
@@ -37,17 +48,23 @@ fn read_media_from_image(image: &mut EwfImage) -> io::Result<(u64, String)> {
     Ok((media_offset, hash_string))
 }
 
-fn open_image(base_location: &str, filename: &str) -> io::Result<EwfImage> {
+fn open_image(base_location: &str, filename: &str) -> Result<EwfImage, ErrorTrace> {
+    let file_resolver: FileResolverReference = open_os_file_resolver(base_location)?;
+
     let mut image: EwfImage = EwfImage::new();
 
-    let file_resolver: FileResolverReference = open_os_file_resolver(base_location)?;
-    image.open(&file_resolver, filename)?;
-
+    match image.open(&file_resolver, filename) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
+            return Err(error);
+        }
+    }
     Ok(image)
 }
 
 #[test]
-fn read_media() -> io::Result<()> {
+fn read_media() -> Result<(), ErrorTrace> {
     let mut image: EwfImage = open_image("../test_data/ewf", "ext2.E01")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;

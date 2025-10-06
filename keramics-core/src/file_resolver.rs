@@ -11,10 +11,10 @@
  * under the License.
  */
 
-use std::io;
 use std::sync::Arc;
 
 use super::data_stream::DataStreamReference;
+use super::errors::ErrorTrace;
 
 pub type FileResolverReference = Arc<Box<dyn FileResolver>>;
 
@@ -24,5 +24,5 @@ pub trait FileResolver {
     fn get_data_stream<'a>(
         &'a self,
         path_components: &mut Vec<&'a str>,
-    ) -> io::Result<Option<DataStreamReference>>;
+    ) -> Result<Option<DataStreamReference>, ErrorTrace>;
 }

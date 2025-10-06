@@ -11,9 +11,8 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_checksums::ReversedCrc32Context;
+use keramics_core::ErrorTrace;
 use keramics_datetime::PosixTime32;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
@@ -223,26 +222,24 @@ impl ExtSuperblock {
     }
 
     /// Reads the superblock from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 1024 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext superblock data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext superblock data size"
             ));
         }
         if data[56..58] != EXT_SUPERBLOCK_SIGNATURE {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported ext superblock signature"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext superblock signature"
             ));
         }
         self.format_revision = bytes_to_u32_le!(data, 76);
 
         if self.format_revision > 1 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!("Unsupported format revision: {}", self.format_revision),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format revision: {}",
+                self.format_revision
+            )));
         }
         self.compatible_feature_flags = bytes_to_u32_le!(data, 92);
         self.incompatible_feature_flags = bytes_to_u32_le!(data, 96);
@@ -254,48 +251,36 @@ impl ExtSuperblock {
             self.number_of_blocks |= (bytes_to_u32_le!(data, 336) as u64) << 32;
         }
         if self.number_of_blocks == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of blocks: {} value out of bounds",
-                    self.number_of_blocks
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of blocks: {} value out of bounds",
+                self.number_of_blocks
+            )));
         }
         self.block_size = bytes_to_u32_le!(data, 24);
 
         if self.block_size > 32 - 10 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid block size: {} value out of bounds",
-                    self.block_size
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid block size: {} value out of bounds",
+                self.block_size
+            )));
         }
         self.block_size = 1024 << self.block_size;
 
         self.number_of_blocks_per_block_group = bytes_to_u32_le!(data, 32);
 
         if self.number_of_blocks_per_block_group == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of blocks per block group: {} value out of bounds",
-                    self.number_of_blocks_per_block_group
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of blocks per block group: {} value out of bounds",
+                self.number_of_blocks_per_block_group
+            )));
         }
         self.number_of_inodes_per_block_group = bytes_to_u32_le!(data, 40);
 
         if self.number_of_inodes_per_block_group == 0 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of inodes per block group: {} value out of bounds",
-                    self.number_of_inodes_per_block_group
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of inodes per block group: {} value out of bounds",
+                self.number_of_inodes_per_block_group
+            )));
         }
         self.last_mount_time = PosixTime32::from_le_bytes(&data[44..48]);
         self.last_written_time = PosixTime32::from_le_bytes(&data[48..52]);
@@ -308,13 +293,10 @@ impl ExtSuperblock {
 
         let number_of_block_groups_per_flex_group: u8 = data[372];
         if number_of_block_groups_per_flex_group >= 16 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Invalid number of blocks per flex group: {} value out of bounds",
-                    number_of_block_groups_per_flex_group,
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of blocks per flex group: {} value out of bounds",
+                number_of_block_groups_per_flex_group,
+            )));
         }
         self.number_of_block_groups_per_flex_group =
             1 << (number_of_block_groups_per_flex_group as u32);
@@ -332,10 +314,10 @@ impl ExtSuperblock {
         {
             let checksum_type: u8 = data[373];
             if checksum_type != 1 {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    format!("Unsupported checksum type: {}", checksum_type,),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported checksum type: {}",
+                    checksum_type
+                )));
             }
             let stored_checksum: u32 = bytes_to_u32_le!(data, 1020);
 
@@ -346,13 +328,10 @@ impl ExtSuperblock {
             calculated_checksum = 0xffffffff - calculated_checksum;
 
             if stored_checksum != 0 && stored_checksum != calculated_checksum {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!(
-                        "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} ext superblock checksums",
-                        stored_checksum, calculated_checksum
-                    ),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                    stored_checksum, calculated_checksum
+                )));
             }
         }
         Ok(())
@@ -454,7 +433,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ExtSuperblock::new();

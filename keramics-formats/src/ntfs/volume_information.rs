@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u16_le;
 
@@ -53,11 +52,10 @@ impl NtfsVolumeInformation {
     }
 
     /// Reads the volume information from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 12 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported NTFS volume information data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported NTFS volume information data size"
             ));
         }
         self.major_format_version = data[8];
@@ -68,26 +66,21 @@ impl NtfsVolumeInformation {
     }
 
     /// Reads the volume information from a MFT attribute.
-    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> io::Result<Self> {
+    pub fn from_attribute(mft_attribute: &NtfsMftAttribute) -> Result<Self, ErrorTrace> {
         if mft_attribute.attribute_type != NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                format!(
-                    "Unsupported attribute type: 0x{:08x}.",
-                    mft_attribute.attribute_type
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute type: 0x{:08x}",
+                mft_attribute.attribute_type
+            )));
         }
         if mft_attribute.is_compressed() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported compressed $VOLUME_INFORMATION attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compressed $VOLUME_INFORMATION attribute"
             ));
         }
         if !mft_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported non-resident $VOLUME_INFORMATION attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported non-resident $VOLUME_INFORMATION attribute"
             ));
         }
         let mut volume_information: NtfsVolumeInformation = NtfsVolumeInformation::new();
@@ -108,7 +101,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let mut test_struct = NtfsVolumeInformation::new();
 
         let test_data: Vec<u8> = get_test_data();

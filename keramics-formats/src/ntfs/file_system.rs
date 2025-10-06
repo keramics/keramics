@@ -12,11 +12,10 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::io::SeekFrom;
 use std::rc::Rc;
 
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, bytes_to_u16_le};
 
 use super::block_stream::NtfsBlockStream;
@@ -105,24 +104,21 @@ impl NtfsFileSystem {
     }
 
     /// Retrieves the file entry for a specific identifier (MFT entry number).
-    pub fn get_file_entry_by_identifier(&self, mft_entry_number: u64) -> io::Result<NtfsFileEntry> {
+    pub fn get_file_entry_by_identifier(
+        &self,
+        mft_entry_number: u64,
+    ) -> Result<NtfsFileEntry, ErrorTrace> {
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "Missing data stream",
-                ));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
         if mft_entry_number >= self.mft.number_of_entries {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Invalid MFT entry number: {} value out of bounds",
-                    mft_entry_number
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid MFT entry number: {} value out of bounds",
+                mft_entry_number
+            )));
         }
         let mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, mft_entry_number)?;
 
@@ -141,7 +137,10 @@ impl NtfsFileSystem {
     }
 
     /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(&self, path: &NtfsPath) -> io::Result<Option<NtfsFileEntry>> {
+    pub fn get_file_entry_by_path(
+        &self,
+        path: &NtfsPath,
+    ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
         if path.is_empty() || path.components[0].len() != 0 {
             return Ok(None);
         }
@@ -158,14 +157,17 @@ impl NtfsFileSystem {
     }
 
     /// Retrieves the root directory (file entry).
-    pub fn get_root_directory(&self) -> io::Result<NtfsFileEntry> {
+    pub fn get_root_directory(&self) -> Result<NtfsFileEntry, ErrorTrace> {
         self.get_file_entry_by_identifier(NTFS_ROOT_DIRECTORY_IDENTIFIER)
     }
 
     // TODO: add method to retrieve USN journal file entry
 
     /// Reads a file system from a data stream.
-    pub fn read_data_stream(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    pub fn read_data_stream(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         self.read_metadata(data_stream)?;
 
         self.data_stream = Some(data_stream.clone());
@@ -174,7 +176,7 @@ impl NtfsFileSystem {
     }
 
     /// Reads the boot record, master file table and security descriptors.
-    fn read_metadata(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut boot_record: NtfsBootRecord = NtfsBootRecord::new();
         boot_record.read_at_position(data_stream, SeekFrom::Start(0))?;
 
@@ -195,52 +197,47 @@ impl NtfsFileSystem {
     }
 
     /// Reads the case folding mappings from the $UpCase metadata file.
-    fn read_case_folding_mappings(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_case_folding_mappings(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         let mft_entry: NtfsMftEntry = self
             .mft
             .get_entry(data_stream, NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER)?;
 
         if mft_entry.is_bad {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported marked bad MFT entry.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported marked bad MFT entry"
             ));
         }
         if !mft_entry.is_allocated {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported unallocated MFT entry.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported unallocated MFT entry"
             ));
         }
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
         mft_entry.read_attributes(&mut mft_attributes)?;
 
         if mft_attributes.attribute_list.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported MFT entry with attribute list.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported MFT entry with attribute list"
             ));
         }
         let data_attribute: &NtfsMftAttribute =
             match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(data_attribute) => data_attribute,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Missing $Data attribute.",
-                    ));
+                    return Err(keramics_core::error_trace_new!("Missing $Data attribute"));
                 }
             };
         if data_attribute.is_resident() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported resident $Data attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident $Data attribute"
             ));
         }
         if data_attribute.is_compressed() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported compressed $Data attribute.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compressed $Data attribute"
             ));
         }
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.mft.cluster_block_size);
@@ -248,8 +245,16 @@ impl NtfsFileSystem {
 
         let mut data: Vec<u8> = vec![0; 131072];
 
-        block_stream.read_exact_at_position(&mut data, SeekFrom::Start(0))?;
-
+        match block_stream.read_exact_at_position(&mut data, SeekFrom::Start(0)) {
+            Ok(offset) => offset,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read case folding mappings"
+                );
+                return Err(error);
+            }
+        };
         match Rc::get_mut(&mut self.case_folding_mappings) {
             Some(case_folding_mappings) => {
                 let mut data_offset: usize = 0;
@@ -263,9 +268,8 @@ impl NtfsFileSystem {
                 }
             }
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Unable to initialize case folding mappings"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to initialize case folding mappings"
                 ));
             }
         };
@@ -277,15 +281,12 @@ impl NtfsFileSystem {
         &mut self,
         data_stream: &DataStreamReference,
         mft_block_number: u64,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if mft_block_number > u64::MAX / (self.cluster_block_size as u64) {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Unsupported MFT block number: {} value out of bounds",
-                    mft_block_number
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT block number: {} value out of bounds",
+                mft_block_number
+            )));
         }
         match Rc::get_mut(&mut self.mft) {
             Some(mft) => mft.initialize(
@@ -295,9 +296,8 @@ impl NtfsFileSystem {
                 mft_block_number,
             )?,
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    format!("Unable to initialize master file table"),
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to initialize master file table"
                 ));
             }
         };
@@ -305,44 +305,42 @@ impl NtfsFileSystem {
     }
 
     /// Reads the volume information from the $Volume metadata file.
-    fn read_volume_information(&mut self, data_stream: &DataStreamReference) -> io::Result<()> {
+    fn read_volume_information(
+        &mut self,
+        data_stream: &DataStreamReference,
+    ) -> Result<(), ErrorTrace> {
         let mft_entry: NtfsMftEntry = self
             .mft
             .get_entry(data_stream, NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER)?;
 
         if mft_entry.is_bad {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported marked bad MFT entry.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported marked bad MFT entry"
             ));
         }
         if !mft_entry.is_allocated {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported unallocated MFT entry.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported unallocated MFT entry"
             ));
         }
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
         mft_entry.read_attributes(&mut mft_attributes)?;
 
         if mft_attributes.attribute_list.is_some() {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidData,
-                "Unsupported MFT entry with attribute list.",
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported MFT entry with attribute list"
             ));
         }
         match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
             Some(mft_attribute) => {
                 if !mft_attribute.is_resident() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported non-resident $VOLUME_NAME attribute.",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported non-resident $VOLUME_NAME attribute"
                     ));
                 }
                 if mft_attribute.is_compressed() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidData,
-                        "Unsupported compressed $VOLUME_NAME attribute.",
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported compressed $VOLUME_NAME attribute"
                     ));
                 }
                 let volume_label: Ucs2String =
@@ -371,7 +369,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
-    fn get_file_system() -> io::Result<NtfsFileSystem> {
+    fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
@@ -381,7 +379,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_format_version() -> io::Result<()> {
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
         let file_system: NtfsFileSystem = get_file_system()?;
 
         let format_version: Option<(u8, u8)> = file_system.get_format_version();
@@ -391,7 +389,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_volume_flags() -> io::Result<()> {
+    fn test_get_volume_flags() -> Result<(), ErrorTrace> {
         let file_system: NtfsFileSystem = get_file_system()?;
 
         let volume_flags: Option<u16> = file_system.get_volume_flags();
@@ -401,7 +399,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_volume_label() -> io::Result<()> {
+    fn test_get_volume_label() -> Result<(), ErrorTrace> {
         let file_system: NtfsFileSystem = get_file_system()?;
 
         let volume_label: Option<&Ucs2String> = file_system.get_volume_label();
@@ -415,7 +413,7 @@ mod tests {
     // TODO: add tests for get_file_entry_by_path
 
     #[test]
-    fn test_get_root_directory() -> io::Result<()> {
+    fn test_get_root_directory() -> Result<(), ErrorTrace> {
         let file_system: NtfsFileSystem = get_file_system()?;
 
         let root_directory: NtfsFileEntry = file_system.get_root_directory()?;
@@ -428,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_stream() -> io::Result<()> {
+    fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
@@ -444,7 +442,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_metadata() -> io::Result<()> {
+    fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
         let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;

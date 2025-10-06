@@ -12,10 +12,9 @@
  */
 
 use std::collections::HashMap;
-use std::io;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, FakeDataStream};
+use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_types::Ucs2String;
 
 use super::block_stream::NtfsBlockStream;
@@ -57,7 +56,7 @@ impl NtfsMftAttributes {
     }
 
     /// Adds an attribute.
-    pub fn add_attribute(&mut self, mut attribute: NtfsMftAttribute) -> io::Result<()> {
+    pub fn add_attribute(&mut self, mut attribute: NtfsMftAttribute) -> Result<(), ErrorTrace> {
         if !self.attribute_groups.contains_key(&attribute.name) {
             let attribute_name: Option<Ucs2String> = match &attribute.name {
                 Some(name) => Some(name.clone()),
@@ -71,10 +70,7 @@ impl NtfsMftAttributes {
             match self.attribute_groups.get_mut(&attribute.name) {
                 Some(attribute_group) => attribute_group,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::InvalidInput,
-                        format!("Missing attribute group"),
-                    ));
+                    return Err(keramics_core::error_trace_new!("Missing attribute group"));
                 }
             };
         match attribute_group.get_attribute_index(attribute.attribute_type) {
@@ -82,10 +78,10 @@ impl NtfsMftAttributes {
                 match self.attributes.get_mut(*existing_attribute_index) {
                     Some(existing_attribute) => existing_attribute.merge(&mut attribute)?,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            format!("Missing attribute: {}", existing_attribute_index),
-                        ));
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing attribute: {}",
+                            existing_attribute_index
+                        )));
                     }
                 };
             }
@@ -96,9 +92,8 @@ impl NtfsMftAttributes {
                 match attribute_type {
                     NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST => {
                         if self.attribute_list.is_some() {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Attribute list already set.",
+                            return Err(keramics_core::error_trace_new!(
+                                "Attribute list already set"
                             ));
                         }
                         self.attribute_list = Some(attribute_index);
@@ -108,9 +103,8 @@ impl NtfsMftAttributes {
                     }
                     NTFS_ATTRIBUTE_TYPE_REPARSE_POINT => {
                         if self.reparse_point.is_some() {
-                            return Err(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Reparse point already set.",
+                            return Err(keramics_core::error_trace_new!(
+                                "Reparse point already set"
                             ));
                         }
                         let reparse_point: NtfsReparsePoint =
@@ -130,19 +124,22 @@ impl NtfsMftAttributes {
     }
 
     /// Retrieves the number of attributes.
-    pub fn get_number_of_attributes(&self) -> io::Result<usize> {
+    pub fn get_number_of_attributes(&self) -> Result<usize, ErrorTrace> {
         Ok(self.attributes.len())
     }
 
     /// Retrieves a specific attribute.
-    pub fn get_attribute_by_index(&self, attribute_index: usize) -> io::Result<&NtfsMftAttribute> {
+    pub fn get_attribute_by_index(
+        &self,
+        attribute_index: usize,
+    ) -> Result<&NtfsMftAttribute, ErrorTrace> {
         match self.attributes.get(attribute_index) {
             Some(mft_attribute) => Ok(mft_attribute),
             None => {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    format!("Missing attribute: {}", attribute_index),
-                ));
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing attribute: {}",
+                    attribute_index
+                )));
             }
         }
     }
@@ -200,7 +197,7 @@ impl NtfsMftAttributes {
         name: &Option<Ucs2String>,
         data_stream: &DataStreamReference,
         cluster_block_size: u32,
-    ) -> io::Result<Option<DataStreamReference>> {
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let data_attribute: &NtfsMftAttribute =
             match self.get_attribute(name, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(data_attribute) => data_attribute,
@@ -216,9 +213,8 @@ impl NtfsMftAttributes {
         };
         if let Some(compression_method) = wof_compression_method {
             if data_attribute.is_resident() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidData,
-                    "Unsupported resident $DATA attribute.",
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported resident $DATA attribute"
                 ));
             }
             let attribute_name: Ucs2String = Ucs2String::from_string("WofCompressedData");
@@ -226,20 +222,27 @@ impl NtfsMftAttributes {
                 match self.get_attribute(&Some(attribute_name), NTFS_ATTRIBUTE_TYPE_DATA) {
                     Some(mft_attribute) => mft_attribute,
                     None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing WofCompressedData $DATA attribute",
+                        return Err(keramics_core::error_trace_new!(
+                            "Missing WofCompressedData $DATA attribute"
                         ));
                     }
                 };
             let mut wof_compressed_stream: NtfsWofCompressedStream =
                 NtfsWofCompressedStream::new(cluster_block_size, compression_method);
-            wof_compressed_stream.open(
+            match wof_compressed_stream.open(
                 data_stream,
                 wof_data_attribute,
                 data_attribute.valid_data_size,
-            )?;
-
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open WofCompressedData stream"
+                    );
+                    return Err(error);
+                }
+            }
             Ok(Some(Arc::new(RwLock::new(wof_compressed_stream))))
         } else if data_attribute.is_resident() {
             // A resident $DATA attribute with a compression type in the data flags is stored uncompressed.

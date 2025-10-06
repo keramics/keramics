@@ -11,9 +11,8 @@
  * under the License.
  */
 
-use std::io;
-
 use keramics_checksums::Adler32Context;
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
@@ -48,11 +47,10 @@ impl EwfTableHeader {
     }
 
     /// Reads the table header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 24 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported EWF table header data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported EWF table header data size"
             ));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 20);
@@ -62,13 +60,10 @@ impl EwfTableHeader {
         let calculated_checksum: u32 = adler32_context.finalize();
 
         if stored_checksum != calculated_checksum {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!(
-                    "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} EWF table entries checksums",
-                    stored_checksum, calculated_checksum
-                ),
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
+                stored_checksum, calculated_checksum
+            )));
         }
         self.number_of_entries = bytes_to_u32_le!(data, 0);
         self.base_offset = bytes_to_u64_le!(data, 8);
@@ -89,7 +84,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> io::Result<()> {
+    fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = EwfTableHeader::new();

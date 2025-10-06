@@ -13,6 +13,7 @@
 
 mod data_stream;
 mod enums;
+mod errors;
 mod fake_data_stream;
 mod fake_file_resolver;
 mod file_resolver;
@@ -24,6 +25,7 @@ mod os_file_resolver;
 
 pub use data_stream::{DataStream, DataStreamReference};
 pub use enums::ByteOrder;
+pub use errors::ErrorTrace;
 pub use fake_data_stream::{FakeDataStream, open_fake_data_stream};
 pub use fake_file_resolver::FakeFileResolver;
 pub use file_resolver::{FileResolver, FileResolverReference};

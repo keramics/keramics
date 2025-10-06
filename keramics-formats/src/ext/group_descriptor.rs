@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 
@@ -45,11 +44,10 @@ impl Ext2GroupDescriptor {
         &self,
         group_descriptor: &mut ExtGroupDescriptor,
         data: &[u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext group descriptor data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext group descriptor data size"
             ));
         }
         group_descriptor.inode_table_block_number = bytes_to_u32_le!(data, 8) as u64;
@@ -122,12 +120,11 @@ impl Ext4GroupDescriptor {
         &self,
         group_descriptor: &mut ExtGroupDescriptor,
         data: &[u8],
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         if data_size != 32 && data_size != 64 {
-            return Err(io::Error::new(
-                io::ErrorKind::InvalidInput,
-                format!("Unsupported ext group descriptor data size"),
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported ext group descriptor data size"
             ));
         }
         let lower_32bit: u32 = bytes_to_u32_le!(data, 8);
@@ -170,7 +167,7 @@ impl ExtGroupDescriptor {
     }
 
     /// Reads the group descriptor from a buffer.
-    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> io::Result<()> {
+    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> Result<(), ErrorTrace> {
         if format_version == 4 {
             let group_descriptor: Ext4GroupDescriptor = Ext4GroupDescriptor::new();
             group_descriptor.read_data(self, data)
@@ -212,7 +209,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_ext2() -> io::Result<()> {
+    fn test_read_data_ext2() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtGroupDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data_ext2();
@@ -233,7 +230,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_ext4_32bit() -> io::Result<()> {
+    fn test_read_data_ext4_32bit() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtGroupDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data_ext4_32bit();
@@ -254,7 +251,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_ext4_64bit() -> io::Result<()> {
+    fn test_read_data_ext4_64bit() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtGroupDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data_ext4_64bit();

@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use std::io;
-
+use keramics_core::ErrorTrace;
 use keramics_core::mediator::Mediator;
 
 use super::data_run::{NtfsDataRun, NtfsDataRunType};
@@ -40,7 +39,11 @@ impl NtfsClusterGroup {
     }
 
     /// Reads the data runs from a buffer.
-    pub fn read_data_runs(&mut self, data: &[u8], data_runs_offset: usize) -> io::Result<usize> {
+    pub fn read_data_runs(
+        &mut self,
+        data: &[u8],
+        data_runs_offset: usize,
+    ) -> Result<usize, ErrorTrace> {
         let mut data_offset: usize = data_runs_offset;
         let data_size: usize = data.len();
         let mut last_block_number: u64 = 0;
@@ -81,7 +84,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_read_data_runs() -> io::Result<()> {
+    fn test_read_data_runs() -> Result<(), ErrorTrace> {
         let data: Vec<u8> = vec![0x11, 0x03, 0x37, 0x01, 0x0d, 0x00];
 
         let mut cluster_group = NtfsClusterGroup::new(0, 16);

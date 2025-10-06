@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::{DataStream, DataStreamReference};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
 
@@ -56,7 +55,7 @@ impl ExtBlockStream {
         data_stream: &DataStreamReference,
         number_of_blocks: u64,
         block_ranges: &Vec<ExtBlockRange>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
         self.block_tree =
             BlockTree::<ExtBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
@@ -68,7 +67,12 @@ impl ExtBlockStream {
                 .insert_value(logical_offset, range_size, block_range.clone())
             {
                 Ok(_) => {}
-                Err(error) => return Err(keramics_core::error_to_io_error!(error)),
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to insert block range into block tree",
+                        error
+                    ));
+                }
             };
         }
         self.data_stream = Some(data_stream.clone());
@@ -77,7 +81,7 @@ impl ExtBlockStream {
     }
 
     /// Reads media data based on the block ranges.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> io::Result<usize> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = self.current_offset;
@@ -89,10 +93,10 @@ impl ExtBlockStream {
             let block_range: &ExtBlockRange = match self.block_tree.get_value(current_offset) {
                 Some(value) => value,
                 None => {
-                    return Err(io::Error::new(
-                        io::ErrorKind::Other,
-                        format!("Missing block range for offset: {}", current_offset),
-                    ));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing block range for offset: {}",
+                        current_offset
+                    )));
                 }
             };
             let range_logical_offset: u64 =
@@ -109,25 +113,23 @@ impl ExtBlockStream {
             }
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
-                ExtBlockRangeType::InFile => match self.data_stream.as_ref() {
-                    Some(data_stream) => match data_stream.write() {
-                        Ok(mut data_stream) => {
-                            let range_physical_offset: u64 =
-                                block_range.physical_block_number * (self.block_size as u64);
-                            data_stream.read_at_position(
-                                &mut data[data_offset..data_end_offset],
-                                SeekFrom::Start(range_physical_offset + range_relative_offset),
-                            )?
+                ExtBlockRangeType::InFile => {
+                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                        Some(data_stream) => data_stream,
+                        None => {
+                            return Err(keramics_core::error_trace_new!("Missing data stream"));
                         }
-                        Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-                    },
-                    None => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidInput,
-                            "Missing data stream",
-                        ));
-                    }
-                },
+                    };
+                    let range_physical_offset: u64 =
+                        block_range.physical_block_number * (self.block_size as u64);
+
+                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(range_physical_offset + range_relative_offset)
+                    );
+                    read_count
+                }
                 ExtBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
 
@@ -146,12 +148,12 @@ impl ExtBlockStream {
 
 impl DataStream for ExtBlockStream {
     /// Retrieves the size of the data.
-    fn get_size(&mut self) -> io::Result<u64> {
+    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
     }
 
     /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.current_offset >= self.size {
             return Ok(0);
         }
@@ -161,15 +163,20 @@ impl DataStream for ExtBlockStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = self.read_data_from_blocks(&mut buf[..read_size])?;
-
+        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                return Err(error);
+            }
+        };
         self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> io::Result<u64> {
+    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 let mut current_offset: i64 = self.current_offset as i64;

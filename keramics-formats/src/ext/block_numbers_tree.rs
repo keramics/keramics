@@ -12,11 +12,10 @@
  */
 
 use std::cmp::min;
-use std::io;
 use std::io::SeekFrom;
 
-use keramics_core::DataStreamReference;
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_le;
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
@@ -53,7 +52,7 @@ impl ExtBlockNumbersTree {
         data_reference: &[u8],
         data_stream: &DataStreamReference,
         block_ranges: &mut Vec<ExtBlockRange>,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut logical_block_number: u64 = 0;
 
         self.read_node_data(
@@ -113,7 +112,7 @@ impl ExtBlockNumbersTree {
         logical_block_number: &mut u64,
         block_ranges: &mut Vec<ExtBlockRange>,
         depth: u16,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         let mut number_of_ranges: usize = block_ranges.len();
@@ -208,13 +207,11 @@ impl ExtBlockNumbersTree {
         logical_block_number: &mut u64,
         block_ranges: &mut Vec<ExtBlockRange>,
         depth: u16,
-    ) -> io::Result<()> {
+    ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.block_size as usize];
 
-        let offset: u64 = match data_stream.write() {
-            Ok(mut data_stream) => data_stream.read_exact_at_position(&mut data, position)?,
-            Err(error) => return Err(keramics_core::error_to_io_error!(error)),
-        };
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "ExtBlockNumbersTreeNode data of size: {} at offset: {} (0x{:08x})\n",
@@ -391,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data_reference() -> io::Result<()> {
+    fn test_read_data_reference() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
 
         let test_data: Vec<u8> = get_test_data();
@@ -426,7 +423,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_node_data() -> io::Result<()> {
+    fn test_read_node_data() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
 
         let test_data: Vec<u8> = get_test_data();
@@ -456,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_node_data_with_indirect_block() -> io::Result<()> {
+    fn test_read_node_data_with_indirect_block() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
 
         let test_data: Vec<u8> = get_test_data();
@@ -492,7 +489,7 @@ mod tests {
     }
 
     #[test]
-    fn read_node_at_position() -> io::Result<()> {
+    fn read_node_at_position() -> Result<(), ErrorTrace> {
         let mut test_struct = ExtBlockNumbersTree::new(1024, 16);
 
         let test_data: Vec<u8> = get_test_data();
