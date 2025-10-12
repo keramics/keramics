@@ -288,8 +288,8 @@ impl ExtSuperblock {
         self.group_descriptor_size = bytes_to_u16_le!(data, 254);
         self.first_meta_block_group = bytes_to_u32_le!(data, 260);
         self.file_system_identifier.copy_from_slice(&data[104..120]);
-        self.volume_label = ByteString::from_bytes(&data[120..136]);
-        self.last_mount_path = ByteString::from_bytes(&data[136..200]);
+        self.volume_label = ByteString::from(&data[120..136]);
+        self.last_mount_path = ByteString::from(&data[136..200]);
 
         let number_of_block_groups_per_flex_group: u8 = data[372];
         if number_of_block_groups_per_flex_group >= 16 {

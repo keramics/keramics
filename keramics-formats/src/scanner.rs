@@ -284,6 +284,8 @@ impl FormatScanner {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     #[test]
@@ -326,7 +328,8 @@ mod tests {
                 ));
             }
         };
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/qcow/ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let scan_results: HashSet<FormatIdentifier> =
             format_scanner.scan_data_stream(&data_stream)?;
 

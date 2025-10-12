@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::sparseimage::SparseImageFile;
@@ -103,10 +105,18 @@ fn read_media_from_file(file: &mut SparseImageFile) -> Result<(u64, String), Err
     Ok((media_offset, hash_string))
 }
 
-fn open_file(path: &str) -> Result<SparseImageFile, ErrorTrace> {
+fn open_file(path: &PathBuf) -> Result<SparseImageFile, ErrorTrace> {
+    let data_stream: DataStreamReference = match open_os_data_stream(path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open data stream",
+                error
+            ));
+        }
+    };
     let mut file: SparseImageFile = SparseImageFile::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(path)?;
     match file.read_data_stream(&data_stream) {
         Ok(_) => {}
         Err(mut error) => {
@@ -122,7 +132,8 @@ fn open_file(path: &str) -> Result<SparseImageFile, ErrorTrace> {
 
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
-    let mut file: SparseImageFile = open_file("../test_data/sparseimage/hfsplus.sparseimage")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
+    let mut file: SparseImageFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

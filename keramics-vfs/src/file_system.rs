@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::ffi::OsStr;
 use std::path::Path;
 use std::rc::Rc;
 
@@ -428,7 +427,7 @@ impl VfsFileSystem {
                         true => {
                             let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
-                            match os_file_entry.open(OsStr::new(string_path.as_str())) {
+                            match os_file_entry.open(string_path.as_os_str()) {
                                 Ok(_) => {}
                                 Err(error) => {
                                     return Err(keramics_core::error_trace_new_with_error!(

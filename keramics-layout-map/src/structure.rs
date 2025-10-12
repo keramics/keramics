@@ -312,7 +312,7 @@ impl StructureLayoutField {
                 let format_string: String = format!("    {}: \"{{}}\",\n", self.name);
 
                 quote! {
-                    let #field_name: #field_type = #field_type::from_bytes(&data[#data_offset_literal..#data_end_offset_literal]);
+                    let #field_name: #field_type = #field_type::from(&data[#data_offset_literal..#data_end_offset_literal]);
                     string_parts.push(format!(#format_string, #field_name.to_string()));
 
                 }
@@ -872,13 +872,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -886,10 +886,10 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             DataType::UnsignedInteger16Bit,
             ByteOrder::LittleEndian,
-            &"- 7".to_string(),
+            &String::from("- 7"),
             Format::NotSet,
         );
         structure_layout
@@ -922,13 +922,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_sequence_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::UnsignedInteger64Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -936,10 +936,10 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 64);
@@ -977,13 +977,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_string_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::UnsignedInteger64Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -991,10 +991,10 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             DataType::ByteString,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 32);
@@ -1010,7 +1010,7 @@ mod tests {
                 let field1: u64 = keramics_types::bytes_to_u64_be!(data, 0);
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: keramics_types::ByteString = keramics_types::ByteString::from_bytes(&data[8..40]);
+                let field2: keramics_types::ByteString = keramics_types::ByteString::from(&data[8..40]);
                 string_parts.push(format!("    field2: \"{}\",\n", field2.to_string()));
 
                 string_parts.push(format!("}}\n\n"));
@@ -1028,19 +1028,23 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_bit_fields() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::LittleEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::LittleEndian);
 
         let mut group: StructureLayoutBitFieldsGroup =
             StructureLayoutBitFieldsGroup::new(DataType::BitField32, ByteOrder::NotSet);
 
-        let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new(&"field1".to_string(), 9, &"".to_string(), Format::NotSet);
+        let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
+            &String::from("field1"),
+            9,
+            &String::from(""),
+            Format::NotSet,
+        );
         group.bitfields.push(bitfield);
 
         let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             23,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         group.bitfields.push(bitfield);
@@ -1085,13 +1089,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_group() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::UnsignedInteger64Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -1099,13 +1103,13 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let mut group: StructureLayoutGroup =
-            StructureLayoutGroup::new(&"data.len() > 8".to_string());
+            StructureLayoutGroup::new(&String::from("data.len() > 8"));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             DataType::UnsignedInteger32Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         group.fields.push(field);
@@ -1141,13 +1145,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_struct_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::UnsignedInteger32Bit,
             ByteOrder::LittleEndian,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -1155,13 +1159,13 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             DataType::Struct {
-                name: "MyStruct".to_string(),
+                name: String::from("MyStruct"),
                 size: 7,
             },
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -1195,13 +1199,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_struct_sequence_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::SignedInteger32Bit,
             ByteOrder::LittleEndian,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         structure_layout
@@ -1209,13 +1213,13 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field2".to_string(),
+            &String::from("field2"),
             DataType::Struct {
-                name: "MyStruct".to_string(),
+                name: String::from("MyStruct"),
                 size: 5,
             },
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 10);
@@ -1255,13 +1259,13 @@ mod tests {
     #[test]
     fn test_read_at_position() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&"TestStruct".to_string(), ByteOrder::BigEndian);
+            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &"field1".to_string(),
+            &String::from("field1"),
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
-            &"".to_string(),
+            &String::from(""),
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 16);

@@ -24,20 +24,14 @@ use std::os::unix::fs::MetadataExt;
 use std::os::windows::fs::MetadataExt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+
+#[cfg(unix)]
 use keramics_datetime::{DateTime, PosixTime32, PosixTime64Ns};
 
-use crate::enums::VfsFileType;
+#[cfg(windows)]
+use keramics_datetime::{DateTime, Filetime};
 
-/// Determines the POSIX date and time value.
-fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
-    if fraction != 0 {
-        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction as u32))
-    } else if timestamp != 0 {
-        DateTime::PosixTime32(PosixTime32::new(timestamp as i32))
-    } else {
-        DateTime::NotSet
-    }
-}
+use crate::enums::VfsFileType;
 
 /// Operating system file entry.
 pub struct OsFileEntry {
@@ -122,6 +116,17 @@ impl OsFileEntry {
         self.modification_time.as_ref()
     }
 
+    /// Determines the POSIX date and time value.
+    fn get_posix_datetime_value(&self, timestamp: i64, fraction: i64) -> DateTime {
+        if fraction != 0 {
+            DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction as u32))
+        } else if timestamp != 0 {
+            DateTime::PosixTime32(PosixTime32::new(timestamp as i32))
+        } else {
+            DateTime::NotSet
+        }
+    }
+
     /// Opens the file entry.
     #[cfg(unix)]
     pub(crate) fn open(&mut self, path: &OsStr) -> Result<(), ErrorTrace> {
@@ -149,20 +154,13 @@ impl OsFileEntry {
                 return Err(keramics_core::error_trace_new!("Unsupported file mode"));
             }
         };
-        self.modification_time = Some(get_posix_datetime_value(
-            file_metadata.mtime(),
-            file_metadata.mtime_nsec(),
-        ));
-        self.access_time = Some(get_posix_datetime_value(
-            file_metadata.atime(),
-            file_metadata.atime_nsec(),
-        ));
-        self.change_time = Some(get_posix_datetime_value(
-            file_metadata.ctime(),
-            file_metadata.ctime_nsec(),
-        ));
+        self.modification_time =
+            Some(self.get_posix_datetime_value(file_metadata.mtime(), file_metadata.mtime_nsec()));
+        self.access_time =
+            Some(self.get_posix_datetime_value(file_metadata.atime(), file_metadata.atime_nsec()));
+        self.change_time =
+            Some(self.get_posix_datetime_value(file_metadata.ctime(), file_metadata.ctime_nsec()));
 
-        // Determine creation time.
         self.creation_time = match file_metadata.created() {
             Ok(system_time) => match system_time.duration_since(UNIX_EPOCH) {
                 Ok(duration) => Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
@@ -186,8 +184,41 @@ impl OsFileEntry {
     /// Opens the file entry.
     #[cfg(windows)]
     pub(crate) fn open(&mut self, path: &OsStr) -> Result<(), ErrorTrace> {
-        // TODO: add Windows support.
-        todo!();
+        let os_path: &Path = Path::new(path);
+
+        let file_metadata: Metadata = match metadata(os_path) {
+            Ok(file_metadata) => file_metadata,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to retrieve file metadata",
+                    error
+                ));
+            }
+        };
+        let file_attributes: u32 = file_metadata.file_attributes();
+
+        self.file_type = match file_attributes & 0x000000f0 {
+            0x00000010 => VfsFileType::Directory,
+            0x00000040 => VfsFileType::Device,
+            _ => VfsFileType::File,
+        };
+        self.modification_time = Some(DateTime::Filetime(Filetime::new(
+            file_metadata.last_write_time(),
+        )));
+
+        self.access_time = Some(DateTime::Filetime(Filetime::new(
+            file_metadata.last_access_time(),
+        )));
+
+        // TODO: add support for change_time
+
+        self.creation_time = Some(DateTime::Filetime(Filetime::new(
+            file_metadata.creation_time(),
+        )));
+
+        self.path = path.to_os_string();
+
+        Ok(())
     }
 }
 
@@ -295,6 +326,7 @@ mod tests {
     }
 
     // TODO: add tests for get_name
+    // TODO: add tests for get_posix_datetime_value
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {

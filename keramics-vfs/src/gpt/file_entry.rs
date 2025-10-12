@@ -113,12 +113,15 @@ impl GptFileEntry {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_volume_system() -> Result<GptVolumeSystem, ErrorTrace> {
         let mut volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/gpt/gpt.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 
         Ok(volume_system)
@@ -158,7 +161,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("gpt1".to_string()));
+        assert_eq!(name, Some(String::from("gpt1")));
 
         Ok(())
     }

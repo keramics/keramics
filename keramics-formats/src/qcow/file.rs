@@ -379,7 +379,7 @@ impl QcowFile {
             ));
             self.mediator.debug_print_data(&data, true);
         }
-        self.backing_file_name = Some(ByteString::from_bytes(&data));
+        self.backing_file_name = Some(ByteString::from(&data));
 
         Ok(())
     }
@@ -625,12 +625,15 @@ impl DataStream for QcowFile {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file() -> Result<QcowFile, ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/qcow/ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
@@ -642,7 +645,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/qcow/ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         assert_eq!(file.media_size, 4194304);
@@ -654,7 +658,8 @@ mod tests {
     fn test_read_file_header() -> Result<(), ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/qcow/ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_file_header(&data_stream)?;
 
         assert_eq!(file.media_size, 4194304);

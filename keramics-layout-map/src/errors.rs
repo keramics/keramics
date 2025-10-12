@@ -29,13 +29,10 @@ impl ParseError {
     }
 }
 
-impl Error for ParseError {
-    fn description(&self) -> &str {
-        &self.message
-    }
-}
+impl Error for ParseError {}
 
 impl fmt::Display for ParseError {
+    /// Formats the error for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.message)
     }

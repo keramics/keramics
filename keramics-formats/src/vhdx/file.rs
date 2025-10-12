@@ -790,12 +790,15 @@ impl DataStream for VhdxFile {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file() -> Result<VhdxFile, ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/vhdx/ext2.vhdx")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ext2.vhdx");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
@@ -805,8 +808,8 @@ mod tests {
     fn test_get_parent_file_name() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         let parent_file_name: Option<Ucs2String> = file.get_parent_file_name();
@@ -819,8 +822,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         assert_eq!(file.bytes_per_sector, 512);
@@ -844,8 +847,8 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_metadata(&data_stream)?;
 
         assert_eq!(file.bytes_per_sector, 512);

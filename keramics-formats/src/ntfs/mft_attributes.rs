@@ -217,7 +217,7 @@ impl NtfsMftAttributes {
                     "Unsupported resident $DATA attribute"
                 ));
             }
-            let attribute_name: Ucs2String = Ucs2String::from_string("WofCompressedData");
+            let attribute_name: Ucs2String = Ucs2String::from("WofCompressedData");
             let wof_data_attribute: &NtfsMftAttribute =
                 match self.get_attribute(&Some(attribute_name), NTFS_ATTRIBUTE_TYPE_DATA) {
                     Some(mft_attribute) => mft_attribute,

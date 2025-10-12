@@ -53,7 +53,7 @@ impl EwfFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<String> {
         match self {
-            EwfFileEntry::Layer { .. } => Some("ewf1".to_string()),
+            EwfFileEntry::Layer { .. } => Some(String::from("ewf1")),
             EwfFileEntry::Root { .. } => None,
         }
     }
@@ -94,13 +94,17 @@ impl EwfFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::{FileResolverReference, open_os_file_resolver};
+    use std::path::PathBuf;
+
+    use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
     fn get_image() -> Result<EwfImage, ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/ewf")?;
-        image.open(&file_resolver, "ext2.E01")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ewf");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ext2.E01");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(image)
     }
@@ -137,7 +141,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("ewf1".to_string()));
+        assert_eq!(name, Some(String::from("ewf1")));
 
         Ok(())
     }

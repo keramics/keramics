@@ -13,7 +13,7 @@
 
 use std::collections::HashSet;
 
-use keramics_core::{DataStreamReference, ErrorTrace, FileResolverReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::BuildError;
 
 use keramics_formats::apm::ApmVolumeSystem;
@@ -31,7 +31,6 @@ use crate::apm::ApmFileSystem;
 use crate::enums::{VfsFileType, VfsType};
 use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
-use crate::file_resolver::open_vfs_file_resolver;
 use crate::file_system::VfsFileSystem;
 use crate::gpt::GptFileSystem;
 use crate::location::VfsLocation;
@@ -294,21 +293,32 @@ impl VfsScanner {
             return Ok(());
         }
         let vfs_type: &VfsType = scan_node.get_type();
-        let node_file_system_path: VfsLocation = vfs_location.new_child(vfs_type, "/");
-        let node_file_system: VfsFileSystemReference =
-            self.resolver.open_file_system(&node_file_system_path)?;
 
         // TODO: add support for configuration driven scanning older image layers
 
-        // TODO: use layer identifier in location?
-        let vfs_type: &VfsType = scan_node.get_type();
-        let location: String = format!("{}{}", path_prefix, number_of_layers);
-        let node_path: VfsLocation = vfs_location.new_child(vfs_type, location.as_str());
-        match self.scan_for_format(&node_file_system, &node_path)? {
-            Some(vfs_type) => {
-                let sub_node_path: VfsLocation = node_path.new_child(&vfs_type, "/");
-                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
-                self.scan_for_sub_nodes(&node_file_system, &node_path, &mut sub_scan_node)?;
+        // TODO: use layer identifier in path?
+        let image_layer_path: String = format!("{}{}", path_prefix, number_of_layers);
+        let node_vfs_path: VfsPath = VfsPath::new(vfs_type, image_layer_path.as_str());
+        let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_vfs_path);
+        let node_file_system: VfsFileSystemReference =
+            match self.resolver.open_file_system(&node_vfs_location) {
+                Ok(file_system) => file_system,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                    return Err(error);
+                }
+            };
+        match self.scan_for_format(&node_file_system, &node_vfs_location)? {
+            Some(sub_node_vfs_type) => {
+                let root_path: &str = match sub_node_vfs_type {
+                    VfsType::Ntfs { .. } => "\\",
+                    _ => "/",
+                };
+                let sub_node_vfs_path: VfsPath = VfsPath::new(&sub_node_vfs_type, root_path);
+                let sub_node_vfs_location: VfsLocation =
+                    node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
+                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+                self.scan_for_sub_nodes(&node_file_system, &node_vfs_location, &mut sub_scan_node)?;
 
                 scan_node.sub_nodes.push(sub_scan_node);
             }
@@ -329,160 +339,153 @@ impl VfsScanner {
         // TODO: handle image with both GPT and MBR volume systems.
         match scan_node.get_type() {
             VfsType::Apm { .. } => {
-                let result: Option<DataStreamReference> =
-                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing data stream: {}",
-                            vfs_path.to_string()
-                        )));
-                    }
-                };
                 let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-                match apm_volume_system.read_data_stream(&data_stream) {
+                match ApmFileSystem::open_volume_system(
+                    &mut apm_volume_system,
+                    file_system,
+                    vfs_path,
+                ) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read APM volume system from data stream"
+                            "Unable to open APM volume system"
                         );
                         return Err(error);
                     }
-                }
+                };
                 let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
 
-                self.scan_for_volume_system_sub_nodes(
+                match self.scan_for_volume_system_sub_nodes(
                     vfs_location,
                     scan_node,
                     ApmFileSystem::PATH_PREFIX,
                     number_of_partitions,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan APM volume system "
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsType::Ext { .. } => {}
             VfsType::Ewf { .. } => {
                 let mut ewf_image: EwfImage = EwfImage::new();
 
-                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
-                let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
-
-                match ewf_image.open(&file_resolver, vfs_path.get_file_name()) {
+                match EwfFileSystem::open_image(&mut ewf_image, file_system, vfs_path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
                         return Err(error);
                     }
                 }
-                self.scan_for_storage_media_image_sub_nodes(
+                match self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
                     EwfFileSystem::PATH_PREFIX,
                     1,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan EWF image ");
+                        return Err(error);
+                    }
+                }
             }
             VfsType::Gpt { .. } => {
-                let result: Option<DataStreamReference> =
-                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing data stream: {}",
-                            vfs_path.to_string()
-                        )));
-                    }
-                };
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
-                match gpt_volume_system.read_data_stream(&data_stream) {
+                match GptFileSystem::open_volume_system(
+                    &mut gpt_volume_system,
+                    file_system,
+                    vfs_path,
+                ) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read GPT volume system from data stream"
+                            "Unable to open GPT volume system"
                         );
                         return Err(error);
                     }
-                }
+                };
                 let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
 
-                self.scan_for_volume_system_sub_nodes(
+                match self.scan_for_volume_system_sub_nodes(
                     vfs_location,
                     scan_node,
                     GptFileSystem::PATH_PREFIX,
                     number_of_partitions,
-                )?;
-            }
-            VfsType::Mbr { .. } => {
-                let result: Option<DataStreamReference> =
-                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing data stream: {}",
-                            vfs_path.to_string()
-                        )));
-                    }
-                };
-                let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
-
-                match mbr_volume_system.read_data_stream(&data_stream) {
+                ) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read MBR volume system from data stream"
+                            "Unable to scan GPT volume system "
                         );
                         return Err(error);
                     }
                 }
+            }
+            VfsType::Mbr { .. } => {
+                let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
+
+                match MbrFileSystem::open_volume_system(
+                    &mut mbr_volume_system,
+                    file_system,
+                    vfs_path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open MBR volume system"
+                        );
+                        return Err(error);
+                    }
+                };
                 let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
 
-                self.scan_for_volume_system_sub_nodes(
+                match self.scan_for_volume_system_sub_nodes(
                     vfs_location,
                     scan_node,
                     MbrFileSystem::PATH_PREFIX,
                     number_of_partitions,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan MBR volume system "
+                        );
+                        return Err(error);
+                    }
+                }
             }
             VfsType::Ntfs { .. } => {}
             VfsType::Os { .. } => match self.scan_for_format(&file_system, vfs_location)? {
-                Some(vfs_type) => {
-                    let sub_node_path: VfsLocation = vfs_location.new_child(&vfs_type, "/");
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
-                    self.scan_for_sub_nodes(file_system, vfs_location, &mut sub_scan_node)?;
+                Some(sub_node_vfs_type) => {
+                    let root_path: &str = match &sub_node_vfs_type {
+                        VfsType::Ntfs { .. } => "\\",
+                        _ => "/",
+                    };
+                    let sub_node_vfs_path: VfsPath = VfsPath::new(&sub_node_vfs_type, root_path);
+                    let sub_node_vfs_location: VfsLocation =
+                        vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
+                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
+                    match self.scan_for_sub_nodes(file_system, vfs_location, &mut sub_scan_node) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to scan OS ");
+                            return Err(error);
+                        }
+                    }
                     scan_node.sub_nodes.push(sub_scan_node);
                 }
                 None => {}
@@ -490,11 +493,7 @@ impl VfsScanner {
             VfsType::Qcow { .. } => {
                 let mut qcow_image: QcowImage = QcowImage::new();
 
-                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
-                let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
-
-                match qcow_image.open(&file_resolver, vfs_path.get_file_name()) {
+                match QcowFileSystem::open_image(&mut qcow_image, file_system, vfs_path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -503,101 +502,76 @@ impl VfsScanner {
                 }
                 let number_of_layers: usize = qcow_image.get_number_of_layers();
 
-                self.scan_for_storage_media_image_sub_nodes(
+                match self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
                     QcowFileSystem::PATH_PREFIX,
                     number_of_layers,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan QCOW image ");
+                        return Err(error);
+                    }
+                }
             }
             VfsType::SparseImage { .. } => {
-                let result: Option<DataStreamReference> =
-                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing data stream: {}",
-                            vfs_path.to_string()
-                        )));
-                    }
-                };
                 let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
-                match sparseimage_file.read_data_stream(&data_stream) {
+                match SparseImageFileSystem::open_file(&mut sparseimage_file, file_system, vfs_path)
+                {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read sparseimage file from data stream"
+                            "Unable to open sparseimage file"
                         );
                         return Err(error);
                     }
                 }
-                self.scan_for_storage_media_image_sub_nodes(
+                match self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
                     SparseImageFileSystem::PATH_PREFIX,
                     1,
-                )?;
-            }
-            VfsType::Udif { .. } => {
-                let result: Option<DataStreamReference> =
-                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing data stream: {}",
-                            vfs_path.to_string()
-                        )));
-                    }
-                };
-                let mut udif_file: UdifFile = UdifFile::new();
-
-                match udif_file.read_data_stream(&data_stream) {
+                ) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read UDIF file from data stream"
+                            "Unable to scan sparseimage file "
                         );
                         return Err(error);
                     }
                 }
-                self.scan_for_storage_media_image_sub_nodes(
+            }
+            VfsType::Udif { .. } => {
+                let mut udif_file: UdifFile = UdifFile::new();
+
+                match UdifFileSystem::open_file(&mut udif_file, file_system, vfs_path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
+                        return Err(error);
+                    }
+                }
+                match self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
                     UdifFileSystem::PATH_PREFIX,
                     1,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan UDIF file ");
+                        return Err(error);
+                    }
+                }
             }
             VfsType::Vhd { .. } => {
                 let mut vhd_image: VhdImage = VhdImage::new();
 
-                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
-                let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
-
-                match vhd_image.open(&file_resolver, vfs_path.get_file_name()) {
+                match VhdFileSystem::open_image(&mut vhd_image, file_system, vfs_path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
@@ -606,21 +580,23 @@ impl VfsScanner {
                 }
                 let number_of_layers: usize = vhd_image.get_number_of_layers();
 
-                self.scan_for_storage_media_image_sub_nodes(
+                match self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
                     VhdFileSystem::PATH_PREFIX,
                     number_of_layers,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan VHD image ");
+                        return Err(error);
+                    }
+                }
             }
             VfsType::Vhdx { .. } => {
                 let mut vhdx_image: VhdxImage = VhdxImage::new();
 
-                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
-                let file_resolver: FileResolverReference =
-                    open_vfs_file_resolver(file_system, parent_vfs_path)?;
-
-                match vhdx_image.open(&file_resolver, vfs_path.get_file_name()) {
+                match VhdxFileSystem::open_image(&mut vhdx_image, file_system, vfs_path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
@@ -629,12 +605,18 @@ impl VfsScanner {
                 }
                 let number_of_layers: usize = vhdx_image.get_number_of_layers();
 
-                self.scan_for_storage_media_image_sub_nodes(
+                match self.scan_for_storage_media_image_sub_nodes(
                     vfs_location,
                     scan_node,
                     VhdxFileSystem::PATH_PREFIX,
                     number_of_layers,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan VHDX image ");
+                        return Err(error);
+                    }
+                }
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(
@@ -745,23 +727,44 @@ impl VfsScanner {
         number_of_volumes: usize,
     ) -> Result<(), ErrorTrace> {
         let vfs_type: &VfsType = scan_node.get_type();
-        let node_file_system_path: VfsLocation = vfs_location.new_child(vfs_type, "/");
+
+        let root_path: &str = match vfs_type {
+            VfsType::Ntfs { .. } => "\\",
+            _ => "/",
+        };
+        let vfs_path: VfsPath = VfsPath::new(vfs_type, root_path);
+        let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, vfs_path);
         let node_file_system: VfsFileSystemReference =
-            self.resolver.open_file_system(&node_file_system_path)?;
+            match self.resolver.open_file_system(&file_system_vfs_location) {
+                Ok(file_system) => file_system,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                    return Err(error);
+                }
+            };
 
         for volume_index in 0..number_of_volumes {
-            // TODO: use volume identifier in location?
-            let location: String = format!("{}{}", path_prefix, volume_index + 1);
-
             let vfs_type: &VfsType = scan_node.get_type();
-            let node_path: VfsLocation = vfs_location.new_child(vfs_type, location.as_str());
-            let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_path);
+
+            // TODO: use volume identifier in location?
+            let volume_path: String = format!("{}{}", path_prefix, volume_index + 1);
+
+            let node_vfs_path: VfsPath = VfsPath::new(vfs_type, volume_path.as_str());
+            let node_vfs_location: VfsLocation =
+                vfs_location.new_with_layer(vfs_type, node_vfs_path);
+            let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
             match self.scan_for_format(&node_file_system, &volume_scan_node.location)? {
-                Some(vfs_type) => {
-                    let sub_node_path: VfsLocation =
-                        volume_scan_node.location.new_child(&vfs_type, "/");
-                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_path);
+                Some(sub_node_vfs_type) => {
+                    let root_path: &str = match sub_node_vfs_type {
+                        VfsType::Ntfs { .. } => "\\",
+                        _ => "/",
+                    };
+                    let sub_node_vfs_path: VfsPath = VfsPath::new(&sub_node_vfs_type, root_path);
+                    let sub_node_vfs_location: VfsLocation = volume_scan_node
+                        .location
+                        .new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
+                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
                     self.scan_for_sub_nodes(
                         &node_file_system,
                         &volume_scan_node.location,
@@ -884,11 +887,14 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let vfs_file_system_path: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_file_system_path: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_location: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/qcow1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
@@ -913,11 +919,14 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
-        let vfs_file_system_path: VfsLocation = os_vfs_location.new_child(&VfsType::Gpt, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/");
+        let vfs_file_system_path: VfsLocation =
+            os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_location: VfsLocation = os_vfs_location.new_child(&VfsType::Gpt, "/gpt1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/gpt1");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();

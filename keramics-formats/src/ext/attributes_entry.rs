@@ -99,10 +99,8 @@ impl ExtAttributesEntry {
                 )));
             }
         };
-        let mut name: ByteString = ByteString::new();
-        name.elements = name_prefix.as_bytes().to_vec();
-
-        ByteString::read_elements(&mut name.elements, &data[0..data_end_offset]);
+        let mut name: ByteString = ByteString::from(name_prefix);
+        name.read_data(&data[0..data_end_offset]);
 
         Ok(name)
     }

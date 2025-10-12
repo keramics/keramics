@@ -577,13 +577,15 @@ impl DataStream for UdifFile {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file() -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
@@ -593,8 +595,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         assert_eq!(file.bytes_per_sector, 512);
@@ -607,8 +609,8 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_metadata(&data_stream)?;
 
         assert_eq!(file.bytes_per_sector, 512);

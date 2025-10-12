@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::udif::UdifFile;
@@ -48,10 +50,18 @@ fn read_media_from_file(file: &mut UdifFile) -> Result<(u64, String), ErrorTrace
     Ok((media_offset, hash_string))
 }
 
-fn open_file(path: &str) -> Result<UdifFile, ErrorTrace> {
+fn open_file(path: &PathBuf) -> Result<UdifFile, ErrorTrace> {
+    let data_stream: DataStreamReference = match open_os_data_stream(path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open data stream",
+                error
+            ));
+        }
+    };
     let mut file: UdifFile = UdifFile::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(path)?;
     match file.read_data_stream(&data_stream) {
         Ok(_) => {}
         Err(mut error) => {
@@ -67,7 +77,8 @@ fn open_file(path: &str) -> Result<UdifFile, ErrorTrace> {
 
 #[test]
 fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
-    let mut file: UdifFile = open_file("../test_data/udif/hfsplus_adc.dmg")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_adc.dmg");
+    let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
@@ -78,7 +89,8 @@ fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
-    let mut file: UdifFile = open_file("../test_data/udif/hfsplus_bzip2.dmg")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_bzip2.dmg");
+    let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
@@ -89,7 +101,8 @@ fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
-    let mut file: UdifFile = open_file("../test_data/udif/hfsplus_lzfse.dmg")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_lzfse.dmg");
+    let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
@@ -100,7 +113,8 @@ fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
-    let mut file: UdifFile = open_file("../test_data/udif/hfsplus_zlib.dmg")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+    let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

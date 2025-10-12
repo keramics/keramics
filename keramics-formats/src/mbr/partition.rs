@@ -123,13 +123,16 @@ impl DataStream for MbrPartition {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
         let mut partition = MbrPartition::new(0, 512, 66048, 0x83, 0x00);
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 
         Ok(())

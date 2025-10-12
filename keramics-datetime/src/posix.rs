@@ -69,6 +69,7 @@ impl PosixTime32 {
 }
 
 impl fmt::Display for PosixTime32 {
+    /// Formats the timestamp for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,
@@ -111,6 +112,7 @@ impl PosixTime64Ns {
 }
 
 impl fmt::Display for PosixTime64Ns {
+    /// Formats the timestamp for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,

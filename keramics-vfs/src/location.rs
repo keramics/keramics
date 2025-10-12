@@ -31,73 +31,29 @@ pub enum VfsLocation {
 }
 
 impl VfsLocation {
-    /// Creates a new child location.
-    pub fn new_child(&self, vfs_type: &VfsType, path: &str) -> Self {
-        let parent: Arc<VfsLocation> = Arc::new(self.clone());
-        match &vfs_type {
-            VfsType::Apm
-            | VfsType::Ext
-            | VfsType::Ewf
-            | VfsType::Gpt
-            | VfsType::Ntfs
-            | VfsType::Mbr
-            | VfsType::Qcow
-            | VfsType::SparseImage
-            | VfsType::Udif
-            | VfsType::Vhd
-            | VfsType::Vhdx => VfsLocation::Layer {
-                path: VfsPath::new(&vfs_type, path),
-                parent: parent,
-                vfs_type: vfs_type.clone(),
-            },
-            VfsType::Fake => {
-                panic!("Unsupported type: VfsType::Fake")
-            }
-            VfsType::Os => panic!("Unsupported type: VfsType::Os"),
-        }
-    }
-
-    /// Creates a new location of the current location and additional path components.
-    pub fn new_with_join<'a>(&'a self, path_components: &mut Vec<&'a str>) -> Self {
-        match self {
-            VfsLocation::Base { path, vfs_type } => VfsLocation::Base {
-                path: path.new_with_join(path_components),
-                vfs_type: vfs_type.clone(),
-            },
-            VfsLocation::Layer {
-                path,
-                parent,
-                vfs_type,
-            } => VfsLocation::Layer {
-                path: path.new_with_join(path_components),
-                parent: parent.clone(),
-                vfs_type: vfs_type.clone(),
-            },
+    /// Creates a new location with an additional layer.
+    pub fn new_with_layer(&self, vfs_type: &VfsType, path: VfsPath) -> Self {
+        VfsLocation::Layer {
+            path: path,
+            parent: Arc::new(self.clone()),
+            vfs_type: vfs_type.clone(),
         }
     }
 
     /// Creates a new location from the path with the same parent.
-    pub fn new_with_parent(&self, path: &str) -> Self {
+    pub fn new_with_parent(&self, path: VfsPath) -> Self {
         match self {
             VfsLocation::Base { vfs_type, .. } => VfsLocation::Base {
-                path: VfsPath::new(&vfs_type, path),
+                path: path,
                 vfs_type: vfs_type.clone(),
             },
             VfsLocation::Layer {
                 parent, vfs_type, ..
             } => VfsLocation::Layer {
-                path: VfsPath::new(&vfs_type, path),
+                path: path,
                 parent: parent.clone(),
                 vfs_type: vfs_type.clone(),
             },
-        }
-    }
-
-    /// Retrieves the type.
-    pub fn get_type(&self) -> &VfsType {
-        match self {
-            VfsLocation::Base { vfs_type, .. } => &vfs_type,
-            VfsLocation::Layer { vfs_type, .. } => &vfs_type,
         }
     }
 
@@ -114,6 +70,14 @@ impl VfsLocation {
         match self {
             VfsLocation::Base { .. } => None,
             VfsLocation::Layer { parent, .. } => Some(parent.as_ref()),
+        }
+    }
+
+    /// Retrieves the type.
+    pub fn get_type(&self) -> &VfsType {
+        match self {
+            VfsLocation::Base { vfs_type, .. } => &vfs_type,
+            VfsLocation::Layer { vfs_type, .. } => &vfs_type,
         }
     }
 
@@ -152,9 +116,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new_child() {
+    fn test_new_with_layer() {
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let test_location: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
 
         let vfs_type: &VfsType = test_location.get_type();
         assert!(vfs_type == &VfsType::Qcow);
@@ -163,12 +128,11 @@ mod tests {
         assert_eq!(vfs_path.to_string(), "/");
     }
 
-    // TODO: test with new_child panicking
-
     #[test]
     fn test_new_with_parent() {
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
-        let test_location: VfsLocation = vfs_location.new_with_parent("../test_data/bogus.txt");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "../test_data/bogus.txt");
+        let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
 
         let vfs_path: &VfsPath = test_location.get_path();
         assert_eq!(vfs_path.to_string(), "../test_data/bogus.txt");
@@ -177,9 +141,11 @@ mod tests {
         assert!(vfs_type == &VfsType::Os);
 
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let vfs_location: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
 
-        let test_location: VfsLocation = vfs_location.new_with_parent("/qcow1");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
+        let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
 
         let vfs_path: &VfsPath = test_location.get_path();
         assert_eq!(vfs_path.to_string(), "/qcow1");
@@ -187,6 +153,8 @@ mod tests {
         let vfs_type: &VfsType = test_location.get_type();
         assert!(vfs_type == &VfsType::Qcow);
     }
+
+    // TODO: add tests for get_path
 
     #[test]
     fn test_get_parent() {
@@ -196,9 +164,13 @@ mod tests {
         assert!(parent.is_none());
 
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let test_location: VfsLocation = os_vfs_location.new_child(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
 
         let parent: Option<&VfsLocation> = test_location.get_parent();
         assert!(parent.is_some());
     }
+
+    // TODO: add tests for get_type
+    // TODO: add tests for to_string
 }

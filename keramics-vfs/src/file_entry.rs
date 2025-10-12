@@ -532,7 +532,7 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 let ntfs_name: Option<Ucs2String> = match name {
-                    Some(string) => Some(Ucs2String::from_string(string)),
+                    Some(string) => Some(Ucs2String::from(string)),
                     None => None,
                 };
                 match ntfs_file_entry.get_data_stream_by_name(&ntfs_name) {

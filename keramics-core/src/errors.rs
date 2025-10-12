@@ -43,7 +43,7 @@ impl ErrorTrace {
 impl Error for ErrorTrace {}
 
 impl fmt::Display for ErrorTrace {
-    /// Formats the error as a string.
+    /// Formats the error for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,

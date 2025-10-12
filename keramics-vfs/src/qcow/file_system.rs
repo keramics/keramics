@@ -13,10 +13,11 @@
 
 use std::sync::Arc;
 
-use keramics_core::{ErrorTrace, FileResolverReference};
+use keramics_core::ErrorTrace;
 use keramics_formats::qcow::QcowImage;
+use keramics_formats::{FileResolverReference, PathComponent};
 
-use crate::file_resolver::open_vfs_file_resolver;
+use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
@@ -136,28 +137,23 @@ impl QcowFileSystem {
         parent_file_system: Option<&VfsFileSystemReference>,
         vfs_location: &VfsLocation,
     ) -> Result<(), ErrorTrace> {
-        let vfs_path: &VfsPath = vfs_location.get_path();
-
-        let file_resolver: FileResolverReference = match parent_file_system {
-            Some(file_system) => {
-                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
-                open_vfs_file_resolver(file_system, parent_vfs_path)?
-            }
+        let file_system: &VfsFileSystemReference = match parent_file_system {
+            Some(file_system) => file_system,
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Missing parent file system"
                 ));
             }
         };
+        let vfs_path: &VfsPath = vfs_location.get_path();
+
         match Arc::get_mut(&mut self.image) {
             Some(image) => {
-                match image.open(&file_resolver, vfs_path.get_file_name()) {
+                match Self::open_image(image, file_system, vfs_path) {
                     Ok(_) => {}
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to open QCOW image",
-                            error
-                        ));
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
+                        return Err(error);
                     }
                 }
                 self.number_of_layers = image.get_number_of_layers();
@@ -166,6 +162,42 @@ impl QcowFileSystem {
                 return Err(keramics_core::error_trace_new!(
                     "Unable to obtain mutable reference to QCOW image"
                 ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens a QCOW image.
+    pub(crate) fn open_image(
+        image: &mut QcowImage,
+        file_system: &VfsFileSystemReference,
+        vfs_path: &VfsPath,
+    ) -> Result<(), ErrorTrace> {
+        let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
+        let file_resolver: FileResolverReference =
+            match new_vfs_file_resolver(file_system, parent_vfs_path) {
+                Ok(file_resolver) => file_resolver,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to create VFS file resolver"
+                    );
+                    return Err(error);
+                }
+            };
+        let file_name: PathComponent = match vfs_path.get_file_name() {
+            Some(file_name) => file_name,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve file name"
+                ));
+            }
+        };
+        match image.open(&file_resolver, &file_name) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
+                return Err(error);
             }
         }
         Ok(())
@@ -233,7 +265,7 @@ mod tests {
         let qcow_file_entry: QcowFileEntry = result.unwrap();
 
         let name: Option<String> = qcow_file_entry.get_name();
-        assert_eq!(name, Some("qcow1".to_string()));
+        assert_eq!(name, Some(String::from("qcow1")));
 
         let file_type: VfsFileType = qcow_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -249,15 +281,15 @@ mod tests {
     fn test_get_layer_index() -> Result<(), ErrorTrace> {
         let qcow_file_system: QcowFileSystem = get_file_system()?;
 
-        let file_name: String = "qcow1".to_string();
+        let file_name: String = String::from("qcow1");
         let layer_index: Option<usize> = qcow_file_system.get_layer_index(&file_name);
         assert_eq!(layer_index, Some(0));
 
-        let file_name: String = "qcow99".to_string();
+        let file_name: String = String::from("qcow99");
         let layer_index: Option<usize> = qcow_file_system.get_layer_index(&file_name);
         assert!(layer_index.is_none());
 
-        let file_name: String = "bogus1".to_string();
+        let file_name: String = String::from("bogus1");
         let layer_index: Option<usize> = qcow_file_system.get_layer_index(&file_name);
         assert!(layer_index.is_none());
 

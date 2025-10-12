@@ -13,10 +13,11 @@
 
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{ErrorTrace, FileResolverReference};
+use keramics_core::ErrorTrace;
 use keramics_formats::ewf::EwfImage;
+use keramics_formats::{FileResolverReference, PathComponent};
 
-use crate::file_resolver::open_vfs_file_resolver;
+use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
@@ -114,22 +115,19 @@ impl EwfFileSystem {
         parent_file_system: Option<&VfsFileSystemReference>,
         vfs_location: &VfsLocation,
     ) -> Result<(), ErrorTrace> {
-        let vfs_path: &VfsPath = vfs_location.get_path();
-
-        let file_resolver: FileResolverReference = match parent_file_system {
-            Some(file_system) => {
-                let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
-                open_vfs_file_resolver(file_system, parent_vfs_path)?
-            }
+        let file_system: &VfsFileSystemReference = match parent_file_system {
+            Some(file_system) => file_system,
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Missing parent file system"
                 ));
             }
         };
+        let vfs_path: &VfsPath = vfs_location.get_path();
+
         match self.image.write() {
             Ok(mut image) => {
-                match image.open(&file_resolver, vfs_path.get_file_name()) {
+                match Self::open_image(&mut image, file_system, vfs_path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
@@ -143,6 +141,42 @@ impl EwfFileSystem {
                     "Unable to obtain write lock on EWF image",
                     error
                 ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens an EWF image.
+    pub(crate) fn open_image(
+        image: &mut EwfImage,
+        file_system: &VfsFileSystemReference,
+        vfs_path: &VfsPath,
+    ) -> Result<(), ErrorTrace> {
+        let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
+        let file_resolver: FileResolverReference =
+            match new_vfs_file_resolver(file_system, parent_vfs_path) {
+                Ok(file_resolver) => file_resolver,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to create VFS file resolver"
+                    );
+                    return Err(error);
+                }
+            };
+        let file_name: PathComponent = match vfs_path.get_file_name() {
+            Some(file_name) => file_name,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve file name"
+                ));
+            }
+        };
+        match image.open(&file_resolver, &file_name) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
+                return Err(error);
             }
         }
         Ok(())
@@ -210,7 +244,7 @@ mod tests {
         let ewf_file_entry: EwfFileEntry = result.unwrap();
 
         let name: Option<String> = ewf_file_entry.get_name();
-        assert_eq!(name, Some("ewf1".to_string()));
+        assert_eq!(name, Some(String::from("ewf1")));
 
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -247,4 +281,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for open_image
 }

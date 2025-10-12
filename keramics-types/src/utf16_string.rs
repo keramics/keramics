@@ -76,7 +76,7 @@ mod tests {
         ];
 
         let ucs2_string: Utf16String = Utf16String::from_be_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), "UTF-16 string".to_string(),);
+        assert_eq!(ucs2_string.to_string(), String::from("UTF-16 string"));
     }
 
     #[test]
@@ -87,6 +87,6 @@ mod tests {
         ];
 
         let ucs2_string: Utf16String = Utf16String::from_le_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), "UTF-16 string".to_string(),);
+        assert_eq!(ucs2_string.to_string(), String::from("UTF-16 string"));
     }
 }

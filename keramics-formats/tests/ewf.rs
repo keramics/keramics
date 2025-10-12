@@ -11,9 +11,12 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, ErrorTrace, FileResolverReference, open_os_file_resolver};
+use keramics_core::{DataStream, ErrorTrace};
 use keramics_formats::ewf::EwfImage;
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_media_from_image(image: &mut EwfImage) -> Result<(u64, String), ErrorTrace> {
@@ -48,12 +51,20 @@ fn read_media_from_image(image: &mut EwfImage) -> Result<(u64, String), ErrorTra
     Ok((media_offset, hash_string))
 }
 
-fn open_image(base_location: &str, filename: &str) -> Result<EwfImage, ErrorTrace> {
-    let file_resolver: FileResolverReference = open_os_file_resolver(base_location)?;
-
+fn open_image(base_path: &PathBuf, file_name: &str) -> Result<EwfImage, ErrorTrace> {
+    let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open file resolver",
+                error
+            ));
+        }
+    };
     let mut image: EwfImage = EwfImage::new();
 
-    match image.open(&file_resolver, filename) {
+    let path_component: PathComponent = PathComponent::from(file_name);
+    match image.open(&file_resolver, &path_component) {
         Ok(_) => {}
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
@@ -65,7 +76,8 @@ fn open_image(base_location: &str, filename: &str) -> Result<EwfImage, ErrorTrac
 
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
-    let mut image: EwfImage = open_image("../test_data/ewf", "ext2.E01")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ewf");
+    let mut image: EwfImage = open_image(&path_buf, "ext2.E01")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
     assert_eq!(media_offset, image.media_size);

@@ -124,6 +124,8 @@ impl DataStream for ApmPartition {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     #[test]
@@ -132,7 +134,8 @@ mod tests {
         let type_identifier: ByteString = ByteString::new();
         let mut partition = ApmPartition::new(32768, 4153344, &type_identifier, &name, 0x40000033);
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 
         Ok(())

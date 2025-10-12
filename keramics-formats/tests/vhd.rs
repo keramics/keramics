@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::formatters::format_as_string;
@@ -50,7 +51,7 @@ fn read_media_from_file(file: &mut VhdFile) -> Result<(u64, String), ErrorTrace>
     Ok((media_offset, hash_string))
 }
 
-fn open_file(path: &str) -> Result<VhdFile, ErrorTrace> {
+fn open_file(path: &PathBuf) -> Result<VhdFile, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
         Ok(data_stream) => data_stream,
         Err(error) => {
@@ -77,7 +78,8 @@ fn open_file(path: &str) -> Result<VhdFile, ErrorTrace> {
 
 #[test]
 fn read_media_fixed() -> Result<(), ErrorTrace> {
-    let mut file: VhdFile = open_file("../test_data/vhd/ntfs-parent.vhd")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-parent.vhd");
+    let mut file: VhdFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
@@ -88,7 +90,8 @@ fn read_media_fixed() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_dynamic() -> Result<(), ErrorTrace> {
-    let mut file: VhdFile = open_file("../test_data/vhd/ntfs-dynamic.vhd")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-dynamic.vhd");
+    let mut file: VhdFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
@@ -99,7 +102,8 @@ fn read_media_dynamic() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
-    let mut file: VhdFile = open_file("../test_data/vhd/ext2.vhd")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
+    let mut file: VhdFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
@@ -112,18 +116,14 @@ fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_media_differential() -> Result<(), ErrorTrace> {
-    let mut file: VhdFile = open_file("../test_data/vhd/ntfs-differential.vhd")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
+    let mut file: VhdFile = open_file(&path_buf)?;
 
-    let parent_file: VhdFile = open_file("../test_data/vhd/ntfs-parent.vhd")?;
-    match file.set_parent(&Arc::new(RwLock::new(parent_file))) {
-        Ok(_) => {}
-        Err(error) => {
-            return Err(keramics_core::error_trace_new_with_error!(
-                "Unable to set parent file",
-                error
-            ));
-        }
-    }
+    let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-parent.vhd");
+    let parent_file: VhdFile = open_file(&path_buf)?;
+
+    file.set_parent(&Arc::new(RwLock::new(parent_file)))?;
+
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);
     assert_eq!(md5_hash.as_str(), "4241cbc76e0e17517fb564238edbe415");

@@ -24,7 +24,7 @@ use super::bodyfile;
 /// Retrieves the string representation of a date and time value.
 fn get_date_time_string(date_time: &DateTime) -> Result<String, ErrorTrace> {
     match date_time {
-        DateTime::NotSet => Ok("Not set (0)".to_string()),
+        DateTime::NotSet => Ok(String::from("Not set (0)")),
         DateTime::PosixTime32(posix_time32) => Ok(posix_time32.to_iso8601_string()),
         DateTime::PosixTime64Ns(posix_time64ns) => Ok(posix_time64ns.to_iso8601_string()),
         _ => return Err(keramics_core::error_trace_new!("Unsupported date time")),
@@ -276,7 +276,7 @@ pub fn print_ext_file_system(data_stream: &DataStreamReference) -> ExitCode {
         ext_file_system.last_mount_path.to_string()
     );
     let date_time_string: String = match ext_file_system.last_mount_time {
-        DateTime::NotSet => "Not set (0)".to_string(),
+        DateTime::NotSet => String::from("Not set (0)"),
         DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
         _ => {
             println!("Unsupported last mount time");
@@ -285,7 +285,7 @@ pub fn print_ext_file_system(data_stream: &DataStreamReference) -> ExitCode {
     };
     println!("    Last mount time\t\t\t: {}", date_time_string);
     let date_time_string: String = match ext_file_system.last_written_time {
-        DateTime::NotSet => "Not set (0)".to_string(),
+        DateTime::NotSet => String::from("Not set (0)"),
         DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
         _ => {
             println!("Unsupported last written time");

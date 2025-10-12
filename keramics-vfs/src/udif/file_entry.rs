@@ -53,7 +53,7 @@ impl UdifFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<String> {
         match self {
-            UdifFileEntry::Layer { .. } => Some("udif1".to_string()),
+            UdifFileEntry::Layer { .. } => Some(String::from("udif1")),
             UdifFileEntry::Root { .. } => None,
         }
     }
@@ -92,13 +92,15 @@ impl UdifFileEntry {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file() -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
@@ -136,7 +138,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("udif1".to_string()));
+        assert_eq!(name, Some(String::from("udif1")));
 
         Ok(())
     }

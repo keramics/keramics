@@ -275,6 +275,8 @@ impl DataStream for NtfsBlockStream {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_test_mft_attribute_data() -> Vec<u8> {
@@ -290,7 +292,8 @@ mod tests {
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -307,7 +310,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -324,7 +328,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -341,7 +346,8 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -361,7 +367,8 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_file_size() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -378,7 +385,8 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -439,7 +447,8 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();

@@ -11,9 +11,12 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
-use keramics_core::{DataStream, ErrorTrace, FileResolverReference, open_os_file_resolver};
+use keramics_core::{DataStream, ErrorTrace};
 use keramics_formats::sparsebundle::SparseBundleImage;
+use keramics_formats::{FileResolverReference, open_os_file_resolver};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_media_from_image(image: &mut SparseBundleImage) -> Result<(u64, String), ErrorTrace> {
@@ -48,9 +51,16 @@ fn read_media_from_image(image: &mut SparseBundleImage) -> Result<(u64, String),
     Ok((media_offset, hash_string))
 }
 
-fn open_image(base_location: &str) -> Result<SparseBundleImage, ErrorTrace> {
-    let file_resolver: FileResolverReference = open_os_file_resolver(base_location)?;
-
+fn open_image(base_path: &PathBuf) -> Result<SparseBundleImage, ErrorTrace> {
+    let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open file resolver",
+                error
+            ));
+        }
+    };
     let mut image: SparseBundleImage = SparseBundleImage::new();
 
     match image.open(&file_resolver) {
@@ -65,8 +75,8 @@ fn open_image(base_location: &str) -> Result<SparseBundleImage, ErrorTrace> {
 
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
-    let mut image: SparseBundleImage =
-        open_image("../test_data/sparsebundle/hfsplus.sparsebundle")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+    let mut image: SparseBundleImage = open_image(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
     assert_eq!(media_offset, image.media_size);

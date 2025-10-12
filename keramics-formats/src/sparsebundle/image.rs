@@ -14,10 +14,11 @@
 use std::io::SeekFrom;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{
-    DataStream, DataStreamReference, ErrorTrace, FakeFileResolver, FileResolverReference,
-};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
+use crate::fake_file_resolver::FakeFileResolver;
+use crate::file_resolver::FileResolverReference;
+use crate::path_component::PathComponent;
 use crate::plist::XmlPlist;
 
 /// Mac OS sparse bundle (.sparsebundle) storage media image.
@@ -65,8 +66,9 @@ impl SparseBundleImage {
         file_resolver: &FileResolverReference,
         file_name: &str,
     ) -> Result<(), ErrorTrace> {
+        let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
         let result: Option<DataStreamReference> =
-            match file_resolver.get_data_stream(&mut vec![file_name]) {
+            match file_resolver.get_data_stream(&path_components) {
                 Ok(result) => result,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -208,19 +210,21 @@ impl SparseBundleImage {
             let band_file_name: String = format!("{:x}", block_number);
 
             // TODO: cache band files like EWF
-            let result: Option<DataStreamReference> = match self
-                .file_resolver
-                .get_data_stream(&mut vec!["bands", band_file_name.as_str()])
-            {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open bands file: {}", band_file_name)
-                    );
-                    return Err(error);
-                }
-            };
+            let path_components: [PathComponent; 2] = [
+                PathComponent::from("bands"),
+                PathComponent::from(&band_file_name),
+            ];
+            let result: Option<DataStreamReference> =
+                match self.file_resolver.get_data_stream(&path_components) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to open bands file: {}", band_file_name)
+                        );
+                        return Err(error);
+                    }
+                };
             let data_stream: DataStreamReference = match result {
                 Some(data_stream) => data_stream,
                 None => {
@@ -308,13 +312,15 @@ impl DataStream for SparseBundleImage {
 mod tests {
     use super::*;
 
-    use keramics_core::open_os_file_resolver;
+    use std::path::PathBuf;
+
+    use crate::os_file_resolver::open_os_file_resolver;
 
     fn get_image() -> Result<SparseBundleImage, ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let file_resolver: FileResolverReference =
-            open_os_file_resolver("../test_data/sparsebundle/hfsplus.sparsebundle")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.open(&file_resolver)?;
 
         Ok(image)
@@ -324,8 +330,8 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let file_resolver: FileResolverReference =
-            open_os_file_resolver("../test_data/sparsebundle/hfsplus.sparsebundle")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.open(&file_resolver)?;
 
         assert_eq!(image.block_size, 8388608);
@@ -338,8 +344,8 @@ mod tests {
     fn test_read_info_plist() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let file_resolver: FileResolverReference =
-            open_os_file_resolver("../test_data/sparsebundle/hfsplus.sparsebundle")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.read_info_plist(&file_resolver, "Info.plist")?;
 
         assert_eq!(image.block_size, 8388608);

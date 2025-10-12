@@ -99,7 +99,7 @@ mod tests {
     #[test]
     fn test_get() {
         let mut lru_cache: LruCache<usize, String> = LruCache::new(2);
-        lru_cache.insert(1, "test1".to_string());
+        lru_cache.insert(1, String::from("test1"));
 
         let result: Option<&String> = lru_cache.get(&1);
         assert!(result.is_some());
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_get_mut() {
         let mut lru_cache: LruCache<usize, String> = LruCache::new(2);
-        lru_cache.insert(1, "test1".to_string());
+        lru_cache.insert(1, String::from("test1"));
 
         let result: Option<&mut String> = lru_cache.get_mut(&1);
         assert!(result.is_some());

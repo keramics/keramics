@@ -33,7 +33,7 @@ impl ParseError {
 impl Error for ParseError {}
 
 impl fmt::Display for ParseError {
-    /// Formats the error as a string.
+    /// Formats the error for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.message)
     }

@@ -473,12 +473,15 @@ impl DataStream for VhdFile {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file() -> Result<VhdFile, ErrorTrace> {
         let mut file: VhdFile = VhdFile::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/vhd/ext2.vhd")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
@@ -488,8 +491,8 @@ mod tests {
     fn test_get_parent_file_name() -> Result<(), ErrorTrace> {
         let mut file: VhdFile = VhdFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         let parent_file_name: Option<Ucs2String> = file.get_parent_file_name();
@@ -502,8 +505,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file = VhdFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         assert_eq!(file.media_size, 4194304);
@@ -526,8 +529,8 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file = VhdFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ntfs-differential.vhd");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_metadata(&data_stream)?;
 
         assert_eq!(file.media_size, 4194304);

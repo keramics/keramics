@@ -165,7 +165,7 @@ impl ExtFileEntry {
             }
             // TODO: move read from data_reference into block_stream?
             let byte_string: ByteString = if self.inode.data_size < 60 {
-                ByteString::from_bytes(&self.inode.data_reference)
+                ByteString::from(self.inode.data_reference.as_slice())
             } else {
                 let number_of_blocks: u64 = max(
                     self.inode
@@ -192,7 +192,7 @@ impl ExtFileEntry {
                         return Err(error);
                     }
                 }
-                ByteString::from_bytes(&data)
+                ByteString::from(&data)
             };
             self.symbolic_link_target = Some(byte_string);
         }
@@ -329,8 +329,9 @@ impl ExtFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::open_os_data_stream;
+    use std::path::PathBuf;
 
+    use keramics_core::open_os_data_stream;
     use keramics_datetime::PosixTime32;
 
     use crate::ext::file_system::ExtFileSystem;
@@ -339,7 +340,8 @@ mod tests {
     fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
         Ok(file_system)

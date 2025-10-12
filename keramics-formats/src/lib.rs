@@ -14,7 +14,11 @@
 mod block_tree;
 mod enums;
 mod errors;
+mod fake_file_resolver;
+mod file_resolver;
 mod lru_cache;
+mod os_file_resolver;
+mod path_component;
 mod scanner;
 
 // Data formats used in other formats.
@@ -39,4 +43,7 @@ pub mod ext;
 pub mod ntfs;
 
 pub use enums::FormatIdentifier;
+pub use file_resolver::{FileResolver, FileResolverReference};
+pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
+pub use path_component::PathComponent;
 pub use scanner::FormatScanner;

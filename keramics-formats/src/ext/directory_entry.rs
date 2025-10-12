@@ -76,7 +76,7 @@ impl ExtDirectoryEntry {
                 "Unsupported ext directory entry name size"
             ));
         }
-        let name: ByteString = ByteString::from_bytes(&data[0..data_end_offset]);
+        let name: ByteString = ByteString::from(&data[0..data_end_offset]);
 
         Ok(name)
     }

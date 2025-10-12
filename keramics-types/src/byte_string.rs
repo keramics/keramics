@@ -27,20 +27,6 @@ impl ByteString {
         }
     }
 
-    /// Creates a new byte string from a byte sequence.
-    pub fn from_bytes(data: &[u8]) -> Self {
-        let mut elements: Vec<u8> = Vec::new();
-        ByteString::read_elements(&mut elements, data);
-
-        Self { elements: elements }
-    }
-
-    /// Creates a new byte string from a string.
-    pub fn from_string(string: &str) -> Self {
-        // TODO: add support for encoding.
-        ByteString::from_bytes(string.as_bytes())
-    }
-
     /// Determines if the byte string is empty.
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
@@ -51,17 +37,13 @@ impl ByteString {
         self.elements.len()
     }
 
-    /// Reads byte string elements from a byte sequence.
-    pub fn read_elements(elements: &mut Vec<u8>, data: &[u8]) {
-        let data_size: usize = data.len();
-
-        for data_offset in 0..data_size {
-            let value_8bit = data[data_offset];
-            if value_8bit == 0 {
-                break;
-            }
-            elements.push(value_8bit);
-        }
+    /// Reads the byte string from a buffer.
+    pub fn read_data(&mut self, data: &[u8]) {
+        let slice: &[u8] = match data.iter().position(|value| *value == 0) {
+            Some(data_index) => &data[0..data_index],
+            None => &data,
+        };
+        self.elements.extend_from_slice(&slice);
     }
 
     /// Converts the byte string to a `String`.
@@ -71,16 +53,121 @@ impl ByteString {
     }
 }
 
+impl From<&[u8]> for ByteString {
+    /// Converts a [`&[u8]`] into a [`ByteString`]
+    fn from(slice: &[u8]) -> Self {
+        let elements: &[u8] = match slice.iter().position(|value| *value == 0) {
+            Some(slice_index) => &slice[0..slice_index],
+            None => &slice,
+        };
+        Self {
+            elements: Vec::from(elements),
+        }
+    }
+}
+
+impl From<&str> for ByteString {
+    /// Converts a [`&str`] into a [`ByteString`]
+    #[inline(always)]
+    fn from(string: &str) -> Self {
+        Self::from(string.as_bytes())
+    }
+}
+
+impl From<&String> for ByteString {
+    /// Converts a [`&String`] into a [`ByteString`]
+    #[inline(always)]
+    fn from(string: &String) -> Self {
+        Self::from(string.as_str().as_bytes())
+    }
+}
+
+impl From<&Vec<u8>> for ByteString {
+    /// Converts a [`&Vec<u8>`] into a [`ByteString`]
+    #[inline(always)]
+    fn from(vector: &Vec<u8>) -> Self {
+        Self::from(vector.as_slice())
+    }
+}
+
+impl PartialEq<&[u8]> for ByteString {
+    /// Detemines if a [`ByteString`] is equal to a [`&[u8]`]
+    #[inline(always)]
+    fn eq(&self, slice: &&[u8]) -> bool {
+        self.elements == *slice
+    }
+}
+
+impl PartialEq<&str> for ByteString {
+    /// Detemines if a [`ByteString`] is equal to a [`&str`]
+    #[inline(always)]
+    fn eq(&self, string: &&str) -> bool {
+        self.elements == *string.as_bytes()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    // TODO: add test for elements
+
     #[test]
-    fn test_from_bytes() {
+    fn test_is_empty() {
+        let byte_string: ByteString = ByteString::new();
+        assert!(byte_string.is_empty());
+
+        let byte_string: ByteString = ByteString {
+            elements: vec![
+                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+            ],
+        };
+        assert!(!byte_string.is_empty());
+    }
+
+    #[test]
+    fn test_len() {
+        let byte_string: ByteString = ByteString::new();
+        assert_eq!(byte_string.len(), 0);
+
+        let byte_string: ByteString = ByteString {
+            elements: vec![
+                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+            ],
+        };
+        assert_eq!(byte_string.len(), 12);
+    }
+
+    #[test]
+    fn test_read_data() {
+        let mut byte_string: ByteString = ByteString::new();
+        assert_eq!(byte_string.len(), 0);
+
         let test_data: [u8; 14] = [
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
         ];
-        let byte_string: ByteString = ByteString::from_bytes(&test_data);
+        byte_string.read_data(&test_data);
+        assert_eq!(byte_string.len(), 12);
+    }
+
+    // TODO: add test for to_string
+
+    #[test]
+    fn test_from_u8_slice() {
+        let test_data: [u8; 14] = [
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from(test_data.as_slice());
+
+        let expected_elements: Vec<u8> = vec![
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+        ];
+        assert_eq!(byte_string.elements, expected_elements);
+    }
+
+    #[test]
+    fn test_from_str() {
+        let byte_string: ByteString = ByteString::from("ASCII string");
 
         let expected_elements: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
@@ -90,7 +177,8 @@ mod tests {
 
     #[test]
     fn test_from_string() {
-        let byte_string: ByteString = ByteString::from_string("ASCII string");
+        let test_string: String = String::from("ASCII string");
+        let byte_string: ByteString = ByteString::from(&test_string);
 
         let expected_elements: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
@@ -99,29 +187,17 @@ mod tests {
     }
 
     #[test]
-    fn test_is_empty() {
-        let byte_string: ByteString = ByteString::new();
-        assert!(byte_string.is_empty());
-
-        let test_data: [u8; 14] = [
+    fn test_from_vector() {
+        let test_vector: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
         ];
-        let byte_string: ByteString = ByteString::from_bytes(&test_data);
-        assert!(!byte_string.is_empty());
-    }
+        let byte_string: ByteString = ByteString::from(&test_vector);
 
-    #[test]
-    fn test_len() {
-        let byte_string: ByteString = ByteString::new();
-        assert_eq!(byte_string.len(), 0);
-
-        let test_data: [u8; 14] = [
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        let expected_elements: Vec<u8> = vec![
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
         ];
-        let byte_string: ByteString = ByteString::from_bytes(&test_data);
-        assert_eq!(byte_string.len(), 12);
+        assert_eq!(byte_string.elements, expected_elements);
     }
 
-    // TODO: add test for read_elements
-    // TODO: add test for to_string
+    // TODO: add tests for PartialEq
 }

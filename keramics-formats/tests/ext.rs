@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
@@ -53,18 +55,35 @@ fn read_path(file_system: &ExtFileSystem, path: &str) -> Result<(u64, String), E
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(path: &str) -> Result<ExtFileSystem, ErrorTrace> {
+fn open_file_system(path: &PathBuf) -> Result<ExtFileSystem, ErrorTrace> {
+    let data_stream: DataStreamReference = match open_os_data_stream(path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open data stream",
+                error
+            ));
+        }
+    };
     let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(path)?;
-    file_system.read_data_stream(&data_stream)?;
-
+    match file_system.read_data_stream(&data_stream) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to read ext file system from data stream"
+            );
+            return Err(error);
+        }
+    };
     Ok(file_system)
 }
 
 #[test]
 fn read_ext2_file_empty() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
     assert_eq!(offset, 0);
@@ -75,7 +94,8 @@ fn read_ext2_file_empty() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext2_file_regular() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
     assert_eq!(offset, 11358);
@@ -86,7 +106,8 @@ fn read_ext2_file_regular() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext2_file_with_initial_sparse_extent() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/initial_sparse1")?;
     assert_eq!(offset, 1048611);
@@ -97,7 +118,8 @@ fn read_ext2_file_with_initial_sparse_extent() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext2_file_with_trailing_sparse_extent() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext2.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/trailing_sparse1")?;
     assert_eq!(offset, 1048576);
@@ -108,7 +130,8 @@ fn read_ext2_file_with_trailing_sparse_extent() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext4_file_empty() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
     assert_eq!(offset, 0);
@@ -119,7 +142,8 @@ fn read_ext4_file_empty() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext4_file_regular() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
     assert_eq!(offset, 11358);
@@ -130,7 +154,8 @@ fn read_ext4_file_regular() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext4_file_with_inline_data() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/testfile1")?;
     assert_eq!(offset, 9);
@@ -141,7 +166,8 @@ fn read_ext4_file_with_inline_data() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext4_file_with_initial_sparse_extent() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/initial_sparse1")?;
     assert_eq!(offset, 1048611);
@@ -152,7 +178,8 @@ fn read_ext4_file_with_initial_sparse_extent() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext4_file_with_trailing_sparse_extent() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/trailing_sparse1")?;
     assert_eq!(offset, 1048576);
@@ -163,7 +190,8 @@ fn read_ext4_file_with_trailing_sparse_extent() -> Result<(), ErrorTrace> {
 
 #[test]
 fn read_ext4_file_with_uninitialized_extent() -> Result<(), ErrorTrace> {
-    let file_system: ExtFileSystem = open_file_system("../test_data/ext/ext4.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext4.raw");
+    let file_system: ExtFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/uninitialized1")?;
     assert_eq!(offset, 4130);

@@ -53,7 +53,7 @@ impl SparseImageFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<String> {
         match self {
-            SparseImageFileEntry::Layer { .. } => Some("sparseimage1".to_string()),
+            SparseImageFileEntry::Layer { .. } => Some(String::from("sparseimage1")),
             SparseImageFileEntry::Root { .. } => None,
         }
     }
@@ -92,13 +92,15 @@ impl SparseImageFileEntry {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file() -> Result<SparseImageFile, ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
-        let data_stream: DataStreamReference =
-            open_os_data_stream("../test_data/sparseimage/hfsplus.sparseimage")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
@@ -136,7 +138,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("sparseimage1".to_string()));
+        assert_eq!(name, Some(String::from("sparseimage1")));
 
         Ok(())
     }
