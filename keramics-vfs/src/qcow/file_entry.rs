@@ -102,13 +102,17 @@ impl QcowFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::{FileResolverReference, open_os_file_resolver};
+    use std::path::PathBuf;
+
+    use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
     fn get_image() -> Result<QcowImage, ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/qcow")?;
-        image.open(&file_resolver, "ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ext2.qcow2");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(image)
     }
@@ -147,7 +151,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("qcow1".to_string()));
+        assert_eq!(name, Some(String::from("qcow1")));
 
         Ok(())
     }

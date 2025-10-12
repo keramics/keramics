@@ -101,12 +101,15 @@ impl MbrFileEntry {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_volume_system() -> Result<MbrVolumeSystem, ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 
         Ok(volume_system)
@@ -146,7 +149,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("mbr1".to_string()));
+        assert_eq!(name, Some(String::from("mbr1")));
 
         Ok(())
     }

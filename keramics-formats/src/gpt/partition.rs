@@ -124,6 +124,8 @@ impl DataStream for GptPartition {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     #[test]
@@ -132,7 +134,8 @@ mod tests {
         let type_identifier: Uuid = Uuid::new();
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/gpt/gpt.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 
         Ok(())

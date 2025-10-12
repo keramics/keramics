@@ -266,12 +266,15 @@ impl MbrVolumeSystem {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_volume_system() -> Result<MbrVolumeSystem, ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 
         Ok(volume_system)
@@ -302,7 +305,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
@@ -314,7 +318,8 @@ mod tests {
     fn test_read_master_boot_record() -> Result<(), ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/mbr/mbr.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_master_boot_record(&data_stream)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);

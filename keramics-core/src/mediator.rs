@@ -24,21 +24,25 @@ pub struct Mediator {
 }
 
 impl Mediator {
+    /// Creates a new mediator.
     pub fn new(debug_output: bool) -> Self {
         Self {
             debug_output: debug_output,
         }
     }
 
+    /// Retrieves the current mediator.
     pub fn current() -> MediatorReference {
         CURRENT_MEDIATOR.with(|mediator| mediator.read().unwrap().clone())
     }
 
+    /// Creates the current mediator.
     pub fn make_current(self) {
         CURRENT_MEDIATOR.with(|mediator| *mediator.write().unwrap() = Arc::new(self))
     }
 
     /// Prints a string for debugging.
+    // TODO: Change text to &str
     pub fn debug_print(&self, text: String) {
         if self.debug_output {
             print!("{}", text);
@@ -65,6 +69,6 @@ mod tests {
     fn test_debug_print() {
         let mediator: MediatorReference = Mediator::current();
 
-        mediator.debug_print("test".to_string());
+        mediator.debug_print(String::from("test"));
     }
 }

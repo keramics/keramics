@@ -13,6 +13,7 @@
 
 use std::fs::{File, Metadata};
 use std::io::{Read, Seek, SeekFrom};
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use super::data_stream::{DataStream, DataStreamReference};
@@ -76,7 +77,7 @@ macro_rules! open_file {
 }
 
 /// Opens a new operating system data stream.
-pub fn open_os_data_stream(path: &str) -> Result<DataStreamReference, ErrorTrace> {
+pub fn open_os_data_stream(path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
     let file: File = open_file!(path);
 
     Ok(Arc::new(RwLock::new(file)))
@@ -98,7 +99,8 @@ mod tests {
 
     #[test]
     fn test_open_os_data_stream() -> Result<(), ErrorTrace> {
-        let _ = open_os_data_stream("../test_data/file.txt")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/file.txt");
+        let _ = open_os_data_stream(&path_buf)?;
 
         Ok(())
     }

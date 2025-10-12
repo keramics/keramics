@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::qcow::QcowFile;
@@ -48,10 +50,17 @@ fn read_media_from_file(file: &mut QcowFile) -> Result<(u64, String), ErrorTrace
     Ok((media_offset, hash_string))
 }
 
-fn open_file(path: &str) -> Result<QcowFile, ErrorTrace> {
+fn open_file(path: &PathBuf) -> Result<QcowFile, ErrorTrace> {
+    let data_stream: DataStreamReference = match open_os_data_stream(path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open data stream",
+                error
+            ));
+        }
+    };
     let mut file: QcowFile = QcowFile::new();
-
-    let data_stream: DataStreamReference = open_os_data_stream(path)?;
 
     match file.read_data_stream(&data_stream) {
         Ok(_) => {}
@@ -68,7 +77,8 @@ fn open_file(path: &str) -> Result<QcowFile, ErrorTrace> {
 
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
-    let mut file: QcowFile = open_file("../test_data/qcow/ext2.qcow2")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+    let mut file: QcowFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
     assert_eq!(media_offset, file.media_size);

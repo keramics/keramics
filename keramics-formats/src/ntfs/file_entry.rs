@@ -377,7 +377,7 @@ impl NtfsFileEntry {
             }
             None => {}
         };
-        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
+        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from("$I30"));
         self.has_directory_entries = self.mft_attributes.has_attribute_group(&i30_index_name);
 
         Ok(())

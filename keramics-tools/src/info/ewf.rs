@@ -13,31 +13,43 @@
 
 use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use keramics_core::formatters::format_as_string;
-use keramics_core::{FileResolverReference, open_os_file_resolver};
 use keramics_formats::ewf::{EwfHeaderValueType, EwfImage, EwfMediaType};
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
 use crate::formatters::format_as_bytesize;
 
 /// Prints information about an EWF image.
 pub fn print_ewf_image(path: &PathBuf) -> ExitCode {
-    let base_path: &Path = path.parent().unwrap();
-    let filename: &OsStr = path.file_name().unwrap();
+    let mut base_path: PathBuf = path.clone();
+    base_path.pop();
 
-    let file_resolver: FileResolverReference =
-        match open_os_file_resolver(base_path.to_str().unwrap()) {
-            Ok(file_resolver) => file_resolver,
-            Err(error) => {
-                println!("Unable to create file resolver with error: {}", error);
-                return ExitCode::FAILURE;
-            }
-        };
+    let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+        Ok(file_resolver) => file_resolver,
+        Err(error) => {
+            println!("Unable to create file resolver with error: {}", error);
+            return ExitCode::FAILURE;
+        }
+    };
     let mut ewf_image: EwfImage = EwfImage::new();
 
-    match ewf_image.open(&file_resolver, filename.to_str().unwrap()) {
+    let file_name: PathComponent = match path.file_name() {
+        Some(file_name) => match file_name.to_str() {
+            Some(file_name) => PathComponent::from(file_name),
+            None => {
+                println!("Invalid file name");
+                return ExitCode::FAILURE;
+            }
+        },
+        None => {
+            println!("Missing file name");
+            return ExitCode::FAILURE;
+        }
+    };
+    match ewf_image.open(&file_resolver, &file_name) {
         Ok(_) => {}
         Err(error) => {
             println!("Unable to open EWF image with error: {}", error);

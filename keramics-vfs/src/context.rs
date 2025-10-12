@@ -47,8 +47,13 @@ impl VfsContext {
         vfs_location: &VfsLocation,
         name: Option<&str>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        let file_system: VfsFileSystemReference = self.open_file_system(vfs_location)?;
-
+        let file_system: VfsFileSystemReference = match self.open_file_system(vfs_location) {
+            Ok(file_system) => file_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                return Err(error);
+            }
+        };
         let vfs_path: &VfsPath = vfs_location.get_path();
         file_system.get_data_stream_by_path_and_name(vfs_path, name)
     }
@@ -58,8 +63,13 @@ impl VfsContext {
         &mut self,
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
-        let file_system: VfsFileSystemReference = self.open_file_system(vfs_location)?;
-
+        let file_system: VfsFileSystemReference = match self.open_file_system(vfs_location) {
+            Ok(file_system) => file_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                return Err(error);
+            }
+        };
         let vfs_path: &VfsPath = vfs_location.get_path();
         file_system.get_file_entry_by_path(vfs_path)
     }
@@ -93,7 +103,16 @@ impl VfsContext {
             Some(file_system) => Ok(file_system),
             None => {
                 let parent_file_system: Option<VfsFileSystemReference> = match parent_vfs_location {
-                    Some(parent_vfs_location) => Some(self.open_file_system(parent_vfs_location)?),
+                    Some(parent_vfs_location) => match self.open_file_system(parent_vfs_location) {
+                        Ok(file_system) => Some(file_system),
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to open parent file system"
+                            );
+                            return Err(error);
+                        }
+                    },
                     None => None,
                 };
                 let file_system_path: VfsLocation = match parent_vfs_location {
@@ -101,8 +120,13 @@ impl VfsContext {
                     None => self.os_vfs_location.clone(),
                 };
                 let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
-                file_system.open(parent_file_system.as_ref(), &file_system_path)?;
-
+                match file_system.open(parent_file_system.as_ref(), &file_system_path) {
+                    Ok(()) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                        return Err(error);
+                    }
+                }
                 let cached_file_system: VfsFileSystemReference =
                     VfsFileSystemReference::new(file_system);
 
@@ -110,7 +134,6 @@ impl VfsContext {
                     file_system_path,
                     VfsFileSystemReference::downgrade(&cached_file_system),
                 );
-
                 Ok(cached_file_system)
             }
         }

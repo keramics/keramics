@@ -387,12 +387,15 @@ impl ExtFileSystem {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
         Ok(file_system)
@@ -475,7 +478,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
         assert_eq!(file_system.block_size, 1024);
@@ -488,7 +492,8 @@ mod tests {
     fn test_read_block_groups() -> Result<(), ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ext/ext2.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_block_groups(&data_stream)?;
 
         assert_eq!(file_system.block_size, 1024);

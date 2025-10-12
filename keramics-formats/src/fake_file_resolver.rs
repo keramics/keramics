@@ -11,9 +11,10 @@
  * under the License.
  */
 
-use super::data_stream::DataStreamReference;
-use super::errors::ErrorTrace;
+use keramics_core::{DataStreamReference, ErrorTrace};
+
 use super::file_resolver::FileResolver;
+use super::path_component::PathComponent;
 
 pub struct FakeFileResolver {}
 
@@ -26,9 +27,9 @@ impl FakeFileResolver {
 
 impl FileResolver for FakeFileResolver {
     /// Retrieves a data stream with the specified path.
-    fn get_data_stream<'a>(
-        &'a self,
-        _path_components: &mut Vec<&'a str>,
+    fn get_data_stream(
+        &self,
+        _path_components: &[PathComponent],
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         Ok(None)
     }
@@ -38,14 +39,16 @@ impl FileResolver for FakeFileResolver {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let file_resolver: FakeFileResolver = FakeFileResolver::new();
 
-        let mut path_components: Vec<&str> = vec!["file.txt"];
+        let path_components: [PathComponent; 1] = [PathComponent::from("file.txt")];
 
         let data_stream: Option<DataStreamReference> =
-            file_resolver.get_data_stream(&mut path_components)?;
+            file_resolver.get_data_stream(&path_components)?;
         assert!(data_stream.is_none());
 
         Ok(())

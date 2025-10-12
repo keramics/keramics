@@ -22,16 +22,14 @@ use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
-use keramics_core::{
-    DataStream, DataStreamReference, ErrorTrace, FileResolverReference, open_os_data_stream,
-    open_os_file_resolver,
-};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_formats::{FormatIdentifier, FormatScanner};
 use keramics_hashes::{DigestHashContext, Md5Context};
 use keramics_vfs::{
@@ -76,22 +74,10 @@ impl StorageMediaImage {
     /// Opens a storage media image.
     fn get_base_path_and_file_name<'a>(
         path: &'a PathBuf,
-    ) -> Result<(&'a str, &'a str), ErrorTrace> {
-        let base_path: &str = match path.parent() {
-            Some(parent_path) => match parent_path.to_str() {
-                Some(path_string) => path_string,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported source - invalid parent directory"
-                    ));
-                }
-            },
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported source - missing parent directory"
-                ));
-            }
-        };
+    ) -> Result<(PathBuf, &'a str), ErrorTrace> {
+        let mut base_path: PathBuf = path.clone();
+        base_path.pop();
+
         let file_name: &str = match path.file_name() {
             Some(file_name_path) => match file_name_path.to_str() {
                 Some(path_string) => path_string,
@@ -158,20 +144,21 @@ impl StorageMediaImage {
                             return Err(error);
                         }
                     };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
+                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
                     Ok(file_resolver) => file_resolver,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
-                                "Unable to create file resolver for base path: {}",
-                                base_path
+                                "Unable to create file resolver for path: {}",
+                                base_path.display()
                             )
                         );
                         return Err(error);
                     }
                 };
-                match ewf_image.open(&file_resolver, file_name) {
+                let path_component: PathComponent = PathComponent::from(file_name);
+                match ewf_image.open(&file_resolver, &path_component) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
@@ -195,20 +182,21 @@ impl StorageMediaImage {
                             return Err(error);
                         }
                     };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
+                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
                     Ok(file_resolver) => file_resolver,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
                                 "Unable to create file resolver for base path: {}",
-                                base_path
+                                base_path.display()
                             )
                         );
                         return Err(error);
                     }
                 };
-                match qcow_image.open(&file_resolver, file_name) {
+                let path_component: PathComponent = PathComponent::from(file_name);
+                match qcow_image.open(&file_resolver, &path_component) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -217,13 +205,7 @@ impl StorageMediaImage {
                 }
             }
             StorageMediaImage::SparseImage(file) => {
-                let path_string: &str = match path.to_str() {
-                    Some(path_string) => path_string,
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Unsupported path"));
-                    }
-                };
-                let data_stream: DataStreamReference = match open_os_data_stream(path_string) {
+                let data_stream: DataStreamReference = match open_os_data_stream(path) {
                     Ok(data_stream) => data_stream,
                     Err(mut error) => {
                         // TODO: get printable version of path instead of using display().
@@ -246,13 +228,7 @@ impl StorageMediaImage {
                 }
             }
             StorageMediaImage::Udif(file) => {
-                let path_string: &str = match path.to_str() {
-                    Some(path_string) => path_string,
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Unsupported path"));
-                    }
-                };
-                let data_stream: DataStreamReference = match open_os_data_stream(path_string) {
+                let data_stream: DataStreamReference = match open_os_data_stream(path) {
                     Ok(data_stream) => data_stream,
                     Err(mut error) => {
                         // TODO: get printable version of path instead of using display().
@@ -290,20 +266,21 @@ impl StorageMediaImage {
                             return Err(error);
                         }
                     };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
+                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
                     Ok(file_resolver) => file_resolver,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
                                 "Unable to create file resolver for base path: {}",
-                                base_path
+                                base_path.display()
                             )
                         );
                         return Err(error);
                     }
                 };
-                match vhd_image.open(&file_resolver, file_name) {
+                let path_component: PathComponent = PathComponent::from(file_name);
+                match vhd_image.open(&file_resolver, &path_component) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
@@ -327,20 +304,21 @@ impl StorageMediaImage {
                             return Err(error);
                         }
                     };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
+                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
                     Ok(file_resolver) => file_resolver,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
                                 "Unable to create file resolver for base path: {}",
-                                base_path
+                                base_path.display()
                             )
                         );
                         return Err(error);
                     }
                 };
-                match vhdx_image.open(&file_resolver, file_name) {
+                let path_component: PathComponent = PathComponent::from(file_name);
+                match vhdx_image.open(&file_resolver, &path_component) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
@@ -538,7 +516,7 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Some(Commands::Hash) => {
-            let data_stream: DataStreamReference = match open_os_data_stream(source) {
+            let data_stream: DataStreamReference = match open_os_data_stream(&arguments.source) {
                 Ok(data_stream) => data_stream,
                 Err(error) => {
                     println!("Unable to open file: {} with error:\n{}", source, error);

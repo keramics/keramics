@@ -26,7 +26,7 @@ pub enum EwfHeaderValue {
 impl EwfHeaderValue {
     /// Creates a new EWF header value from a byte sequence.
     pub fn from_bytes(bytes: &[u8]) -> Self {
-        EwfHeaderValue::Byte(ByteString::from_bytes(bytes))
+        EwfHeaderValue::Byte(ByteString::from(bytes))
     }
 
     /// Creates a new EWF header value from a UTF-16 sequence.

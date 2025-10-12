@@ -69,7 +69,7 @@ impl NtfsDirectoryIndex {
 
     /// Initializes the directory index.
     pub fn initialize(&mut self, mft_attributes: &NtfsMftAttributes) -> Result<(), ErrorTrace> {
-        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from_string("$I30"));
+        let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from("$I30"));
         let i30_attribute_group: &NtfsMftAttributeGroup =
             match mft_attributes.get_attribute_group(&i30_index_name) {
                 Some(attribute_group) => attribute_group,

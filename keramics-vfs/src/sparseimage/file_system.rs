@@ -125,31 +125,14 @@ impl SparseImageFileSystem {
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
 
-        let result: Option<DataStreamReference> =
-            match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                    return Err(error);
-                }
-            };
-        let data_stream: DataStreamReference = match result {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Missing data stream: {}",
-                    vfs_path.to_string()
-                )));
-            }
-        };
         match self.file.write() {
             Ok(mut file) => {
-                match file.read_data_stream(&data_stream) {
-                    Ok(()) => {}
+                match Self::open_file(&mut file, file_system, vfs_path) {
+                    Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read sparseiamge file from data stream"
+                            "Unable to open sparseimage file"
                         );
                         return Err(error);
                     }
@@ -161,6 +144,39 @@ impl SparseImageFileSystem {
                     "Unable to obtain write lock on sparseimage file",
                     error
                 ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens a sparseimage file.
+    pub(crate) fn open_file(
+        file: &mut SparseImageFile,
+        file_system: &VfsFileSystemReference,
+        vfs_path: &VfsPath,
+    ) -> Result<(), ErrorTrace> {
+        let result: Option<DataStreamReference> =
+            match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
+        let data_stream: DataStreamReference = match result {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        match file.read_data_stream(&data_stream) {
+            Ok(()) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read sparseimage file from data stream"
+                );
+                return Err(error);
             }
         }
         Ok(())
@@ -231,7 +247,7 @@ mod tests {
         let sparseimage_file_entry: SparseImageFileEntry = result.unwrap();
 
         let name: Option<String> = sparseimage_file_entry.get_name();
-        assert_eq!(name, Some("sparseimage1".to_string()));
+        assert_eq!(name, Some(String::from("sparseimage1")));
 
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -271,4 +287,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for open_file
 }

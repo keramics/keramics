@@ -31,7 +31,7 @@ pub const FILE_ATTRIBUTE_FLAG_SYSTEM: u32 = 0x00000004;
 /// Retrieves the string representation of a date and time value.
 fn get_date_time_string(date_time: &DateTime) -> Result<String, ErrorTrace> {
     match date_time {
-        DateTime::NotSet => Ok("Not set (0)".to_string()),
+        DateTime::NotSet => Ok(String::from("Not set (0)")),
         DateTime::Filetime(filetime) => Ok(filetime.to_iso8601_string()),
         _ => return Err(keramics_core::error_trace_new!("Unsupported date time")),
     }

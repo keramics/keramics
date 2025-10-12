@@ -148,6 +148,7 @@ impl Uuid {
 }
 
 impl fmt::Display for Uuid {
+    /// Formats the UUID for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.to_string())
     }

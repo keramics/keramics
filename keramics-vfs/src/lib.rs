@@ -45,7 +45,7 @@ pub use context::VfsContext;
 pub use data_fork::VfsDataFork;
 pub use enums::*;
 pub use file_entry::VfsFileEntry;
-pub use file_resolver::{VfsFileResolver, open_vfs_file_resolver};
+pub use file_resolver::{VfsFileResolver, new_vfs_file_resolver};
 pub use file_system::VfsFileSystem;
 pub use finder::VfsFinder;
 pub use location::{VfsLocation, new_os_vfs_location};

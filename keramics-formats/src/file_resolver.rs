@@ -13,16 +13,17 @@
 
 use std::sync::Arc;
 
-use super::data_stream::DataStreamReference;
-use super::errors::ErrorTrace;
+use keramics_core::{DataStreamReference, ErrorTrace};
+
+use super::path_component::PathComponent;
 
 pub type FileResolverReference = Arc<Box<dyn FileResolver>>;
 
 /// File resolver trait.
 pub trait FileResolver {
     /// Retrieves a data stream with the specified path.
-    fn get_data_stream<'a>(
-        &'a self,
-        path_components: &mut Vec<&'a str>,
+    fn get_data_stream(
+        &self,
+        path_components: &[PathComponent],
     ) -> Result<Option<DataStreamReference>, ErrorTrace>;
 }

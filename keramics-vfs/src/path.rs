@@ -11,52 +11,27 @@
  * under the License.
  */
 
-use std::path::MAIN_SEPARATOR_STR;
+use std::path::PathBuf;
 
+use keramics_core::ErrorTrace;
+use keramics_formats::PathComponent;
 use keramics_formats::ext::ExtPath;
 use keramics_formats::ntfs::NtfsPath;
 use keramics_types::{ByteString, Ucs2String};
 
 use super::enums::VfsType;
 
-/// Retrieves the directory name of the path.
-fn get_directory_name<'a>(path: &'a str, separator: &'a str) -> &'a str {
-    match path.rsplit_once(separator) {
-        Some(path_components) => {
-            if path_components.0.is_empty() {
-                separator
-            } else {
-                path_components.0
-            }
-        }
-        None => path,
-    }
-}
-
-/// Retrieves the file name of the path.
-fn get_file_name<'a>(path: &'a str, separator: &'a str) -> &'a str {
-    match path.rsplit_once(separator) {
-        Some(path_components) => {
-            if path_components.1.is_empty() {
-                separator
-            } else {
-                path_components.1
-            }
-        }
-        None => path,
-    }
-}
-
 /// Virtual File System (VFS) path.
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub enum VfsPath {
     Ext(ExtPath),
     Ntfs(NtfsPath),
-    Os(String),
+    Os(PathBuf),
     String(Vec<String>),
 }
 
 impl VfsPath {
+    /// String path component separator.
     const COMPONENT_SEPARATOR: &'static str = "/";
 
     /// Creates a new path.
@@ -84,49 +59,85 @@ impl VfsPath {
             }
             VfsType::Ext => VfsPath::Ext(ExtPath::from(path)),
             VfsType::Ntfs => VfsPath::Ntfs(NtfsPath::from(path)),
-            VfsType::Os => VfsPath::Os(path.to_string()),
+            VfsType::Os => VfsPath::Os(PathBuf::from(path)),
         }
     }
 
     /// Creates a new path of the current path and additional path components.
-    pub fn new_with_join<'a>(&'a self, path_components: &mut Vec<&'a str>) -> Self {
-        match self {
+    pub fn new_with_join(&self, path_components: &[PathComponent]) -> Result<Self, ErrorTrace> {
+        let vfs_path: VfsPath = match self {
             VfsPath::Ext(ext_path) => {
-                let mut new_path_components: Vec<ByteString> = ext_path.components.clone();
-                new_path_components.append(
-                    &mut path_components
-                        .iter()
-                        .map(|component| ByteString::from_string(component))
-                        .collect::<Vec<ByteString>>(),
-                );
-                VfsPath::Ext(ExtPath::from(&new_path_components))
+                let mut ext_path_components: Vec<ByteString> = ext_path.components.clone();
+
+                for path_component in path_components {
+                    let byte_string: ByteString = match path_component {
+                        PathComponent::ByteString(byte_string) => byte_string.clone(),
+                        PathComponent::String(string) => ByteString::from(string),
+                        _ => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported path component"
+                            ));
+                        }
+                    };
+                    ext_path_components.push(byte_string);
+                }
+                VfsPath::Ext(ExtPath {
+                    components: ext_path_components,
+                })
             }
             VfsPath::Ntfs(ntfs_path) => {
-                let mut new_path_components: Vec<Ucs2String> = ntfs_path.components.clone();
-                new_path_components.append(
-                    &mut path_components
-                        .iter()
-                        .map(|component| Ucs2String::from_string(component))
-                        .collect::<Vec<Ucs2String>>(),
-                );
-                VfsPath::Ntfs(NtfsPath::from(&new_path_components))
+                let mut ntfs_path_components: Vec<Ucs2String> = ntfs_path.components.clone();
+
+                for path_component in path_components {
+                    let ucs2_string: Ucs2String = match path_component {
+                        PathComponent::String(string) => Ucs2String::from(string),
+                        PathComponent::Ucs2String(ucs2_string) => ucs2_string.clone(),
+                        _ => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported path component"
+                            ));
+                        }
+                    };
+                    ntfs_path_components.push(ucs2_string);
+                }
+                VfsPath::Ntfs(NtfsPath {
+                    components: ntfs_path_components,
+                })
             }
-            VfsPath::Os(string_path) => {
-                let mut new_path_components: Vec<&str> = vec![string_path.as_str()];
-                new_path_components.append(path_components);
-                VfsPath::Os(new_path_components.join(MAIN_SEPARATOR_STR))
+            VfsPath::Os(path_buf) => {
+                let mut new_path_buf: PathBuf = path_buf.clone();
+
+                for path_component in path_components {
+                    let string: String = match path_component {
+                        PathComponent::String(string) => string.clone(),
+                        _ => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported path component"
+                            ));
+                        }
+                    };
+                    new_path_buf.push(string);
+                }
+                VfsPath::Os(new_path_buf)
             }
             VfsPath::String(string_path_components) => {
-                let mut new_path_components: Vec<String> = string_path_components.clone();
-                new_path_components.append(
-                    &mut path_components
-                        .iter()
-                        .map(|component| component.to_string())
-                        .collect::<Vec<String>>(),
-                );
-                VfsPath::String(new_path_components)
+                let mut string_path_components: Vec<String> = string_path_components.clone();
+
+                for path_component in path_components {
+                    let string: String = match path_component {
+                        PathComponent::String(string) => string.clone(),
+                        _ => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported path component"
+                            ));
+                        }
+                    };
+                    string_path_components.push(string);
+                }
+                VfsPath::String(string_path_components)
             }
-        }
+        };
+        Ok(vfs_path)
     }
 
     /// Creates a new path of the parent directory of the current path.
@@ -140,10 +151,11 @@ impl VfsPath {
                 let parent_ntfs_path: NtfsPath = ntfs_path.new_with_parent_directory();
                 VfsPath::Ntfs(parent_ntfs_path)
             }
-            VfsPath::Os(string_path) => {
-                let parent_string_path: &str =
-                    get_directory_name(string_path.as_str(), MAIN_SEPARATOR_STR);
-                VfsPath::Os(parent_string_path.to_string())
+            VfsPath::Os(path_buf) => {
+                let mut new_path_buf: PathBuf = path_buf.clone();
+                new_path_buf.pop();
+
+                VfsPath::Os(new_path_buf)
             }
             VfsPath::String(string_path_components) => {
                 let mut number_of_components: usize = string_path_components.len();
@@ -156,17 +168,28 @@ impl VfsPath {
     }
 
     /// Retrieves the file name.
-    pub fn get_file_name(&self) -> &str {
+    pub fn get_file_name(&self) -> Option<PathComponent> {
         match self {
-            VfsPath::Ext(_) => todo!(),
-            VfsPath::Ntfs(_) => todo!(),
-            VfsPath::Os(string_path) => get_file_name(string_path.as_str(), MAIN_SEPARATOR_STR),
+            VfsPath::Ext(ext_path) => match ext_path.file_name() {
+                Some(byte_string) => Some(PathComponent::ByteString(byte_string.clone())),
+                None => None,
+            },
+            VfsPath::Ntfs(ntfs_path) => match ntfs_path.file_name() {
+                Some(ucs2_string) => Some(PathComponent::Ucs2String(ucs2_string.clone())),
+                None => None,
+            },
+            VfsPath::Os(path_buf) => match path_buf.file_name() {
+                Some(os_str) => Some(PathComponent::String(os_str.to_str().unwrap().to_string())),
+                None => None,
+            },
             VfsPath::String(string_path_components) => {
                 let mut number_of_components: usize = string_path_components.len();
                 if number_of_components > 1 {
                     number_of_components -= 1;
                 }
-                string_path_components[number_of_components].as_str()
+                Some(PathComponent::String(
+                    string_path_components[number_of_components].clone(),
+                ))
             }
         }
     }
@@ -176,7 +199,8 @@ impl VfsPath {
         match self {
             VfsPath::Ext(ext_path) => ext_path.to_string(),
             VfsPath::Ntfs(ntfs_path) => ntfs_path.to_string(),
-            VfsPath::Os(string_path) => string_path.clone(),
+            // TODO: change to_string_lossy to a non-lossy conversion
+            VfsPath::Os(path_buf) => path_buf.to_string_lossy().to_string(),
             VfsPath::String(string_path_components) => {
                 let number_of_components: usize = string_path_components.len();
                 if number_of_components == 1 && string_path_components[0].is_empty() {
@@ -194,22 +218,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_get_directory_name() {
-        assert_eq!(get_directory_name("/", "/"), "/");
-        assert_eq!(get_directory_name("/gpt1", "/"), "/");
-
-        assert_eq!(get_directory_name("/gpt1", "\\"), "/gpt1");
-    }
-
-    #[test]
-    fn test_get_file_name() {
-        assert_eq!(get_file_name("/", "/"), "/");
-        assert_eq!(get_file_name("/gpt1", "/"), "gpt1");
-
-        assert_eq!(get_file_name("/gpt1", "\\"), "/gpt1");
-    }
-
-    #[test]
     fn test_new() {
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/ext1");
         assert!(matches!(vfs_path, VfsPath::Ext(_)));
@@ -225,30 +233,60 @@ mod tests {
     }
 
     #[test]
-    fn test_new_with_join() {
+    fn test_new_with_join() -> Result<(), ErrorTrace> {
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/");
 
-        let test_path: VfsPath = vfs_path.new_with_join(&mut vec!["ext1"]);
+        let test_path_components: [PathComponent; 1] = [PathComponent::from("ext1")];
+        let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "/ext1");
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Ntfs, "\\");
 
-        let test_path: VfsPath = vfs_path.new_with_join(&mut vec!["ntfs1"]);
+        let test_path_components: [PathComponent; 1] = [PathComponent::from("ntfs1")];
+        let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "\\ntfs1");
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "/");
 
-        let test_path: VfsPath = vfs_path.new_with_join(&mut vec!["os1"]);
-        // TODO: change // to /
-        assert_eq!(test_path.to_string(), "//os1");
+        let test_path_components: [PathComponent; 1] = [PathComponent::from("os1")];
+        let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
+        assert_eq!(test_path.to_string(), "/os1");
 
         let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/");
 
-        let test_path: VfsPath = vfs_path.new_with_join(&mut vec!["apm1"]);
+        let test_path_components: [PathComponent; 1] = [PathComponent::from("apm1")];
+        let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "/apm1");
+
+        Ok(())
     }
 
     // TODO: add tests for new_with_parent_directory
-    // TODO: add tests for get_file_name
+
+    #[test]
+    fn test_get_file_name() {
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/ext1");
+        let result: Option<PathComponent> = vfs_path.get_file_name();
+        assert_eq!(
+            result,
+            Some(PathComponent::ByteString(ByteString::from("ext1")))
+        );
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ntfs, "\\ntfs1");
+        let result: Option<PathComponent> = vfs_path.get_file_name();
+        assert_eq!(
+            result,
+            Some(PathComponent::Ucs2String(Ucs2String::from("ntfs1")))
+        );
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "/os1");
+        let result: Option<PathComponent> = vfs_path.get_file_name();
+        assert_eq!(result, Some(PathComponent::String(String::from("os1"))));
+
+        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm1");
+        let result: Option<PathComponent> = vfs_path.get_file_name();
+        assert_eq!(result, Some(PathComponent::String(String::from("apm1"))));
+    }
+
     // TODO: add tests for to_string
 }

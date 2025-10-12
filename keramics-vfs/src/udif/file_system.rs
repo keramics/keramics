@@ -123,6 +123,33 @@ impl UdifFileSystem {
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
 
+        match self.file.write() {
+            Ok(mut file) => {
+                match Self::open_file(&mut file, file_system, vfs_path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
+                        return Err(error);
+                    }
+                }
+                self.number_of_layers = 1;
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on UDIF file",
+                    error
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens an UDIF file.
+    pub(crate) fn open_file(
+        file: &mut UdifFile,
+        file_system: &VfsFileSystemReference,
+        vfs_path: &VfsPath,
+    ) -> Result<(), ErrorTrace> {
         let result: Option<DataStreamReference> =
             match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
                 Ok(result) => result,
@@ -134,31 +161,17 @@ impl UdifFileSystem {
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
             None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Missing data stream: {}",
-                    vfs_path.to_string()
-                )));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
-        match self.file.write() {
-            Ok(mut file) => {
-                match file.read_data_stream(&data_stream) {
-                    Ok(()) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read UDIF file from data stream"
-                        );
-                        return Err(error);
-                    }
-                }
-                self.number_of_layers = 1;
-            }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on UDIF file",
-                    error
-                ));
+        match file.read_data_stream(&data_stream) {
+            Ok(()) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read UDIF file from data stream"
+                );
+                return Err(error);
             }
         }
         Ok(())
@@ -227,7 +240,7 @@ mod tests {
         let udif_file_entry: UdifFileEntry = result.unwrap();
 
         let name: Option<String> = udif_file_entry.get_name();
-        assert_eq!(name, Some("udif1".to_string()));
+        assert_eq!(name, Some(String::from("udif1")));
 
         let file_type: VfsFileType = udif_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -265,4 +278,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for open_file
 }

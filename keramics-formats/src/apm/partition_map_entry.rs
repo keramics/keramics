@@ -82,8 +82,8 @@ impl ApmPartitionMapEntry {
         self.number_of_entries = bytes_to_u32_be!(data, 4);
         self.start_sector = bytes_to_u32_be!(data, 8);
         self.number_of_sectors = bytes_to_u32_be!(data, 12);
-        self.name = ByteString::from_bytes(&data[16..48]);
-        self.type_identifier = ByteString::from_bytes(&data[48..80]);
+        self.name = ByteString::from(&data[16..48]);
+        self.type_identifier = ByteString::from(&data[48..80]);
         self.status_flags = bytes_to_u32_be!(data, 88);
 
         Ok(())

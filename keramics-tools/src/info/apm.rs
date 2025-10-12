@@ -98,7 +98,7 @@ pub fn print_apm_volume_system(data_stream: &DataStreamReference) -> ExitCode {
             "    Type identifier\t\t\t: {}",
             apm_partition.type_identifier.to_string()
         );
-        if apm_partition.name.elements.len() > 0 {
+        if !apm_partition.name.is_empty() {
             println!("    Name\t\t\t\t: {}", apm_partition.name.to_string());
         }
         println!(

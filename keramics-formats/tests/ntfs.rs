@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::path::PathBuf;
+
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem, NtfsPath};
@@ -70,18 +72,35 @@ fn read_path(file_system: &NtfsFileSystem, path: &str) -> Result<(u64, String), 
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(path: &str) -> Result<NtfsFileSystem, ErrorTrace> {
+fn open_file_system(path: &PathBuf) -> Result<NtfsFileSystem, ErrorTrace> {
+    let data_stream: DataStreamReference = match open_os_data_stream(path) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            return Err(keramics_core::error_trace_new_with_error!(
+                "Unable to open data stream",
+                error
+            ));
+        }
+    };
     let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-    let data_stream: DataStreamReference = open_os_data_stream(path)?;
-    file_system.read_data_stream(&data_stream)?;
-
+    match file_system.read_data_stream(&data_stream) {
+        Ok(_) => {}
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to read NTFS file system from data stream"
+            );
+            return Err(error);
+        }
+    };
     Ok(file_system)
 }
 
 #[test]
 fn read_ntfs_empty_file() -> Result<(), ErrorTrace> {
-    let file_system: NtfsFileSystem = open_file_system("../test_data/ntfs/ntfs.raw")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+    let file_system: NtfsFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "\\emptyfile")?;
     assert_eq!(offset, 0);

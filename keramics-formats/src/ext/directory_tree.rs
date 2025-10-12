@@ -126,12 +126,8 @@ impl ExtDirectoryTree {
             if entry.inode_number == 0 {
                 continue;
             }
-            // Ignore "."
-            if entry.name_size == 1 && name.elements[0] == 0x2e {
-                continue;
-            }
-            // Ignore ".."
-            if entry.name_size == 2 && name.elements[0] == 0x2e && name.elements[1] == 0x2e {
+            // Ignore "." and ".."
+            if name == "." || name == ".." {
                 continue;
             }
             entries.insert(name, entry);

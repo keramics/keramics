@@ -33,7 +33,7 @@ impl BuildError {
 impl Error for BuildError {}
 
 impl fmt::Display for BuildError {
-    /// Formats the error as a string.
+    /// Formats the error for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{}", self.message)
     }

@@ -110,7 +110,7 @@ impl ApmVolumeSystem {
             partition_map_entry
                 .read_at_position(data_stream, SeekFrom::Start(partition_map_entry_offset))?;
             if partition_map_entry_index == 0 {
-                if partition_map_entry.type_identifier.elements != APM_PARTITION_MAP_TYPE {
+                if partition_map_entry.type_identifier != APM_PARTITION_MAP_TYPE.as_slice() {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported partition map entry: {} unsupported partition type",
                         partition_map_entry_index,
@@ -140,12 +140,15 @@ impl ApmVolumeSystem {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_volume_system() -> Result<ApmVolumeSystem, ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 
         Ok(volume_system)
@@ -176,7 +179,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
@@ -188,7 +192,8 @@ mod tests {
     fn test_read_partition_map() -> Result<(), ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/apm/apm.dmg")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_partition_map(&data_stream)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);

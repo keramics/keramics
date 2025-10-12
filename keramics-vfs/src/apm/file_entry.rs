@@ -101,29 +101,17 @@ impl ApmFileEntry {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_volume_system() -> Result<ApmVolumeSystem, ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-        let data_stream: DataStreamReference = match open_os_data_stream("../test_data/apm/apm.dmg")
-        {
-            Ok(data_stream) => data_stream,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
-                return Err(error);
-            }
-        };
-        match volume_system.read_data_stream(&data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read APM volume system from data stream"
-                );
-                return Err(error);
-            }
-        }
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        volume_system.read_data_stream(&data_stream)?;
+
         Ok(volume_system)
     }
 
@@ -161,7 +149,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("apm1".to_string()));
+        assert_eq!(name, Some(String::from("apm1")));
 
         Ok(())
     }

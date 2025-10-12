@@ -13,7 +13,10 @@
 
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, ErrorTrace, FileResolverReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
+
+use crate::file_resolver::FileResolverReference;
+use crate::path_component::PathComponent;
 
 use super::file::QcowFile;
 
@@ -51,15 +54,19 @@ impl QcowImage {
     pub fn open(
         &mut self,
         file_resolver: &FileResolverReference,
-        file_name: &str,
+        file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
         let mut files: Vec<QcowFile> = Vec::new();
 
+        let path_components: [PathComponent; 1] = [file_name.clone()];
         let result: Option<DataStreamReference> =
-            match file_resolver.get_data_stream(&mut vec![file_name]) {
+            match file_resolver.get_data_stream(&path_components) {
                 Ok(result) => result,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open file: {}", file_name.to_string())
+                    );
                     return Err(error);
                 }
             };
@@ -68,7 +75,7 @@ impl QcowImage {
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "No such file: {}",
-                    file_name
+                    file_name.to_string()
                 )));
             }
         };
@@ -78,8 +85,9 @@ impl QcowImage {
         while let Some(file_name) = file.get_backing_file_name() {
             let backing_file_name: String = file_name.to_string();
 
+            let path_components: [PathComponent; 1] = [PathComponent::from(&backing_file_name)];
             let result: Option<DataStreamReference> =
-                match file_resolver.get_data_stream(&mut vec![backing_file_name.as_str()]) {
+                match file_resolver.get_data_stream(&path_components) {
                     Ok(result) => result,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open backing file");
@@ -121,13 +129,17 @@ impl QcowImage {
 mod tests {
     use super::*;
 
-    use keramics_core::open_os_file_resolver;
+    use std::path::PathBuf;
+
+    use crate::os_file_resolver::open_os_file_resolver;
 
     fn get_image() -> Result<QcowImage, ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/qcow")?;
-        image.open(&file_resolver, "ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ext2.qcow2");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(image)
     }
@@ -163,8 +175,10 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/qcow")?;
-        image.open(&file_resolver, "ext2.qcow2")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/qcow");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ext2.qcow2");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(())
     }

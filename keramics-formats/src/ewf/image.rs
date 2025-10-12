@@ -16,13 +16,14 @@ use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
 use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{
-    DataStream, DataStreamReference, ErrorTrace, FakeFileResolver, FileResolverReference,
-};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
 use crate::block_tree::BlockTree;
+use crate::fake_file_resolver::FakeFileResolver;
+use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
+use crate::path_component::PathComponent;
 
 use super::block_range::{EwfBlockRange, EwfBlockRangeType};
 use super::constants::*;
@@ -185,7 +186,7 @@ impl EwfImage {
     pub fn open(
         &mut self,
         file_resolver: &FileResolverReference,
-        file_name: &str,
+        file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
         self.read_segment_files(&file_resolver, file_name)?;
 
@@ -450,18 +451,28 @@ impl EwfImage {
     fn read_segment_files(
         &mut self,
         file_resolver: &FileResolverReference,
-        file_name: &str,
+        file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        let (name, extension): (&str, &str) = match file_name.rsplit_once(".") {
-            Some(components) => (components.0, components.1),
+        // TODO: add function that retrieves both file stem and extension
+        let name: String = match file_name.file_stem() {
+            Some(file_stem) => file_stem.to_string(),
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Extension missing in segment file: {}",
-                    file_name
+                    file_name.to_string(),
                 )));
             }
         };
-        let naming_schema: EwfNamingSchema = match extension {
+        let extension: String = match file_name.extension() {
+            Some(extension) => extension.to_string(),
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Extension missing in segment file: {}",
+                    file_name.to_string(),
+                )));
+            }
+        };
+        let naming_schema: EwfNamingSchema = match extension.as_str() {
             "E01" => EwfNamingSchema::E01UpperCase,
             "S01" => EwfNamingSchema::S01UpperCase,
             "e01" => EwfNamingSchema::E01LowerCase,
@@ -469,7 +480,7 @@ impl EwfImage {
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported extension in segment file: {}",
-                    file_name
+                    file_name.to_string(),
                 )));
             }
         };
@@ -482,8 +493,9 @@ impl EwfImage {
                 self.get_segment_file_extension(segment_number, &naming_schema)?;
             let segment_file_name: String = format!("{}.{}", name, segment_extension);
 
+            let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
             let result: Option<DataStreamReference> =
-                match file_resolver.get_data_stream(&mut vec![segment_file_name.as_str()]) {
+                match file_resolver.get_data_stream(&path_components) {
                     Ok(result) => result,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -817,13 +829,17 @@ impl DataStream for EwfImage {
 mod tests {
     use super::*;
 
-    use keramics_core::open_os_file_resolver;
+    use std::path::PathBuf;
+
+    use crate::os_file_resolver::open_os_file_resolver;
 
     fn get_image() -> Result<EwfImage, ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/ewf")?;
-        image.open(&file_resolver, "ext2.E01")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ewf");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ext2.E01");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(image)
     }
@@ -886,8 +902,10 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/ewf")?;
-        image.open(&file_resolver, "ext2.E01")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ewf");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ext2.E01");
+        image.open(&file_resolver, &file_name)?;
 
         assert_eq!(image.media_size, 4194304);
 

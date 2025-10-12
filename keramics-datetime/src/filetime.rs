@@ -66,6 +66,7 @@ impl Filetime {
 }
 
 impl fmt::Display for Filetime {
+    /// Formats the timestamp for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(
             formatter,

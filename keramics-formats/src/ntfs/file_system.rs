@@ -367,12 +367,15 @@ impl NtfsFileSystem {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
     use keramics_core::open_os_data_stream;
 
     fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
         Ok(file_system)
@@ -403,7 +406,7 @@ mod tests {
         let file_system: NtfsFileSystem = get_file_system()?;
 
         let volume_label: Option<&Ucs2String> = file_system.get_volume_label();
-        let expected_label: Ucs2String = Ucs2String::from_string("ntfs_test");
+        let expected_label: Ucs2String = Ucs2String::from("ntfs_test");
         assert_eq!(volume_label, Some(&expected_label));
 
         Ok(())
@@ -429,7 +432,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
         assert_eq!(file_system.bytes_per_sector, 512);
@@ -445,7 +449,8 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let data_stream: DataStreamReference = open_os_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_metadata(&data_stream)?;
 
         assert_eq!(file_system.bytes_per_sector, 512);

@@ -149,6 +149,35 @@ impl GptFileSystem {
         };
         let vfs_path: &VfsPath = vfs_location.get_path();
 
+        match Arc::get_mut(&mut self.volume_system) {
+            Some(volume_system) => {
+                match Self::open_volume_system(volume_system, file_system, vfs_path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open GPT volume system"
+                        );
+                        return Err(error);
+                    }
+                }
+                self.number_of_partitions = volume_system.get_number_of_partitions();
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to GPT volume system"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Opens a GPT volume system.
+    pub(crate) fn open_volume_system(
+        volume_system: &mut GptVolumeSystem,
+        file_system: &VfsFileSystemReference,
+        vfs_path: &VfsPath,
+    ) -> Result<(), ErrorTrace> {
         let result: Option<DataStreamReference> =
             match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
                 Ok(result) => result,
@@ -160,30 +189,17 @@ impl GptFileSystem {
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
             None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Missing data stream: {}",
-                    vfs_path.to_string()
-                )));
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
-        match Arc::get_mut(&mut self.volume_system) {
-            Some(volume_system) => {
-                match volume_system.read_data_stream(&data_stream) {
-                    Ok(()) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read GPT volume system from data stream"
-                        );
-                        return Err(error);
-                    }
-                }
-                self.number_of_partitions = volume_system.get_number_of_partitions();
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to GPT volume system"
-                ));
+        match volume_system.read_data_stream(&data_stream) {
+            Ok(()) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read GPT volume system from data stream"
+                );
+                return Err(error);
             }
         }
         Ok(())
@@ -251,7 +267,7 @@ mod tests {
         let gpt_file_entry: GptFileEntry = result.unwrap();
 
         let name: Option<String> = gpt_file_entry.get_name();
-        assert_eq!(name, Some("gpt1".to_string()));
+        assert_eq!(name, Some(String::from("gpt1")));
 
         let file_type: VfsFileType = gpt_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -267,15 +283,15 @@ mod tests {
     fn test_get_partition_index() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
-        let file_name: String = "gpt1".to_string();
+        let file_name: String = String::from("gpt1");
         let partition_index: Option<usize> = gpt_file_system.get_partition_index(&file_name);
         assert_eq!(partition_index, Some(0));
 
-        let file_name: String = "gpt99".to_string();
+        let file_name: String = String::from("gpt99");
         let partition_index: Option<usize> = gpt_file_system.get_partition_index(&file_name);
         assert!(partition_index.is_none());
 
-        let file_name: String = "bogus1".to_string();
+        let file_name: String = String::from("bogus1");
         let partition_index: Option<usize> = gpt_file_system.get_partition_index(&file_name);
         assert!(partition_index.is_none());
 
@@ -307,4 +323,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for open_volume_system
 }

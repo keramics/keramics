@@ -102,13 +102,17 @@ impl VhdFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::{FileResolverReference, open_os_file_resolver};
+    use std::path::PathBuf;
+
+    use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
     fn get_image() -> Result<VhdImage, ErrorTrace> {
         let mut image: VhdImage = VhdImage::new();
 
-        let file_resolver: FileResolverReference = open_os_file_resolver("../test_data/vhd")?;
-        image.open(&file_resolver, "ntfs-differential.vhd")?;
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd");
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("ntfs-differential.vhd");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(image)
     }
@@ -147,7 +151,7 @@ mod tests {
         };
 
         let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some("vhd1".to_string()));
+        assert_eq!(name, Some(String::from("vhd1")));
 
         Ok(())
     }

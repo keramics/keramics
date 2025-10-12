@@ -245,8 +245,8 @@ impl HashTool {
             };
             // TODO: create skip list
             let hash_string: String = if path_components.len() > 1
-                && path_components[1] == VfsString::Ucs2(Ucs2String::from_string("$BadClus"))
-                && name == Some("$Bad".to_string())
+                && path_components[1] == VfsString::Ucs2(Ucs2String::from("$BadClus"))
+                && name == Some(String::from("$Bad"))
             {
                 String::from("N/A (skipped)")
             } else {
@@ -515,7 +515,7 @@ fn main() -> ExitCode {
                 }
             };
             if root_scan_node.is_empty() {
-                let data_stream: DataStreamReference = match open_os_data_stream(source) {
+                let data_stream: DataStreamReference = match open_os_data_stream(&source_argument) {
                     Ok(data_stream) => data_stream,
                     Err(error) => {
                         println!("Unable to open file: {} with error:\n{}", source, error);
