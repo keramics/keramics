@@ -1,0 +1,4 @@
+* text=auto
+
+LICENSE text eol=lf
+test_data/file.txt text eol=lf
