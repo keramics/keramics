@@ -15,10 +15,10 @@ use std::ffi::{OsStr, OsString};
 use std::fs::{File, Metadata, metadata};
 use std::path::Path;
 use std::sync::{Arc, RwLock};
-use std::time::UNIX_EPOCH;
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
+use std::time::UNIX_EPOCH;
 
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
@@ -117,7 +117,8 @@ impl OsFileEntry {
     }
 
     /// Determines the POSIX date and time value.
-    fn get_posix_datetime_value(&self, timestamp: i64, fraction: i64) -> DateTime {
+    #[cfg(unix)]
+    fn get_posix_datetime_value(timestamp: i64, fraction: i64) -> DateTime {
         if fraction != 0 {
             DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction as u32))
         } else if timestamp != 0 {
@@ -154,12 +155,18 @@ impl OsFileEntry {
                 return Err(keramics_core::error_trace_new!("Unsupported file mode"));
             }
         };
-        self.modification_time =
-            Some(self.get_posix_datetime_value(file_metadata.mtime(), file_metadata.mtime_nsec()));
-        self.access_time =
-            Some(self.get_posix_datetime_value(file_metadata.atime(), file_metadata.atime_nsec()));
-        self.change_time =
-            Some(self.get_posix_datetime_value(file_metadata.ctime(), file_metadata.ctime_nsec()));
+        self.modification_time = Some(Self::get_posix_datetime_value(
+            file_metadata.mtime(),
+            file_metadata.mtime_nsec(),
+        ));
+        self.access_time = Some(Self::get_posix_datetime_value(
+            file_metadata.atime(),
+            file_metadata.atime_nsec(),
+        ));
+        self.change_time = Some(Self::get_posix_datetime_value(
+            file_metadata.ctime(),
+            file_metadata.ctime_nsec(),
+        ));
 
         self.creation_time = match file_metadata.created() {
             Ok(system_time) => match system_time.duration_since(UNIX_EPOCH) {
@@ -326,6 +333,7 @@ mod tests {
     }
 
     // TODO: add tests for get_name
+
     // TODO: add tests for get_posix_datetime_value
 
     #[test]
