@@ -82,8 +82,14 @@ impl VhdxImage {
             }
         };
         let mut file: VhdxFile = VhdxFile::new();
-        file.read_data_stream(&data_stream)?;
 
+        match file.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file");
+                return Err(error);
+            }
+        }
         while file.parent_identifier.is_some() {
             let parent_file_name: String = match file.get_parent_file_name() {
                 Some(file_name) => file_name.to_string(),
@@ -113,8 +119,14 @@ impl VhdxImage {
                 }
             };
             let mut parent_file: VhdxFile = VhdxFile::new();
-            parent_file.read_data_stream(&data_stream)?;
 
+            match parent_file.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read parent file");
+                    return Err(error);
+                }
+            }
             files.push(file);
 
             file = parent_file;
@@ -124,7 +136,13 @@ impl VhdxImage {
         let mut file_index: usize = 0;
         while let Some(mut file) = files.pop() {
             if file_index > 0 {
-                file.set_parent(&mut self.files[file_index - 1])?;
+                match file.set_parent(&mut self.files[file_index - 1]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to set parent");
+                        return Err(error);
+                    }
+                }
             }
             self.files.push(Arc::new(RwLock::new(file)));
 

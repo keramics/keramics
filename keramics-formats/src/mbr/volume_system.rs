@@ -91,8 +91,16 @@ impl MbrVolumeSystem {
                     partition_entry.partition_type,
                     partition_entry.flags,
                 );
-                partition.open(data_stream)?;
-
+                match partition.open(data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to open partition: {}", partition_index)
+                        );
+                        return Err(error);
+                    }
+                }
                 Ok(partition)
             }
             None => {
@@ -109,21 +117,32 @@ impl MbrVolumeSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_master_boot_record(data_stream)?;
-
+        match self.read_boot_records(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read boot records");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
 
     /// Reads the master and extended boot records.
-    fn read_master_boot_record(
-        &mut self,
-        data_stream: &DataStreamReference,
-    ) -> Result<(), ErrorTrace> {
+    fn read_boot_records(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut master_boot_record = MbrMasterBootRecord::new();
 
-        master_boot_record.read_at_position(data_stream, SeekFrom::Start(0))?;
+        match master_boot_record.read_at_position(data_stream, SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read master boot record at offset: 0 (0x00000000)"
+                );
+                return Err(error);
+            }
+        }
         if self.bytes_per_sector == 0 {
             for partition_entry in master_boot_record.partition_entries.iter() {
                 if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
@@ -173,7 +192,16 @@ impl MbrVolumeSystem {
         if extended_boot_record_offset != 0 {
             self.first_extended_boot_record_offset = extended_boot_record_offset;
 
-            self.read_extended_boot_record(data_stream, extended_boot_record_offset, 4)?;
+            match self.read_extended_boot_record(data_stream, extended_boot_record_offset, 4) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read first extended boot record"
+                    );
+                    return Err(error);
+                }
+            }
         }
         if self.bytes_per_sector == 0 {
             match self
@@ -215,8 +243,20 @@ impl MbrVolumeSystem {
             ));
         }
         let mut extended_boot_record = MbrExtendedBootRecord::new();
-        extended_boot_record.read_at_position(data_stream, SeekFrom::Start(offset))?;
 
+        match extended_boot_record.read_at_position(data_stream, SeekFrom::Start(offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read extended boot record at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
+        }
         let mut entry_index: usize = 0;
         let mut extended_boot_record_offset: u64 = 0;
 
@@ -239,11 +279,20 @@ impl MbrVolumeSystem {
             entry_index += 1;
         }
         if extended_boot_record_offset != 0 {
-            self.read_extended_boot_record(
+            match self.read_extended_boot_record(
                 data_stream,
                 extended_boot_record_offset,
                 first_entry_index + 4,
-            )?;
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read next extended boot record"
+                    );
+                    return Err(error);
+                }
+            }
         }
         Ok(())
     }
@@ -315,12 +364,12 @@ mod tests {
     }
 
     #[test]
-    fn test_read_master_boot_record() -> Result<(), ErrorTrace> {
+    fn test_read_boot_records() -> Result<(), ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
         let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        volume_system.read_master_boot_record(&data_stream)?;
+        volume_system.read_boot_records(&data_stream)?;
 
         assert_eq!(volume_system.get_number_of_partitions(), 2);
 

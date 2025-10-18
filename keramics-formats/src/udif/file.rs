@@ -83,8 +83,13 @@ impl UdifFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_metadata(data_stream)?;
-
+        match self.read_metadata(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -94,8 +99,13 @@ impl UdifFile {
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut file_footer: UdifFileFooter = UdifFileFooter::new();
 
-        file_footer.read_at_position(data_stream, SeekFrom::End(-512))?;
-
+        match file_footer.read_at_position(data_stream, SeekFrom::End(-512)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file footer");
+                return Err(error);
+            }
+        }
         self.bytes_per_sector = 512;
 
         let data_fork_end_offset: u64 = file_footer.data_fork_offset + file_footer.data_fork_size;
@@ -188,8 +198,14 @@ impl UdifFile {
                     self.mediator.debug_print_data(&data, true);
                 }
                 let mut block_table = UdifBlockTable::new();
-                block_table.read_data(&data)?;
 
+                match block_table.read_data(&data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read block table");
+                        return Err(error);
+                    }
+                }
                 if block_table.start_sector != media_sector {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported block table: {} start sector value out of bounds",
@@ -365,8 +381,16 @@ impl UdifFile {
                     if !self.block_cache.contains(&block_range.data_offset) {
                         let mut data: Vec<u8> = vec![0; block_range.size as usize];
 
-                        self.read_compressed_block(block_range, &mut data)?;
-
+                        match self.read_compressed_block(block_range, &mut data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read compressed block"
+                                );
+                                return Err(error);
+                            }
+                        }
                         self.block_cache.insert(block_range.data_offset, data);
                     }
                     let range_data: &Vec<u8> = match self.block_cache.get(&block_range.data_offset)

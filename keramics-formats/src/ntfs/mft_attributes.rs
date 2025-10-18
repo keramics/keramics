@@ -23,6 +23,7 @@ use super::constants::*;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_attribute_group::NtfsMftAttributeGroup;
 use super::reparse_point::NtfsReparsePoint;
+use super::standard_information::NtfsStandardInformation;
 use super::wof_compressed_stream::NtfsWofCompressedStream;
 
 /// New Technologies File System (NTFS) Master File Table (MFT) attributes.
@@ -41,6 +42,9 @@ pub struct NtfsMftAttributes {
 
     /// Reparse point.
     pub reparse_point: Option<NtfsReparsePoint>,
+
+    /// Standard information.
+    pub standard_information: Option<NtfsStandardInformation>,
 }
 
 impl NtfsMftAttributes {
@@ -52,6 +56,7 @@ impl NtfsMftAttributes {
             attribute_list: None,
             data_attributes: Vec::new(),
             reparse_point: None,
+            standard_information: None,
         }
     }
 
@@ -76,7 +81,16 @@ impl NtfsMftAttributes {
         match attribute_group.get_attribute_index(attribute.attribute_type) {
             Some(existing_attribute_index) => {
                 match self.attributes.get_mut(*existing_attribute_index) {
-                    Some(existing_attribute) => existing_attribute.merge(&mut attribute)?,
+                    Some(existing_attribute) => match existing_attribute.merge(&mut attribute) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to merge attribute"
+                            );
+                            return Err(error);
+                        }
+                    },
                     None => {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Missing attribute: {}",
@@ -108,8 +122,36 @@ impl NtfsMftAttributes {
                             ));
                         }
                         let reparse_point: NtfsReparsePoint =
-                            NtfsReparsePoint::from_attribute(&attribute)?;
+                            match NtfsReparsePoint::from_attribute(&attribute) {
+                                Ok(reparse_point) => reparse_point,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to create reparse point from attribute"
+                                    );
+                                    return Err(error);
+                                }
+                            };
                         self.reparse_point = Some(reparse_point);
+                    }
+                    NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION => {
+                        if self.standard_information.is_some() {
+                            return Err(keramics_core::error_trace_new!(
+                                "Standard information already set"
+                            ));
+                        }
+                        let standard_information: NtfsStandardInformation =
+                            match NtfsStandardInformation::from_attribute(&attribute) {
+                                Ok(standard_information) => standard_information,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to create standard information from attribute"
+                                    );
+                                    return Err(error);
+                                }
+                            };
+                        self.standard_information = Some(standard_information);
                     }
                     _ => {}
                 };
@@ -124,8 +166,8 @@ impl NtfsMftAttributes {
     }
 
     /// Retrieves the number of attributes.
-    pub fn get_number_of_attributes(&self) -> Result<usize, ErrorTrace> {
-        Ok(self.attributes.len())
+    pub fn get_number_of_attributes(&self) -> usize {
+        self.attributes.len()
     }
 
     /// Retrieves a specific attribute.
@@ -203,7 +245,6 @@ impl NtfsMftAttributes {
                 Some(data_attribute) => data_attribute,
                 None => return Ok(None),
             };
-
         let wof_compression_method: Option<u32> = match &self.reparse_point {
             Some(NtfsReparsePoint::WindowsOverlayFilter { reparse_data }) => match name {
                 None => Some(reparse_data.compression_method),
@@ -238,7 +279,7 @@ impl NtfsMftAttributes {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to open WofCompressedData stream"
+                        "Unable to open WoF compressed stream"
                     );
                     return Err(error);
                 }
@@ -252,13 +293,27 @@ impl NtfsMftAttributes {
         } else if data_attribute.is_compressed() {
             let mut compressed_stream: NtfsCompressedStream =
                 NtfsCompressedStream::new(cluster_block_size);
-            compressed_stream.open(data_stream, data_attribute)?;
 
+            match compressed_stream.open(data_stream, data_attribute) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open compressed stream"
+                    );
+                    return Err(error);
+                }
+            }
             Ok(Some(Arc::new(RwLock::new(compressed_stream))))
         } else {
             let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
-            block_stream.open(data_stream, data_attribute)?;
-
+            match block_stream.open(data_stream, data_attribute) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                    return Err(error);
+                }
+            }
             Ok(Some(Arc::new(RwLock::new(block_stream))))
         }
     }
@@ -281,5 +336,6 @@ mod tests {
 
     // TODO: add tests for get_number_of_data_attributes
     // TODO: add tests for get_data_attribute_by_index
+
     // TODO: add tests for get_data_stream_by_name
 }

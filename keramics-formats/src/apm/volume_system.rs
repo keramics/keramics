@@ -71,8 +71,16 @@ impl ApmVolumeSystem {
                     &partition_entry.name,
                     partition_entry.status_flags,
                 );
-                partition.open(data_stream)?;
-
+                match partition.open(data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to open partition: {}", partition_index)
+                        );
+                        return Err(error);
+                    }
+                }
                 Ok(partition)
             }
             None => {
@@ -89,8 +97,13 @@ impl ApmVolumeSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_partition_map(data_stream)?;
-
+        match self.read_partition_map(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read partition map");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -107,8 +120,18 @@ impl ApmVolumeSystem {
         loop {
             let mut partition_map_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
 
-            partition_map_entry
-                .read_at_position(data_stream, SeekFrom::Start(partition_map_entry_offset))?;
+            match partition_map_entry
+                .read_at_position(data_stream, SeekFrom::Start(partition_map_entry_offset))
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read partition map entry"
+                    );
+                    return Err(error);
+                }
+            }
             if partition_map_entry_index == 0 {
                 if partition_map_entry.type_identifier != APM_PARTITION_MAP_TYPE.as_slice() {
                     return Err(keramics_core::error_trace_new!(format!(

@@ -55,36 +55,70 @@ impl ExtBlockNumbersTree {
     ) -> Result<(), ErrorTrace> {
         let mut logical_block_number: u64 = 0;
 
-        self.read_node_data(
+        match self.read_node_data(
             &data_reference[0..48],
             data_stream,
             &mut logical_block_number,
             block_ranges,
             0,
-        )?;
-        self.read_node_data(
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read direct block numbers");
+                return Err(error);
+            }
+        }
+        match self.read_node_data(
             &data_reference[48..52],
             data_stream,
             &mut logical_block_number,
             block_ranges,
             1,
-        )?;
-        self.read_node_data(
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read indirect block numbers"
+                );
+                return Err(error);
+            }
+        }
+        match self.read_node_data(
             &data_reference[52..56],
             data_stream,
             &mut logical_block_number,
             block_ranges,
             2,
-        )?;
-        self.read_node_data(
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read double indirect block numbers"
+                );
+                return Err(error);
+            }
+        }
+        match self.read_node_data(
             &data_reference[56..60],
             data_stream,
             &mut logical_block_number,
             block_ranges,
             3,
-        )?;
-        if self.mediator.debug_output && block_ranges.len() > 0 {
-            let last_block_range: &ExtBlockRange = &block_ranges[block_ranges.len() - 1];
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read tripple indirect block numbers"
+                );
+                return Err(error);
+            }
+        }
+        let number_of_ranges: usize = block_ranges.len();
+        if self.mediator.debug_output && number_of_ranges > 0 {
+            let last_block_range: &ExtBlockRange = &block_ranges[number_of_ranges - 1];
 
             self.mediator
                 .debug_print(format!("{:#?}\n\n", last_block_range));
@@ -115,8 +149,6 @@ impl ExtBlockNumbersTree {
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
-        let mut number_of_ranges: usize = block_ranges.len();
-
         for data_offset in (0..data_size).step_by(4) {
             if *logical_block_number >= self.number_of_blocks {
                 break;
@@ -126,13 +158,25 @@ impl ExtBlockNumbersTree {
             if block_number != 0 && depth > 0 {
                 let sub_node_offset: u64 = (block_number as u64) * (self.block_size as u64);
 
-                self.read_node_at_position(
+                match self.read_node_at_position(
                     data_stream,
                     SeekFrom::Start(sub_node_offset),
                     logical_block_number,
                     block_ranges,
                     depth,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read sub node at offset: {} (0x{:08x})",
+                                sub_node_offset, sub_node_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
                 continue;
             }
             let mut number_of_blocks: u64 = 1;
@@ -147,6 +191,7 @@ impl ExtBlockNumbersTree {
             }
             let mut create_new_block_range: bool = true;
 
+            let number_of_ranges: usize = block_ranges.len();
             if number_of_ranges > 0 {
                 let last_block_range: &mut ExtBlockRange = &mut block_ranges[number_of_ranges - 1];
 
@@ -169,7 +214,7 @@ impl ExtBlockNumbersTree {
                         }
                     }
                 }
-            };
+            }
             if create_new_block_range {
                 if self.mediator.debug_output {
                     if number_of_ranges > 0 {
@@ -191,8 +236,6 @@ impl ExtBlockNumbersTree {
                     range_type,
                 );
                 block_ranges.push(block_range);
-
-                number_of_ranges += 1;
             }
             *logical_block_number += number_of_blocks;
         }

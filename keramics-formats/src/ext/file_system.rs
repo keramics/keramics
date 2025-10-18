@@ -130,11 +130,23 @@ impl ExtFileSystem {
                 inode_number
             )));
         }
-        let inode: ExtInode = self.inode_table.get_inode(data_stream, inode_number)?;
-
-        let file_entry: ExtFileEntry =
-            ExtFileEntry::new(data_stream, &self.inode_table, inode_number, inode, None);
-        Ok(file_entry)
+        let inode: ExtInode = match self.inode_table.get_inode(data_stream, inode_number) {
+            Ok(inode) => inode,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve inode: {}", inode_number)
+                );
+                return Err(error);
+            }
+        };
+        Ok(ExtFileEntry::new(
+            data_stream,
+            &self.inode_table,
+            inode_number,
+            inode,
+            None,
+        ))
     }
 
     /// Retrieves the file entry for a specific path.
@@ -145,21 +157,59 @@ impl ExtFileSystem {
         if path.is_empty() || path.components[0].len() != 0 {
             return Ok(None);
         }
-        let mut file_entry: ExtFileEntry = self.get_root_directory()?;
-
+        let result: Option<ExtFileEntry> = match self.get_root_directory() {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                return Err(error);
+            }
+        };
+        let mut file_entry: ExtFileEntry = match result {
+            Some(file_entry) => file_entry,
+            None => return Ok(None),
+        };
         // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
-            file_entry = match file_entry.get_sub_file_entry_by_name(path_component)? {
+            let result: Option<ExtFileEntry> =
+                match file_entry.get_sub_file_entry_by_name(path_component) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve sub file entry: {}",
+                                path_component.to_string()
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
+            file_entry = match result {
                 Some(file_entry) => file_entry,
                 None => return Ok(None),
-            }
+            };
         }
         Ok(Some(file_entry))
     }
 
     /// Retrieves the root directory (file entry).
-    pub fn get_root_directory(&self) -> Result<ExtFileEntry, ErrorTrace> {
-        self.get_file_entry_by_identifier(EXT_ROOT_DIRECTORY_IDENTIFIER)
+    pub fn get_root_directory(&self) -> Result<Option<ExtFileEntry>, ErrorTrace> {
+        if self.number_of_inodes == 0 {
+            return Ok(None);
+        }
+        match self.get_file_entry_by_identifier(EXT_ROOT_DIRECTORY_IDENTIFIER) {
+            Ok(file_entry) => Ok(Some(file_entry)),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve file entry: {}",
+                        EXT_ROOT_DIRECTORY_IDENTIFIER
+                    )
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Reads a file system from a data stream.
@@ -167,8 +217,13 @@ impl ExtFileSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_block_groups(data_stream)?;
-
+        match self.read_block_groups(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read block groups");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -226,8 +281,22 @@ impl ExtFileSystem {
                 }
                 if block_group_number == 0 {
                     let mut superblock: ExtSuperblock = ExtSuperblock::new();
-                    superblock.read_at_position(data_stream, SeekFrom::Start(superblock_offset))?;
 
+                    match superblock
+                        .read_at_position(data_stream, SeekFrom::Start(superblock_offset))
+                    {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read superblock at offset: {} (0x{:08x})",
+                                    superblock_offset, superblock_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
                     self.features.initialize(&superblock);
 
                     number_of_block_groups = superblock.get_number_of_block_groups();
@@ -334,8 +403,21 @@ impl ExtFileSystem {
                     first_group_number,
                     number_of_group_descriptors,
                 );
-                group_descriptor_table
-                    .read_at_position(data_stream, SeekFrom::Start(group_descriptor_offset))?;
+                match group_descriptor_table
+                    .read_at_position(data_stream, SeekFrom::Start(group_descriptor_offset))
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read group descriptor table at offset: {} (0x{:08x})",
+                                group_descriptor_offset, group_descriptor_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
                 if !self.features.has_meta_block_groups()
                     || block_group_number < meta_group_start_block_number
                 {
@@ -363,20 +445,31 @@ impl ExtFileSystem {
                 break;
             }
         }
-        match Rc::get_mut(&mut self.inode_table) {
-            Some(inode_table) => inode_table.initialize(
-                &self.features,
-                self.block_size,
-                self.inode_size,
-                number_of_inodes_per_block_group,
-                &mut group_descriptors,
-            )?,
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to initialize inode table"
-                ));
-            }
-        };
+        if number_of_inodes_per_block_group > 0 {
+            match Rc::get_mut(&mut self.inode_table) {
+                Some(inode_table) => match inode_table.initialize(
+                    &self.features,
+                    self.block_size,
+                    self.inode_size,
+                    number_of_inodes_per_block_group,
+                    &mut group_descriptors,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to initialize inode table"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to obtain mutable reference to inode table"
+                    ));
+                }
+            };
+        }
         // TODO: sanity check self.number_of_inodes and size of inode table.
 
         Ok(())
@@ -467,7 +560,7 @@ mod tests {
     fn test_get_root_directory() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
-        let file_entry: ExtFileEntry = file_system.get_root_directory()?;
+        let file_entry: ExtFileEntry = file_system.get_root_directory()?.unwrap();
 
         assert_eq!(file_entry.inode_number, 2);
 

@@ -47,8 +47,16 @@ impl VhdxParentLocator {
             self.mediator
                 .debug_print(VhdxParentLocatorHeader::debug_read_data(data));
         }
-        parent_locator_header.read_data(data)?;
-
+        match parent_locator_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read parent locator header"
+                );
+                return Err(error);
+            }
+        }
         let mut data_offset: usize = 20;
         let data_size: usize = data.len();
 
@@ -68,7 +76,19 @@ impl VhdxParentLocator {
                         &data[data_offset..data_end_offset],
                     ));
             }
-            parent_locator_entry.read_data(&data[data_offset..data_end_offset])?;
+            match parent_locator_entry.read_data(&data[data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read parent locator entry: {}",
+                            parent_locator_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            }
             data_offset = data_end_offset;
 
             if parent_locator_entry.key_data_offset < 20

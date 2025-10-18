@@ -23,13 +23,6 @@ pub struct ExtPath {
 impl ExtPath {
     const COMPONENT_SEPARATOR: &'static str = "/";
 
-    /// Creates a new path.
-    pub fn new() -> Self {
-        Self {
-            components: vec![ByteString::new()],
-        }
-    }
-
     /// Creates a new path of the current path and additional path components.
     pub fn new_with_join(&self, path_components: &[ByteString]) -> Self {
         let mut components: Vec<ByteString> = self.components.clone();
@@ -64,8 +57,9 @@ impl ExtPath {
                 .position(|value| *value == 0x2e)
             {
                 Some(value_index) => {
-                    // Note that value_index is relative to byte_string.element[1..]
-                    Some(ByteString::from(&byte_string.elements[value_index + 2..]))
+                    // Note that value_index is relative to the end of the string.
+                    let string_index: usize = byte_string.elements.len() - value_index;
+                    Some(ByteString::from(&byte_string.elements[string_index..]))
                 }
                 None => None,
             },
@@ -84,8 +78,9 @@ impl ExtPath {
                 .position(|value| *value == 0x2e)
             {
                 Some(value_index) => {
-                    // Note that value_index is relative to byte_string.element[1..]
-                    Some(ByteString::from(&byte_string.elements[0..value_index + 1]))
+                    // Note that value_index is relative to the end of the string.
+                    let string_size: usize = byte_string.elements.len() - value_index - 1;
+                    Some(ByteString::from(&byte_string.elements[0..string_size]))
                 }
                 None => Some(byte_string.clone()),
             },
@@ -117,30 +112,33 @@ impl ExtPath {
     pub fn to_string(&self) -> String {
         let number_of_components: usize = self.components.len();
         if number_of_components == 1 && self.components[0].is_empty() {
-            ExtPath::COMPONENT_SEPARATOR.to_string()
+            Self::COMPONENT_SEPARATOR.to_string()
         } else {
             self.components
                 .iter()
                 .map(|component| component.to_string())
                 .collect::<Vec<String>>()
-                .join(ExtPath::COMPONENT_SEPARATOR)
+                .join(Self::COMPONENT_SEPARATOR)
         }
     }
 }
 
 impl From<&str> for ExtPath {
     /// Converts a [`&str`] into a [`ExtPath`]
-    fn from(string: &str) -> ExtPath {
-        let components: Vec<ByteString> = if string == ExtPath::COMPONENT_SEPARATOR {
+    fn from(string: &str) -> Self {
+        let components: Vec<ByteString> = if string.is_empty() {
+            // Splitting "" results in [""]
+            vec![]
+        } else if string == Self::COMPONENT_SEPARATOR {
             // Splitting "/" results in ["", ""]
             vec![ByteString::new()]
         } else {
             string
-                .split(ExtPath::COMPONENT_SEPARATOR)
+                .split(Self::COMPONENT_SEPARATOR)
                 .map(|component| ByteString::from(component))
                 .collect::<Vec<ByteString>>()
         };
-        ExtPath {
+        Self {
             components: components,
         }
     }
@@ -148,53 +146,75 @@ impl From<&str> for ExtPath {
 
 impl From<&String> for ExtPath {
     /// Converts a [`&String`] into a [`ExtPath`]
-    #[inline]
-    fn from(string: &String) -> ExtPath {
-        ExtPath::from(string.as_str())
+    #[inline(always)]
+    fn from(string: &String) -> Self {
+        Self::from(string.as_str())
     }
 }
 
-impl From<&Vec<ByteString>> for ExtPath {
-    /// Converts a [`&Vec<ByteString>`] into a [`ExtPath`]
+impl From<&[&str]> for ExtPath {
+    /// Converts a [`&[&str]`] into a [`ExtPath`]
     #[inline]
-    fn from(path_components: &Vec<ByteString>) -> ExtPath {
-        ExtPath {
-            components: path_components.clone(),
+    fn from(path_components: &[&str]) -> Self {
+        let components: Vec<ByteString> = path_components
+            .iter()
+            .map(|component| ByteString::from(*component))
+            .collect::<Vec<ByteString>>();
+
+        Self {
+            components: components,
+        }
+    }
+}
+
+impl From<&[ByteString]> for ExtPath {
+    /// Converts a [`&[ByteString]`] into a [`ExtPath`]
+    #[inline]
+    fn from(path_components: &[ByteString]) -> Self {
+        Self {
+            components: path_components.to_vec(),
+        }
+    }
+}
+
+impl From<&[String]> for ExtPath {
+    /// Converts a [`&[String]`] into a [`ExtPath`]
+    #[inline]
+    fn from(path_components: &[String]) -> Self {
+        let components: Vec<ByteString> = path_components
+            .iter()
+            .map(|component| ByteString::from(component))
+            .collect::<Vec<ByteString>>();
+
+        Self {
+            components: components,
         }
     }
 }
 
 impl From<&Vec<&str>> for ExtPath {
     /// Converts a [`&Vec<&str>`] into a [`ExtPath`]
+    #[inline(always)]
+    fn from(path_components: &Vec<&str>) -> Self {
+        Self::from(path_components.as_slice())
+    }
+}
+
+impl From<&Vec<ByteString>> for ExtPath {
+    /// Converts a [`&Vec<ByteString>`] into a [`ExtPath`]
     #[inline]
-    fn from(path_components: &Vec<&str>) -> ExtPath {
-        let mut components: Vec<ByteString> = vec![ByteString::new()];
-        components.append(
-            &mut path_components
-                .iter()
-                .map(|component| ByteString::from(*component))
-                .collect::<Vec<ByteString>>(),
-        );
-        ExtPath {
-            components: components,
+    fn from(path_components: &Vec<ByteString>) -> Self {
+        Self {
+            components: path_components.clone(),
         }
     }
 }
 
 impl From<&Vec<String>> for ExtPath {
     /// Converts a [`&Vec<String>`] into a [`ExtPath`]
-    #[inline]
-    fn from(path_components: &Vec<String>) -> ExtPath {
-        let mut components: Vec<ByteString> = vec![ByteString::new()];
-        components.append(
-            &mut path_components
-                .iter()
-                .map(|component| ByteString::from(component))
-                .collect::<Vec<ByteString>>(),
-        );
-        ExtPath {
-            components: components,
-        }
+    #[inline(always)]
+    fn from(path_components: &Vec<String>) -> Self {
+        Self::from(path_components.as_slice())
     }
 }
 
@@ -203,19 +223,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new_with_parent_directory() {
-        let ext_path: ExtPath = ExtPath::from("/directory/filename.txt");
-
-        let test_struct: ExtPath = ext_path.new_with_parent_directory();
-        assert_eq!(test_struct.to_string(), "/directory");
-    }
-
-    #[test]
     fn test_new_with_join() {
         let ext_path: ExtPath = ExtPath::from("/directory");
 
         let test_struct: ExtPath = ext_path.new_with_join(&[ByteString::from("filename.txt")]);
         assert_eq!(test_struct.to_string(), "/directory/filename.txt");
+    }
+
+    #[test]
+    fn test_new_with_parent_directory() {
+        let ext_path: ExtPath = ExtPath::from("/directory/filename.txt");
+
+        let test_struct: ExtPath = ext_path.new_with_parent_directory();
+        assert_eq!(test_struct.to_string(), "/directory");
     }
 
     #[test]
@@ -275,8 +295,38 @@ mod tests {
         assert_eq!(result, Some(&ByteString::from("")));
     }
 
-    // TODO: add tests for is_empty
-    // TODO: add tests for push
+    #[test]
+    fn test_is_empty() {
+        let test_struct: ExtPath = ExtPath::from("/directory/filename.txt");
+        assert_eq!(test_struct.is_empty(), false);
+
+        let test_struct: ExtPath = ExtPath::from("");
+        assert_eq!(test_struct.is_empty(), true);
+    }
+
+    #[test]
+    fn test_push() {
+        let mut test_struct: ExtPath = ExtPath::from("/directory");
+        assert_eq!(test_struct.to_string(), "/directory");
+        assert_eq!(
+            test_struct,
+            ExtPath {
+                components: vec![ByteString::from(""), ByteString::from("directory")]
+            }
+        );
+
+        test_struct.push(ByteString::from("filename.txt"));
+        assert_eq!(
+            test_struct,
+            ExtPath {
+                components: vec![
+                    ByteString::from(""),
+                    ByteString::from("directory"),
+                    ByteString::from("filename.txt")
+                ]
+            }
+        );
+    }
 
     #[test]
     fn test_to_string() {
@@ -297,15 +347,51 @@ mod tests {
     fn test_from_str() {
         let test_struct: ExtPath = ExtPath::from("/");
         assert_eq!(test_struct.components.len(), 1);
+        assert_eq!(
+            test_struct,
+            ExtPath {
+                components: vec![ByteString::from("")]
+            }
+        );
 
         let test_struct: ExtPath = ExtPath::from("/directory");
         assert_eq!(test_struct.components.len(), 2);
+        assert_eq!(
+            test_struct,
+            ExtPath {
+                components: vec![ByteString::from(""), ByteString::from("directory")]
+            }
+        );
 
         let test_struct: ExtPath = ExtPath::from("/directory/filename.txt");
         assert_eq!(test_struct.components.len(), 3);
+        assert_eq!(
+            test_struct,
+            ExtPath {
+                components: vec![
+                    ByteString::from(""),
+                    ByteString::from("directory"),
+                    ByteString::from("filename.txt")
+                ]
+            }
+        );
 
         let test_struct: ExtPath = ExtPath::from("/directory/");
         assert_eq!(test_struct.components.len(), 3);
+        assert_eq!(
+            test_struct,
+            ExtPath {
+                components: vec![
+                    ByteString::from(""),
+                    ByteString::from("directory"),
+                    ByteString::from("")
+                ]
+            }
+        );
+
+        let test_struct: ExtPath = ExtPath::from("");
+        assert_eq!(test_struct.components.len(), 0);
+        assert_eq!(test_struct, ExtPath { components: vec![] });
     }
 
     #[test]
@@ -325,43 +411,104 @@ mod tests {
         let string: String = String::from("/directory/");
         let test_struct: ExtPath = ExtPath::from(&string);
         assert_eq!(test_struct.components.len(), 3);
+
+        let string: String = String::from("");
+        let test_struct: ExtPath = ExtPath::from(&string);
+        assert_eq!(test_struct.components.len(), 0);
+    }
+
+    #[test]
+    fn test_from_str_slice() {
+        let str_array: [&str; 1] = [""];
+        let test_struct: ExtPath = ExtPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 1);
+
+        let str_array: [&str; 2] = ["", "directory"];
+        let test_struct: ExtPath = ExtPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 2);
+
+        let str_array: [&str; 3] = ["", "directory", "filename.txt"];
+        let test_struct: ExtPath = ExtPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+
+        let str_array: [&str; 3] = ["", "directory", ""];
+        let test_struct: ExtPath = ExtPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+    }
+
+    // TODO: add tests for from_byte_string_slice
+
+    #[test]
+    fn test_from_string_slice() {
+        let string_array: [String; 1] = [String::from("")];
+        let test_struct: ExtPath = ExtPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 1);
+
+        let string_array: [String; 2] = [String::from(""), String::from("directory")];
+        let test_struct: ExtPath = ExtPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 2);
+
+        let string_array: [String; 3] = [
+            String::from(""),
+            String::from("directory"),
+            String::from("filename.txt"),
+        ];
+        let test_struct: ExtPath = ExtPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+
+        let string_array: [String; 3] = [
+            String::from(""),
+            String::from("directory"),
+            String::from(""),
+        ];
+        let test_struct: ExtPath = ExtPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
     }
 
     #[test]
     fn test_from_str_vector() {
-        let str_vector: Vec<&str> = vec![];
+        let str_vector: Vec<&str> = vec![""];
         let test_struct: ExtPath = ExtPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 1);
 
-        let str_vector: Vec<&str> = vec!["directory"];
+        let str_vector: Vec<&str> = vec!["", "directory"];
         let test_struct: ExtPath = ExtPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 2);
 
-        let str_vector: Vec<&str> = vec!["directory", "filename.txt"];
+        let str_vector: Vec<&str> = vec!["", "directory", "filename.txt"];
         let test_struct: ExtPath = ExtPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 3);
 
-        let str_vector: Vec<&str> = vec!["directory", ""];
+        let str_vector: Vec<&str> = vec!["", "directory", ""];
         let test_struct: ExtPath = ExtPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 3);
     }
 
+    // TODO: add tests for from_byte_string_vector
+
     #[test]
     fn test_from_string_vector() {
-        let string_vector: Vec<String> = vec![];
+        let string_vector: Vec<String> = vec![String::from("")];
         let test_struct: ExtPath = ExtPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 1);
 
-        let string_vector: Vec<String> = vec![String::from("directory")];
+        let string_vector: Vec<String> = vec![String::from(""), String::from("directory")];
         let test_struct: ExtPath = ExtPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 2);
 
-        let string_vector: Vec<String> =
-            vec![String::from("directory"), String::from("filename.txt")];
+        let string_vector: Vec<String> = vec![
+            String::from(""),
+            String::from("directory"),
+            String::from("filename.txt"),
+        ];
         let test_struct: ExtPath = ExtPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 3);
 
-        let string_vector: Vec<String> = vec![String::from("directory"), String::from("")];
+        let string_vector: Vec<String> = vec![
+            String::from(""),
+            String::from("directory"),
+            String::from(""),
+        ];
         let test_struct: ExtPath = ExtPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 3);
     }

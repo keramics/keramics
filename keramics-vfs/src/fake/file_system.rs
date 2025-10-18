@@ -95,11 +95,11 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let fake_file_system: FakeFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/file.txt");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
         let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/bogus.txt");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
         let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 

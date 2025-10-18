@@ -36,6 +36,7 @@ mod index_entry_header;
 mod index_node_header;
 mod index_root_header;
 mod index_value;
+mod junction_reparse_data;
 mod master_file_table;
 mod mft_attribute;
 mod mft_attribute_group;

@@ -26,6 +26,17 @@ pub enum VfsString {
 }
 
 impl VfsString {
+    /// Determines if the VFS string is empty.
+    pub fn is_empty(&self) -> bool {
+        match self {
+            VfsString::Byte(byte_string) => byte_string.is_empty(),
+            VfsString::Empty => true,
+            VfsString::OsString(os_string) => os_string.is_empty(),
+            VfsString::String(string) => string.is_empty(),
+            VfsString::Ucs2(ucs2_string) => ucs2_string.is_empty(),
+        }
+    }
+
     /// Converts the VFS string to a `String`.
     pub fn to_string(&self) -> String {
         match self {

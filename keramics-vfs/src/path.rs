@@ -20,22 +20,20 @@ use keramics_formats::ntfs::NtfsPath;
 use keramics_types::{ByteString, Ucs2String};
 
 use super::enums::VfsType;
+use super::string_path::StringPath;
 
 /// Virtual File System (VFS) path.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VfsPath {
     Ext(ExtPath),
     Ntfs(NtfsPath),
     Os(PathBuf),
-    String(Vec<String>),
+    String(StringPath),
 }
 
 impl VfsPath {
-    /// String path component separator.
-    const COMPONENT_SEPARATOR: &'static str = "/";
-
-    /// Creates a new path.
-    pub fn new(vfs_type: &VfsType, path: &str) -> Self {
+    /// Creates a new VFS path based on the path string.
+    pub fn from_path(vfs_type: &VfsType, path: &str) -> Self {
         match vfs_type {
             VfsType::Apm
             | VfsType::Ewf
@@ -46,24 +44,33 @@ impl VfsPath {
             | VfsType::SparseImage
             | VfsType::Udif
             | VfsType::Vhd
-            | VfsType::Vhdx => {
-                let string_path_components: Vec<String> = if path == VfsPath::COMPONENT_SEPARATOR {
-                    // Splitting "/" results in ["", ""]
-                    vec![String::new()]
-                } else {
-                    path.split(VfsPath::COMPONENT_SEPARATOR)
-                        .map(|component| component.to_string())
-                        .collect::<Vec<String>>()
-                };
-                VfsPath::String(string_path_components)
-            }
+            | VfsType::Vhdx => VfsPath::String(StringPath::from(path)),
             VfsType::Ext => VfsPath::Ext(ExtPath::from(path)),
             VfsType::Ntfs => VfsPath::Ntfs(NtfsPath::from(path)),
             VfsType::Os => VfsPath::Os(PathBuf::from(path)),
         }
     }
 
-    /// Creates a new path of the current path and additional path components.
+    /// Creates a new VFS path based on the path components.
+    pub fn from_path_components(vfs_type: &VfsType, path_components: &[&str]) -> Self {
+        match vfs_type {
+            VfsType::Apm
+            | VfsType::Ewf
+            | VfsType::Fake
+            | VfsType::Gpt
+            | VfsType::Mbr
+            | VfsType::Qcow
+            | VfsType::SparseImage
+            | VfsType::Udif
+            | VfsType::Vhd
+            | VfsType::Vhdx => VfsPath::String(StringPath::from(path_components)),
+            VfsType::Ext => VfsPath::Ext(ExtPath::from(path_components)),
+            VfsType::Ntfs => VfsPath::Ntfs(NtfsPath::from(path_components)),
+            VfsType::Os => VfsPath::Os(PathBuf::from_iter(path_components)),
+        }
+    }
+
+    /// Creates a new VFS path of the current path and additional path components.
     pub fn new_with_join(&self, path_components: &[PathComponent]) -> Result<Self, ErrorTrace> {
         let vfs_path: VfsPath = match self {
             VfsPath::Ext(ext_path) => {
@@ -120,8 +127,8 @@ impl VfsPath {
                 }
                 VfsPath::Os(new_path_buf)
             }
-            VfsPath::String(string_path_components) => {
-                let mut string_path_components: Vec<String> = string_path_components.clone();
+            VfsPath::String(string_path) => {
+                let mut string_path_components: Vec<String> = string_path.components.clone();
 
                 for path_component in path_components {
                     let string: String = match path_component {
@@ -134,13 +141,15 @@ impl VfsPath {
                     };
                     string_path_components.push(string);
                 }
-                VfsPath::String(string_path_components)
+                VfsPath::String(StringPath {
+                    components: string_path_components,
+                })
             }
         };
         Ok(vfs_path)
     }
 
-    /// Creates a new path of the parent directory of the current path.
+    /// Creates a new VFS path of the parent directory of the current path.
     pub fn new_with_parent_directory(&self) -> Self {
         match self {
             VfsPath::Ext(ext_path) => {
@@ -157,12 +166,9 @@ impl VfsPath {
 
                 VfsPath::Os(new_path_buf)
             }
-            VfsPath::String(string_path_components) => {
-                let mut number_of_components: usize = string_path_components.len();
-                if number_of_components > 1 {
-                    number_of_components -= 1;
-                }
-                VfsPath::String(string_path_components[0..number_of_components].to_vec())
+            VfsPath::String(string_path) => {
+                let parent_string_path: StringPath = string_path.new_with_parent_directory();
+                VfsPath::String(parent_string_path)
             }
         }
     }
@@ -182,33 +188,21 @@ impl VfsPath {
                 Some(os_str) => Some(PathComponent::String(os_str.to_str().unwrap().to_string())),
                 None => None,
             },
-            VfsPath::String(string_path_components) => {
-                let mut number_of_components: usize = string_path_components.len();
-                if number_of_components > 1 {
-                    number_of_components -= 1;
-                }
-                Some(PathComponent::String(
-                    string_path_components[number_of_components].clone(),
-                ))
-            }
+            VfsPath::String(string_path) => match string_path.file_name() {
+                Some(string) => Some(PathComponent::String(string.clone())),
+                None => None,
+            },
         }
     }
 
-    /// Retrieves a string representation of the path.
+    /// Retrieves a string representation of the VFS path.
     pub fn to_string(&self) -> String {
         match self {
             VfsPath::Ext(ext_path) => ext_path.to_string(),
             VfsPath::Ntfs(ntfs_path) => ntfs_path.to_string(),
             // TODO: change to_string_lossy to a non-lossy conversion
             VfsPath::Os(path_buf) => path_buf.to_string_lossy().to_string(),
-            VfsPath::String(string_path_components) => {
-                let number_of_components: usize = string_path_components.len();
-                if number_of_components == 1 && string_path_components[0].is_empty() {
-                    VfsPath::COMPONENT_SEPARATOR.to_string()
-                } else {
-                    string_path_components.join(VfsPath::COMPONENT_SEPARATOR)
-                }
-            }
+            VfsPath::String(string_path) => string_path.to_string(),
         }
     }
 }
@@ -218,41 +212,60 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new() {
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/ext1");
+    fn test_from_path() {
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/ext1");
         assert!(matches!(vfs_path, VfsPath::Ext(_)));
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ntfs, "\\ntfs1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\ntfs1");
         assert!(matches!(vfs_path, VfsPath::Ntfs(_)));
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "/os1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/os1");
         assert!(matches!(vfs_path, VfsPath::Os(_)));
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/apm1");
+        assert!(matches!(vfs_path, VfsPath::String(_)));
+    }
+
+    #[test]
+    fn test_from_path_components() {
+        let path_components: [&str; 1] = ["ext1"];
+        let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Ext, &path_components);
+        assert!(matches!(vfs_path, VfsPath::Ext(_)));
+
+        let path_components: [&str; 1] = ["ntfs1"];
+        let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Ntfs, &path_components);
+        assert!(matches!(vfs_path, VfsPath::Ntfs(_)));
+
+        let path_components: [&str; 1] = ["os1"];
+        let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Os, &path_components);
+        assert!(matches!(vfs_path, VfsPath::Os(_)));
+
+        let path_components: [&str; 1] = ["apm1"];
+        let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Apm, &path_components);
         assert!(matches!(vfs_path, VfsPath::String(_)));
     }
 
     #[test]
     fn test_new_with_join() -> Result<(), ErrorTrace> {
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/");
 
         let test_path_components: [PathComponent; 1] = [PathComponent::from("ext1")];
         let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "/ext1");
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ntfs, "\\");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\");
 
         let test_path_components: [PathComponent; 1] = [PathComponent::from("ntfs1")];
         let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "\\ntfs1");
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
 
         let test_path_components: [PathComponent; 1] = [PathComponent::from("os1")];
         let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "/os1");
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/");
 
         let test_path_components: [PathComponent; 1] = [PathComponent::from("apm1")];
         let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
@@ -265,25 +278,25 @@ mod tests {
 
     #[test]
     fn test_get_file_name() {
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/ext1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/ext1");
         let result: Option<PathComponent> = vfs_path.get_file_name();
         assert_eq!(
             result,
             Some(PathComponent::ByteString(ByteString::from("ext1")))
         );
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ntfs, "\\ntfs1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\ntfs1");
         let result: Option<PathComponent> = vfs_path.get_file_name();
         assert_eq!(
             result,
             Some(PathComponent::Ucs2String(Ucs2String::from("ntfs1")))
         );
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "/os1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/os1");
         let result: Option<PathComponent> = vfs_path.get_file_name();
         assert_eq!(result, Some(PathComponent::String(String::from("os1"))));
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/apm1");
         let result: Option<PathComponent> = vfs_path.get_file_name();
         assert_eq!(result, Some(PathComponent::String(String::from("apm1"))));
     }

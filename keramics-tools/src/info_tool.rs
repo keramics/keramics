@@ -26,6 +26,7 @@ mod formatters;
 mod info;
 mod range_stream;
 
+use info::{ExtInfo, NtfsInfo};
 use range_stream::FileRangeDataStream;
 
 #[derive(Parser)]
@@ -66,9 +67,6 @@ struct EntryCommandArguments {
 
 #[derive(Args, Debug)]
 struct HierarchyCommandArguments {
-    #[arg(long, default_value_t = false)]
-    /// Output as a bodyfile
-    bodyfile: bool,
     // TODO: allow to set the path component/segment separator
     // TODO: allow to set the data stream name separator
 }
@@ -206,10 +204,10 @@ fn main() -> ExitCode {
     match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
             FormatIdentifier::Ext => {
-                info::print_entry_ext_file_system(&data_stream, command_arguments.entry)
+                ExtInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
             FormatIdentifier::Ntfs => {
-                info::print_entry_ntfs_file_system(&data_stream, command_arguments.entry)
+                NtfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
@@ -217,38 +215,38 @@ fn main() -> ExitCode {
             }
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => {
-                info::print_hierarcy_ext_file_system(&data_stream, command_arguments.bodyfile)
-            }
-            FormatIdentifier::Ntfs => {
-                info::print_hierarcy_ntfs_file_system(&data_stream, command_arguments.bodyfile)
-            }
+            FormatIdentifier::Ext => ExtInfo::print_hierarchy(&data_stream),
+            FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE
             }
         },
-        Some(Commands::Path(command_arguments)) => match &format_identifier {
+        Some(Commands::Path(command_arguments)) => {
             // TODO: detect leading partion path component and suggest/check path exists without
             // it.
-            FormatIdentifier::Ext => {
-                info::print_path_ext_file_system(&data_stream, &command_arguments.path)
+            let path_components: Vec<&str> = command_arguments.path.split('/').collect();
+
+            match &format_identifier {
+                FormatIdentifier::Ext => {
+                    ExtInfo::print_file_entry_by_path(&data_stream, &path_components)
+                }
+                FormatIdentifier::Ntfs => {
+                    NtfsInfo::print_file_entry_by_path(&data_stream, &path_components)
+                }
+                _ => {
+                    println!("Unsupported format: {}", format_identifier.to_string());
+                    ExitCode::FAILURE
+                }
             }
-            FormatIdentifier::Ntfs => {
-                info::print_path_ntfs_file_system(&data_stream, &command_arguments.path)
-            }
-            _ => {
-                println!("Unsupported format: {}", format_identifier.to_string());
-                ExitCode::FAILURE
-            }
-        },
+        }
         None => match &format_identifier {
             FormatIdentifier::Apm => info::print_apm_volume_system(&data_stream),
-            FormatIdentifier::Ext => info::print_ext_file_system(&data_stream),
+            FormatIdentifier::Ext => ExtInfo::print_file_system(&data_stream),
             FormatIdentifier::Ewf => info::print_ewf_image(&arguments.source),
             FormatIdentifier::Gpt => info::print_gpt_volume_system(&data_stream),
             FormatIdentifier::Mbr => info::print_mbr_volume_system(&data_stream),
-            FormatIdentifier::Ntfs => info::print_ntfs_file_system(&data_stream),
+            FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
             FormatIdentifier::Qcow => info::print_qcow_file(&data_stream),
             // TODO: add support for sparse bundle.
             FormatIdentifier::SparseImage => info::print_sparseimage_file(&data_stream),

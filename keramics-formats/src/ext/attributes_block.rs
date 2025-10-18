@@ -50,7 +50,10 @@ impl ExtAttributesBlock {
             if data_end_offset >= data_size {
                 break;
             }
-            if data[entry_data_offset..data_end_offset] == [0; 8] {
+            // The list terminator has the first 4 values set to 0 (8 bytes).
+            // Note that some implementations of older Android versions of ext appear to
+            // only set the first 4 bytes to 0.
+            if data[entry_data_offset..entry_data_offset + 4] == [0; 4] {
                 break;
             }
             data_end_offset += 8;
@@ -66,15 +69,25 @@ impl ExtAttributesBlock {
                         &data[entry_data_offset..data_end_offset],
                     ));
             }
-            entry.read_data(&data[entry_data_offset..data_end_offset])?;
-
+            match entry.read_data(&data[entry_data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes entry");
+                    return Err(error);
+                }
+            }
             entry_data_offset = data_end_offset;
 
             let attribute: ExtAttribute = ExtAttribute::new();
             // TODO: fill attribute
 
-            let name: ByteString = entry.read_name(&data[entry_data_offset..])?;
-
+            let name: ByteString = match entry.read_name(&data[entry_data_offset..]) {
+                Ok(name) => name,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attribute name");
+                    return Err(error);
+                }
+            };
             if self.mediator.debug_output {
                 self.mediator
                     .debug_print(format!("    attribute_name: {},\n", name.to_string()));

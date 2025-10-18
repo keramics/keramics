@@ -91,10 +91,22 @@ impl NtfsMftEntry {
             }
             let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
 
-            mft_attribute.read_data(&self.data[data_offset..])?;
+            match mft_attribute.read_data(&self.data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read MFT attribute");
+                    return Err(error);
+                }
+            }
             data_offset += mft_attribute.attribute_size as usize;
 
-            mft_attributes.add_attribute(mft_attribute)?;
+            match mft_attributes.add_attribute(mft_attribute) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to add MFT attribute");
+                    return Err(error);
+                }
+            }
         }
         Ok(())
     }
@@ -118,8 +130,13 @@ impl NtfsMftEntry {
             self.mediator
                 .debug_print(NtfsMftEntryHeader::debug_read_data(data));
         }
-        mft_entry_header.read_data(data)?;
-
+        match mft_entry_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read MFT entry header");
+                return Err(error);
+            }
+        }
         if mft_entry_header.mft_entry_size as usize != data_size {
             return Err(keramics_core::error_trace_new!(format!(
                 "Mismatch between MFT entry size in header: {} and boot record: {}",
@@ -155,11 +172,17 @@ impl NtfsMftEntry {
             )));
         }
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
-        apply_fixup_values(
+        match apply_fixup_values(
             data,
             mft_entry_header.fixup_values_offset,
             mft_entry_header.number_of_fixup_values,
-        )?;
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to apply fix-up values");
+                return Err(error);
+            }
+        }
         self.sequence_number = mft_entry_header.sequence_number;
         self.base_record_file_reference = mft_entry_header.base_record_file_reference;
         self.journal_sequence_number = mft_entry_header.journal_sequence_number;
@@ -195,8 +218,19 @@ impl NtfsMftEntry {
             ));
             self.mediator.debug_print_data(&data, true);
         }
-        self.read_data(&mut data)?;
-
+        match self.read_data(&mut data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read MFT entry at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
+        }
         self.data = data;
 
         Ok(())

@@ -28,11 +28,7 @@ macro_rules! error_trace_function {
 #[macro_export]
 macro_rules! error_trace_new {
     ( $message:expr ) => {
-        keramics_core::ErrorTrace::new(format!(
-            "{}: {}",
-            keramics_core::error_trace_function!(),
-            $message,
-        ));
+        $crate::ErrorTrace::new(format!("{}: {}", $crate::error_trace_function!(), $message,))
     };
 }
 
@@ -40,12 +36,12 @@ macro_rules! error_trace_new {
 #[macro_export]
 macro_rules! error_trace_new_with_error {
     ( $message:expr, $error:expr ) => {
-        keramics_core::ErrorTrace::new(format!(
+        $crate::ErrorTrace::new(format!(
             "{}: {} with error: {}",
-            keramics_core::error_trace_function!(),
+            $crate::error_trace_function!(),
             $message,
             $error.to_string(),
-        ));
+        ))
     };
 }
 
@@ -53,11 +49,7 @@ macro_rules! error_trace_new_with_error {
 #[macro_export]
 macro_rules! error_trace_add_frame {
     ( $error:expr, $message:expr ) => {
-        $error.add_frame(format!(
-            "{}: {}",
-            keramics_core::error_trace_function!(),
-            $message,
-        ));
+        $error.add_frame(format!("{}: {}", $crate::error_trace_function!(), $message,))
     };
 }
 
@@ -69,7 +61,7 @@ macro_rules! data_stream_get_size {
             Ok(mut data_stream) => match data_stream.get_size() {
                 Ok(size) => size,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
+                    $crate::error_trace_add_frame!(
                         error,
                         "Unable to determine size of data stream"
                     );
@@ -77,7 +69,7 @@ macro_rules! data_stream_get_size {
                 }
             },
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                return Err($crate::error_trace_new_with_error!(
                     "Unable to obtain write lock on data stream",
                     error
                 ));
@@ -94,12 +86,12 @@ macro_rules! data_stream_read_at_position {
             Ok(mut data_stream) => match data_stream.read_at_position($buf, $pos) {
                 Ok(read_count) => read_count,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read from data stream");
+                    $crate::error_trace_add_frame!(error, "Unable to read from data stream");
                     return Err(error);
                 }
             },
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                return Err($crate::error_trace_new_with_error!(
                     "Unable to obtain write lock on data stream",
                     error
                 ));
@@ -116,12 +108,12 @@ macro_rules! data_stream_read_exact_at_position {
             Ok(mut data_stream) => match data_stream.read_exact_at_position($buf, $pos) {
                 Ok(offset) => offset,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read from data stream");
+                    $crate::error_trace_add_frame!(error, "Unable to read from data stream");
                     return Err(error);
                 }
             },
             Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+                return Err($crate::error_trace_new_with_error!(
                     "Unable to obtain write lock on data stream",
                     error
                 ));

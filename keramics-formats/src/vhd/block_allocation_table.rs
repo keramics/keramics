@@ -104,8 +104,16 @@ impl VhdBlockAllocationTable {
             self.mediator
                 .debug_print(VhdBlockAllocationTableEntry::debug_read_data(&data));
         }
-        entry.read_data(&data)?;
-
+        match entry.read_data(&data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read block allocation table"
+                );
+                return Err(error);
+            }
+        }
         Ok(entry)
     }
 }

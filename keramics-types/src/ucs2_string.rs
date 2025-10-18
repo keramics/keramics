@@ -47,9 +47,16 @@ impl Ucs2String {
 
     /// Reads a little-endian UCS-2 string from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
+        let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
-        Ucs2String::read_elements_le(&mut elements, data);
 
+        for data_offset in (0..data_size).step_by(2) {
+            let value_16bit: u16 = bytes_to_u16_le!(data, data_offset);
+            if value_16bit == 0 {
+                break;
+            }
+            elements.push(value_16bit);
+        }
         Self { elements: elements }
     }
 
@@ -63,10 +70,10 @@ impl Ucs2String {
         self.elements.len()
     }
 
-    // TODO: add read_elements_be
+    // TODO: add read_data_be
 
-    /// Reads a little-endian UCS-2 string from a byte sequence.
-    pub fn read_elements_le(elements: &mut Vec<u16>, data: &[u8]) {
+    /// Reads a little-endian UCS-2 string from a buffer.
+    pub fn read_data_le(&mut self, data: &[u8]) {
         let data_size: usize = data.len();
 
         for data_offset in (0..data_size).step_by(2) {
@@ -74,7 +81,7 @@ impl Ucs2String {
             if value_16bit == 0 {
                 break;
             }
-            elements.push(value_16bit);
+            self.elements.push(value_16bit);
         }
     }
 
@@ -218,8 +225,8 @@ mod tests {
         assert_eq!(ucs2_string.len(), 12);
     }
 
-    // TODO: add tests for read_elements_be
-    // TODO: add tests for read_elements_le
+    // TODO: add tests for read_data_be
+    // TODO: add tests for read_data_le
 
     #[test]
     fn test_compare() {

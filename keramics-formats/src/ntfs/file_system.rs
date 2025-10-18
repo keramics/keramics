@@ -120,8 +120,16 @@ impl NtfsFileSystem {
                 mft_entry_number
             )));
         }
-        let mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, mft_entry_number)?;
-
+        let mft_entry: NtfsMftEntry = match self.mft.get_entry(data_stream, mft_entry_number) {
+            Ok(mft_entry) => mft_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve MFT entry: {}", mft_entry_number)
+                );
+                return Err(error);
+            }
+        };
         let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
             data_stream,
             &self.mft,
@@ -131,8 +139,13 @@ impl NtfsFileSystem {
             None,
             None,
         );
-        file_entry.read_attributes()?;
-
+        match file_entry.read_attributes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         Ok(file_entry)
     }
 
@@ -144,11 +157,27 @@ impl NtfsFileSystem {
         if path.is_empty() || path.components[0].len() != 0 {
             return Ok(None);
         }
-        let mut file_entry: NtfsFileEntry = self.get_root_directory()?;
-
+        let mut file_entry: NtfsFileEntry = match self.get_root_directory() {
+            Ok(file_entry) => file_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                return Err(error);
+            }
+        };
         // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
-            file_entry = match file_entry.get_sub_file_entry_by_name(path_component)? {
+            let result: Option<NtfsFileEntry> =
+                match file_entry.get_sub_file_entry_by_name(path_component) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve sub file entry: {}", path.to_string())
+                        );
+                        return Err(error);
+                    }
+                };
+            file_entry = match result {
                 Some(file_entry) => file_entry,
                 None => return Ok(None),
             }
@@ -158,7 +187,13 @@ impl NtfsFileSystem {
 
     /// Retrieves the root directory (file entry).
     pub fn get_root_directory(&self) -> Result<NtfsFileEntry, ErrorTrace> {
-        self.get_file_entry_by_identifier(NTFS_ROOT_DIRECTORY_IDENTIFIER)
+        match self.get_file_entry_by_identifier(NTFS_ROOT_DIRECTORY_IDENTIFIER) {
+            Ok(file_entry) => Ok(file_entry),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                return Err(error);
+            }
+        }
     }
 
     // TODO: add method to retrieve USN journal file entry
@@ -168,8 +203,13 @@ impl NtfsFileSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_metadata(data_stream)?;
-
+        match self.read_metadata(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -178,20 +218,45 @@ impl NtfsFileSystem {
     /// Reads the boot record, master file table and security descriptors.
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut boot_record: NtfsBootRecord = NtfsBootRecord::new();
-        boot_record.read_at_position(data_stream, SeekFrom::Start(0))?;
 
+        match boot_record.read_at_position(data_stream, SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read boot record");
+                return Err(error);
+            }
+        }
         self.bytes_per_sector = boot_record.bytes_per_sector;
         self.cluster_block_size = boot_record.cluster_block_size;
         self.mft_entry_size = boot_record.mft_entry_size;
         self.index_entry_size = boot_record.index_entry_size;
         self.volume_serial_number = boot_record.volume_serial_number;
 
-        self.read_master_file_table(data_stream, boot_record.mft_block_number)?;
-        self.read_volume_information(data_stream)?;
-        self.read_case_folding_mappings(data_stream)?;
-
+        match self.read_master_file_table(data_stream, boot_record.mft_block_number) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read master file table");
+                return Err(error);
+            }
+        }
+        match self.read_volume_information(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read volume information");
+                return Err(error);
+            }
+        }
+        match self.read_case_folding_mappings(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read case folding mappings"
+                );
+                return Err(error);
+            }
+        }
         // TODO: read security descriptors, MFT entry 9 ($Secure)
-        // let mft_entry: NtfsMftEntry = self.mft.get_entry(data_stream, 9)?;
 
         Ok(())
     }
@@ -201,10 +266,22 @@ impl NtfsFileSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        let mft_entry: NtfsMftEntry = self
+        let mft_entry: NtfsMftEntry = match self
             .mft
-            .get_entry(data_stream, NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER)?;
-
+            .get_entry(data_stream, NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER)
+        {
+            Ok(mft_entry) => mft_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve MFT entry: {}",
+                        NTFS_CASE_FOLDING_MAPPIINGS_FILE_IDENTIFIER
+                    )
+                );
+                return Err(error);
+            }
+        };
         if mft_entry.is_bad {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported marked bad MFT entry"
@@ -216,8 +293,14 @@ impl NtfsFileSystem {
             ));
         }
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
-        mft_entry.read_attributes(&mut mft_attributes)?;
 
+        match mft_entry.read_attributes(&mut mft_attributes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         if mft_attributes.attribute_list.is_some() {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported MFT entry with attribute list"
@@ -241,8 +324,14 @@ impl NtfsFileSystem {
             ));
         }
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.mft.cluster_block_size);
-        block_stream.open(data_stream, data_attribute)?;
 
+        match block_stream.open(data_stream, data_attribute) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                return Err(error);
+            }
+        }
         let mut data: Vec<u8> = vec![0; 131072];
 
         match block_stream.read_exact_at_position(&mut data, SeekFrom::Start(0)) {
@@ -289,15 +378,24 @@ impl NtfsFileSystem {
             )));
         }
         match Rc::get_mut(&mut self.mft) {
-            Some(mft) => mft.initialize(
+            Some(mft) => match mft.initialize(
                 self.cluster_block_size,
                 self.mft_entry_size,
                 data_stream,
                 mft_block_number,
-            )?,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to initialize master file table"
+                    );
+                    return Err(error);
+                }
+            },
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unable to initialize master file table"
+                    "Unable to obtain mutable reference to master file table"
                 ));
             }
         };
@@ -309,10 +407,22 @@ impl NtfsFileSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        let mft_entry: NtfsMftEntry = self
+        let mft_entry: NtfsMftEntry = match self
             .mft
-            .get_entry(data_stream, NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER)?;
-
+            .get_entry(data_stream, NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER)
+        {
+            Ok(mft_entry) => mft_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve MFT entry: {}",
+                        NTFS_VOLUME_INFORMATION_FILE_IDENTIFIER
+                    )
+                );
+                return Err(error);
+            }
+        };
         if mft_entry.is_bad {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported marked bad MFT entry"
@@ -324,8 +434,14 @@ impl NtfsFileSystem {
             ));
         }
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
-        mft_entry.read_attributes(&mut mft_attributes)?;
 
+        match mft_entry.read_attributes(&mut mft_attributes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         if mft_attributes.attribute_list.is_some() {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported MFT entry with attribute list"
@@ -353,8 +469,16 @@ impl NtfsFileSystem {
         match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
             Some(mft_attribute) => {
                 let volume_information: NtfsVolumeInformation =
-                    NtfsVolumeInformation::from_attribute(mft_attribute)?;
-
+                    match NtfsVolumeInformation::from_attribute(mft_attribute) {
+                        Ok(volume_information) => volume_information,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create volume information from attribute"
+                            );
+                            return Err(error);
+                        }
+                    };
                 self.volume_information = Some(volume_information);
             }
             None => {}
@@ -424,7 +548,6 @@ mod tests {
             root_directory.mft_entry_number,
             NTFS_ROOT_DIRECTORY_IDENTIFIER
         );
-
         Ok(())
     }
 

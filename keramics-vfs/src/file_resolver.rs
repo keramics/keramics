@@ -85,7 +85,7 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "../test_data");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "../test_data");
         let file_resolver: FileResolverReference = new_vfs_file_resolver(&file_system, vfs_path)?;
 
         let path_components: [PathComponent; 1] = [PathComponent::from("file.txt")];
@@ -100,7 +100,7 @@ mod tests {
     fn test_new_vfs_file_resolver() -> Result<(), ErrorTrace> {
         let file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "../test_data");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "../test_data");
         let _ = new_vfs_file_resolver(&file_system, vfs_path)?;
 
         Ok(())

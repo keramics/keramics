@@ -47,8 +47,13 @@ impl EwfError2 {
             self.mediator
                 .debug_print(EwfError2Header::debug_read_data(data));
         }
-        error2_header.read_data(data)?;
-
+        match error2_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read error2 header");
+                return Err(error);
+            }
+        }
         // TODO: check for empty error2
         // TODO: check for number of entries exceeding maximum
 
@@ -63,8 +68,13 @@ impl EwfError2 {
                 &data[footer_offset..footer_end_offset],
             ));
         }
-        error2_footer.read_data(&data[footer_offset..footer_end_offset])?;
-
+        match error2_footer.read_data(&data[footer_offset..footer_end_offset]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read error2 footer");
+                return Err(error);
+            }
+        }
         let mut adler32_context: Adler32Context = Adler32Context::new(1);
         adler32_context.update(&data[data_offset..footer_offset]);
         let calculated_checksum: u32 = adler32_context.finalize();
@@ -75,7 +85,7 @@ impl EwfError2 {
                 error2_footer.checksum, calculated_checksum
             )));
         }
-        for _ in 0..error2_header.number_of_entries {
+        for entry_index in 0..error2_header.number_of_entries {
             let data_end_offset: usize = data_offset + 8;
 
             let mut error2_entry: EwfError2Entry = EwfError2Entry::new();
@@ -85,7 +95,16 @@ impl EwfError2 {
                     &data[data_offset..data_end_offset],
                 ));
             }
-            error2_entry.read_data(&data[data_offset..data_end_offset])?;
+            match error2_entry.read_data(&data[data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to read error2 entry: {}", entry_index)
+                    );
+                    return Err(error);
+                }
+            }
             data_offset = data_end_offset;
 
             self.entries.push(error2_entry);

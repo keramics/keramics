@@ -87,8 +87,16 @@ impl GptVolumeSystem {
                     &partition_entry.type_identifier,
                     &partition_entry.identifier,
                 );
-                partition.open(data_stream)?;
-
+                match partition.open(data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to open partition: {}", partition_index)
+                        );
+                        return Err(error);
+                    }
+                }
                 Ok(partition)
             }
             None => {
@@ -107,8 +115,13 @@ impl GptVolumeSystem {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_partition_table(data_stream)?;
-
+        match self.read_partition_table(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read partition table");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -122,8 +135,18 @@ impl GptVolumeSystem {
         let mut partition_table_header = GptPartitionTableHeader::new();
 
         if self.bytes_per_sector != 0 {
-            partition_table_header
-                .read_at_position(data_stream, SeekFrom::Start(self.bytes_per_sector as u64))?;
+            match partition_table_header
+                .read_at_position(data_stream, SeekFrom::Start(self.bytes_per_sector as u64))
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read partition table header"
+                    );
+                    return Err(error);
+                }
+            }
         } else {
             for bytes_per_sector in SUPPORTED_BYTES_PER_SECTOR.iter() {
                 match partition_table_header
@@ -158,10 +181,19 @@ impl GptVolumeSystem {
                             "Invalid backup partition table block number falling back to last block"
                         ));
                     }
-                    backup_partition_table_header.read_at_position(
+                    match backup_partition_table_header.read_at_position(
                         data_stream,
                         SeekFrom::End(-(self.bytes_per_sector as i64)),
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read backup partition table"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
             };
         }
@@ -202,8 +234,17 @@ impl GptVolumeSystem {
             crc32_context.update(&entry_data);
 
             let mut partition_entry = GptPartitionEntry::new(entry_index as usize);
-            partition_entry.read_data(&entry_data)?;
 
+            match partition_entry.read_data(&entry_data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read partition table entry"
+                    );
+                    return Err(error);
+                }
+            }
             if !partition_entry.type_identifier.is_nil() {
                 // TODO: check upper bound with size or area_end_block_number
                 if partition_entry.start_block_number

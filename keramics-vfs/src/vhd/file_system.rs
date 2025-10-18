@@ -47,19 +47,19 @@ impl VhdFileSystem {
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path_components) => {
-                let number_of_components: usize = string_path_components.len();
+            VfsPath::String(string_path) => {
+                let number_of_components: usize = string_path.components.len();
                 if number_of_components == 0 || number_of_components > 2 {
                     return Ok(false);
                 }
-                if string_path_components[0] != "" {
+                if string_path.components[0] != "" {
                     return Ok(false);
                 }
                 // A single empty component represents "/".
                 if number_of_components == 1 {
                     return Ok(true);
                 }
-                match self.get_layer_index(&string_path_components[1]) {
+                match self.get_layer_index(&string_path.components[1]) {
                     Some(_) => Ok(true),
                     None => Ok(false),
                 }
@@ -74,12 +74,12 @@ impl VhdFileSystem {
         vfs_path: &VfsPath,
     ) -> Result<Option<VhdFileEntry>, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path_components) => {
-                let number_of_components: usize = string_path_components.len();
+            VfsPath::String(string_path) => {
+                let number_of_components: usize = string_path.components.len();
                 if number_of_components == 0 || number_of_components > 2 {
                     return Ok(None);
                 }
-                if string_path_components[0] != "" {
+                if string_path.components[0] != "" {
                     return Ok(None);
                 }
                 // A single empty component represents "/".
@@ -88,7 +88,7 @@ impl VhdFileSystem {
 
                     return Ok(Some(vhd_file_entry));
                 }
-                let layer_index: usize = match self.get_layer_index(&string_path_components[1]) {
+                let layer_index: usize = match self.get_layer_index(&string_path.components[1]) {
                     Some(layer_index) => layer_index,
                     None => return Ok(None),
                 };
@@ -231,15 +231,15 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let vhd_file_system: VhdFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/");
         let result: bool = vhd_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/vhd1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd1");
         let result: bool = vhd_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/bogus1");
         let result: bool = vhd_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
@@ -250,7 +250,7 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let vhd_file_system: VhdFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/");
         let result: Option<VhdFileEntry> = vhd_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -262,7 +262,7 @@ mod tests {
         let file_type: VfsFileType = vhd_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/vhd1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd1");
         let result: Option<VhdFileEntry> = vhd_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -274,7 +274,7 @@ mod tests {
         let file_type: VfsFileType = vhd_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/bogus1");
         let result: Option<VhdFileEntry> = vhd_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 

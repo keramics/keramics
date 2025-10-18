@@ -152,8 +152,13 @@ impl NtfsMftAttribute {
             self.mediator
                 .debug_print(NtfsMftAttributeHeader::debug_read_data(data));
         }
-        mft_attribute_header.read_data(data)?;
-
+        match mft_attribute_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attribute header");
+                return Err(error);
+            }
+        }
         self.attribute_type = mft_attribute_header.attribute_type;
         self.attribute_size = mft_attribute_header.attribute_size;
         self.non_resident_flag = mft_attribute_header.non_resident_flag;
@@ -179,8 +184,16 @@ impl NtfsMftAttribute {
                         &data[data_offset..],
                     ));
             }
-            resident_attribute.read_data(&data[data_offset..])?;
-
+            match resident_attribute.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read resident attribute"
+                    );
+                    return Err(error);
+                }
+            }
             data_offset += 8;
         } else {
             if self.mediator.debug_output {
@@ -189,8 +202,16 @@ impl NtfsMftAttribute {
                         &data[data_offset..],
                     ));
             }
-            non_resident_attribute.read_data(&data[data_offset..])?;
-
+            match non_resident_attribute.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read non-resident attribute"
+                    );
+                    return Err(error);
+                }
+            }
             if self.mediator.debug_output {
                 if self.is_compressed()
                     && non_resident_attribute.compression_unit_size == 0
@@ -222,8 +243,13 @@ impl NtfsMftAttribute {
 
             let name_size: usize = (mft_attribute_header.name_size as usize) * 2;
 
-            self.read_name(data, name_offset, name_size)?;
-
+            match self.read_name(data, name_offset, name_size) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read name");
+                    return Err(error);
+                }
+            }
             data_offset = name_offset + name_size;
         }
         if self.is_resident() {
@@ -279,8 +305,13 @@ impl NtfsMftAttribute {
                 non_resident_attribute.data_first_vcn,
                 non_resident_attribute.data_last_vcn,
             );
-            cluster_group.read_data_runs(data, data_runs_offset)?;
-
+            match cluster_group.read_data_runs(data, data_runs_offset) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read data runs");
+                    return Err(error);
+                }
+            }
             self.data_cluster_groups.push(cluster_group);
 
             self.allocated_data_size = non_resident_attribute.allocated_data_size;

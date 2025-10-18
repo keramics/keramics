@@ -46,8 +46,17 @@ impl NtfsAttributeList {
                 ));
             }
             let mut entry: NtfsAttributeListEntry = NtfsAttributeListEntry::new();
-            entry.read_data(&data[data_offset..])?;
 
+            match entry.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read attribute list entry"
+                    );
+                    return Err(error);
+                }
+            }
             // TODO: read name.
             // TODO: print remaining data.
 
@@ -77,12 +86,28 @@ impl NtfsAttributeList {
             ));
         }
         if data_attribute.is_resident() {
-            self.read_data(&data_attribute.resident_data)?;
+            match self.read_data(&data_attribute.resident_data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read resident attribute list"
+                    );
+                    return Err(error);
+                }
+            }
         } else {
             let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
-            block_stream.open(data_stream, data_attribute)?;
 
+            match block_stream.open(data_stream, data_attribute) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                    return Err(error);
+                }
+            }
             let mut cluster_block: Vec<u8> = vec![0; cluster_block_size as usize];
+
             loop {
                 let read_count: usize = match block_stream.read(&mut cluster_block) {
                     Ok(read_count) => read_count,
@@ -97,9 +122,18 @@ impl NtfsAttributeList {
                 if read_count == 0 {
                     break;
                 }
-                self.read_data(&cluster_block[..read_count])?;
+                match self.read_data(&cluster_block[..read_count]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read non-resident attribute list"
+                        );
+                        return Err(error);
+                    }
+                }
             }
-        };
+        }
         Ok(())
     }
 }
@@ -140,6 +174,17 @@ mod tests {
         ];
     }
 
-    // TODO: add tests for read_data
+    #[test]
+    fn test_read_data() -> Result<(), ErrorTrace> {
+        let mut test_struct: NtfsAttributeList = NtfsAttributeList::new();
+
+        let test_data: Vec<u8> = get_test_data();
+        test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.entries.len(), 1);
+
+        Ok(())
+    }
+
     // TODO: add tests for read_attribute
 }

@@ -78,25 +78,24 @@ impl ExportTool {
         &self,
         data_stream_writer: &mut writer::DataStreamWriter,
         vfs_scan_node: &VfsScanNode,
-        path: &String,
+        path_components: &[&str],
         name: Option<&str>,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
             let vfs_type: &VfsType = vfs_scan_node.location.get_type();
-            let vfs_path: VfsPath = VfsPath::new(vfs_type, path.as_str());
+            let vfs_path: VfsPath = VfsPath::from_path_components(vfs_type, path_components);
             let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(vfs_path);
-            let result: Option<DataStreamReference> =
-                match vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, name) {
-                    Ok(result) => result,
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to retrieve data stream",
-                            error
-                        ));
-                    }
-                };
+            let result: Option<DataStreamReference> = match vfs_resolver
+                .get_data_stream_by_path_and_name(&vfs_location, name)
+            {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
             match result {
                 // TODO: pass sanitized file entry path and data stream name.
                 Some(data_stream) => match data_stream_writer.write_data_stream(&data_stream) {
@@ -116,15 +115,16 @@ impl ExportTool {
                 match self.export_data_stream_from_scan_node(
                     data_stream_writer,
                     sub_scan_node,
-                    path,
+                    path_components,
                     name,
                 ) {
                     Ok(number_of_file_entries) => number_of_file_entries,
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to retrieve number of sub file entries",
-                            error
-                        ));
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve number of sub file entries"
+                        );
+                        return Err(error);
                     }
                 }
             }
@@ -195,10 +195,12 @@ fn main() -> ExitCode {
                 Some(ref name) => Some(name.as_str()),
                 None => None,
             };
+            let path_components: Vec<&str> = command_arguments.path.split('/').collect();
+
             match export_tool.export_data_stream_from_scan_node(
                 &mut data_stream_writer,
                 root_scan_node,
-                &command_arguments.path,
+                &path_components,
                 name,
             ) {
                 Ok(_) => {}

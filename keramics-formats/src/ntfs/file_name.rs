@@ -146,7 +146,7 @@ impl NtfsFileName {
                     "Unsupported NTFS file name data size"
                 ));
             }
-            Ucs2String::read_elements_le(&mut self.name.elements, &data[66..data_end_offset]);
+            self.name.read_data_le(&data[66..data_end_offset]);
         }
         Ok(())
     }
@@ -165,8 +165,14 @@ impl NtfsFileName {
             ));
         }
         let mut file_name: NtfsFileName = NtfsFileName::new();
-        file_name.read_data(&mft_attribute.resident_data)?;
 
+        match file_name.read_data(&mft_attribute.resident_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file name");
+                return Err(error);
+            }
+        }
         Ok(file_name)
     }
 }

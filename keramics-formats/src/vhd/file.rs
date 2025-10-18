@@ -115,8 +115,13 @@ impl VhdFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_metadata(data_stream)?;
-
+        match self.read_metadata(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -126,8 +131,13 @@ impl VhdFile {
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut file_footer: VhdFileFooter = VhdFileFooter::new();
 
-        file_footer.read_at_position(data_stream, SeekFrom::End(-512))?;
-
+        match file_footer.read_at_position(data_stream, SeekFrom::End(-512)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file footer");
+                return Err(error);
+            }
+        }
         self.disk_type = match file_footer.disk_type {
             VHD_DISK_TYPE_FIXED => VhdDiskType::Fixed,
             VHD_DISK_TYPE_DYNAMIC => VhdDiskType::Dynamic,
@@ -143,8 +153,18 @@ impl VhdFile {
         if self.disk_type != VhdDiskType::Fixed {
             let mut dynamic_disk_header: VhdDynamicDiskHeader = VhdDynamicDiskHeader::new();
 
-            dynamic_disk_header
-                .read_at_position(data_stream, SeekFrom::Start(file_footer.next_offset))?;
+            match dynamic_disk_header
+                .read_at_position(data_stream, SeekFrom::Start(file_footer.next_offset))
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read dynamic disk header"
+                    );
+                    return Err(error);
+                }
+            }
             let block_size: u64 = dynamic_disk_header.block_size as u64;
             let block_tree_data_size: u64 =
                 (dynamic_disk_header.number_of_blocks as u64) * block_size;
@@ -191,10 +211,24 @@ impl VhdFile {
         let block_allocation_table: &VhdBlockAllocationTable =
             self.block_allocation_table.as_ref().unwrap();
         let entry: VhdBlockAllocationTableEntry =
-            block_allocation_table.read_entry(data_stream, block_number as u32)?;
-
+            match block_allocation_table.read_entry(data_stream, block_number as u32) {
+                Ok(entry) => entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read block allocation table entry"
+                    );
+                    return Err(error);
+                }
+            };
         if entry.sector_number != 0xffffffff {
-            self.read_sector_bitmap(block_number, entry.sector_number)?;
+            match self.read_sector_bitmap(block_number, entry.sector_number) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
+                    return Err(error);
+                }
+            }
         } else {
             let block_media_offset: u64 = block_number * (self.block_size as u64);
 
@@ -246,8 +280,14 @@ impl VhdFile {
 
         let mut sector_bitmap: VhdSectorBitmap =
             VhdSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
-        sector_bitmap.read_at_position(data_stream, SeekFrom::Start(sector_bitmap_offset))?;
 
+        match sector_bitmap.read_at_position(data_stream, SeekFrom::Start(sector_bitmap_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
+                return Err(error);
+            }
+        }
         let mut range_media_offset: u64 = block_number * (self.block_size as u64);
         let mut range_data_offset: u64 = sector_bitmap_offset + (self.sector_bitmap_size as u64);
 
@@ -307,8 +347,16 @@ impl VhdFile {
                 self.block_tree.get_value(media_offset);
 
             if block_tree_value.is_none() {
-                self.read_block_allocation_entry(block_number)?;
-
+                match self.read_block_allocation_entry(block_number) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read block allocation entry"
+                        );
+                        return Err(error);
+                    }
+                }
                 block_tree_value = self.block_tree.get_value(media_offset);
             }
             let block_range: &VhdBlockRange = match block_tree_value {

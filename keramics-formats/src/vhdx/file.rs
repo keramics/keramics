@@ -132,8 +132,13 @@ impl VhdxFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_metadata(data_stream)?;
-
+        match self.read_metadata(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -142,16 +147,35 @@ impl VhdxFile {
     /// Reads the file header, image headers and region tables.
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut file_header: VhdxFileHeader = VhdxFileHeader::new();
-        file_header.read_at_position(data_stream, SeekFrom::Start(0))?;
 
+        match file_header.read_at_position(data_stream, SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file header");
+                return Err(error);
+            }
+        }
         let mut primary_image_header: VhdxImageHeader = VhdxImageHeader::new();
 
-        primary_image_header.read_at_position(data_stream, SeekFrom::Start(65536))?;
-
+        match primary_image_header.read_at_position(data_stream, SeekFrom::Start(65536)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read primary image header");
+                return Err(error);
+            }
+        }
         let mut secondary_image_header: VhdxImageHeader = VhdxImageHeader::new();
 
-        secondary_image_header.read_at_position(data_stream, SeekFrom::Start(2 * 65536))?;
-
+        match secondary_image_header.read_at_position(data_stream, SeekFrom::Start(2 * 65536)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read secondary image header"
+                );
+                return Err(error);
+            }
+        }
         if primary_image_header.sequence_number > secondary_image_header.sequence_number {
             self.identifier = primary_image_header.data_write_identifier;
             self.format_version = primary_image_header.format_version;
@@ -161,12 +185,25 @@ impl VhdxFile {
         }
         let mut primary_region_table: VhdxRegionTable = VhdxRegionTable::new();
 
-        primary_region_table.read_at_position(data_stream, SeekFrom::Start(3 * 65536))?;
-
+        match primary_region_table.read_at_position(data_stream, SeekFrom::Start(3 * 65536)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read primary region table");
+                return Err(error);
+            }
+        }
         let mut secondary_region_table: VhdxRegionTable = VhdxRegionTable::new();
 
-        secondary_region_table.read_at_position(data_stream, SeekFrom::Start(4 * 65536))?;
-
+        match secondary_region_table.read_at_position(data_stream, SeekFrom::Start(4 * 65536)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read secondary region table"
+                );
+                return Err(error);
+            }
+        }
         // TODO: compare primary region table with secondary
 
         let metadata_region: &VhdxRegionTableEntry = match primary_region_table
@@ -186,8 +223,13 @@ impl VhdxFile {
                 return Err(keramics_core::error_trace_new!("Missing metadata region"));
             }
         };
-        self.read_metadata_values(data_stream, metadata_region)?;
-
+        match self.read_metadata_values(data_stream, metadata_region) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read metadata values");
+                return Err(error);
+            }
+        }
         let block_allocation_table_region: &VhdxRegionTableEntry = match primary_region_table
             .entries
             .get(&VHDX_BLOCK_ALLOCATION_TABLE_REGION_IDENTIFIER)
@@ -235,8 +277,15 @@ impl VhdxFile {
     ) -> Result<(), ErrorTrace> {
         let mut metadata_table: VhdxMetadataTable = VhdxMetadataTable::new();
 
-        metadata_table
-            .read_at_position(data_stream, SeekFrom::Start(metadata_region.data_offset))?;
+        match metadata_table
+            .read_at_position(data_stream, SeekFrom::Start(metadata_region.data_offset))
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read metadata table");
+                return Err(error);
+            }
+        }
         if self.mediator.debug_output {
             self.mediator
                 .debug_print(format!("VhdxMetadataValues {{\n"));
@@ -452,11 +501,20 @@ impl VhdxFile {
                 let metadata_item_offset: u64 =
                     metadata_region.data_offset + metadata_table_entry.item_offset as u64;
 
-                parent_locator.read_at_position(
+                match parent_locator.read_at_position(
                     data_stream,
                     metadata_table_entry.item_size,
                     SeekFrom::Start(metadata_item_offset),
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read parent locator"
+                        );
+                        return Err(error);
+                    }
+                }
                 match parent_locator.entries.get("parent_linkage") {
                     Some(ucs2_string) => {
                         // TODO: improve handling of invalid string.
@@ -520,11 +578,26 @@ impl VhdxFile {
         };
         let block_allocation_table: &VhdxBlockAllocationTable =
             self.block_allocation_table.as_ref().unwrap();
-        let entry: VhdxBlockAllocationTableEntry =
-            block_allocation_table.read_entry(data_stream, table_entry as u32)?;
 
+        let entry: VhdxBlockAllocationTableEntry =
+            match block_allocation_table.read_entry(data_stream, table_entry as u32) {
+                Ok(entry) => entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read block allocation table entry"
+                    );
+                    return Err(error);
+                }
+            };
         if self.disk_type == VhdxDiskType::Differential && entry.block_state != 6 {
-            self.read_sector_bitmap(block_number, entry.block_offset)?;
+            match self.read_sector_bitmap(block_number, entry.block_offset) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
+                    return Err(error);
+                }
+            }
         } else {
             let block_media_offset: u64 = block_number * (self.block_size as u64);
 
@@ -577,16 +650,31 @@ impl VhdxFile {
 
         let block_allocation_table: &VhdxBlockAllocationTable =
             self.block_allocation_table.as_ref().unwrap();
-        let entry: VhdxBlockAllocationTableEntry =
-            block_allocation_table.read_entry(data_stream, table_entry as u32)?;
 
+        let entry: VhdxBlockAllocationTableEntry =
+            match block_allocation_table.read_entry(data_stream, table_entry as u32) {
+                Ok(entry) => entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read block allocation table entry"
+                    );
+                    return Err(error);
+                }
+            };
         let sector_bitmap_offset: u64 = entry.block_offset
             + ((block_number % self.entries_per_chunk) * self.sector_bitmap_size as u64);
 
         let mut sector_bitmap: VhdxSectorBitmap =
             VhdxSectorBitmap::new(self.sector_bitmap_size as usize, self.bytes_per_sector);
-        sector_bitmap.read_at_position(data_stream, SeekFrom::Start(sector_bitmap_offset))?;
 
+        match sector_bitmap.read_at_position(data_stream, SeekFrom::Start(sector_bitmap_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read sector bitmap");
+                return Err(error);
+            }
+        }
         let mut range_media_offset: u64 = block_number * (self.block_size as u64);
         let mut range_data_offset: u64 = block_offset;
 
@@ -639,8 +727,16 @@ impl VhdxFile {
                 self.block_tree.get_value(media_offset);
 
             if block_tree_value.is_none() {
-                self.read_block_allocation_entry(block_number)?;
-
+                match self.read_block_allocation_entry(block_number) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read block allocation entry"
+                        );
+                        return Err(error);
+                    }
+                }
                 block_tree_value = self.block_tree.get_value(media_offset);
             }
             let block_range: &VhdxBlockRange = match block_tree_value {

@@ -71,7 +71,7 @@ mod tests {
     fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(

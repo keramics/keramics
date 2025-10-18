@@ -103,43 +103,48 @@ impl NtfsFileEntry {
         }
     }
 
-    /// Retrieves the access time from the directory entry $FILE_NAME attribute.
+    /// Retrieves the access time from the $STANDARD_INFORMATION attribute.
     pub fn get_access_time(&self) -> Option<&DateTime> {
-        match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name.access_time),
-            None => None,
+        match &self.mft_attributes.standard_information {
+            Some(standard_information) => Some(&standard_information.access_time),
+            _ => None,
         }
     }
 
     /// Retrieves the base record file reference.
-    pub fn get_base_record_file_reference(&self) -> (u64, u16) {
-        (
-            self.mft_entry.base_record_file_reference & 0x0000ffffffffffff,
-            (self.mft_entry.base_record_file_reference >> 48) as u16,
-        )
+    pub fn get_base_record_file_reference(&self) -> u64 {
+        self.mft_entry.base_record_file_reference
     }
 
-    /// Retrieves the change time from the directory entry $FILE_NAME attribute.
+    /// Retrieves the change time from the $STANDARD_INFORMATION attribute.
     pub fn get_change_time(&self) -> Option<&DateTime> {
-        match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name.entry_modification_time),
-            None => None,
+        match &self.mft_attributes.standard_information {
+            Some(standard_information) => Some(&standard_information.entry_modification_time),
+            _ => None,
         }
     }
 
-    /// Retrieves the creation time from the directory entry $FILE_NAME attribute.
+    /// Retrieves the creation time from the $STANDARD_INFORMATION attribute.
     pub fn get_creation_time(&self) -> Option<&DateTime> {
-        match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name.creation_time),
-            None => None,
+        match &self.mft_attributes.standard_information {
+            Some(standard_information) => Some(&standard_information.creation_time),
+            _ => None,
         }
     }
 
-    /// Retrieves the file attribute flags.
+    /// Retrieves the file attribute flags from the $STANDARD_INFORMATION attribute.
     pub fn get_file_attribute_flags(&self) -> u32 {
+        match &self.mft_attributes.standard_information {
+            Some(standard_information) => standard_information.file_attribute_flags,
+            _ => 0,
+        }
+    }
+
+    /// Retrieves the file reference.
+    pub fn get_file_reference(&self) -> u64 {
         match &self.directory_entry {
-            Some(directory_entry) => directory_entry.file_name.file_attribute_flags,
-            None => 0,
+            Some(directory_entry) => directory_entry.file_reference,
+            None => self.mft_entry_number | ((self.sequence_number as u64) << 48),
         }
     }
 
@@ -148,40 +153,51 @@ impl NtfsFileEntry {
         self.mft_entry.journal_sequence_number
     }
 
-    /// Retrieves the modification time from the directory entry $FILE_NAME attribute.
+    /// Retrieves the modification time from the $STANDARD_INFORMATION attribute.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
-        match &self.directory_entry {
-            Some(directory_entry) => Some(&directory_entry.file_name.modification_time),
-            None => None,
+        match &self.mft_attributes.standard_information {
+            Some(standard_information) => Some(&standard_information.modification_time),
+            _ => None,
         }
     }
 
-    /// Retrieves the name from the directory entry $FILE_NAME attribute.
+    /// Retrieves the name from the directory entry $FILE_NAME.
     pub fn get_name(&self) -> Option<&Ucs2String> {
         self.name.as_ref()
     }
 
+    /// Retrieves the parent file reference.
+    pub fn get_parent_file_reference(&self) -> Option<u64> {
+        match &self.directory_entry {
+            Some(directory_entry) => Some(directory_entry.file_name.parent_file_reference),
+            None => None,
+        }
+    }
+
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
-        match &self.directory_entry {
-            Some(directory_entry) => directory_entry.file_name.data_size,
+        match self
+            .mft_attributes
+            .get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA)
+        {
+            Some(data_attribute) => data_attribute.data_size,
             None => 0,
         }
     }
 
     /// Retrieves the symbolic link target.
     pub fn get_symbolic_link_target(&mut self) -> Result<Option<&Ucs2String>, ErrorTrace> {
-        match &self.mft_attributes.reparse_point {
-            Some(NtfsReparsePoint::SymbolicLink { .. }) => {
-                // TODO: implement
-                todo!();
+        let result: Option<&Ucs2String> = match &self.mft_attributes.reparse_point {
+            Some(NtfsReparsePoint::SymbolicLink { reparse_data }) => {
+                Some(&reparse_data.substitute_name)
             }
-            _ => Ok(None),
-        }
+            _ => None,
+        };
+        Ok(result)
     }
 
     /// Retrieves the number of attributes.
-    pub fn get_number_of_attributes(&self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_attributes(&self) -> usize {
         self.mft_attributes.get_number_of_attributes()
     }
 
@@ -190,39 +206,82 @@ impl NtfsFileEntry {
         &self,
         attribute_index: usize,
     ) -> Result<NtfsAttribute<'_>, ErrorTrace> {
-        let mft_attribute: &NtfsMftAttribute = self
-            .mft_attributes
-            .get_attribute_by_index(attribute_index)?;
-
+        let mft_attribute: &NtfsMftAttribute =
+            match self.mft_attributes.get_attribute_by_index(attribute_index) {
+                Ok(attribute) => attribute,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve attribute: {}", attribute_index)
+                    );
+                    return Err(error);
+                }
+            };
         let attribute: NtfsAttribute = match mft_attribute.attribute_type {
             NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION => {
                 let standard_information: NtfsStandardInformation =
-                    NtfsStandardInformation::from_attribute(mft_attribute)?;
+                    match NtfsStandardInformation::from_attribute(mft_attribute) {
+                        Ok(standard_information) => standard_information,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create standard information from attribute"
+                            );
+                            return Err(error);
+                        }
+                    };
                 NtfsAttribute::StandardInformation {
                     standard_information: standard_information,
                 }
             }
             NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST => {
                 let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
-                attribute_list.read_attribute(
+
+                match attribute_list.read_attribute(
                     mft_attribute,
                     &self.data_stream,
                     self.mft.cluster_block_size,
-                )?;
-
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read attribute list"
+                        );
+                        return Err(error);
+                    }
+                }
                 NtfsAttribute::AttributeList {
                     attribute_list: attribute_list,
                 }
             }
             NTFS_ATTRIBUTE_TYPE_FILE_NAME => {
-                let file_name: NtfsFileName = NtfsFileName::from_attribute(mft_attribute)?;
+                let file_name: NtfsFileName = match NtfsFileName::from_attribute(mft_attribute) {
+                    Ok(file_name) => file_name,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to create file name from attribute"
+                        );
+                        return Err(error);
+                    }
+                };
                 NtfsAttribute::FileName {
                     file_name: file_name,
                 }
             }
             NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION => {
                 let volume_information: NtfsVolumeInformation =
-                    NtfsVolumeInformation::from_attribute(mft_attribute)?;
+                    match NtfsVolumeInformation::from_attribute(mft_attribute) {
+                        Ok(volume_information) => volume_information,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create volume information from attribute"
+                            );
+                            return Err(error);
+                        }
+                    };
                 NtfsAttribute::VolumeInformation {
                     volume_information: volume_information,
                 }
@@ -241,7 +300,16 @@ impl NtfsFileEntry {
             }
             NTFS_ATTRIBUTE_TYPE_REPARSE_POINT => {
                 let reparse_point: NtfsReparsePoint =
-                    NtfsReparsePoint::from_attribute(mft_attribute)?;
+                    match NtfsReparsePoint::from_attribute(mft_attribute) {
+                        Ok(reparse_point) => reparse_point,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create reparse point from attribute"
+                            );
+                            return Err(error);
+                        }
+                    };
                 NtfsAttribute::ReparsePoint {
                     reparse_point: reparse_point,
                 }
@@ -307,7 +375,16 @@ impl NtfsFileEntry {
             return Ok(0);
         }
         if !self.read_directory_entries {
-            self.read_directory_entries()?;
+            match self.read_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries"
+                    );
+                    return Err(error);
+                }
+            }
         }
         Ok(self.directory_entries.get_number_of_entries())
     }
@@ -318,15 +395,37 @@ impl NtfsFileEntry {
         sub_file_entry_index: usize,
     ) -> Result<NtfsFileEntry, ErrorTrace> {
         if !self.read_directory_entries {
-            self.read_directory_entries()?;
+            match self.read_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries"
+                    );
+                    return Err(error);
+                }
+            }
         }
-        let directory_entry: &NtfsDirectoryEntry = self
+        let directory_entry: &NtfsDirectoryEntry = match self
             .directory_entries
-            .get_entry_by_index(sub_file_entry_index)?;
-
+            .get_entry_by_index(sub_file_entry_index)
+        {
+            Ok(mft_entry) => mft_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
+                return Err(error);
+            }
+        };
         let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
-        let mft_entry: NtfsMftEntry = self.mft.get_entry(&self.data_stream, mft_entry_number)?;
 
+        let mft_entry: NtfsMftEntry = match self.mft.get_entry(&self.data_stream, mft_entry_number)
+        {
+            Ok(mft_entry) => mft_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve MFT entry");
+                return Err(error);
+            }
+        };
         let name: &Ucs2String = directory_entry.get_name();
 
         let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
@@ -338,28 +437,56 @@ impl NtfsFileEntry {
             Some(name.clone()),
             Some(directory_entry.clone()),
         );
-        file_entry.read_attributes()?;
-
+        match file_entry.read_attributes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         Ok(file_entry)
     }
 
     /// Reads the attributes.
     pub(super) fn read_attributes(&mut self) -> Result<(), ErrorTrace> {
-        self.mft_entry.read_attributes(&mut self.mft_attributes)?;
-
+        match self.mft_entry.read_attributes(&mut self.mft_attributes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         match self.mft_attributes.attribute_list {
             Some(attribute_index) => {
-                let mft_attribute: &NtfsMftAttribute = self
-                    .mft_attributes
-                    .get_attribute_by_index(attribute_index)?;
-
+                let mft_attribute: &NtfsMftAttribute =
+                    match self.mft_attributes.get_attribute_by_index(attribute_index) {
+                        Ok(attribute) => attribute,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to retrieve attribute: {}", attribute_index)
+                            );
+                            return Err(error);
+                        }
+                    };
                 let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
-                attribute_list.read_attribute(
+
+                match attribute_list.read_attribute(
                     &mft_attribute,
                     &self.data_stream,
                     self.mft.cluster_block_size,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read attribute list"
+                        );
+                        return Err(error);
+                    }
+                }
                 let mut mft_entries_set: HashSet<u64> = HashSet::new();
+
                 for entry in attribute_list.entries.iter() {
                     let mft_entry_number: u64 = entry.file_reference & 0x0000ffffffffffff;
                     if mft_entry_number != self.mft_entry_number {
@@ -367,17 +494,37 @@ impl NtfsFileEntry {
                     }
                 }
                 let mut mft_entries: Vec<u64> = mft_entries_set.drain().collect::<Vec<u64>>();
+
                 mft_entries.sort();
 
                 for mft_entry_number in mft_entries.iter() {
                     let mft_entry: NtfsMftEntry =
-                        self.mft.get_entry(&self.data_stream, *mft_entry_number)?;
-                    mft_entry.read_attributes(&mut self.mft_attributes)?;
+                        match self.mft.get_entry(&self.data_stream, *mft_entry_number) {
+                            Ok(mft_entry) => mft_entry,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve MFT entry"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    match mft_entry.read_attributes(&mut self.mft_attributes) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read attributes"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
             }
             None => {}
         };
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from("$I30"));
+
         self.has_directory_entries = self.mft_attributes.has_attribute_group(&i30_index_name);
 
         Ok(())
@@ -392,17 +539,41 @@ impl NtfsFileEntry {
             return Ok(None);
         }
         if !self.directory_index.is_initialized {
-            self.directory_index.initialize(&self.mft_attributes)?;
+            match self.directory_index.initialize(&self.mft_attributes) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to initialize directory index"
+                    );
+                    return Err(error);
+                }
+            }
         }
-        match self
+        let result: Option<NtfsDirectoryEntry> = match self
             .directory_index
-            .get_directory_entry_by_name(&self.data_stream, sub_file_entry_name)?
+            .get_directory_entry_by_name(&self.data_stream, sub_file_entry_name)
         {
+            Ok(directory_entry) => directory_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
+                return Err(error);
+            }
+        };
+        match result {
             Some(directory_entry) => {
                 let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
                 let mft_entry: NtfsMftEntry =
-                    self.mft.get_entry(&self.data_stream, mft_entry_number)?;
-
+                    match self.mft.get_entry(&self.data_stream, mft_entry_number) {
+                        Ok(mft_entry) => mft_entry,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve MFT entry"
+                            );
+                            return Err(error);
+                        }
+                    };
                 let name: &Ucs2String = directory_entry.get_name();
 
                 let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
@@ -414,8 +585,13 @@ impl NtfsFileEntry {
                     Some(name.clone()),
                     Some(directory_entry),
                 );
-                file_entry.read_attributes()?;
-
+                match file_entry.read_attributes() {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                        return Err(error);
+                    }
+                }
                 Ok(Some(file_entry))
             }
             None => Ok(None),
@@ -442,6 +618,19 @@ impl NtfsFileEntry {
         self.mft_entry.is_empty
     }
 
+    /// Determines if the file entry is a junction.
+    pub fn is_junction(&self) -> bool {
+        match &self.mft_attributes.reparse_point {
+            Some(NtfsReparsePoint::Junction { .. }) => true,
+            _ => false,
+        }
+    }
+
+    /// Determines if the file entry is the root directory.
+    pub fn is_root_directory(&self) -> bool {
+        self.mft_entry_number == NTFS_ROOT_DIRECTORY_IDENTIFIER
+    }
+
     /// Determines if the file entry is a symbolic link.
     pub fn is_symbolic_link(&self) -> bool {
         match &self.mft_attributes.reparse_point {
@@ -456,10 +645,30 @@ impl NtfsFileEntry {
             return Err(keramics_core::error_trace_new!("Missing directory entries"));
         }
         if !self.directory_index.is_initialized {
-            self.directory_index.initialize(&self.mft_attributes)?;
+            match self.directory_index.initialize(&self.mft_attributes) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to initialize directory index"
+                    );
+                    return Err(error);
+                }
+            }
         }
-        self.directory_index
-            .get_directory_entries(&self.data_stream, &mut self.directory_entries)?;
+        match self
+            .directory_index
+            .get_directory_entries(&self.data_stream, &mut self.directory_entries)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve directory entries"
+                );
+                return Err(error);
+            }
+        }
         self.read_directory_entries = true;
 
         Ok(())
@@ -492,6 +701,8 @@ mod tests {
     // TODO: add tests for is_allocated
     // TODO: add tests for is_bad
     // TODO: add tests for is_empty
+    // TODO: add tests for is_junction
+    // TODO: add tests for is_root_directory
     // TODO: add tests for is_symbolic_link
     // TODO: add tests for read_directory_entries
 }

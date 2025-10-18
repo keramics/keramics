@@ -276,11 +276,13 @@ impl ExtSuperblock {
         }
         self.number_of_inodes_per_block_group = bytes_to_u32_le!(data, 40);
 
-        if self.number_of_inodes_per_block_group == 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid number of inodes per block group: {} value out of bounds",
-                self.number_of_inodes_per_block_group
-            )));
+        if self.incompatible_feature_flags & EXT_INCOMPATIBLE_FEATURE_FLAG_JOURNAL_DEVICE == 0 {
+            if self.number_of_inodes_per_block_group == 0 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid number of inodes per block group: {} value out of bounds",
+                    self.number_of_inodes_per_block_group
+                )));
+            }
         }
         self.last_mount_time = PosixTime32::from_le_bytes(&data[44..48]);
         self.last_written_time = PosixTime32::from_le_bytes(&data[48..52]);
@@ -365,7 +367,7 @@ mod tests {
             0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0xf0, 0x00, 0x50, 0xbb, 0x07, 0xee, 0x46, 0xa3,
             0x83, 0xa6, 0xa4, 0x05, 0xee, 0x0d, 0xb5, 0x1f, 0x65, 0x78, 0x74, 0x32, 0x5f, 0x74,
             0x65, 0x73, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x2f, 0x6d, 0x6e, 0x74,
-            0x2f, 0x64, 0x66, 0x76, 0x66, 0x73, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x2f, 0x6b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -439,8 +441,36 @@ mod tests {
         let mut test_struct = ExtSuperblock::new();
         test_struct.read_data(&test_data)?;
 
+        assert_eq!(test_struct.number_of_inodes, 1024);
+        assert_eq!(test_struct.number_of_blocks, 4096);
+        assert_eq!(test_struct.block_size, 1024);
+        assert_eq!(test_struct.number_of_blocks_per_block_group, 8192);
+        assert_eq!(test_struct.number_of_inodes_per_block_group, 1024);
         assert_eq!(test_struct.last_mount_time, PosixTime32::new(1626962851));
-        // TODO: check more values.
+        assert_eq!(test_struct.last_written_time, PosixTime32::new(1626962852));
+        assert_eq!(test_struct.format_revision, 1);
+        assert_eq!(test_struct.inode_size, 128);
+        assert_eq!(test_struct.compatible_feature_flags, 0x00000038);
+        assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
+        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000003);
+
+        let expected_file_system_identifier: [u8; 16] = [
+            0xf0, 0x00, 0x50, 0xbb, 0x07, 0xee, 0x46, 0xa3, 0x83, 0xa6, 0xa4, 0x05, 0xee, 0x0d,
+            0xb5, 0x1f,
+        ];
+        assert_eq!(
+            test_struct.file_system_identifier,
+            expected_file_system_identifier
+        );
+        assert_eq!(test_struct.volume_label, ByteString::from("ext2_test"));
+        assert_eq!(
+            test_struct.last_mount_path,
+            ByteString::from("/mnt/keramics")
+        );
+        assert_eq!(test_struct.group_descriptor_size, 0);
+        assert_eq!(test_struct.number_of_block_groups_per_flex_group, 1);
+        assert_eq!(test_struct.first_meta_block_group, 0);
+        assert_eq!(test_struct.metadata_checksum_seed, None);
 
         Ok(())
     }

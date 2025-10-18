@@ -32,8 +32,9 @@ impl PathComponent {
                 } else {
                     match string[1..].chars().rev().position(|value| value == '.') {
                         Some(value_index) => {
-                            // Note that value_index is relative to string[1..]
-                            Some(PathComponent::String(string[value_index + 2..].to_string()))
+                            // Note that value_index is relative to end of the string.
+                            let string_index: usize = string.len() - value_index;
+                            Some(PathComponent::String(string[string_index..].to_string()))
                         }
                         None => None,
                     }
@@ -52,10 +53,9 @@ impl PathComponent {
                 } else {
                     match string[1..].chars().rev().position(|value| value == '.') {
                         Some(value_index) => {
-                            // Note that value_index is relative to string[1..]
-                            Some(PathComponent::String(
-                                string[0..value_index + 1].to_string(),
-                            ))
+                            // Note that value_index is relative to end of the string.
+                            let string_size: usize = string.len() - value_index - 1;
+                            Some(PathComponent::String(string[0..string_size].to_string()))
                         }
                         None => Some(PathComponent::String(string.clone())),
                     }
