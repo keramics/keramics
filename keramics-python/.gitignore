@@ -1,0 +1,6 @@
+*.so
+.tox
+__pycache__
+build
+dist
+pykeramics.egg-info
