@@ -138,6 +138,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "sparsebundle"
+path = "fuzz_targets/sparsebundle.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "sparseimage"
 path = "fuzz_targets/sparseimage.rs"
 test = false
