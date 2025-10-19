@@ -9,6 +9,7 @@ members = [
     "./keramics-formats",
     "./keramics-hashes",
     "./keramics-layout-map",
+    "./keramics-python",
     "./keramics-sigscan",
     "./keramics-tools",
     "./keramics-types",

@@ -1,0 +1,17 @@
+[package]
+authors.workspace = true
+description = "Keramics Python bindings"
+edition.workspace = true
+license.workspace = true
+name = "keramics-python"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+name = "pykeramics"
+crate-type = ["cdylib"]
+
+[dependencies]
+keramics-datetime = { version = "0.0.0", path = "../keramics-datetime" }
+keramics-vfs = { version = "0.0.0", path = "../keramics-vfs" }
+pyo3 = { version = "0.26.0", features = ["extension-module"] }
