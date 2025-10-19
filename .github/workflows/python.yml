@@ -35,4 +35,4 @@ jobs:
         python3 -m pip install tox
     - name: Build Python module
       run: |
-        cd python && tox -e${{ matrix.toxenv }}
+        cd keramics-python && tox -e${{ matrix.toxenv }}
