@@ -10,13 +10,16 @@ jobs:
       matrix:
         include:
         - os: macos-latest
+          build-args: "--all-features"
         - os: ubuntu-latest
+          build-args: "--all-features"
         - os: windows-latest
+          build-args: ""
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
     - name: Build
-      run: cargo build --verbose
+      run: cargo build --verbose ${{ matrix.build-args }}
     - name: Run tests
       env:
         RUST_BACKTRACE: 1
