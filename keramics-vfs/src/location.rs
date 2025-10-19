@@ -31,6 +31,14 @@ pub enum VfsLocation {
 }
 
 impl VfsLocation {
+    /// Creates a new location base.
+    pub fn new_base(vfs_type: &VfsType, path: VfsPath) -> Self {
+        VfsLocation::Base {
+            path: path,
+            vfs_type: vfs_type.clone(),
+        }
+    }
+
     /// Creates a new location with an additional layer.
     pub fn new_with_layer(&self, vfs_type: &VfsType, path: VfsPath) -> Self {
         VfsLocation::Layer {
@@ -57,19 +65,19 @@ impl VfsLocation {
         }
     }
 
-    /// Retrieves the path.
-    pub fn get_path(&self) -> &VfsPath {
-        match self {
-            VfsLocation::Base { path, .. } => &path,
-            VfsLocation::Layer { path, .. } => &path,
-        }
-    }
-
     /// Retrieves the parent location.
     pub fn get_parent(&self) -> Option<&Self> {
         match self {
             VfsLocation::Base { .. } => None,
             VfsLocation::Layer { parent, .. } => Some(parent.as_ref()),
+        }
+    }
+
+    /// Retrieves the path.
+    pub fn get_path(&self) -> &VfsPath {
+        match self {
+            VfsLocation::Base { path, .. } => &path,
+            VfsLocation::Layer { path, .. } => &path,
         }
     }
 
@@ -115,6 +123,8 @@ pub fn new_os_vfs_location(path: &str) -> VfsLocation {
 mod tests {
     use super::*;
 
+    // TODO: add tests for new_base
+
     #[test]
     fn test_new_with_layer() {
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
@@ -154,8 +164,6 @@ mod tests {
         assert!(vfs_type == &VfsType::Qcow);
     }
 
-    // TODO: add tests for get_path
-
     #[test]
     fn test_get_parent() {
         let test_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
@@ -171,6 +179,8 @@ mod tests {
         assert!(parent.is_some());
     }
 
+    // TODO: add tests for get_path
     // TODO: add tests for get_type
     // TODO: add tests for to_string
+    // TODO: add tests for new_os_vfs_location
 }

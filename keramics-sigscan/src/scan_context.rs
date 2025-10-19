@@ -13,7 +13,7 @@
 
 use std::cmp::min;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::enums::PatternType;
 use super::scan_result::ScanResult;
@@ -103,7 +103,7 @@ impl<'a> ScanContext<'a> {
                         PatternType::BoundToStart => signature.pattern_offset as u64,
                         PatternType::Unbound => self.data_offset,
                     };
-                    self.results.insert(pattern_offset, Rc::clone(&signature));
+                    self.results.insert(pattern_offset, Arc::clone(&signature));
 
                     skip_value = signature.pattern_size;
                 }

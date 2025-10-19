@@ -12,7 +12,7 @@
  */
 
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
@@ -40,7 +40,7 @@ pub struct NtfsFileEntry {
     data_stream: DataStreamReference,
 
     /// Master File Table (MFT).
-    mft: Rc<NtfsMasterFileTable>,
+    mft: Arc<NtfsMasterFileTable>,
 
     /// The MFT entry number.
     pub mft_entry_number: u64,
@@ -77,8 +77,8 @@ impl NtfsFileEntry {
     /// Creates a new file entry.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        mft: &Rc<NtfsMasterFileTable>,
-        case_folding_mappings: &Rc<HashMap<u16, u16>>,
+        mft: &Arc<NtfsMasterFileTable>,
+        case_folding_mappings: &Arc<HashMap<u16, u16>>,
         mft_entry_number: u64,
         mft_entry: NtfsMftEntry,
         name: Option<Ucs2String>,

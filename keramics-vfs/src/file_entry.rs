@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
@@ -42,7 +42,7 @@ pub enum VfsFileEntry {
     Apm(ApmFileEntry),
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
-    Fake(Rc<FakeFileEntry>),
+    Fake(Arc<FakeFileEntry>),
     Gpt(GptFileEntry),
     Mbr(MbrFileEntry),
     Ntfs(NtfsFileEntry),
@@ -118,7 +118,8 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
-                match file_mode & 0xf000 {
+                let file_type: u16 = file_mode & 0xf000;
+                match file_type {
                     EXT_FILE_MODE_TYPE_FIFO => VfsFileType::NamedPipe,
                     EXT_FILE_MODE_TYPE_CHARACTER_DEVICE => VfsFileType::CharacterDevice,
                     EXT_FILE_MODE_TYPE_DIRECTORY => VfsFileType::Directory,
@@ -126,7 +127,7 @@ impl VfsFileEntry {
                     EXT_FILE_MODE_TYPE_REGULAR_FILE => VfsFileType::File,
                     EXT_FILE_MODE_TYPE_SYMBOLIC_LINK => VfsFileType::SymbolicLink,
                     EXT_FILE_MODE_TYPE_SOCKET => VfsFileType::Socket,
-                    _ => VfsFileType::Unknown,
+                    _ => VfsFileType::Unknown(file_type),
                 }
             }
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
@@ -176,7 +177,7 @@ impl VfsFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&mut self) -> Option<VfsString> {
+    pub fn get_name(&self) -> Option<VfsString> {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry.get_name() {
                 Some(name) => Some(VfsString::String(name)),

@@ -12,7 +12,7 @@
  */
 
 use std::io::SeekFrom;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -47,7 +47,7 @@ pub struct ExtFileSystem {
     inode_size: u16,
 
     /// Inode table.
-    inode_table: Rc<ExtInodeTable>,
+    inode_table: Arc<ExtInodeTable>,
 
     /// Metadata checksum seed.
     metadata_checksum_seed: u32,
@@ -75,7 +75,7 @@ impl ExtFileSystem {
             number_of_inodes: 0,
             block_size: 0,
             inode_size: 0,
-            inode_table: Rc::new(ExtInodeTable::new()),
+            inode_table: Arc::new(ExtInodeTable::new()),
             metadata_checksum_seed: 0,
             last_mount_path: ByteString::new(),
             last_mount_time: DateTime::NotSet,
@@ -446,7 +446,7 @@ impl ExtFileSystem {
             }
         }
         if number_of_inodes_per_block_group > 0 {
-            match Rc::get_mut(&mut self.inode_table) {
+            match Arc::get_mut(&mut self.inode_table) {
                 Some(inode_table) => match inode_table.initialize(
                     &self.features,
                     self.block_size,

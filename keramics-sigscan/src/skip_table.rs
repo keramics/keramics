@@ -84,7 +84,7 @@ impl SkipTable {
 mod tests {
     use super::*;
 
-    use std::rc::Rc;
+    use std::sync::Arc;
 
     use crate::enums::PatternType;
     use crate::signature::Signature;
@@ -94,7 +94,7 @@ mod tests {
         let mut skip_table: SkipTable = SkipTable::new();
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,

@@ -13,7 +13,7 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -39,7 +39,7 @@ pub struct NtfsDirectoryIndex {
     mediator: MediatorReference,
 
     /// Case folding mappings.
-    pub case_folding_mappings: Rc<HashMap<u16, u16>>,
+    pub case_folding_mappings: Arc<HashMap<u16, u16>>,
 
     /// Index.
     index: NtfsIndex,
@@ -56,7 +56,7 @@ pub struct NtfsDirectoryIndex {
 
 impl NtfsDirectoryIndex {
     /// Creates a new directory index.
-    pub fn new(cluster_block_size: u32, case_folding_mappings: &Rc<HashMap<u16, u16>>) -> Self {
+    pub fn new(cluster_block_size: u32, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
         Self {
             mediator: Mediator::current(),
             case_folding_mappings: case_folding_mappings.clone(),
@@ -656,7 +656,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
-    fn get_case_folding_mappings() -> Rc<HashMap<u16, u16>> {
+    fn get_case_folding_mappings() -> Arc<HashMap<u16, u16>> {
         let characters: Vec<u16> = vec![
             0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x0008, 0x0009, 0x000a,
             0x000b, 0x000c, 0x000d, 0x000e, 0x000f, 0x0010, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015,
@@ -6626,7 +6626,7 @@ mod tests {
                 case_folding_mappings.insert(character_value, value_16bit);
             }
         }
-        Rc::new(case_folding_mappings)
+        Arc::new(case_folding_mappings)
     }
 
     // TODO: add tests for initialize
@@ -6934,7 +6934,7 @@ mod tests {
         let mut index_entry = NtfsIndexEntry::new();
         index_entry.read_data(&mut test_data)?;
 
-        let case_folding_mappings: Rc<HashMap<u16, u16>> = get_case_folding_mappings();
+        let case_folding_mappings: Arc<HashMap<u16, u16>> = get_case_folding_mappings();
         let test_struct = NtfsDirectoryIndex::new(4096, &case_folding_mappings);
         let data_stream: DataStreamReference = open_fake_data_stream(vec![]);
 

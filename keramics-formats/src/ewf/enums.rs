@@ -12,7 +12,7 @@
  */
 
 /// Header value type
-#[derive(Default, Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq)]
 pub enum EwfHeaderValueType {
     AcquisitionDate,
     CaseNumber,
@@ -23,7 +23,6 @@ pub enum EwfHeaderValueType {
     ExaminerName,
     Model,
     Notes,
-    #[default]
     NotSet,
     PasswordHash,
     Platform,
@@ -34,14 +33,13 @@ pub enum EwfHeaderValueType {
 }
 
 /// Media type.
-#[derive(Clone, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum EwfMediaType {
     FixedDisk,
     LogicalEvidence,
     Memory,
     OpticalDisk,
     RemoveableDisk,
-    #[default]
     Unknown,
 }
 

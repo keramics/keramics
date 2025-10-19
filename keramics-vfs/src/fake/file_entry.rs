@@ -46,7 +46,7 @@ impl FakeFileEntry {
         // TODO: test timestamps with current time
         Self {
             data_stream: None,
-            file_type: VfsFileType::NotSet,
+            file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
             creation_time: None,

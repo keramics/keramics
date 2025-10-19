@@ -13,7 +13,7 @@
 
 use std::cmp::{max, min};
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 
@@ -73,7 +73,7 @@ impl ScanTreeNode {
         let mut remaining_signatures: Vec<SignatureReference> = Vec::new();
         for signature in signature_table.signatures.iter() {
             if !signatures_in_node.contains(signature) {
-                remaining_signatures.push(Rc::clone(signature));
+                remaining_signatures.push(Arc::clone(signature));
             }
         }
         let mut sub_offsets_to_ignore: Vec<usize> = offsets_to_ignore.clone();
@@ -95,7 +95,7 @@ impl ScanTreeNode {
                     if number_of_signatures == 1 {
                         self.scan_objects.insert(
                             signature_group.byte_value as i16,
-                            ScanObject::Signature(Rc::clone(&signature_group.signatures[0])),
+                            ScanObject::Signature(Arc::clone(&signature_group.signatures[0])),
                         );
                     } else {
                         let mut sub_signature_table: SignatureTable =
@@ -133,7 +133,7 @@ impl ScanTreeNode {
         if number_of_remaining_signatures == 1 {
             self.scan_objects.insert(
                 DEFAULT_SCAN_OBJECT,
-                ScanObject::Signature(Rc::clone(&remaining_signatures[0])),
+                ScanObject::Signature(Arc::clone(&remaining_signatures[0])),
             );
         } else if number_of_remaining_signatures > 1 {
             let mut sub_signature_table: SignatureTable =
@@ -208,7 +208,7 @@ impl ScanTreeNode {
         }
         if let Some(ScanObject::Signature(signature)) = scan_object {
             if signature.scan_buffer(data_offset, data_size, buffer, buffer_offset, buffer_size) {
-                return ScanResult::Signature(Rc::clone(signature));
+                return ScanResult::Signature(Arc::clone(signature));
             } else if scan_object_key == DEFAULT_SCAN_OBJECT {
                 return ScanResult::None;
             }
@@ -227,7 +227,7 @@ impl ScanTreeNode {
                         buffer_offset,
                         buffer_size,
                     ) {
-                        ScanResult::Signature(Rc::clone(signature))
+                        ScanResult::Signature(Arc::clone(signature))
                     } else {
                         ScanResult::None
                     }
@@ -305,8 +305,6 @@ impl ScanTree {
 mod tests {
     use super::*;
 
-    use std::rc::Rc;
-
     use crate::signature::Signature;
 
     #[test]
@@ -316,7 +314,7 @@ mod tests {
         assert_eq!(scan_tree_node.scan_objects.len(), 0);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,
@@ -341,7 +339,7 @@ mod tests {
         assert_eq!(scan_tree.root_node.scan_objects.len(), 0);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,
@@ -361,7 +359,7 @@ mod tests {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToStart);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "msiecf1",
             PatternType::BoundToStart,
             0,
@@ -396,7 +394,7 @@ mod tests {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::BoundToEnd);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vhd1",
             PatternType::BoundToEnd,
             72,
@@ -429,7 +427,7 @@ mod tests {
         let mut scan_tree: ScanTree = ScanTree::new(PatternType::Unbound);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "test1",
             PatternType::Unbound,
             0,

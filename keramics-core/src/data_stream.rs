@@ -19,7 +19,7 @@ use super::errors::ErrorTrace;
 pub type DataStreamReference = Arc<RwLock<dyn DataStream>>;
 
 /// Data stream trait.
-pub trait DataStream {
+pub trait DataStream: Send + Sync {
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace>;
 

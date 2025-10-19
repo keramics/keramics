@@ -20,7 +20,7 @@ use super::path_component::PathComponent;
 pub type FileResolverReference = Arc<Box<dyn FileResolver>>;
 
 /// File resolver trait.
-pub trait FileResolver {
+pub trait FileResolver: Send + Sync {
     /// Retrieves a data stream with the specified path.
     fn get_data_stream(
         &self,

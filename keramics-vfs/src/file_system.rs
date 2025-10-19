@@ -12,7 +12,7 @@
  */
 
 use std::path::Path;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
@@ -337,7 +337,7 @@ impl VfsFileSystem {
                 }
             }
             VfsFileSystem::Fake(fake_file_system) => {
-                let result: Option<Rc<FakeFileEntry>> =
+                let result: Option<Arc<FakeFileEntry>> =
                     match fake_file_system.get_file_entry_by_path(vfs_path) {
                         Ok(result) => result,
                         Err(mut error) => {

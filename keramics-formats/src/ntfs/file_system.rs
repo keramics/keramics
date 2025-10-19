@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 use std::io::SeekFrom;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, bytes_to_u16_le};
@@ -47,10 +47,10 @@ pub struct NtfsFileSystem {
     pub index_entry_size: u32,
 
     /// Master File Table (MFT).
-    mft: Rc<NtfsMasterFileTable>,
+    mft: Arc<NtfsMasterFileTable>,
 
     /// Case folding mappings.
-    case_folding_mappings: Rc<HashMap<u16, u16>>,
+    case_folding_mappings: Arc<HashMap<u16, u16>>,
 
     /// Volume information from the $VOLUME_INFORMATION attribute of the "$Volume" metadata file.
     volume_information: Option<NtfsVolumeInformation>,
@@ -71,8 +71,8 @@ impl NtfsFileSystem {
             cluster_block_size: 0,
             mft_entry_size: 0,
             index_entry_size: 0,
-            mft: Rc::new(NtfsMasterFileTable::new()),
-            case_folding_mappings: Rc::new(HashMap::new()),
+            mft: Arc::new(NtfsMasterFileTable::new()),
+            case_folding_mappings: Arc::new(HashMap::new()),
             volume_information: None,
             volume_label: None,
             volume_serial_number: 0,
@@ -344,7 +344,7 @@ impl NtfsFileSystem {
                 return Err(error);
             }
         };
-        match Rc::get_mut(&mut self.case_folding_mappings) {
+        match Arc::get_mut(&mut self.case_folding_mappings) {
             Some(case_folding_mappings) => {
                 let mut data_offset: usize = 0;
                 for character_value in 0..=65535 {
@@ -377,7 +377,7 @@ impl NtfsFileSystem {
                 mft_block_number
             )));
         }
-        match Rc::get_mut(&mut self.mft) {
+        match Arc::get_mut(&mut self.mft) {
             Some(mft) => match mft.initialize(
                 self.cluster_block_size,
                 self.mft_entry_size,

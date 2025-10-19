@@ -13,7 +13,7 @@
 
 use std::cmp::min;
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 
@@ -107,7 +107,7 @@ impl SignatureTable {
                 PatternType::BoundToStart => signature.pattern_offset,
                 PatternType::Unbound => 0,
             };
-            self.signatures.push(Rc::clone(&signature));
+            self.signatures.push(Arc::clone(&signature));
 
             for pattern_index in 0..signature.pattern_size {
                 if !offsets_to_ignore.contains(&pattern_offset) {
@@ -364,7 +364,7 @@ impl SignatureTable {
                 for (_, signature_group) in byte_value_group.signature_groups.iter() {
                     for signature in signature_group.signatures.iter() {
                         if !signatures.contains(signature) {
-                            signatures.push(Rc::clone(signature));
+                            signatures.push(Arc::clone(signature));
                         }
                     }
                 }
@@ -400,8 +400,6 @@ impl SignatureTable {
 mod tests {
     use super::*;
 
-    use std::rc::Rc;
-
     use crate::signature::Signature;
 
     #[test]
@@ -409,7 +407,7 @@ mod tests {
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,
@@ -430,7 +428,7 @@ mod tests {
         assert_eq!(signature_table.signatures.len(), 0);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,
@@ -451,7 +449,7 @@ mod tests {
         assert_eq!(signature_table.signatures.len(), 0);
 
         let mut signatures: Vec<SignatureReference> = Vec::new();
-        signatures.push(Rc::new(Signature::new(
+        signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,

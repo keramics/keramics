@@ -139,13 +139,14 @@ impl DisplayPath {
         vfs_location: &VfsLocation,
     ) -> Result<String, ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
-        let result: Option<VfsFileEntry> = match vfs_resolver.get_file_entry_by_path(vfs_location) {
-            Ok(file_entry) => file_entry,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                return Err(error);
-            }
-        };
+        let result: Option<VfsFileEntry> =
+            match vfs_resolver.get_file_entry_by_location(vfs_location) {
+                Ok(file_entry) => file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                    return Err(error);
+                }
+            };
         let display_path: Option<String> = match result {
             Some(VfsFileEntry::Gpt(gpt_file_entry)) => match gpt_file_entry.get_identifier() {
                 Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),

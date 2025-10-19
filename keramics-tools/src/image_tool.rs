@@ -907,7 +907,7 @@ impl ImageTool {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let result: Option<VfsFileEntry> =
-            match vfs_resolver.get_file_entry_by_path(&vfs_scan_node.location) {
+            match vfs_resolver.get_file_entry_by_location(&vfs_scan_node.location) {
                 Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");

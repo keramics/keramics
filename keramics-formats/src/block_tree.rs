@@ -11,15 +11,14 @@
  * under the License.
  */
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::errors::InsertError;
 
 /// Block tree node type.
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq)]
 enum BlockTreeNodeType {
     Branch,
-    #[default]
     Leaf,
 }
 
@@ -38,7 +37,7 @@ struct BlockTreeNode<T> {
     pub sub_nodes: Vec<Option<BlockTreeNode<T>>>,
 
     /// Values.
-    pub values: Vec<Option<Rc<T>>>,
+    pub values: Vec<Option<Arc<T>>>,
 }
 
 impl<T> BlockTreeNode<T> {
@@ -60,7 +59,7 @@ impl<T> BlockTreeNode<T> {
         leaf_value_size: u64,
         offset: u64,
         size: u64,
-        value: Rc<T>,
+        value: Arc<T>,
     ) -> Result<(), InsertError> {
         if self.node_type == BlockTreeNodeType::Branch {
             if self.sub_nodes.len() == 0 {
@@ -233,7 +232,7 @@ impl<T> BlockTree<T> {
             self.leaf_value_size,
             offset,
             size,
-            Rc::new(value),
+            Arc::new(value),
         )
     }
 }

@@ -13,7 +13,6 @@
 
 use std::cmp::max;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
@@ -33,7 +32,7 @@ pub struct ExtFileEntry {
     data_stream: DataStreamReference,
 
     /// Inode table.
-    inode_table: Rc<ExtInodeTable>,
+    inode_table: Arc<ExtInodeTable>,
 
     /// The inode number.
     pub inode_number: u32,
@@ -58,7 +57,7 @@ impl ExtFileEntry {
     /// Creates a new file entry.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        inode_table: &Rc<ExtInodeTable>,
+        inode_table: &Arc<ExtInodeTable>,
         inode_number: u32,
         inode: ExtInode,
         name: Option<ByteString>,
