@@ -18,8 +18,8 @@ use std::sync::Arc;
 use libfuzzer_sys::fuzz_target;
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_fake_data_stream};
-use keramics_formats::{FileResolver, FileResolverReference, PathComponent};
 use keramics_formats::sparsebundle::SparseBundleImage;
+use keramics_formats::{FileResolver, FileResolverReference, PathComponent};
 
 pub struct SparseBundleFuzzFileResolver {
     file_name: PathComponent,
@@ -40,6 +40,7 @@ impl FileResolver for SparseBundleFuzzFileResolver {
         &self,
         path_components: &[PathComponent],
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        // TODO: emulate bands file
         if path_components[0] == self.file_name {
             let data_stream: DataStreamReference = open_fake_data_stream(&self.data);
 
