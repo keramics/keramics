@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn test_read_entry() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_struct = VhdBlockAllocationTable::new(0, 3);
 

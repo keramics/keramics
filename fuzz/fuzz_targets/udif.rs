@@ -15,7 +15,7 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use keramics_core::{open_fake_data_stream, DataStreamReference};
+use keramics_core::{DataStreamReference, open_fake_data_stream};
 use keramics_formats::udif::UdifFile;
 
 // Universal Disk Image Format (UDIF) file fuzz target.
@@ -23,5 +23,5 @@ fuzz_target!(|data: &[u8]| {
     let mut udif_file: UdifFile = UdifFile::new();
 
     let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = udif_file.read_data_steam(&data_stream);
+    _ = udif_file.read_data_stream(&data_stream);
 });

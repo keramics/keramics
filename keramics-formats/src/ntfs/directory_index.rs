@@ -6936,7 +6936,7 @@ mod tests {
 
         let case_folding_mappings: Arc<HashMap<u16, u16>> = get_case_folding_mappings();
         let test_struct = NtfsDirectoryIndex::new(4096, &case_folding_mappings);
-        let data_stream: DataStreamReference = open_fake_data_stream(vec![]);
+        let data_stream: DataStreamReference = open_fake_data_stream(&[]);
 
         let mut entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();
         test_struct.get_directory_entries_from_node(&test_data, 24, &data_stream, &mut entries)?;

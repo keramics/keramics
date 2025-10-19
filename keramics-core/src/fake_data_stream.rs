@@ -114,9 +114,9 @@ impl DataStream for FakeDataStream {
 }
 
 /// Opens a new fake data stream.
-pub fn open_fake_data_stream(data: Vec<u8>) -> DataStreamReference {
+pub fn open_fake_data_stream(data: &[u8]) -> DataStreamReference {
     let data_size: u64 = data.len() as u64;
-    let fake_data_stream: FakeDataStream = FakeDataStream::new(&data, data_size);
+    let fake_data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
     Arc::new(RwLock::new(fake_data_stream))
 }
 

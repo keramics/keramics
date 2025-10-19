@@ -250,7 +250,7 @@ mod tests {
     #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = EwfHeader::new();
         let mut header_values: HashMap<EwfHeaderValueType, EwfHeaderValue> = HashMap::new();
