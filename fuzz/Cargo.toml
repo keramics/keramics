@@ -11,167 +11,197 @@ version.workspace = true
 [package.metadata]
 cargo-fuzz = true
 
+[features]
+fuzzing = []
+
 [[bin]]
 name = "adc"
 path = "fuzz_targets/adc.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "apm"
 path = "fuzz_targets/apm.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "bzip2"
 path = "fuzz_targets/bzip2.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "deflate"
 path = "fuzz_targets/deflate.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "ewf"
 path = "fuzz_targets/ewf.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "ext"
 path = "fuzz_targets/ext.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "gpt"
 path = "fuzz_targets/gpt.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "lzfse"
 path = "fuzz_targets/lzfse.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "lznt1"
 path = "fuzz_targets/lznt1.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "lzvn"
 path = "fuzz_targets/lzvn.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "lzx"
 path = "fuzz_targets/lzx.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "lzxpress"
 path = "fuzz_targets/lzxpress.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "lzxpress_huffman"
 path = "fuzz_targets/lzxpress_huffman.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "mbr"
 path = "fuzz_targets/mbr.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "md5"
 path = "fuzz_targets/md5.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "ntfs"
 path = "fuzz_targets/ntfs.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "qcow"
 path = "fuzz_targets/qcow.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "sha1"
 path = "fuzz_targets/sha1.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "sha224"
 path = "fuzz_targets/sha224.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "sha256"
 path = "fuzz_targets/sha256.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "sha512"
 path = "fuzz_targets/sha512.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "sparsebundle"
 path = "fuzz_targets/sparsebundle.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "sparseimage"
 path = "fuzz_targets/sparseimage.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "udif"
 path = "fuzz_targets/udif.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "vhd"
 path = "fuzz_targets/vhd.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "vhdx"
 path = "fuzz_targets/vhdx.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [[bin]]
 name = "zlib"
 path = "fuzz_targets/zlib.rs"
 test = false
 doc = false
+required-features = ["fuzzing"]
 
 [dependencies]
 keramics-compression = { version = "0.0.0", path = "../keramics-compression" }
