@@ -112,7 +112,7 @@ mod tests {
             0x61, 0x20, 0x68, 0x69, 0x67, 0x68, 0x20, 0x74, 0x65, 0x6d, 0x70, 0x65, 0x72, 0x61,
             0x74, 0x75, 0x72, 0x65, 0x2e, 0x0a,
         ];
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let md5: String = Bodyfile::calculate_md5(&data_stream)?;
         assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");

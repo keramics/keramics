@@ -278,7 +278,7 @@ mod tests {
         let mut test_struct = ExtExtentsTree::new(1024, 16);
 
         let test_data: Vec<u8> = get_test_data();
-        let test_data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
 
@@ -313,7 +313,7 @@ mod tests {
         let mut test_struct = ExtExtentsTree::new(1024, 16);
 
         let test_data: Vec<u8> = get_test_data();
-        let test_data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let test_data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut logical_block_number: u64 = 0;
         let mut block_ranges: Vec<ExtBlockRange> = Vec::new();

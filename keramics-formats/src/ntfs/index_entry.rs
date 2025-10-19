@@ -451,7 +451,7 @@ mod tests {
     fn test_read_at_position() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let test_data_size: u32 = test_data.len() as u32;
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = NtfsIndexEntry::new();
         test_struct.read_at_position(&data_stream, test_data_size, SeekFrom::Start(0))?;

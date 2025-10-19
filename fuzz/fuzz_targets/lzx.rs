@@ -15,13 +15,11 @@
 
 use libfuzzer_sys::fuzz_target;
 
-use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::udif::UdifFile;
+use keramics_compression::LzxContext;
 
-// Universal Disk Image Format (UDIF) file fuzz target.
+// LZX decompression fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut udif_file: UdifFile = UdifFile::new();
-
-    let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = udif_file.read_data_stream(&data_stream);
+    let mut lzx_context: LzxContext = LzxContext::new();
+    let mut uncompressed_data: [u8; 65536] = [0; 65536];
+    _ = lzx_context.decompress(&data, &mut uncompressed_data);
 });

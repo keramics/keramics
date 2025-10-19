@@ -1122,7 +1122,7 @@ mod tests {
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1145,7 +1145,7 @@ mod tests {
     #[test]
     fn test_read_compressed_block() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1165,7 +1165,7 @@ mod tests {
     #[test]
     fn test_read_compressed_block_offsets() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1187,7 +1187,7 @@ mod tests {
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1205,7 +1205,7 @@ mod tests {
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1223,7 +1223,7 @@ mod tests {
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1244,7 +1244,7 @@ mod tests {
     #[test]
     fn test_seek_beyond_file_size() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1262,7 +1262,7 @@ mod tests {
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1324,7 +1324,7 @@ mod tests {
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
@@ -1345,7 +1345,7 @@ mod tests {
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();

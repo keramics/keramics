@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn test_read_at_position_e01() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_e01();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = EwfE01Volume::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
@@ -398,7 +398,7 @@ mod tests {
     #[test]
     fn test_read_at_position_s01() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_s01();
-        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = EwfS01Volume::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
