@@ -4,7 +4,6 @@ description = "Keramics layout map procedural macros"
 edition.workspace = true
 license.workspace = true
 name = "keramics-layout-map"
-publish = false
 repository.workspace = true
 version.workspace = true
 

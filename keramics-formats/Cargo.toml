@@ -12,16 +12,16 @@ name = "keramics_formats"
 path = "src/lib.rs"
 
 [dependencies]
-keramics-checksums = { version = "0", path = "../keramics-checksums" }
-keramics-compression = { version = "0", path = "../keramics-compression" }
-keramics-core = { version = "0", path = "../keramics-core" }
-keramics-datetime = { version = "0", path = "../keramics-datetime" }
-keramics-encodings = { version = "0", path = "../keramics-encodings" }
-keramics-layout-map = { version = "0", path = "../keramics-layout-map" }
-keramics-sigscan = { version = "0", path = "../keramics-sigscan" }
-keramics-types = { version = "0", path = "../keramics-types" }
+keramics-checksums = { version = "0.0.0", path = "../keramics-checksums" }
+keramics-compression = { version = "0.0.0", path = "../keramics-compression" }
+keramics-core = { version = "0.0.0", path = "../keramics-core" }
+keramics-datetime = { version = "0.0.0", path = "../keramics-datetime" }
+keramics-encodings = { version = "0.0.0", path = "../keramics-encodings" }
+keramics-layout-map = { version = "0.0.0", path = "../keramics-layout-map" }
+keramics-sigscan = { version = "0.0.0", path = "../keramics-sigscan" }
+keramics-types = { version = "0.0.0", path = "../keramics-types" }
 pest = { version = "2.8.2" }
 pest_derive = { version = "2.8.2" }
 
 [dev-dependencies]
-keramics-hashes = { version = "0", path = "../keramics-hashes" }
+keramics-hashes = { version = "0.0.0", path = "../keramics-hashes" }
