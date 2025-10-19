@@ -1,6 +1,6 @@
 [package]
 authors.workspace = true
-description = "Keramics signature scanner"
+description = "Keramics data formats signature scanner"
 edition.workspace = true
 license.workspace = true
 name = "keramics-sigscan"
