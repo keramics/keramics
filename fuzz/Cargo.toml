@@ -204,8 +204,8 @@ doc = false
 required-features = ["fuzzing"]
 
 [dependencies]
-keramics-compression = { version = "0.0.0", path = "../keramics-compression" }
-keramics-core = { version = "0.0.0", path = "../keramics-core" }
-keramics-formats = { version = "0.0.0", path = "../keramics-formats" }
-keramics-hashes = { version = "0.0.0", path = "../keramics-hashes" }
+keramics-compression = { version = "0.0.1", path = "../keramics-compression" }
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
+keramics-formats = { version = "0.0.1", path = "../keramics-formats" }
+keramics-hashes = { version = "0.0.1", path = "../keramics-hashes" }
 libfuzzer-sys = { version = "0.4" }

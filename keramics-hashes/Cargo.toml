@@ -12,5 +12,5 @@ name = "keramics_hashes"
 path = "src/lib.rs"
 
 [dependencies]
-keramics-core = { version = "0.0.0", path = "../keramics-core" }
-keramics-types = { version = "0.0.0", path = "../keramics-types" }
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
+keramics-types = { version = "0.0.1", path = "../keramics-types" }

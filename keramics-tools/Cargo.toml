@@ -30,9 +30,9 @@ path = "src/info_tool.rs"
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 indicatif = { version = "0.18" }
-keramics-core = { version = "0.0.0", path = "../keramics-core" }
-keramics-datetime = { version = "0.0.0", path = "../keramics-datetime" }
-keramics-formats = { version = "0.0.0", path = "../keramics-formats" }
-keramics-hashes = { version = "0.0.0", path = "../keramics-hashes" }
-keramics-types = { version = "0.0.0", path = "../keramics-types" }
-keramics-vfs = { version = "0.0.0", path = "../keramics-vfs" }
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
+keramics-datetime = { version = "0.0.1", path = "../keramics-datetime" }
+keramics-formats = { version = "0.0.1", path = "../keramics-formats" }
+keramics-hashes = { version = "0.0.1", path = "../keramics-hashes" }
+keramics-types = { version = "0.0.1", path = "../keramics-types" }
+keramics-vfs = { version = "0.0.1", path = "../keramics-vfs" }

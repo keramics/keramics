@@ -12,4 +12,4 @@ name = "keramics_encodings"
 path = "src/lib.rs"
 
 [dependencies]
-keramics-core = { version = "0.0.0", path = "../keramics-core" }
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
