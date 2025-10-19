@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Tools for analysis of data formats"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-tools"
 repository.workspace = true
 version.workspace = true

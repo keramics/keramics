@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics Python bindings"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-python"
 repository.workspace = true
 version.workspace = true

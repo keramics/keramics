@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics checksum calculation methods"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-checksums"
 repository.workspace = true
 version.workspace = true

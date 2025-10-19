@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics decompression methods"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-compression"
 repository.workspace = true
 version.workspace = true

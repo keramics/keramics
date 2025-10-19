@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics digest hash calculation methods"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-hashes"
 repository.workspace = true
 version.workspace = true

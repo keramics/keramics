@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics data formats"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-formats"
 repository.workspace = true
 version.workspace = true

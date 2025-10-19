@@ -3,6 +3,7 @@ authors.workspace = true
 description = "mdbook preprocessor for extended Markdown tables"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "mdbook-tables"
 publish = false
 repository.workspace = true

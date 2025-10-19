@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics data formats signature scanner"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-sigscan"
 repository.workspace = true
 version.workspace = true

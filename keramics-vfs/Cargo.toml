@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics Virtual File System (VFS)"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-vfs"
 version.workspace = true
 

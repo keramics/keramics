@@ -3,6 +3,7 @@ authors.workspace = true
 description = "Keramics OSS-Fuzz fuzz targets"
 edition.workspace = true
 license.workspace = true
+license-file.workspace = true
 name = "keramics-fuzz"
 publish = false
 repository.workspace = true
