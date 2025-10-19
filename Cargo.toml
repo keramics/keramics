@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "./docs/mdbook-tables",
+    "./fuzz",
     "./keramics-checksums",
     "./keramics-compression",
     "./keramics-core",
