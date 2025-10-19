@@ -56,13 +56,13 @@ impl VfsResolver {
         }
     }
 
-    /// Retrieves a file entry with the specified path.
-    pub fn get_file_entry_by_path(
+    /// Retrieves a file entry with the specified location.
+    pub fn get_file_entry_by_location(
         &self,
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         match self.context.write() {
-            Ok(mut context) => context.get_file_entry_by_path(vfs_location),
+            Ok(mut context) => context.get_file_entry_by_location(vfs_location),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on context",
@@ -118,15 +118,17 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
+    fn test_get_file_entry_by_location() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
-        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_location)?;
+        let result: Option<VfsFileEntry> =
+            vfs_resolver.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_some());
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/bogus.txt");
-        let result: Option<VfsFileEntry> = vfs_resolver.get_file_entry_by_path(&vfs_location)?;
+        let result: Option<VfsFileEntry> =
+            vfs_resolver.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());
 
         Ok(())

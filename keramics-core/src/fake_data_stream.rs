@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -19,8 +20,11 @@ use super::errors::ErrorTrace;
 
 /// Fake (or virtual) data stream.
 pub struct FakeDataStream {
-    /// The data buffer.
+    /// The data.
     data: Vec<u8>,
+
+    /// The data size.
+    data_size: usize,
 
     /// The current offset.
     current_offset: u64,
@@ -31,11 +35,12 @@ pub struct FakeDataStream {
 
 impl FakeDataStream {
     /// Creates a new data stream.
-    pub fn new(data: &[u8], data_size: u64) -> Self {
+    pub fn new(data: &[u8], size: u64) -> Self {
         Self {
             data: data.to_vec(),
+            data_size: data.len(),
             current_offset: 0,
-            size: data_size,
+            size: size,
         }
     }
 }
@@ -57,14 +62,36 @@ impl DataStream for FakeDataStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let data_offset: usize = self.current_offset as usize;
-        let data_end_offset: usize = data_offset + read_size;
+        let mut buf_offset: usize = 0;
 
-        buf[..read_size].copy_from_slice(&self.data[data_offset..data_end_offset]);
+        while buf_offset < read_size {
+            let read_remainder_size: usize = read_size - buf_offset;
 
-        self.current_offset += read_size as u64;
+            let read_count: usize = if self.current_offset < self.data_size as u64 {
+                let data_offset: usize = self.current_offset as usize;
 
-        Ok(read_size)
+                let data_remainder_size: usize =
+                    min(read_remainder_size, self.data_size - data_offset);
+
+                let data_end_offset: usize = data_offset + data_remainder_size;
+                let buf_end_offset: usize = buf_offset + data_remainder_size;
+
+                buf[buf_offset..buf_end_offset]
+                    .copy_from_slice(&self.data[data_offset..data_end_offset]);
+
+                data_remainder_size
+            } else {
+                let buf_end_offset: usize = buf_offset + read_remainder_size;
+
+                buf[buf_offset..buf_end_offset].fill(0);
+
+                read_remainder_size
+            };
+            buf_offset += read_count;
+        }
+        self.current_offset += buf_offset as u64;
+
+        Ok(buf_offset)
     }
 
     /// Sets the current position of the data.
@@ -117,15 +144,62 @@ mod tests {
         ];
     }
 
-    #[test]
-    fn test_read() -> Result<(), ErrorTrace> {
+    fn get_test_data_stream() -> FakeDataStream {
         let test_data: Vec<u8> = get_test_data();
-        let data_size: u64 = test_data.len() as u64;
-        let mut data_stream: FakeDataStream = FakeDataStream::new(&test_data, data_size);
+        FakeDataStream::new(&test_data, 32768)
+    }
 
-        let mut test_buf: [u8; 202] = [0; 202];
-        let read_count: usize = data_stream.read(&mut test_buf)?;
-        assert_eq!(read_count, 202);
+    #[test]
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let offset: u64 = data_stream.seek(SeekFrom::Start(1024))?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let offset: u64 = data_stream.seek(SeekFrom::End(-512))?;
+        assert_eq!(offset, data_stream.size - 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let offset = data_stream.seek(SeekFrom::Start(1024))?;
+        assert_eq!(offset, 1024);
+
+        let offset: u64 = data_stream.seek(SeekFrom::Current(-512))?;
+        assert_eq!(offset, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let offset: u64 = data_stream.seek(SeekFrom::End(512))?;
+        assert_eq!(offset, data_stream.size + 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+        data_stream.seek(SeekFrom::Start(128))?;
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 64);
 
         let expected_data: String = [
             "A ceramic is any of the various hard, brittle, heat-resistant, and ",
@@ -134,11 +208,22 @@ mod tests {
         ]
         .join("");
 
-        assert_eq!(test_buf, expected_data.as_bytes());
+        assert_eq!(data, expected_data.as_bytes()[128..192]);
 
         Ok(())
     }
 
-    // TODO: add test for seek
-    // TODO: add test for get_size
+    #[test]
+    fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+        data_stream.seek(SeekFrom::End(512))?;
+
+        let mut data: Vec<u8> = vec![0; 512];
+        let read_size: usize = data_stream.read(&mut data)?;
+        assert_eq!(read_size, 0);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_size.
 }

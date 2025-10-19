@@ -11,7 +11,7 @@
  * under the License.
  */
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum VfsFileType {
     BlockDevice,
     CharacterDevice,
@@ -19,20 +19,17 @@ pub enum VfsFileType {
     Directory,
     File,
     NamedPipe,
-    #[default]
-    NotSet,
     Socket,
     SymbolicLink,
-    Unknown,
+    Unknown(u16),
     Whiteout,
 }
 
-#[derive(Clone, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum VfsType {
     Apm,
     Ext,
     Ewf,
-    #[default]
     Fake,
     Gpt,
     Mbr,

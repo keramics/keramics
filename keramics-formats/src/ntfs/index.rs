@@ -78,11 +78,23 @@ impl NtfsIndex {
         }
         let mut index_entry: NtfsIndexEntry = NtfsIndexEntry::new();
 
-        index_entry.read_at_position(
+        match index_entry.read_at_position(
             data_stream,
             self.index_entry_size,
             SeekFrom::Start(index_entry_offset),
-        )?;
+        ) {
+            Ok(read_count) => read_count,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read index entry at offset: {} (0x{:08x})",
+                        index_entry_offset, index_entry_offset
+                    )
+                );
+                return Err(error);
+            }
+        };
         Ok(index_entry)
     }
 

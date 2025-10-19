@@ -13,7 +13,6 @@
 
 use std::cmp::max;
 use std::collections::BTreeMap;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
@@ -33,7 +32,7 @@ pub struct ExtFileEntry {
     data_stream: DataStreamReference,
 
     /// Inode table.
-    inode_table: Rc<ExtInodeTable>,
+    inode_table: Arc<ExtInodeTable>,
 
     /// The inode number.
     pub inode_number: u32,
@@ -58,7 +57,7 @@ impl ExtFileEntry {
     /// Creates a new file entry.
     pub(super) fn new(
         data_stream: &DataStreamReference,
-        inode_table: &Rc<ExtInodeTable>,
+        inode_table: &Arc<ExtInodeTable>,
         inode_number: u32,
         inode: ExtInode,
         name: Option<ByteString>,
@@ -163,7 +162,6 @@ impl ExtFileEntry {
                     self.inode.data_size,
                 )));
             }
-            // TODO: move read from data_reference into block_stream?
             let byte_string: ByteString = if self.inode.data_size < 60 {
                 ByteString::from(self.inode.data_reference.as_slice())
             } else {
@@ -175,13 +173,20 @@ impl ExtFileEntry {
                 );
                 let mut block_stream: ExtBlockStream =
                     ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-                block_stream.open(
+
+                match block_stream.open(
                     &self.data_stream,
                     number_of_blocks,
                     &self.inode.block_ranges,
-                )?;
-
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                        return Err(error);
+                    }
+                }
                 let mut data: Vec<u8> = vec![0; self.inode.data_size as usize];
+
                 match block_stream.read_exact(&mut data) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -224,11 +229,18 @@ impl ExtFileEntry {
             );
             let mut block_stream: ExtBlockStream =
                 ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-            block_stream.open(
+
+            match block_stream.open(
                 &self.data_stream,
                 number_of_blocks,
                 &self.inode.block_ranges,
-            )?;
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                    return Err(error);
+                }
+            }
             Ok(Some(Arc::new(RwLock::new(block_stream))))
         }
     }
@@ -236,7 +248,16 @@ impl ExtFileEntry {
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         if !self.read_directory_entries {
-            self.read_directory_entries()?;
+            match self.read_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries"
+                    );
+                    return Err(error);
+                }
+            }
         }
         Ok(self.directory_entries.len())
     }
@@ -247,7 +268,16 @@ impl ExtFileEntry {
         sub_file_entry_index: usize,
     ) -> Result<ExtFileEntry, ErrorTrace> {
         if !self.read_directory_entries {
-            self.read_directory_entries()?;
+            match self.read_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries"
+                    );
+                    return Err(error);
+                }
+            }
         }
         let (name, directory_entry): (&ByteString, &ExtDirectoryEntry) =
             match self.directory_entries.iter().nth(sub_file_entry_index) {
@@ -259,10 +289,19 @@ impl ExtFileEntry {
                     )));
                 }
             };
-        let inode: ExtInode = self
+        let inode: ExtInode = match self
             .inode_table
-            .get_inode(&self.data_stream, directory_entry.inode_number)?;
-
+            .get_inode(&self.data_stream, directory_entry.inode_number)
+        {
+            Ok(inode) => inode,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve inode: {}", directory_entry.inode_number)
+                );
+                return Err(error);
+            }
+        };
         let file_entry: ExtFileEntry = ExtFileEntry::new(
             &self.data_stream,
             &self.inode_table,
@@ -281,17 +320,35 @@ impl ExtFileEntry {
         sub_file_entry_name: &ByteString,
     ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
         if !self.read_directory_entries {
-            self.read_directory_entries()?;
+            match self.read_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries"
+                    );
+                    return Err(error);
+                }
+            }
         }
         let (name, directory_entry): (&ByteString, &ExtDirectoryEntry) =
             match self.directory_entries.get_key_value(sub_file_entry_name) {
                 Some(key_and_value) => key_and_value,
                 None => return Ok(None),
             };
-        let inode: ExtInode = self
+        let inode: ExtInode = match self
             .inode_table
-            .get_inode(&self.data_stream, directory_entry.inode_number)?;
-
+            .get_inode(&self.data_stream, directory_entry.inode_number)
+        {
+            Ok(inode) => inode,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve inode: {}", directory_entry.inode_number)
+                );
+                return Err(error);
+            }
+        };
         let file_entry: ExtFileEntry = ExtFileEntry::new(
             &self.data_stream,
             &self.inode_table,
@@ -302,6 +359,11 @@ impl ExtFileEntry {
         Ok(Some(file_entry))
     }
 
+    /// Determines if the file entry is the root directory.
+    pub fn is_root_directory(&self) -> bool {
+        self.inode_number == EXT_ROOT_DIRECTORY_IDENTIFIER
+    }
+
     /// Reads the directory entries.
     fn read_directory_entries(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY {
@@ -309,14 +371,33 @@ impl ExtFileEntry {
                 ExtDirectoryTree::new(self.inode_table.block_size);
 
             if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-                directory_tree
-                    .read_inline_data(&self.inode.data_reference, &mut self.directory_entries)?;
+                match directory_tree
+                    .read_inline_data(&self.inode.data_reference, &mut self.directory_entries)
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read directory entries from inline data"
+                        );
+                        return Err(error);
+                    }
+                }
             } else {
-                directory_tree.read_block_data(
+                match directory_tree.read_block_data(
                     &self.data_stream,
                     &self.inode.block_ranges,
                     &mut self.directory_entries,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read directory entries"
+                        );
+                        return Err(error);
+                    }
+                }
             }
         }
         self.read_directory_entries = true;
@@ -586,5 +667,8 @@ mod tests {
 
     // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for get_sub_file_entry_by_name
+
+    // TODO: add tests for is_root_directory
+
     // TODO: add tests for read_directory_entries
 }

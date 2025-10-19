@@ -12,7 +12,7 @@
  */
 
 /// Format identifier.
-#[derive(Clone, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum FormatIdentifier {
     Apm,
     Ext,
@@ -23,7 +23,6 @@ pub enum FormatIdentifier {
     Qcow,
     SparseImage,
     Udif,
-    #[default]
     Unknown,
     Vhd,
     Vhdx,

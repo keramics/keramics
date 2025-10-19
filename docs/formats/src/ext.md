@@ -154,7 +154,7 @@ The ext3 superblock is 336 bytes in size and consists of:
 | 28 | 4 | | Fragment size, which contains the number of bits to shift 1024 to the MSB (left)
 | 32 | 4 | | Number of blocks per block group
 | 36 | 4 | | Number of fragments per block group
-| 40 | 4 | | Number of inodes per block group
+| 40 | 4 | | Number of inodes per block group, which can be 0 in combination with EXT3_FEATURE_INCOMPAT_JOURNAL_DEV
 | 44 | 4 | | Last mount time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 48 | 4 | | Last written time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 52 | 2 | | The (current) mount count
@@ -214,7 +214,7 @@ The superblock is 1024 bytes in size and consists of:
 | 28 | 4 | | Fragment size, which contains the number of bits to shift 1024 to the most-significant-bit (MSB)
 | 32 | 4 | | Number of blocks per block group
 | 36 | 4 | | Number of fragments per block group
-| 40 | 4 | | Number of inodes per block group
+| 40 | 4 | | Number of inodes per block group, which can be 0 in combination with EXT4_FEATURE_INCOMPAT_JOURNAL_DEV
 | 44 | 4 | | Last mount time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 48 | 4 | | Last written time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 52 | 2 | | The (current) mount count
@@ -405,7 +405,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 0x00000001 | EXT2_FEATURE_INCOMPAT_COMPRESSION | Has compression, which is not yet implemented
 | 0x00000002 | EXT2_FEATURE_INCOMPAT_FILETYPE | Directory entry has file type
 | 0x00000004 | EXT3_FEATURE_INCOMPAT_RECOVER | Needs recovery
-| 0x00000008 | EXT3_FEATURE_INCOMPAT_JOURNAL_DEV | Has journal device
+| 0x00000008 | EXT3_FEATURE_INCOMPAT_JOURNAL_DEV | Journal device
 | 0x00000010 | EXT2_FEATURE_INCOMPAT_META_BG | Has meta (or metadata) block groups
 | | |
 | 0x00000040 | EXT4_FEATURE_INCOMPAT_EXTENTS | Has extents
@@ -682,6 +682,9 @@ The ext2 inode is 128 bytes in size and consists of:
 > Note that for a character and block device the first 2 bytes of the array of
 > direct block numbers contain the minor and major device number respectively.
 
+> Note that if the inode size is larger than 128 bytes, the additional data can
+> be stored using an ext4 inode extension.
+
 ### The ext3 inode
 
 The ext3 inode is 132 bytes in size and consists of:
@@ -714,12 +717,15 @@ The ext3 inode is 132 bytes in size and consists of:
 | 120 | 2 | | Upper 16-bits of owner (or user) identifier (UID)
 | 122 | 2 | | Upper 16-bits of group identifier (GID)
 | 124 | 4 | | Unknown (reserved)
-| <td colspan="4"> *If inode size > 128*
+| <td colspan="4"> *Extension (if inode size > 128)*
 | 128 | 2 | | Extended inode size
 | 130 | 2 | | Unknown (padding)
 
 > Note that for a character and block device the first 2 bytes of the array of
 > direct block numbers contain the minor and major device number respectively.
+
+> Note that if the inode size is larger than 128 bytes, the additional data can
+> be stored using an ext4 inode extension.
 
 ### The ext4 inode
 
@@ -769,7 +775,7 @@ The ext4 inode is 160 bytes in size and consists of:
 | 122 | 2 | | Upper 16-bits of group identifier (GID)
 | 124 | 2 | | Lower 16-bits of checksum
 | 126 | 2 | | Unknown (reserved)
-| <td colspan="4"> *If inode size > 128*
+| <td colspan="4"> *Extension (if inode size > 128)*
 | 128 | 2 | | Extended inode size
 | 130 | 2 | | Upper 16-bits of checksum
 | 132 | 4 | | (last) inode change time extra precision
@@ -784,6 +790,8 @@ If checksum type is CRC-32C, the checksum is stored as 0xffffffff - CRC-32C.
 
 > Note that for a character and block device the first 2 bytes of the array of
 > direct block numbers contain the minor and major device number respectively.
+
+> Note that extended inode size can vary, seen 4, 28 and 32.
 
 #### Checksum calculation
 
@@ -1104,6 +1112,9 @@ ext4_xattr_entry) is of variable size and consists of:
 
 The last extended attributes entry has the first 4 values set to 0 (8 bytes)
 and is used as a terminator.
+
+> Note that some implementations of older Android versions of ext appear to
+> only set the first 4 bytess to 0.
 
 > Note that the name can be empty, for example in combination with a prefix or
 > with an encrypted file.

@@ -97,7 +97,10 @@ impl NtfsWofCompressedStream {
         match block_stream.open(data_stream, wof_data_attribute) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to open WofCompressedData data stream"
+                );
                 return Err(error);
             }
         }
@@ -123,16 +126,26 @@ impl NtfsWofCompressedStream {
     /// Reads media data based on the compressed blocks.
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.size > 0 && self.block_offsets.len() == 0 {
-            self.read_compressed_block_offsets()?;
-        };
+            match self.read_compressed_block_offsets() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read compressed block offsets"
+                    );
+                    return Err(error);
+                }
+            }
+        }
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
+        let mut current_offset: u64 = self.current_offset;
 
         while data_offset < read_size {
-            if self.current_offset >= self.size {
+            if current_offset >= self.size {
                 break;
             }
-            let block_index: u64 = self.current_offset / (self.compression_unit_size as u64);
+            let block_index: u64 = current_offset / (self.compression_unit_size as u64);
             let block_offset: u64 = self.block_offsets[block_index as usize];
 
             let next_block_index: usize = (block_index as usize) + 1;
@@ -145,7 +158,7 @@ impl NtfsWofCompressedStream {
 
             let range_offset: u64 = block_index * (self.compression_unit_size as u64);
             let range_size: u64 = min(self.compression_unit_size as u64, self.size - range_offset);
-            let block_relative_offset: u64 = self.current_offset - range_offset;
+            let block_relative_offset: u64 = current_offset - range_offset;
             let block_remainder_size: u64 = range_size - block_relative_offset;
 
             let block_read_size: usize =
@@ -173,8 +186,19 @@ impl NtfsWofCompressedStream {
                 if !self.block_cache.contains(&block_offset) {
                     let mut data: Vec<u8> = vec![0; self.compression_unit_size];
 
-                    self.read_compressed_block(block_offset, block_size, &mut data)?;
-
+                    match self.read_compressed_block(block_offset, block_size, &mut data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read compressed block at offset: {} (0x{:08x})",
+                                    block_offset, block_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
                     self.block_cache.insert(block_offset, data);
                 }
                 let block_data: &Vec<u8> = match self.block_cache.get(&block_offset) {
@@ -192,7 +216,7 @@ impl NtfsWofCompressedStream {
                     .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
             }
             data_offset += block_read_size;
-            self.current_offset += block_read_size as u64;
+            current_offset += block_read_size as u64;
         }
         Ok(data_offset)
     }
@@ -314,6 +338,18 @@ impl NtfsWofCompressedStream {
                 )));
             }
             self.block_offsets.push(block_offset);
+        }
+        if self.mediator.debug_output {
+            self.mediator
+                .debug_print(format!("NtfsWofCompressedBlockOffsets {{\n",));
+            self.mediator.debug_print(
+                self.block_offsets
+                    .iter()
+                    .map(|offset| format!("    offset: {} (0x{:08x}),", offset, offset))
+                    .collect::<Vec<String>>()
+                    .join("\n"),
+            );
+            self.mediator.debug_print(format!("\n}}\n\n"));
         }
         Ok(())
     }
@@ -1096,12 +1132,57 @@ mod tests {
 
         block_stream.open(&data_stream, &data_attribute, 28672)?;
 
+        assert_eq!(block_stream.cluster_block_size, 4096);
+        assert_eq!(block_stream.compression_method, 0);
+        assert_eq!(block_stream.compression_unit_size, 4096);
+        assert_eq!(block_stream.compressed_size, 9686);
+
         Ok(())
     }
 
     // TODO: add tests for read_data_from_blocks
-    // TODO: add tests for read_compressed_block
-    // TODO: add tests for read_compressed_block_offsets
+
+    #[test]
+    fn test_read_compressed_block() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        data_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut block_stream: NtfsWofCompressedStream = NtfsWofCompressedStream::new(4096, 0);
+
+        block_stream.open(&data_stream, &data_attribute, 28672)?;
+        block_stream.read_compressed_block_offsets()?;
+
+        let mut data: Vec<u8> = vec![0; 4096];
+        block_stream.read_compressed_block(24, 4096, &mut data)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_compressed_block_offsets() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        data_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut block_stream: NtfsWofCompressedStream = NtfsWofCompressedStream::new(4096, 0);
+
+        block_stream.open(&data_stream, &data_attribute, 28672)?;
+
+        block_stream.read_compressed_block_offsets()?;
+        assert_eq!(
+            block_stream.block_offsets,
+            vec![24, 2155, 4529, 6251, 6517, 6982, 8091]
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
@@ -1261,5 +1342,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_size.
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(test_data);
+
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        data_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut block_stream: NtfsWofCompressedStream = NtfsWofCompressedStream::new(4096, 0);
+        block_stream.open(&data_stream, &data_attribute, 28672)?;
+
+        let size: u64 = block_stream.get_size()?;
+        assert_eq!(size, 28672);
+
+        Ok(())
+    }
 }

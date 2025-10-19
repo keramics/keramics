@@ -19,6 +19,7 @@ use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
 
+/// Digest hash types.
 #[derive(Clone)]
 pub enum DigestHashType {
     Md5,

@@ -91,8 +91,14 @@ impl NtfsCompressedStream {
             ));
         }
         let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
-        block_stream.open(data_stream, data_attribute)?;
 
+        match block_stream.open(data_stream, data_attribute) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(Arc::new(RwLock::new(block_stream)));
 
         self.compression_unit_size =

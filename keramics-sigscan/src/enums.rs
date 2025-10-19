@@ -12,10 +12,9 @@
  */
 
 /// Pattern type.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PatternType {
     BoundToEnd,
-    #[default]
     BoundToStart,
     Unbound,
 }

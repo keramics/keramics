@@ -11,23 +11,21 @@
  * under the License.
  */
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum BitOrder {
     MostSignificantBit,
     LeastSignificantBit,
-    #[default]
     NotSet,
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum ByteOrder {
     BigEndian,
     LittleEndian,
-    #[default]
     NotSet,
 }
 
-#[derive(Default, PartialEq)]
+#[derive(PartialEq)]
 pub enum DataType {
     BitField8,
     BitField16,
@@ -35,17 +33,13 @@ pub enum DataType {
     BitField64,
     ByteString,
     Filetime,
-    #[default]
     NotSet,
     PosixTime32,
     SignedInteger8Bit,
     SignedInteger16Bit,
     SignedInteger32Bit,
     SignedInteger64Bit,
-    Struct {
-        name: String,
-        size: usize,
-    },
+    Struct { name: String, size: usize },
     Ucs2String,
     Utf16String,
     UnsignedInteger8Bit,
@@ -85,10 +79,9 @@ impl Clone for DataType {
     }
 }
 
-#[derive(Clone, Default, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum Format {
     Character,
     Hexadecimal,
-    #[default]
     NotSet,
 }

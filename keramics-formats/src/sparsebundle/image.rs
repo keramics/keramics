@@ -53,8 +53,13 @@ impl SparseBundleImage {
 
     /// Opens a storage media image.
     pub fn open(&mut self, file_resolver: &FileResolverReference) -> Result<(), ErrorTrace> {
-        self.read_info_plist(&file_resolver, "Info.plist")?;
-
+        match self.read_info_plist(&file_resolver, "Info.plist") {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read Info.plist");
+                return Err(error);
+            }
+        }
         self.file_resolver = file_resolver.clone();
 
         Ok(())

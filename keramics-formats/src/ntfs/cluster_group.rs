@@ -51,7 +51,14 @@ impl NtfsClusterGroup {
         while data_offset < data_size {
             let mut data_run: NtfsDataRun = NtfsDataRun::new();
 
-            let read_count: usize = data_run.read_data(&data[data_offset..], last_block_number)?;
+            let read_count: usize =
+                match data_run.read_data(&data[data_offset..], last_block_number) {
+                    Ok(read_count) => read_count,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read data run");
+                        return Err(error);
+                    }
+                };
             data_offset += read_count;
 
             // TODO: move into NtfsDataRun

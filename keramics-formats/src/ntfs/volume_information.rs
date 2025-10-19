@@ -84,8 +84,14 @@ impl NtfsVolumeInformation {
             ));
         }
         let mut volume_information: NtfsVolumeInformation = NtfsVolumeInformation::new();
-        volume_information.read_data(&mft_attribute.resident_data)?;
 
+        match volume_information.read_data(&mft_attribute.resident_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read volume information");
+                return Err(error);
+            }
+        }
         Ok(volume_information)
     }
 }
@@ -102,7 +108,7 @@ mod tests {
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
-        let mut test_struct = NtfsVolumeInformation::new();
+        let mut test_struct: NtfsVolumeInformation = NtfsVolumeInformation::new();
 
         let test_data: Vec<u8> = get_test_data();
         test_struct.read_data(&test_data)?;
@@ -116,12 +122,32 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let test_data: Vec<u8> = get_test_data();
+        let mut test_struct: NtfsVolumeInformation = NtfsVolumeInformation::new();
 
-        let mut test_struct = NtfsVolumeInformation::new();
+        let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..11]);
+
         assert!(result.is_err());
     }
 
-    // TODO: add tests for from_attribute
+    #[test]
+    fn test_from_attribute() -> Result<(), ErrorTrace> {
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+
+        let test_data: Vec<u8> = vec![
+            0x70, 0x00, 0x00, 0x00, 0x28, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
+            0x05, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x03, 0x01, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        mft_attribute.read_data(&test_data)?;
+
+        let test_struct: NtfsVolumeInformation =
+            NtfsVolumeInformation::from_attribute(&mft_attribute)?;
+
+        assert_eq!(test_struct.major_format_version, 3);
+        assert_eq!(test_struct.minor_format_version, 1);
+        assert_eq!(test_struct.volume_flags, 0x0080);
+
+        Ok(())
+    }
 }

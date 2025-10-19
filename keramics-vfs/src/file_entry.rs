@@ -11,14 +11,14 @@
  * under the License.
  */
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_formats::ext::ExtFileEntry;
 use keramics_formats::ext::constants::*;
-use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry};
-use keramics_types::Ucs2String;
+use keramics_formats::ext::{ExtFileEntry, ExtPath};
+use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry, NtfsPath};
+use keramics_types::{ByteString, Ucs2String};
 
 use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
@@ -29,6 +29,7 @@ use super::gpt::GptFileEntry;
 use super::iterators::VfsFileEntriesIterator;
 use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
+use super::path::VfsPath;
 use super::qcow::QcowFileEntry;
 use super::sparseimage::SparseImageFileEntry;
 use super::string::VfsString;
@@ -41,7 +42,7 @@ pub enum VfsFileEntry {
     Apm(ApmFileEntry),
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
-    Fake(Rc<FakeFileEntry>),
+    Fake(Arc<FakeFileEntry>),
     Gpt(GptFileEntry),
     Mbr(MbrFileEntry),
     Ntfs(NtfsFileEntry),
@@ -57,57 +58,57 @@ impl VfsFileEntry {
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_) => None,
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
-            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
-            VfsFileEntry::Gpt(_) => None,
-            VfsFileEntry::Mbr(_) => None,
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_access_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_access_time(),
-            VfsFileEntry::Qcow(_) => None,
-            VfsFileEntry::SparseImage(_) => None,
-            VfsFileEntry::Udif(_) => None,
-            VfsFileEntry::Vhd(_) => None,
-            VfsFileEntry::Vhdx(_) => None,
         }
     }
 
     /// Retrieves the change time.
     pub fn get_change_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_) => None,
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_change_time(),
-            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
-            VfsFileEntry::Gpt(_) => None,
-            VfsFileEntry::Mbr(_) => None,
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_change_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_change_time(),
-            VfsFileEntry::Qcow(_) => None,
-            VfsFileEntry::SparseImage(_) => None,
-            VfsFileEntry::Udif(_) => None,
-            VfsFileEntry::Vhd(_) => None,
-            VfsFileEntry::Vhdx(_) => None,
         }
     }
 
     /// Retrieves the creation time.
     pub fn get_creation_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_) => None,
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
-            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
-            VfsFileEntry::Gpt(_) => None,
-            VfsFileEntry::Mbr(_) => None,
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_creation_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_creation_time(),
-            VfsFileEntry::Qcow(_) => None,
-            VfsFileEntry::SparseImage(_) => None,
-            VfsFileEntry::Udif(_) => None,
-            VfsFileEntry::Vhd(_) => None,
-            VfsFileEntry::Vhdx(_) => None,
         }
     }
 
@@ -117,7 +118,8 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
-                match file_mode & 0xf000 {
+                let file_type: u16 = file_mode & 0xf000;
+                match file_type {
                     EXT_FILE_MODE_TYPE_FIFO => VfsFileType::NamedPipe,
                     EXT_FILE_MODE_TYPE_CHARACTER_DEVICE => VfsFileType::CharacterDevice,
                     EXT_FILE_MODE_TYPE_DIRECTORY => VfsFileType::Directory,
@@ -125,7 +127,7 @@ impl VfsFileEntry {
                     EXT_FILE_MODE_TYPE_REGULAR_FILE => VfsFileType::File,
                     EXT_FILE_MODE_TYPE_SYMBOLIC_LINK => VfsFileType::SymbolicLink,
                     EXT_FILE_MODE_TYPE_SOCKET => VfsFileType::Socket,
-                    _ => VfsFileType::Unknown,
+                    _ => VfsFileType::Unknown(file_type),
                 }
             }
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
@@ -158,24 +160,24 @@ impl VfsFileEntry {
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_) => None,
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
-            VfsFileEntry::Ewf(_) => None,
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
-            VfsFileEntry::Gpt(_) => None,
-            VfsFileEntry::Mbr(_) => None,
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_modification_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_modification_time(),
-            VfsFileEntry::Qcow(_) => None,
-            VfsFileEntry::SparseImage(_) => None,
-            VfsFileEntry::Udif(_) => None,
-            VfsFileEntry::Vhd(_) => None,
-            VfsFileEntry::Vhdx(_) => None,
         }
     }
 
     /// Retrieves the name.
-    pub fn get_name(&mut self) -> Option<VfsString> {
+    pub fn get_name(&self) -> Option<VfsString> {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry.get_name() {
                 Some(name) => Some(VfsString::String(name)),
@@ -195,7 +197,7 @@ impl VfsFileEntry {
                 None => None,
             },
             VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name.clone())),
+                Some(name) => Some(VfsString::String(name)),
                 None => None,
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_name() {
@@ -228,6 +230,88 @@ impl VfsFileEntry {
                 Some(name) => Some(VfsString::String(name)),
                 None => None,
             },
+        }
+    }
+
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => 1,
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_size(),
+            VfsFileEntry::Os(_) => todo!(),
+        }
+    }
+
+    /// Retrieves the symbolic link target.
+    pub fn get_symbolic_link_target(&mut self) -> Result<Option<VfsPath>, ErrorTrace> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => Ok(None),
+            VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_symbolic_link_target() {
+                Ok(result) => match result {
+                    Some(name) => {
+                        let path_components: Vec<ByteString> = name
+                            .elements
+                            .split(|value| *value == 0x2f)
+                            .map(|component| ByteString::from(component))
+                            .collect::<Vec<ByteString>>();
+                        Ok(Some(VfsPath::Ext(ExtPath {
+                            components: path_components,
+                        })))
+                    }
+                    None => Ok(None),
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve ext symbolic link target"
+                    );
+                    Err(error)
+                }
+            },
+            VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_symbolic_link_target()
+            {
+                Ok(result) => match result {
+                    Some(name) => {
+                        let path_components: Vec<Ucs2String> = name
+                            .elements
+                            .split(|value| *value == 0x005c)
+                            .skip(2) // Strip leading "\\??\\".
+                            .map(|component| Ucs2String::from(component))
+                            .collect::<Vec<Ucs2String>>();
+                        Ok(Some(VfsPath::Ntfs(NtfsPath {
+                            components: path_components,
+                        })))
+                    }
+                    None => Ok(None),
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve NTFS symbolic link target"
+                    );
+                    Err(error)
+                }
+            },
+            VfsFileEntry::Os(_) => todo!(),
         }
     }
 
@@ -876,6 +960,25 @@ impl VfsFileEntry {
             number_of_sub_file_entries,
         ))
     }
+
+    /// Determines if the file entry is the root directory.
+    pub fn is_root_directory(&self) -> bool {
+        match self {
+            VfsFileEntry::Apm(apm_file_entry) => todo!(),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
+            VfsFileEntry::Ewf(ewf_file_entry) => todo!(),
+            VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Gpt(gpt_file_entry) => todo!(),
+            VfsFileEntry::Mbr(mbr_file_entry) => todo!(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
+            VfsFileEntry::Os(_) => todo!(),
+            VfsFileEntry::Qcow(qcow_file_entry) => todo!(),
+            VfsFileEntry::SparseImage(sparseimage_file_entry) => todo!(),
+            VfsFileEntry::Udif(udif_file_entry) => todo!(),
+            VfsFileEntry::Vhd(vhd_file_entry) => todo!(),
+            VfsFileEntry::Vhdx(vhdx_file_entry) => todo!(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -907,7 +1010,7 @@ mod tests {
     fn get_apm_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -930,7 +1033,7 @@ mod tests {
     fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -953,7 +1056,7 @@ mod tests {
     fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -976,7 +1079,7 @@ mod tests {
     fn get_gpt_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -999,7 +1102,7 @@ mod tests {
     fn get_mbr_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1012,7 +1115,7 @@ mod tests {
     fn get_os_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1035,7 +1138,7 @@ mod tests {
     fn get_qcow_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1059,7 +1162,7 @@ mod tests {
     fn get_sparseimage_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1082,7 +1185,7 @@ mod tests {
     fn get_udif_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1106,7 +1209,7 @@ mod tests {
     fn get_vhd_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1130,7 +1233,7 @@ mod tests {
     fn get_vhdx_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, path);
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1449,13 +1552,13 @@ mod tests {
     fn test_get_file_type_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/apm2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1468,13 +1571,13 @@ mod tests {
     fn test_get_file_type_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/testdir1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/testdir1/testfile1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1487,13 +1590,13 @@ mod tests {
     fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/ewf1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1508,13 +1611,13 @@ mod tests {
     fn test_get_file_type_with_gpt() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/gpt2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1529,13 +1632,13 @@ mod tests {
     fn test_get_file_type_with_mbr() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/mbr2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/mbr2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1550,13 +1653,13 @@ mod tests {
     fn test_get_file_type_with_qcow() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1569,13 +1672,13 @@ mod tests {
     fn test_get_file_type_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1588,13 +1691,13 @@ mod tests {
     fn test_get_file_type_with_udif() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/udif1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/udif1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1607,13 +1710,13 @@ mod tests {
     fn test_get_file_type_with_vhd() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/vhd2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1626,13 +1729,13 @@ mod tests {
     fn test_get_file_type_with_vhdx() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/vhdx2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1640,6 +1743,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_group_identifier
 
     #[test]
     fn test_get_modification_time_with_apm() -> Result<(), ErrorTrace> {
@@ -1743,20 +1848,23 @@ mod tests {
     }
 
     // TODO: add tests for get_name
+    // TODO: add tests for get_number_of_links
+    // TODO: add tests for get_size
+    // TODO: add tests for get_symbolic_link_target
     // TODO: add tests for get_number_of_data_forks
 
     #[test]
     fn test_get_data_stream_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Apm, "/apm2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/apm2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1770,14 +1878,14 @@ mod tests {
     fn test_get_data_stream_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/testdir1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ext, "/testdir1/testfile1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1791,14 +1899,14 @@ mod tests {
     fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Ewf, "/ewf1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1814,14 +1922,14 @@ mod tests {
     fn test_get_data_stream_with_gpt() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Gpt, "/gpt2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1837,14 +1945,14 @@ mod tests {
     fn test_get_data_stream_with_mbr() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Mbr, "/mbr2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/mbr2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1860,14 +1968,14 @@ mod tests {
     fn test_get_data_stream_with_qcow() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1881,14 +1989,14 @@ mod tests {
     fn test_get_data_stream_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1902,14 +2010,14 @@ mod tests {
     fn test_get_data_stream_with_udif() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Udif, "/udif1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/udif1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1923,14 +2031,14 @@ mod tests {
     fn test_get_data_stream_with_vhd() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhd, "/vhd2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1944,14 +2052,14 @@ mod tests {
     fn test_get_data_stream_with_vhdx() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Vhdx, "/vhdx2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx2");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 

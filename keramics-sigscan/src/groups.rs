@@ -12,7 +12,7 @@
  */
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::types::SignatureReference;
 
@@ -91,15 +91,13 @@ impl SignatureGroup {
 
     /// Appends a signature.
     pub fn append_signature(&mut self, signature: &SignatureReference) {
-        self.signatures.push(Rc::clone(signature));
+        self.signatures.push(Arc::clone(signature));
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use std::rc::Rc;
 
     use crate::enums::PatternType;
     use crate::signature::Signature;
@@ -110,7 +108,7 @@ mod tests {
 
         assert_eq!(byte_value_group.signature_groups.len(), 0);
 
-        let signature: SignatureReference = Rc::new(Signature::new(
+        let signature: SignatureReference = Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,
@@ -140,7 +138,7 @@ mod tests {
 
         assert_eq!(signature_group.signatures.len(), 0);
 
-        let signature: SignatureReference = Rc::new(Signature::new(
+        let signature: SignatureReference = Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,

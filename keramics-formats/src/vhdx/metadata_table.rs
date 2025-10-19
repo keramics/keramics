@@ -47,8 +47,16 @@ impl VhdxMetadataTable {
             self.mediator
                 .debug_print(VhdxMetadataTableHeader::debug_read_data(data));
         }
-        metadata_table_header.read_data(data)?;
-
+        match metadata_table_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read metadata table header"
+                );
+                return Err(error);
+            }
+        }
         let mut data_offset: usize = 32;
 
         for _ in 0..metadata_table_header.number_of_entries {
@@ -62,7 +70,16 @@ impl VhdxMetadataTable {
                         &data[data_offset..data_end_offset],
                     ));
             }
-            metadata_table_entry.read_data(&data[data_offset..data_end_offset])?;
+            match metadata_table_entry.read_data(&data[data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read metadata table entry"
+                    );
+                    return Err(error);
+                }
+            }
             data_offset = data_end_offset;
 
             self.entries.insert(

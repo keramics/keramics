@@ -11,8 +11,8 @@
  * under the License.
  */
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::signature::Signature;
 
-pub type SignatureReference = Rc<Signature>;
+pub type SignatureReference = Arc<Signature>;

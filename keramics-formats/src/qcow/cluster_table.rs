@@ -105,8 +105,13 @@ impl QcowClusterTable {
             mediator.debug_print_data(&data, true);
             mediator.debug_print(QcowClusterTableEntry::debug_read_data(&data));
         }
-        entry.read_data(&data)?;
-
+        match entry.read_data(&data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read cluster table");
+                return Err(error);
+            }
+        }
         Ok(entry)
     }
 }

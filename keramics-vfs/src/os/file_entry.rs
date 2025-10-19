@@ -59,7 +59,7 @@ impl OsFileEntry {
     pub fn new() -> Self {
         Self {
             path: OsString::new(),
-            file_type: VfsFileType::NotSet,
+            file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
             creation_time: None,

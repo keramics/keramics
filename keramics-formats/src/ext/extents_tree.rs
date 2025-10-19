@@ -53,13 +53,19 @@ impl ExtExtentsTree {
     ) -> Result<(), ErrorTrace> {
         let mut logical_block_number: u64 = 0;
 
-        self.read_node_data(
+        match self.read_node_data(
             data_reference,
             data_stream,
             &mut logical_block_number,
             block_ranges,
             6,
-        )?;
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read node");
+                return Err(error);
+            }
+        }
         if logical_block_number < self.number_of_blocks {
             let block_range: ExtBlockRange = ExtBlockRange::new(
                 logical_block_number,
@@ -88,8 +94,13 @@ impl ExtExtentsTree {
             self.mediator
                 .debug_print(ExtExtentsHeader::debug_read_data(&data[0..12]));
         }
-        extents_header.read_data(&data[0..12])?;
-
+        match extents_header.read_data(&data[0..12]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read extents header");
+                return Err(error);
+            }
+        }
         if extents_header.depth >= parent_depth {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid depth: {} value out of bounds",
@@ -109,18 +120,39 @@ impl ExtExtentsTree {
                         &data[data_offset..data_end_offset],
                     ));
                 }
-                entry.read_data(&data[data_offset..data_end_offset])?;
+                match entry.read_data(&data[data_offset..data_end_offset]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read extent index entry"
+                        );
+                        return Err(error);
+                    }
+                }
                 data_offset = data_end_offset;
 
                 let sub_node_offset: u64 = entry.physical_block_number * (self.block_size as u64);
 
-                self.read_node_at_position(
+                match self.read_node_at_position(
                     data_stream,
                     SeekFrom::Start(sub_node_offset),
                     logical_block_number,
                     block_ranges,
                     extents_header.depth,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read sub node at offset {} (0x{:08x})",
+                                sub_node_offset, sub_node_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
             }
         } else {
             for _ in 0..extents_header.number_of_entries {
@@ -134,7 +166,16 @@ impl ExtExtentsTree {
                             &data[data_offset..data_end_offset],
                         ));
                 }
-                entry.read_data(&data[data_offset..data_end_offset])?;
+                match entry.read_data(&data[data_offset..data_end_offset]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read extent descriptor entry"
+                        );
+                        return Err(error);
+                    }
+                }
                 data_offset = data_end_offset;
 
                 if entry.logical_block_number as u64 > *logical_block_number {
@@ -181,7 +222,13 @@ impl ExtExtentsTree {
                     &data[data_offset..data_end_offset],
                 ));
             }
-            extents_footer.read_data(&data[data_offset..data_end_offset])?;
+            match extents_footer.read_data(&data[data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read extents footer");
+                    return Err(error);
+                }
+            }
         }
         Ok(())
     }

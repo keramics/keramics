@@ -46,8 +46,13 @@ impl NtfsIndexEntry {
             self.mediator
                 .debug_print(NtfsIndexEntryHeader::debug_read_data(data));
         }
-        index_entry_header.read_data(data)?;
-
+        match index_entry_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index entry header");
+                return Err(error);
+            }
+        }
         if index_entry_header.fixup_values_offset < 32
             || index_entry_header.fixup_values_offset as usize > data_size
         {
@@ -57,11 +62,17 @@ impl NtfsIndexEntry {
             )));
         }
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
-        apply_fixup_values(
+        match apply_fixup_values(
             data,
             index_entry_header.fixup_values_offset,
             index_entry_header.number_of_fixup_values,
-        )?;
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to apply fix-up values");
+                return Err(error);
+            }
+        }
         // TODO: debug print 8-byte alignment padding.
 
         Ok(())
@@ -93,8 +104,13 @@ impl NtfsIndexEntry {
             ));
             self.mediator.debug_print_data(&data, true);
         }
-        self.read_data(&mut data)?;
-
+        match self.read_data(&mut data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index entry");
+                return Err(error);
+            }
+        }
         self.data = data;
 
         Ok(())

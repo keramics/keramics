@@ -65,8 +65,13 @@ impl SparseImageFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_header_block(data_stream)?;
-
+        match self.read_header_block(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read header block");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -91,8 +96,13 @@ impl SparseImageFile {
             self.mediator
                 .debug_print(SparseImageFileHeader::debug_read_data(&data[0..64]));
         }
-        file_header.read_data(&data[0..64])?;
-
+        match file_header.read_data(&data[0..64]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file header");
+                return Err(error);
+            }
+        }
         let number_of_bands: u32 = file_header
             .number_of_sectors
             .div_ceil(file_header.sectors_per_band);

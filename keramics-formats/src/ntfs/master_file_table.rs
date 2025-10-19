@@ -133,11 +133,17 @@ impl NtfsMasterFileTable {
 
         let mut mft_entry: NtfsMftEntry = NtfsMftEntry::new();
 
-        mft_entry.read_at_position(
+        match mft_entry.read_at_position(
             data_stream,
             self.mft_entry_size,
             SeekFrom::Start(mft_entry_offset),
-        )?;
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read MFT entry");
+                return Err(error);
+            }
+        }
         Ok(mft_entry)
     }
 
@@ -152,7 +158,13 @@ impl NtfsMasterFileTable {
         let mut mft_entry: NtfsMftEntry = NtfsMftEntry::new();
         let mft_offset: u64 = mft_block_number * (cluster_block_size as u64);
 
-        mft_entry.read_at_position(data_stream, mft_entry_size, SeekFrom::Start(mft_offset))?;
+        match mft_entry.read_at_position(data_stream, mft_entry_size, SeekFrom::Start(mft_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read MFT entry");
+                return Err(error);
+            }
+        }
         if mft_entry.is_bad {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported marked bad MFT entry: 0"
@@ -164,8 +176,14 @@ impl NtfsMasterFileTable {
             ));
         }
         let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
-        mft_entry.read_attributes(&mut mft_attributes)?;
 
+        match mft_entry.read_attributes(&mut mft_attributes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         let data_attribute: &NtfsMftAttribute =
             match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => mft_attribute,
@@ -193,15 +211,39 @@ impl NtfsMasterFileTable {
         self.cluster_block_size = cluster_block_size;
         self.mft_entry_size = mft_entry_size;
 
-        self.add_cluster_group(&data_attribute.data_cluster_groups[0])?;
-
+        match self.add_cluster_group(&data_attribute.data_cluster_groups[0]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to add cluster group");
+                return Err(error);
+            }
+        }
         let mft_entries: Vec<u64> = match mft_attributes.attribute_list {
             Some(attribute_index) => {
                 let mft_attribute: &NtfsMftAttribute =
-                    mft_attributes.get_attribute_by_index(attribute_index)?;
-
+                    match mft_attributes.get_attribute_by_index(attribute_index) {
+                        Ok(mft_attribute) => mft_attribute,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to retrieve MFT attribute: {}", attribute_index)
+                            );
+                            return Err(error);
+                        }
+                    };
                 let mut attribute_list: NtfsAttributeList = NtfsAttributeList::new();
-                attribute_list.read_attribute(&mft_attribute, data_stream, cluster_block_size)?;
+
+                match attribute_list.read_attribute(&mft_attribute, data_stream, cluster_block_size)
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read attribute list"
+                        );
+                        return Err(error);
+                    }
+                }
                 let mut mft_entries_set: HashSet<u64> = HashSet::new();
                 for entry in attribute_list.entries.iter() {
                     let mft_entry_number: u64 = entry.file_reference & 0x0000ffffffffffff;
@@ -217,13 +259,38 @@ impl NtfsMasterFileTable {
             None => Vec::new(),
         };
         for mft_entry_number in mft_entries.iter() {
-            let mft_entry: NtfsMftEntry = self.get_entry(data_stream, *mft_entry_number)?;
+            let mft_entry: NtfsMftEntry = match self.get_entry(data_stream, *mft_entry_number) {
+                Ok(mft_entry) => mft_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve MFT entry: {}", *mft_entry_number)
+                    );
+                    return Err(error);
+                }
+            };
             let mut mft_attributes: NtfsMftAttributes = NtfsMftAttributes::new();
-            mft_entry.read_attributes(&mut mft_attributes)?;
+
+            match mft_entry.read_attributes(&mut mft_attributes) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                    return Err(error);
+                }
+            }
 
             match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => {
-                    self.add_cluster_group(&mft_attribute.data_cluster_groups[0])?
+                    match self.add_cluster_group(&mft_attribute.data_cluster_groups[0]) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to add cluster group"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 None => {}
             };

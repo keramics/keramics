@@ -91,8 +91,15 @@ impl ExtGroupDescriptorTable {
                         .debug_read_data(self.format_version, &data[data_offset..data_end_offset]),
                 );
             }
-            group_descriptor.read_data(self.format_version, &data[data_offset..data_end_offset])?;
-
+            match group_descriptor
+                .read_data(self.format_version, &data[data_offset..data_end_offset])
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read group descriptor");
+                    return Err(error);
+                }
+            }
             match self.metadata_checksum_seed {
                 Some(checksum_seed) => {
                     // TODO: add support for crc16 used by EXT4_FEATURE_RO_COMPAT_GDT_CSUM

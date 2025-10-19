@@ -65,7 +65,16 @@ impl XmlPlist {
             let rule: Rule = token_pair.as_rule();
             match rule {
                 Rule::plist_element => {
-                    root_object = self.parse_plist_element(token_pair.into_inner())?;
+                    root_object = match self.parse_plist_element(token_pair.into_inner()) {
+                        Ok(element) => element,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse plist document"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 Rule::EOI | Rule::miscellaneous | Rule::plist_prolog => {}
                 _ => {
@@ -95,7 +104,16 @@ impl XmlPlist {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
                     let object: PlistObject =
-                        self.parse_plist_object_element(token_pair.into_inner())?;
+                        match self.parse_plist_object_element(token_pair.into_inner()) {
+                            Ok(element) => element,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to parse plist array"
+                                );
+                                return Err(error);
+                            }
+                        };
                     array_values.push(object);
                 }
                 _ => {
@@ -122,9 +140,15 @@ impl XmlPlist {
                 return Err(keramics_core::error_trace_new!("Missing array element"));
             }
         };
-        let array_values: Vec<PlistObject> =
-            self.parse_plist_array_content(token_pair.into_inner())?;
-
+        let array_values: Vec<PlistObject> = match self
+            .parse_plist_array_content(token_pair.into_inner())
+        {
+            Ok(element) => element,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse plist array element");
+                return Err(error);
+            }
+        };
         inner_pairs.next();
 
         match inner_pairs.next() {
@@ -148,8 +172,18 @@ impl XmlPlist {
             match rule {
                 Rule::character_data => {}
                 Rule::plist_key_and_object_element_pair => {
-                    let (key, object): (String, PlistObject) =
-                        self.parse_plist_key_and_object_element_pair(token_pair.into_inner())?;
+                    let (key, object): (String, PlistObject) = match self
+                        .parse_plist_key_and_object_element_pair(token_pair.into_inner())
+                    {
+                        Ok(element) => element,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse plist dict"
+                            );
+                            return Err(error);
+                        }
+                    };
                     dict_values.insert(key, object);
                 }
                 _ => {
@@ -178,9 +212,15 @@ impl XmlPlist {
                 ));
             }
         };
-        let dict_values: HashMap<String, PlistObject> =
-            self.parse_plist_dict_content(token_pair.into_inner())?;
-
+        let dict_values: HashMap<String, PlistObject> = match self
+            .parse_plist_dict_content(token_pair.into_inner())
+        {
+            Ok(element) => element,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse plist dict element");
+                return Err(error);
+            }
+        };
         inner_pairs.next();
 
         match inner_pairs.next() {
@@ -203,7 +243,16 @@ impl XmlPlist {
             match rule {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
-                    object = self.parse_plist_object_element(token_pair.into_inner())?;
+                    object = match self.parse_plist_object_element(token_pair.into_inner()) {
+                        Ok(element) => element,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse plist content"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -233,8 +282,22 @@ impl XmlPlist {
         let mut base64_stream: Base64Stream = Base64Stream::new(encoded_data, 0, true);
 
         let mut data: Vec<u8> = Vec::new();
-        while let Some(byte_value) = base64_stream.get_value()? {
-            data.push(byte_value);
+
+        loop {
+            let result: Option<u8> = match base64_stream.get_value() {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve decoded byte value"
+                    );
+                    return Err(error);
+                }
+            };
+            match result {
+                Some(byte_value) => data.push(byte_value),
+                None => break,
+            }
         }
         // TODO: check base64 padding
 
@@ -260,8 +323,13 @@ impl XmlPlist {
                 return Err(keramics_core::error_trace_new!("Missing plist element"));
             }
         };
-        let object: PlistObject = self.parse_plist_content(token_pair.into_inner())?;
-
+        let object: PlistObject = match self.parse_plist_content(token_pair.into_inner()) {
+            Ok(element) => element,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse plist element");
+                return Err(error);
+            }
+        };
         inner_pairs.next();
 
         match inner_pairs.next() {
@@ -356,7 +424,13 @@ impl XmlPlist {
                 return Err(keramics_core::error_trace_new!("Missing plist key element"));
             }
         };
-        let key: String = self.parse_plist_string_element(token_pair.into_inner())?;
+        let key: String = match self.parse_plist_string_element(token_pair.into_inner()) {
+            Ok(element) => element,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse plist key");
+                return Err(error);
+            }
+        };
         let mut object: PlistObject = PlistObject::None;
 
         while let Some(token_pair) = inner_pairs.next() {
@@ -364,7 +438,16 @@ impl XmlPlist {
             match rule {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
-                    object = self.parse_plist_object_element(token_pair.into_inner())?;
+                    object = match self.parse_plist_object_element(token_pair.into_inner()) {
+                        Ok(element) => element,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse plist object"
+                            );
+                            return Err(error);
+                        }
+                    };
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -406,24 +489,78 @@ impl XmlPlist {
         let rule: Rule = token_pair.as_rule();
 
         let object: PlistObject = match rule {
-            Rule::plist_array_element => self.parse_plist_array_element(token_pair.into_inner())?,
+            Rule::plist_array_element => {
+                match self.parse_plist_array_element(token_pair.into_inner()) {
+                    Ok(element) => element,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to parse array object"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             Rule::plist_boolean_false_element => PlistObject::Boolean(false),
             Rule::plist_boolean_true_element => PlistObject::Boolean(true),
-            Rule::plist_data_element => self.parse_plist_data_element(token_pair.into_inner())?,
+            Rule::plist_data_element => {
+                match self.parse_plist_data_element(token_pair.into_inner()) {
+                    Ok(element) => element,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to parse data object");
+                        return Err(error);
+                    }
+                }
+            }
             Rule::plist_date_element => {
                 // TODO: YYYY '-' MM '-' DD 'T' HH ':' MM ':' SS 'Z'
                 todo!();
             }
-            Rule::plist_dict_element => self.parse_plist_dict_element(token_pair.into_inner())?,
+            Rule::plist_dict_element => {
+                match self.parse_plist_dict_element(token_pair.into_inner()) {
+                    Ok(element) => element,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to parse dict object");
+                        return Err(error);
+                    }
+                }
+            }
             Rule::plist_floating_point_element => {
-                self.parse_plist_floating_point_element(token_pair.into_inner())?
+                match self.parse_plist_floating_point_element(token_pair.into_inner()) {
+                    Ok(element) => element,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to parse floating-point object"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             Rule::plist_integer_element => {
-                self.parse_plist_integer_element(token_pair.into_inner())?
+                match self.parse_plist_integer_element(token_pair.into_inner()) {
+                    Ok(element) => element,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to parse integer object"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             Rule::plist_string_element => {
                 let string_value: String =
-                    self.parse_plist_string_element(token_pair.into_inner())?;
+                    match self.parse_plist_string_element(token_pair.into_inner()) {
+                        Ok(element) => element,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse string object"
+                            );
+                            return Err(error);
+                        }
+                    };
                 PlistObject::String(string_value)
             }
             _ => {
@@ -478,17 +615,24 @@ impl XmlPlist {
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(keramics_core::error_trace_new!("Missing string element"));
+                return Err(keramics_core::error_trace_new!(
+                    "Missing plist string element"
+                ));
             }
         };
-        let string_value: String = self.parse_plist_string_content(token_pair.into_inner())?;
-
+        let string_value: String = match self.parse_plist_string_content(token_pair.into_inner()) {
+            Ok(element) => element,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to parse plist string");
+                return Err(error);
+            }
+        };
         inner_pairs.next();
 
         match inner_pairs.next() {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unsupported string element"
+                    "Unsupported plist string element"
                 ));
             }
             None => {}

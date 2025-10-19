@@ -11,11 +11,10 @@
  * under the License.
  */
 
-#[derive(Clone, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub enum VhdxDiskType {
     Differential,
     Dynamic,
-    #[default]
     Fixed,
     Unknown,
 }

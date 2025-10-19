@@ -80,8 +80,14 @@ impl QcowImage {
             }
         };
         let mut file: QcowFile = QcowFile::new();
-        file.read_data_stream(&data_stream)?;
 
+        match file.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file");
+                return Err(error);
+            }
+        }
         while let Some(file_name) = file.get_backing_file_name() {
             let backing_file_name: String = file_name.to_string();
 
@@ -104,8 +110,14 @@ impl QcowImage {
                 }
             };
             let mut backing_file: QcowFile = QcowFile::new();
-            backing_file.read_data_stream(&data_stream)?;
 
+            match backing_file.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read backing file");
+                    return Err(error);
+                }
+            }
             files.push(file);
 
             file = backing_file;
@@ -115,7 +127,13 @@ impl QcowImage {
         let mut file_index: usize = 0;
         while let Some(mut file) = files.pop() {
             if file_index > 0 {
-                file.set_backing_file(&mut self.files[file_index - 1])?;
+                match file.set_backing_file(&mut self.files[file_index - 1]) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to set backing file");
+                        return Err(error);
+                    }
+                }
             }
             self.files.push(Arc::new(RwLock::new(file)));
 

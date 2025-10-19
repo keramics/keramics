@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u16_le;
+use keramics_types::{Ucs2String, bytes_to_u16_le};
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -28,29 +28,71 @@ use keramics_types::bytes_to_u16_le;
     method(name = "debug_read_data")
 )]
 /// New Technologies File System (NTFS) symbolic link reparse data.
-pub struct NtfsSymoblicLinkReparseData {
-    /// Substitute name offset.
-    pub substitute_name_offset: u16,
+pub struct NtfsSymbolicLinkReparseData {
+    /// Substitute name.
+    pub substitute_name: Ucs2String,
+
+    /// Display name.
+    pub display_name: Ucs2String,
 }
 
-impl NtfsSymoblicLinkReparseData {
+impl NtfsSymbolicLinkReparseData {
     /// Creates a new header.
     pub fn new() -> Self {
         Self {
-            substitute_name_offset: 0,
+            substitute_name: Ucs2String::new(),
+            display_name: Ucs2String::new(),
         }
     }
 
     /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size = data.len();
+
         if data_size < 12 {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported symbolic link reparse data size"
             ));
         }
-        // TODO: read substitute name.
-        self.substitute_name_offset = bytes_to_u16_le!(data, 0);
+        let substitute_name_offset: u16 = bytes_to_u16_le!(data, 0);
+        let substitute_name_size: u16 = bytes_to_u16_le!(data, 2);
+
+        let data_offset: usize = (substitute_name_offset as usize) + 12;
+
+        if data_offset >= data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid substitute name offset value out of bounds"
+            ));
+        }
+        let data_end_offset: usize = data_offset + (substitute_name_size as usize);
+
+        if data_end_offset > data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid substitute name size value out of bounds"
+            ));
+        }
+        self.substitute_name
+            .read_data_le(&data[data_offset..data_end_offset]);
+
+        let display_name_offset: u16 = bytes_to_u16_le!(data, 4);
+        let display_name_size: u16 = bytes_to_u16_le!(data, 6);
+
+        let data_offset: usize = (display_name_offset as usize) + 12;
+
+        if data_offset >= data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid display name offset value out of bounds"
+            ));
+        }
+        let data_end_offset: usize = data_offset + (display_name_size as usize);
+
+        if data_end_offset > data_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid display name size value out of bounds"
+            ));
+        }
+        self.display_name
+            .read_data_le(&data[data_offset..data_end_offset]);
 
         Ok(())
     }
@@ -75,21 +117,28 @@ mod tests {
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
-        let mut test_struct = NtfsSymoblicLinkReparseData::new();
+        let mut test_struct: NtfsSymbolicLinkReparseData = NtfsSymbolicLinkReparseData::new();
 
         let test_data: Vec<u8> = get_test_data();
         test_struct.read_data(&test_data[8..])?;
 
-        assert_eq!(test_struct.substitute_name_offset, 42);
+        assert_eq!(
+            test_struct.substitute_name,
+            Ucs2String::from("\\??\\x:\\testdir1\\testfile1")
+        );
+        assert_eq!(
+            test_struct.display_name,
+            Ucs2String::from("x:\\testdir1\\testfile1")
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let test_data: Vec<u8> = get_test_data();
+        let mut test_struct: NtfsSymbolicLinkReparseData = NtfsSymbolicLinkReparseData::new();
 
-        let mut test_struct = NtfsSymoblicLinkReparseData::new();
+        let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[8..19]);
         assert!(result.is_err());
     }

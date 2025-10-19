@@ -13,7 +13,7 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -39,7 +39,7 @@ pub struct NtfsDirectoryIndex {
     mediator: MediatorReference,
 
     /// Case folding mappings.
-    pub case_folding_mappings: Rc<HashMap<u16, u16>>,
+    pub case_folding_mappings: Arc<HashMap<u16, u16>>,
 
     /// Index.
     index: NtfsIndex,
@@ -56,7 +56,7 @@ pub struct NtfsDirectoryIndex {
 
 impl NtfsDirectoryIndex {
     /// Creates a new directory index.
-    pub fn new(cluster_block_size: u32, case_folding_mappings: &Rc<HashMap<u16, u16>>) -> Self {
+    pub fn new(cluster_block_size: u32, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
         Self {
             mediator: Mediator::current(),
             case_folding_mappings: case_folding_mappings.clone(),
@@ -100,8 +100,13 @@ impl NtfsDirectoryIndex {
                     &i30_index_root_attribute.resident_data,
                 ));
         }
-        index_root_header.read_data(&i30_index_root_attribute.resident_data)?;
-
+        match index_root_header.read_data(&i30_index_root_attribute.resident_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index root header");
+                return Err(error);
+            }
+        }
         if index_root_header.attribute_type != NTFS_ATTRIBUTE_TYPE_FILE_NAME {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported $I30 $INDEX_ROOT attribute type: 0x{:08x}",
@@ -125,8 +130,16 @@ impl NtfsDirectoryIndex {
         match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
             Some(mft_attribute) => {
                 let standard_information: NtfsStandardInformation =
-                    NtfsStandardInformation::from_attribute(mft_attribute)?;
-
+                    match NtfsStandardInformation::from_attribute(mft_attribute) {
+                        Ok(standard_information) => standard_information,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to create standard information from attribute"
+                            );
+                            return Err(error);
+                        }
+                    };
                 if standard_information.maximum_number_of_versions == 0
                     && standard_information.version_number == 1
                 {
@@ -139,9 +152,16 @@ impl NtfsDirectoryIndex {
         match mft_attributes
             .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION)
         {
-            Some(mft_attribute) => self
+            Some(mft_attribute) => match self
                 .index
-                .initialize(index_root_header.index_entry_size, mft_attribute)?,
+                .initialize(index_root_header.index_entry_size, mft_attribute)
+            {
+                Ok(standard_information) => standard_information,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to initialize index");
+                    return Err(error);
+                }
+            },
             None => {}
         };
 
@@ -194,9 +214,15 @@ impl NtfsDirectoryIndex {
         data_stream: &DataStreamReference,
         name: &Ucs2String,
     ) -> Result<Option<NtfsDirectoryEntry>, ErrorTrace> {
-        let (index_node_size, index_values_offset): (usize, usize) =
-            self.read_index_node_header(data, index_node_offset)?;
-
+        let (index_node_size, index_values_offset): (usize, usize) = match self
+            .read_index_node_header(data, index_node_offset)
+        {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index node header");
+                return Err(error);
+            }
+        };
         if index_node_size == 0 {
             return Ok(None);
         }
@@ -210,7 +236,13 @@ impl NtfsDirectoryIndex {
 
         while index_value_offset < index_values_end_offset {
             let index_value: NtfsIndexValue =
-                self.read_index_value(data, index_value_offset, index_values_end_offset)?;
+                match self.read_index_value(data, index_value_offset, index_values_end_offset) {
+                    Ok(index_value) => index_value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read index value");
+                        return Err(error);
+                    }
+                };
             index_value_offset += 16;
 
             let key_data_size: usize = index_value.key_data_size as usize;
@@ -237,8 +269,13 @@ impl NtfsDirectoryIndex {
                 return Err(keramics_core::error_trace_new!("Missing key data"));
             }
             let file_name: NtfsFileName =
-                self.read_index_key(data, key_data_offset, key_data_size)?;
-
+                match self.read_index_key(data, key_data_offset, key_data_size) {
+                    Ok(file_name) => file_name,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read index key");
+                        return Err(error);
+                    }
+                };
             let result: Ordering = if self.use_case_folding {
                 let mut case_folded_name: Ucs2String = Ucs2String::new();
 
@@ -273,20 +310,41 @@ impl NtfsDirectoryIndex {
         }
         if is_branch {
             let sub_node_vcn: u64 =
-                self.read_index_branch_value(data, index_value_offset, value_data_size)?;
-
+                match self.read_index_branch_value(data, index_value_offset, value_data_size) {
+                    Ok(index_branch_value) => index_branch_value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read index branch value"
+                        );
+                        return Err(error);
+                    }
+                };
             // TODO: skip if sub node is not allocated.
 
-            let index_entry: NtfsIndexEntry = self
+            let index_entry: NtfsIndexEntry = match self
                 .index
-                .get_entry_at_cluster_block(data_stream, sub_node_vcn)?;
-
-            match self.get_directory_entry_by_name_from_node(
-                &index_entry.data,
-                24,
-                data_stream,
-                name,
-            )? {
+                .get_entry_at_cluster_block(data_stream, sub_node_vcn)
+            {
+                Ok(index_entry) => index_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve index entry");
+                    return Err(error);
+                }
+            };
+            let result: Option<NtfsDirectoryEntry> = match self
+                .get_directory_entry_by_name_from_node(&index_entry.data, 24, data_stream, name)
+            {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve directory entry from node"
+                    );
+                    return Err(error);
+                }
+            };
+            match result {
                 Some(directory_entry) => return Ok(Some(directory_entry)),
                 None => {}
             }
@@ -316,9 +374,15 @@ impl NtfsDirectoryIndex {
         data_stream: &DataStreamReference,
         entries: &mut NtfsDirectoryEntries,
     ) -> Result<(), ErrorTrace> {
-        let (index_node_size, index_values_offset): (usize, usize) =
-            self.read_index_node_header(data, index_node_offset)?;
-
+        let (index_node_size, index_values_offset): (usize, usize) = match self
+            .read_index_node_header(data, index_node_offset)
+        {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index node header");
+                return Err(error);
+            }
+        };
         if index_node_size == 0 {
             return Ok(());
         }
@@ -329,7 +393,13 @@ impl NtfsDirectoryIndex {
 
         while index_value_offset < index_values_end_offset {
             let index_value: NtfsIndexValue =
-                self.read_index_value(data, index_value_offset, index_values_end_offset)?;
+                match self.read_index_value(data, index_value_offset, index_values_end_offset) {
+                    Ok(index_value) => index_value,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read index value");
+                        return Err(error);
+                    }
+                };
             index_value_offset += 16;
 
             let key_data_size: usize = index_value.key_data_size as usize;
@@ -350,15 +420,46 @@ impl NtfsDirectoryIndex {
 
             if index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_BRANCH != 0 {
                 let sub_node_vcn: u64 =
-                    self.read_index_branch_value(data, index_value_offset, value_data_size)?;
-
+                    match self.read_index_branch_value(data, index_value_offset, value_data_size) {
+                        Ok(index_branch_value) => index_branch_value,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read index branch value"
+                            );
+                            return Err(error);
+                        }
+                    };
                 // TODO: skip if sub node is not allocated.
 
-                let index_entry: NtfsIndexEntry = self
+                let index_entry: NtfsIndexEntry = match self
                     .index
-                    .get_entry_at_cluster_block(data_stream, sub_node_vcn)?;
-
-                self.get_directory_entries_from_node(&index_entry.data, 24, data_stream, entries)?;
+                    .get_entry_at_cluster_block(data_stream, sub_node_vcn)
+                {
+                    Ok(index_entry) => index_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve index entry"
+                        );
+                        return Err(error);
+                    }
+                };
+                match self.get_directory_entries_from_node(
+                    &index_entry.data,
+                    24,
+                    data_stream,
+                    entries,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve directory entries from sub node"
+                        );
+                        return Err(error);
+                    }
+                }
             } else if self.mediator.debug_output && value_data_size > 0 {
                 let value_data_end_offset: usize = index_value_offset + value_data_size;
 
@@ -373,9 +474,20 @@ impl NtfsDirectoryIndex {
                 break;
             }
             let file_name: NtfsFileName =
-                self.read_index_key(data, key_data_offset, key_data_size)?;
-            entries.add(index_value.file_reference, file_name)?;
-
+                match self.read_index_key(data, key_data_offset, key_data_size) {
+                    Ok(index_key) => index_key,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read index key");
+                        return Err(error);
+                    }
+                };
+            match entries.add(index_value.file_reference, file_name) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to add directory entry");
+                    return Err(error);
+                }
+            }
             index_value_offset += value_data_size;
 
             let alignment_padding: usize = index_value_offset % 8;
@@ -439,8 +551,14 @@ impl NtfsDirectoryIndex {
             ));
         }
         let mut file_name: NtfsFileName = NtfsFileName::new();
-        file_name.read_data(&data[key_data_offset..key_data_end_offset])?;
 
+        match file_name.read_data(&data[key_data_offset..key_data_end_offset]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file name");
+                return Err(error);
+            }
+        }
         Ok(file_name)
     }
 
@@ -457,8 +575,14 @@ impl NtfsDirectoryIndex {
                 ));
         }
         let mut index_node_header: NtfsIndexNodeHeader = NtfsIndexNodeHeader::new();
-        index_node_header.read_data(&data[index_node_offset..])?;
 
+        match index_node_header.read_data(&data[index_node_offset..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index node header");
+                return Err(error);
+            }
+        }
         let index_node_size: usize = index_node_header.size as usize;
 
         if index_node_size > data.len() {
@@ -506,8 +630,14 @@ impl NtfsDirectoryIndex {
             ));
         }
         let mut index_value: NtfsIndexValue = NtfsIndexValue::new();
-        index_value.read_data(&data[index_value_offset..])?;
 
+        match index_value.read_data(&data[index_value_offset..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read index value");
+                return Err(error);
+            }
+        }
         let value_data_size: usize = index_value.size as usize;
 
         if value_data_size > data.len() - index_value_offset {
@@ -526,7 +656,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
-    fn get_case_folding_mappings() -> Rc<HashMap<u16, u16>> {
+    fn get_case_folding_mappings() -> Arc<HashMap<u16, u16>> {
         let characters: Vec<u16> = vec![
             0x0000, 0x0001, 0x0002, 0x0003, 0x0004, 0x0005, 0x0006, 0x0007, 0x0008, 0x0009, 0x000a,
             0x000b, 0x000c, 0x000d, 0x000e, 0x000f, 0x0010, 0x0011, 0x0012, 0x0013, 0x0014, 0x0015,
@@ -6496,7 +6626,7 @@ mod tests {
                 case_folding_mappings.insert(character_value, value_16bit);
             }
         }
-        Rc::new(case_folding_mappings)
+        Arc::new(case_folding_mappings)
     }
 
     // TODO: add tests for initialize
@@ -6804,7 +6934,7 @@ mod tests {
         let mut index_entry = NtfsIndexEntry::new();
         index_entry.read_data(&mut test_data)?;
 
-        let case_folding_mappings: Rc<HashMap<u16, u16>> = get_case_folding_mappings();
+        let case_folding_mappings: Arc<HashMap<u16, u16>> = get_case_folding_mappings();
         let test_struct = NtfsDirectoryIndex::new(4096, &case_folding_mappings);
         let data_stream: DataStreamReference = open_fake_data_stream(vec![]);
 

@@ -53,8 +53,13 @@ impl UdifBlockTable {
             self.mediator
                 .debug_print(UdifBlockTableHeader::debug_read_data(&data[0..204]));
         }
-        block_table_header.read_data(&data[0..204])?;
-
+        match block_table_header.read_data(&data[0..204]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read block table header");
+                return Err(error);
+            }
+        }
         self.start_sector = block_table_header.start_sector;
 
         let mut data_offset: usize = 204;
@@ -75,7 +80,16 @@ impl UdifBlockTable {
                         &data[data_offset..data_end_offset],
                     ));
             }
-            block_table_entry.read_data(&data[data_offset..data_end_offset])?;
+            match block_table_entry.read_data(&data[data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read block table entry"
+                    );
+                    return Err(error);
+                }
+            }
             data_offset = data_end_offset;
 
             self.entries.push(block_table_entry);

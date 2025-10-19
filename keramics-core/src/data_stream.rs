@@ -19,7 +19,7 @@ use super::errors::ErrorTrace;
 pub type DataStreamReference = Arc<RwLock<dyn DataStream>>;
 
 /// Data stream trait.
-pub trait DataStream {
+pub trait DataStream: Send + Sync {
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace>;
 
@@ -40,10 +40,7 @@ pub trait DataStream {
         let read_count: usize = self.read(buf)?;
 
         if read_count != read_size {
-            return Err(ErrorTrace::new(format!(
-                "{}: Unable to read the exact amount",
-                crate::error_trace_function!(),
-            )));
+            return Err(crate::error_trace_new!("Unable to read the exact amount"));
         }
         Ok(())
     }
@@ -56,10 +53,7 @@ pub trait DataStream {
         let read_count: usize = self.read(buf)?;
 
         if read_count != read_size {
-            return Err(ErrorTrace::new(format!(
-                "{}: Unable to read the exact amount",
-                crate::error_trace_function!(),
-            )));
+            return Err(crate::error_trace_new!("Unable to read the exact amount"));
         }
         Ok(offset)
     }

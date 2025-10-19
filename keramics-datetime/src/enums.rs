@@ -14,11 +14,10 @@
 use super::filetime::Filetime;
 use super::posix::{PosixTime32, PosixTime64Ns};
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DateTime {
     Filetime(Filetime),
     HfsTime,
-    #[default]
     NotSet,
     PosixTime32(PosixTime32),
     PosixTime64Ns(PosixTime64Ns),

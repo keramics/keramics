@@ -58,8 +58,8 @@ impl VfsContext {
         file_system.get_data_stream_by_path_and_name(vfs_path, name)
     }
 
-    /// Retrieves a file entry with the specified path.
-    pub fn get_file_entry_by_path(
+    /// Retrieves a file entry with the specified location.
+    pub fn get_file_entry_by_location(
         &mut self,
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
@@ -164,15 +164,15 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
+    fn test_get_file_entry_by_location() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
-        let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_path(&vfs_location)?;
+        let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_some());
 
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/bogus.txt");
-        let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_path(&vfs_location)?;
+        let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());
 
         Ok(())

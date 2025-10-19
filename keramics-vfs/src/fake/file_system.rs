@@ -12,7 +12,7 @@
  */
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 
@@ -23,7 +23,7 @@ use super::file_entry::FakeFileEntry;
 /// Fake (or virtual) file system.
 pub struct FakeFileSystem {
     /// Paths.
-    paths: HashMap<String, Rc<FakeFileEntry>>,
+    paths: HashMap<String, Arc<FakeFileEntry>>,
 }
 
 impl FakeFileSystem {
@@ -40,7 +40,7 @@ impl FakeFileSystem {
         path: &str,
         file_entry: FakeFileEntry,
     ) -> Result<(), ErrorTrace> {
-        match self.paths.insert(path.to_string(), Rc::new(file_entry)) {
+        match self.paths.insert(path.to_string(), Arc::new(file_entry)) {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
                     "Unable to add file entry given path is already set"
@@ -63,11 +63,11 @@ impl FakeFileSystem {
     pub fn get_file_entry_by_path(
         &self,
         vfs_path: &VfsPath,
-    ) -> Result<Option<Rc<FakeFileEntry>>, ErrorTrace> {
+    ) -> Result<Option<Arc<FakeFileEntry>>, ErrorTrace> {
         // TODO: use string path components as key
         let path: String = vfs_path.to_string();
 
-        let result: Option<Rc<FakeFileEntry>> = match self.paths.get(&path) {
+        let result: Option<Arc<FakeFileEntry>> = match self.paths.get(&path) {
             Some(file_entry) => Some(file_entry.clone()),
             None => None,
         };
@@ -95,11 +95,11 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let fake_file_system: FakeFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/file.txt");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
         let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Fake, "/fake/bogus.txt");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
         let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 

@@ -188,8 +188,13 @@ impl EwfImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        self.read_segment_files(&file_resolver, file_name)?;
-
+        match self.read_segment_files(&file_resolver, file_name) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read segment files");
+                return Err(error);
+            }
+        }
         self.file_resolver = file_resolver.clone();
 
         Ok(())
@@ -252,10 +257,24 @@ impl EwfImage {
                     if !self.block_cache.contains(&block_range.data_offset) {
                         let mut compressed_data: Vec<u8> = vec![0; block_range.data_size as usize];
 
-                        segment_file.read_exact_at_position(
+                        match segment_file.read_exact_at_position(
                             &mut compressed_data,
                             SeekFrom::Start(block_range.data_offset),
-                        )?;
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to read compressed chunk from segment file: {} at offset: {} (0x{:08x})",
+                                        block_range.segment_number,
+                                        block_range.data_offset,
+                                        block_range.data_offset
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
                         if self.mediator.debug_output {
                             self.mediator.debug_print(format!(
                                 "Compressed data of size: {} at offset: {} (0x{:08x})\n",
@@ -296,10 +315,25 @@ impl EwfImage {
                     range_read_size
                 }
                 EwfBlockRangeType::InFile => {
-                    segment_file.read_exact_at_position(
+                    // TODO: read full chunk
+                    let chunk_offset: u64 = block_range.data_offset + range_relative_offset;
+
+                    match segment_file.read_exact_at_position(
                         &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(block_range.data_offset + range_relative_offset),
-                    )?;
+                        SeekFrom::Start(chunk_offset),
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read uncompressed chunk from segment file: {} at offset: {} (0x{:08x})",
+                                    block_range.segment_number, chunk_offset, chunk_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
                     // TODO: calculate and compare checksum
 
                     range_read_size
@@ -332,8 +366,16 @@ impl EwfImage {
                 &EWF_SECTION_TYPE_DATA => {
                     let mut volume: EwfE01Volume = EwfE01Volume::new();
 
-                    volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
-
+                    match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read data section"
+                            );
+                            return Err(error);
+                        }
+                    }
                     if self.set_identifier != volume.set_identifier {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Mismatch between set identifier in volume section: {} and data section: {}",
@@ -345,19 +387,36 @@ impl EwfImage {
                 &EWF_SECTION_TYPE_DIGEST => {
                     let mut digest: EwfDigest = EwfDigest::new();
 
-                    digest.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
-
+                    match digest.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read digest section"
+                            );
+                            return Err(error);
+                        }
+                    }
                     self.md5_hash.copy_from_slice(&digest.md5_hash);
                     self.sha1_hash.copy_from_slice(&digest.sha1_hash);
                 }
                 &EWF_SECTION_TYPE_DISK | &EWF_SECTION_TYPE_VOLUME => {
-                    self.read_volume_section(
+                    match self.read_volume_section(
                         segment_file,
                         segment_file_name,
                         data_stream,
                         file_offset,
                         section_header,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read disk or volume section"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 &EWF_SECTION_TYPE_DONE => {
                     *last_segment_file = true;
@@ -365,18 +424,35 @@ impl EwfImage {
                 &EWF_SECTION_TYPE_ERROR2 => {
                     let mut error2: EwfError2 = EwfError2::new();
 
-                    error2.read_at_position(
+                    match error2.read_at_position(
                         &data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read error2 section"
+                            );
+                            return Err(error);
+                        }
+                    }
                     // TODO: store entries
                 }
                 &EWF_SECTION_TYPE_HASH => {
                     let mut hash: EwfHash = EwfHash::new();
 
-                    hash.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
-
+                    match hash.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read hash section"
+                            );
+                            return Err(error);
+                        }
+                    }
                     self.md5_hash.copy_from_slice(&hash.md5_hash);
                 }
                 &EWF_SECTION_TYPE_HEADER => {
@@ -387,12 +463,22 @@ impl EwfImage {
                         )));
                     }
                     let mut header: EwfHeader = EwfHeader::new();
-                    header.read_at_position(
+
+                    match header.read_at_position(
                         &data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
                         &mut self.header_values,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read header section"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 &EWF_SECTION_TYPE_HEADER2 => {
                     if segment_file.segment_number != 1 {
@@ -402,12 +488,22 @@ impl EwfImage {
                         )));
                     }
                     let mut header2: EwfHeader2 = EwfHeader2::new();
-                    header2.read_at_position(
+
+                    match header2.read_at_position(
                         &data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
                         &mut self.header_values,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read header2 section"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 // TODO: ltree
                 // TODO: ltypes
@@ -419,23 +515,41 @@ impl EwfImage {
                 }
                 // TODO: session
                 &EWF_SECTION_TYPE_TABLE => {
-                    self.read_table_section(
+                    match self.read_table_section(
                         segment_file,
                         data_stream,
                         file_offset,
                         section_header,
                         &last_sectors_section_header,
                         block_media_offset,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read table section"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 &EWF_SECTION_TYPE_TABLE2 => {
                     let mut table2: EwfTable = EwfTable::new();
 
-                    table2.read_at_position(
+                    match table2.read_at_position(
                         &data_stream,
                         section_header.size - 76,
                         SeekFrom::Start(file_offset + 76),
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read table2 section"
+                            );
+                            return Err(error);
+                        }
+                    }
                     // TODO: compare with table
                 }
                 // TODO: xhash
@@ -490,7 +604,16 @@ impl EwfImage {
 
         while !last_segment_file {
             let segment_extension: String =
-                self.get_segment_file_extension(segment_number, &naming_schema)?;
+                match self.get_segment_file_extension(segment_number, &naming_schema) {
+                    Ok(extension) => extension,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine segment file extension"
+                        );
+                        return Err(error);
+                    }
+                };
             let segment_file_name: String = format!("{}.{}", name, segment_extension);
 
             let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
@@ -515,21 +638,36 @@ impl EwfImage {
                 }
             };
             let mut segment_file: EwfFile = EwfFile::new();
-            segment_file.read_data_stream(&data_stream)?;
 
+            match segment_file.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open segment file: {}", segment_file_name)
+                    );
+                    return Err(error);
+                }
+            }
             if segment_file.segment_number != segment_number {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported segment file: {} with segment number: {}",
-                    segment_file_name, segment_file.segment_number
+                    "Unsupported segment number: {} in segment file: {}",
+                    segment_file.segment_number, segment_file_name
                 )));
             }
-            self.read_sections(
+            match self.read_sections(
                 &segment_file,
                 &segment_file_name,
                 &data_stream,
                 &mut block_media_offset,
                 &mut last_segment_file,
-            )?;
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read sections");
+                    return Err(error);
+                }
+            }
             self.segment_file_cache.insert(segment_number, segment_file);
 
             segment_number += 1;
@@ -556,11 +694,17 @@ impl EwfImage {
 
         let mut table: EwfTable = EwfTable::new();
 
-        table.read_at_position(
+        match table.read_at_position(
             &data_stream,
             section_header.size - 76,
             SeekFrom::Start(file_offset + 76),
-        )?;
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read table");
+                return Err(error);
+            }
+        }
         let number_of_entries: usize = table.entries.len();
 
         if number_of_entries == 0 {
@@ -729,7 +873,13 @@ impl EwfImage {
             170 => {
                 let mut volume: EwfS01Volume = EwfS01Volume::new();
 
-                volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
+                match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read volume");
+                        return Err(error);
+                    }
+                }
                 self.number_of_chunks = volume.number_of_chunks;
                 self.sectors_per_chunk = volume.sectors_per_chunk;
                 self.bytes_per_sector = volume.bytes_per_sector;
@@ -738,8 +888,13 @@ impl EwfImage {
             1128 => {
                 let mut volume: EwfE01Volume = EwfE01Volume::new();
 
-                volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))?;
-
+                match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read volume");
+                        return Err(error);
+                    }
+                }
                 self.media_type = match volume.media_type {
                     0x00 => EwfMediaType::RemoveableDisk,
                     0x01 => EwfMediaType::FixedDisk,

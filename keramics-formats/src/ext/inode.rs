@@ -25,30 +25,6 @@ use super::block_range::ExtBlockRange;
 use super::constants::*;
 use super::extents_tree::ExtExtentsTree;
 
-/// Determines the date and time value of a timestamp and extra precision.
-fn get_datetime_value(timestamp: i32, mut extra_precision: u32) -> DateTime {
-    let mut extra_precision_timestamp: i64 = 0;
-    if extra_precision > 0 {
-        let multiplier: u32 = extra_precision & 0x00000003;
-
-        if multiplier != 0 {
-            extra_precision_timestamp = 0x100000000 * (multiplier as i64);
-        }
-        extra_precision_timestamp += timestamp as i64;
-        extra_precision >>= 2;
-    }
-    if extra_precision_timestamp != 0 {
-        DateTime::PosixTime64Ns(PosixTime64Ns::new(
-            extra_precision_timestamp,
-            extra_precision,
-        ))
-    } else if timestamp != 0 {
-        DateTime::PosixTime32(PosixTime32::new(timestamp))
-    } else {
-        DateTime::NotSet
-    }
-}
-
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -92,7 +68,7 @@ impl Ext2Inode {
     pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 128 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext inode data size"
+                "Unsupported inode data size"
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -107,17 +83,18 @@ impl Ext2Inode {
 
         inode.data_size = bytes_to_u32_le!(data, 4) as u64;
 
-        let timestamp: i32 = bytes_to_i32_le!(data, 8);
-        if timestamp > 0 {
-            inode.access_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+        inode.access_timestamp = bytes_to_i32_le!(data, 8);
+        if inode.access_timestamp > 0 {
+            inode.access_time = DateTime::PosixTime32(PosixTime32::new(inode.access_timestamp));
         }
-        let timestamp: i32 = bytes_to_i32_le!(data, 12);
-        if timestamp > 0 {
-            inode.change_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+        inode.change_timestamp = bytes_to_i32_le!(data, 12);
+        if inode.change_timestamp > 0 {
+            inode.change_time = DateTime::PosixTime32(PosixTime32::new(inode.change_timestamp));
         }
-        let timestamp: i32 = bytes_to_i32_le!(data, 16);
-        if timestamp > 0 {
-            inode.modification_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+        inode.modification_timestamp = bytes_to_i32_le!(data, 16);
+        if inode.modification_timestamp > 0 {
+            inode.modification_time =
+                DateTime::PosixTime32(PosixTime32::new(inode.modification_timestamp));
         }
         let timestamp: i32 = bytes_to_i32_le!(data, 20);
         if timestamp > 0 {
@@ -160,11 +137,6 @@ impl Ext2Inode {
         member(field(name = "owner_identifier_upper", data_type = "u16")),
         member(field(name = "group_identifier_upper", data_type = "u16")),
         member(field(name = "unknown2", data_type = "[u8; 4]")),
-        member(group(
-            size_condition = "> 128",
-            field(name = "extra_size", data_type = "u16"),
-            field(name = "padding2", data_type = "[u8; 2]"),
-        )),
     ),
     method(name = "debug_read_data")
 )]
@@ -181,7 +153,7 @@ impl Ext3Inode {
     pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 128 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext inode data size"
+                "Unsupported inode data size"
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -196,17 +168,18 @@ impl Ext3Inode {
 
         inode.data_size = bytes_to_u32_le!(data, 4) as u64;
 
-        let timestamp: i32 = bytes_to_i32_le!(data, 8);
-        if timestamp > 0 {
-            inode.access_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+        inode.access_timestamp = bytes_to_i32_le!(data, 8);
+        if inode.access_timestamp > 0 {
+            inode.access_time = DateTime::PosixTime32(PosixTime32::new(inode.access_timestamp));
         }
-        let timestamp: i32 = bytes_to_i32_le!(data, 12);
-        if timestamp > 0 {
-            inode.change_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+        inode.change_timestamp = bytes_to_i32_le!(data, 12);
+        if inode.change_timestamp > 0 {
+            inode.change_time = DateTime::PosixTime32(PosixTime32::new(inode.change_timestamp));
         }
-        let timestamp: i32 = bytes_to_i32_le!(data, 16);
-        if timestamp > 0 {
-            inode.modification_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+        inode.modification_timestamp = bytes_to_i32_le!(data, 16);
+        if inode.modification_timestamp > 0 {
+            inode.modification_time =
+                DateTime::PosixTime32(PosixTime32::new(inode.modification_timestamp));
         }
         let timestamp: i32 = bytes_to_i32_le!(data, 20);
         if timestamp > 0 {
@@ -249,18 +222,6 @@ impl Ext3Inode {
         member(field(name = "group_identifier_upper", data_type = "u16")),
         member(field(name = "checksum_lower", data_type = "u16", format = "hex")),
         member(field(name = "unknown2", data_type = "[u8; 2]")),
-        member(group(
-            size_condition = "> 128",
-            field(name = "extra_size", data_type = "u16"),
-            field(name = "checksum_upper", data_type = "u16", format = "hex"),
-            field(name = "change_time_extra_precision", data_type = "u32"),
-            field(name = "modification_time_extra_precision", data_type = "u32"),
-            field(name = "access_time_extra_precision", data_type = "u32"),
-            field(name = "creation_time", data_type = "PosixTime32"),
-            field(name = "creation_time_extra_precision", data_type = "u32"),
-            field(name = "version_upper", data_type = "u32"),
-            field(name = "unknown3", data_type = "[u8; 4]"),
-        )),
     ),
     method(name = "debug_read_data")
 )]
@@ -275,16 +236,9 @@ impl Ext4Inode {
 
     /// Reads the inode from a buffer.
     pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
-
-        let extra_size: u16 = if data_size < 132 {
-            0
-        } else {
-            bytes_to_u16_le!(data, 128)
-        };
-        if data_size < 128 + (extra_size as usize) {
+        if data.len() < 128 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext inode data size"
+                "Unsupported inode data size"
             ));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
@@ -304,72 +258,158 @@ impl Ext4Inode {
         inode.flags = bytes_to_u32_le!(data, 32);
 
         if inode.flags & 0x00200000 == 0 {
-            let timestamp: i32 = bytes_to_i32_le!(data, 8);
-            let extra_precision: u32 = if data_size < 144 {
-                0
-            } else {
-                bytes_to_u32_le!(data, 140)
-            };
-            inode.access_time = get_datetime_value(timestamp, extra_precision);
-
-            let timestamp: i32 = bytes_to_i32_le!(data, 12);
-            let extra_precision: u32 = if data_size < 136 {
-                0
-            } else {
-                bytes_to_u32_le!(data, 132)
-            };
-            inode.change_time = get_datetime_value(timestamp, extra_precision);
-
-            let timestamp: i32 = bytes_to_i32_le!(data, 16);
-            let extra_precision: u32 = if data_size < 140 {
-                0
-            } else {
-                bytes_to_u32_le!(data, 136)
-            };
-            inode.modification_time = get_datetime_value(timestamp, extra_precision);
-
+            inode.access_timestamp = bytes_to_i32_le!(data, 8);
+            if inode.access_timestamp > 0 {
+                inode.access_time = DateTime::PosixTime32(PosixTime32::new(inode.access_timestamp));
+            }
+            inode.change_timestamp = bytes_to_i32_le!(data, 12);
+            if inode.change_timestamp > 0 {
+                inode.change_time = DateTime::PosixTime32(PosixTime32::new(inode.change_timestamp));
+            }
+            inode.modification_timestamp = bytes_to_i32_le!(data, 16);
+            if inode.modification_timestamp > 0 {
+                inode.modification_time =
+                    DateTime::PosixTime32(PosixTime32::new(inode.modification_timestamp));
+            }
             let timestamp: i32 = bytes_to_i32_le!(data, 20);
-            inode.deletion_time = if timestamp != 0 {
-                DateTime::PosixTime32(PosixTime32::new(timestamp))
-            } else {
-                DateTime::NotSet
-            };
+            if timestamp > 0 {
+                inode.deletion_time = DateTime::PosixTime32(PosixTime32::new(timestamp));
+            }
         }
         inode.number_of_links = bytes_to_u16_le!(data, 26);
 
         let lower_32bit: u32 = bytes_to_u32_le!(data, 28);
-        inode.number_of_blocks = lower_32bit as u64;
-        if data_size >= 120 {
-            let upper_16bit: u16 = bytes_to_u16_le!(data, 116);
-            inode.number_of_blocks |= (upper_16bit as u64) << 32;
-        }
+        let upper_16bit: u16 = bytes_to_u16_le!(data, 116);
+        inode.number_of_blocks = ((upper_16bit as u64) << 32) | (lower_32bit as u64);
+
         inode.data_reference.copy_from_slice(&data[40..100]);
 
         let lower_16bit: u16 = bytes_to_u16_le!(data, 124);
         inode.checksum = lower_16bit as u32;
-        if data_size >= 132 {
-            let upper_16bit: u16 = bytes_to_u16_le!(data, 130);
+
+        Ok(())
+    }
+}
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        member(field(name = "extra_size", data_type = "u16")),
+        member(field(name = "checksum_upper", data_type = "u16", format = "hex")),
+        member(field(name = "change_time_extra_precision", data_type = "u32")),
+        member(field(name = "modification_time_extra_precision", data_type = "u32")),
+        member(field(name = "access_time_extra_precision", data_type = "u32")),
+        member(field(name = "creation_time", data_type = "PosixTime32")),
+        member(field(name = "creation_time_extra_precision", data_type = "u32")),
+        member(field(name = "version_upper", data_type = "u32")),
+        member(field(name = "unknown3", data_type = "[u8; 4]")),
+    ),
+    method(name = "debug_read_data")
+)]
+/// Extended File System (ext4) inode extension.
+struct Ext4InodeExtension {}
+
+impl Ext4InodeExtension {
+    /// Creates a new inode extension.
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    /// Determines an extra precision timestamp.
+    fn get_extra_precision_timestamp(timestamp: i32, mut extra_precision: u32) -> (i64, u32) {
+        let mut extra_precision_timestamp: i64 = timestamp as i64;
+        if extra_precision > 0 {
+            let multiplier: u32 = extra_precision & 0x00000003;
+
+            if multiplier != 0 {
+                extra_precision_timestamp += 0x100000000 * (multiplier as i64);
+            }
+            extra_precision >>= 2;
+        }
+        (extra_precision_timestamp, extra_precision)
+    }
+
+    /// Reads the inode exension from a buffer.
+    pub fn read_data(&self, inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
+        let extra_size: u16 = bytes_to_u16_le!(data, 0);
+
+        if extra_size >= 4 {
+            let upper_16bit: u16 = bytes_to_u16_le!(data, 2);
             inode.checksum |= (upper_16bit as u32) << 16;
         }
-        if data_size >= 152 {
-            let timestamp: i32 = bytes_to_i32_le!(data, 144);
-            let extra_precision: u32 = bytes_to_u32_le!(data, 148);
-            inode.creation_time = Some(get_datetime_value(timestamp, extra_precision));
+        if inode.flags & 0x00200000 == 0 {
+            if extra_size >= 8 {
+                let extra_precision: u32 = bytes_to_u32_le!(data, 4);
+                let (timestamp, fraction): (i64, u32) =
+                    Self::get_extra_precision_timestamp(inode.change_timestamp, extra_precision);
+
+                if timestamp > 0 {
+                    inode.change_time =
+                        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction));
+                }
+            }
+            if extra_size >= 12 {
+                let extra_precision: u32 = bytes_to_u32_le!(data, 8);
+                let (timestamp, fraction): (i64, u32) = Self::get_extra_precision_timestamp(
+                    inode.modification_timestamp,
+                    extra_precision,
+                );
+
+                if timestamp > 0 {
+                    inode.modification_time =
+                        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction));
+                }
+            }
+            if extra_size >= 16 {
+                let extra_precision: u32 = bytes_to_u32_le!(data, 12);
+                let (timestamp, fraction): (i64, u32) =
+                    Self::get_extra_precision_timestamp(inode.access_timestamp, extra_precision);
+
+                if timestamp > 0 {
+                    inode.access_time =
+                        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction));
+                }
+            }
         }
-        let mut data_offset: usize = 128 + (extra_size as usize);
+        if extra_size >= 24 {
+            let timestamp: i32 = bytes_to_i32_le!(data, 16);
+            let extra_precision: u32 = bytes_to_u32_le!(data, 20);
+            let (extra_precision_timestamp, fraction): (i64, u32) =
+                Self::get_extra_precision_timestamp(timestamp, extra_precision);
+
+            if timestamp > 0 {
+                inode.creation_time = Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                    extra_precision_timestamp,
+                    fraction,
+                )));
+            }
+        }
+        let mut data_offset: usize = extra_size as usize;
         let data_end_offset: usize = data_offset + 4;
+        let data_size: usize = data.len();
+
         if data_end_offset < data_size {
             if data[data_offset..data_end_offset] == EXT_ATTRIBUTES_HEADER_SIGNATURE {
                 data_offset = data_end_offset;
 
                 let attributes_block: ExtAttributesBlock = ExtAttributesBlock::new();
 
-                attributes_block.read_entries(
+                match attributes_block.read_entries(
                     data,
                     data_offset,
                     data_size,
                     &mut inode.attributes,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read extended attributes"
+                        );
+                        return Err(error);
+                    }
+                }
             }
         }
         Ok(())
@@ -390,11 +430,20 @@ pub struct ExtInode {
     /// Data size.
     pub data_size: u64,
 
+    /// Access timestamp.
+    access_timestamp: i32,
+
     /// Access date and time.
     pub access_time: DateTime,
 
+    /// Change timestamp.
+    change_timestamp: i32,
+
     /// Change date and time.
     pub change_time: DateTime,
+
+    /// Modification timestamp.
+    modification_timestamp: i32,
 
     /// Modification date and time.
     pub modification_time: DateTime,
@@ -435,8 +484,11 @@ impl ExtInode {
             owner_identifier: 0,
             group_identifier: 0,
             data_size: 0,
+            access_timestamp: 0,
             access_time: DateTime::NotSet,
+            change_timestamp: 0,
             change_time: DateTime::NotSet,
+            modification_timestamp: 0,
             modification_time: DateTime::NotSet,
             deletion_time: DateTime::NotSet,
             number_of_links: 0,
@@ -452,11 +504,20 @@ impl ExtInode {
 
     /// Reads the inode for debugging.
     pub fn debug_read_data(&self, format_version: u8, data: &[u8]) -> String {
-        match format_version {
+        let mut string_parts: Vec<String> = Vec::new();
+
+        let string: String = match format_version {
             4 => Ext4Inode::debug_read_data(data),
             3 => Ext3Inode::debug_read_data(data),
             _ => Ext2Inode::debug_read_data(data),
+        };
+        string_parts.push(string);
+
+        if data.len() > 128 {
+            let string: String = Ext4InodeExtension::debug_read_data(&data[128..]);
+            string_parts.push(string);
         }
+        string_parts.join("")
     }
 
     /// Reads the inode from a buffer.
@@ -464,17 +525,22 @@ impl ExtInode {
         match format_version {
             4 => {
                 let inode: Ext4Inode = Ext4Inode::new();
-                inode.read_data(self, data)
+                inode.read_data(self, data)?;
             }
             3 => {
                 let inode: Ext3Inode = Ext3Inode::new();
-                inode.read_data(self, data)
+                inode.read_data(self, data)?;
             }
             _ => {
                 let inode: Ext2Inode = Ext2Inode::new();
-                inode.read_data(self, data)
+                inode.read_data(self, data)?;
             }
         }
+        if data.len() > 128 {
+            let inode_extension: Ext4InodeExtension = Ext4InodeExtension::new();
+            inode_extension.read_data(self, &data[128..])?;
+        }
+        Ok(())
     }
 
     /// Reads the data reference.
@@ -507,19 +573,39 @@ impl ExtInode {
                 if format_version == 4 && self.flags & EXT_INODE_FLAG_HAS_EXTENTS != 0 {
                     let mut extents_tree: ExtExtentsTree =
                         ExtExtentsTree::new(block_size, number_of_blocks);
-                    extents_tree.read_data_reference(
+
+                    match extents_tree.read_data_reference(
                         &self.data_reference,
                         data_stream,
                         &mut self.block_ranges,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read extents tree"
+                            );
+                            return Err(error);
+                        }
+                    }
                 } else {
                     let mut block_numbers_tree: ExtBlockNumbersTree =
                         ExtBlockNumbersTree::new(block_size, number_of_blocks);
-                    block_numbers_tree.read_data_reference(
+
+                    match block_numbers_tree.read_data_reference(
                         &self.data_reference,
                         data_stream,
                         &mut self.block_ranges,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read block numbers"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
             }
         };
@@ -577,145 +663,76 @@ mod tests {
     }
 
     #[test]
-    fn test_get_datetime_value() -> Result<(), ErrorTrace> {
-        let datetime: DateTime = get_datetime_value(-1, 0);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime32(PosixTime32 { timestamp: -1 })
-        );
+    fn test_get_extra_precision_timestamp() -> Result<(), ErrorTrace> {
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(1733561817, 0);
+        assert_eq!(timestamp, 1733561817);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(-2147483648, 0);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime32(PosixTime32 {
-                timestamp: -2147483648
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(1733561817, 49382716);
+        assert_eq!(timestamp, 1733561817);
+        assert_eq!(fraction, 12345679);
 
-        let datetime: DateTime = get_datetime_value(0, 0);
-        assert_eq!(datetime, DateTime::NotSet);
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(-1, 1);
+        assert_eq!(timestamp, 4294967295);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(1, 0);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime32(PosixTime32 { timestamp: 1 })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(-2147483648, 1);
+        assert_eq!(timestamp, 2147483648);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(2147483647, 0);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime32(PosixTime32 {
-                timestamp: 2147483647
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(0, 1);
+        assert_eq!(timestamp, 4294967296);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(-1, 1);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 4294967295,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(2147483647, 1);
+        assert_eq!(timestamp, 6442450943);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(-2147483648, 1);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 2147483648,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(-1, 2);
+        assert_eq!(timestamp, 8589934591);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(0, 1);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 4294967296,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(-2147483648, 2);
+        assert_eq!(timestamp, 6442450944);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(2147483647, 1);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 6442450943,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(0, 2);
+        assert_eq!(timestamp, 8589934592);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(-1, 2);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 8589934591,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(2147483647, 2);
+        assert_eq!(timestamp, 10737418239);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(-2147483648, 2);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 6442450944,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(-1, 3);
+        assert_eq!(timestamp, 12884901887);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(0, 2);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 8589934592,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(-2147483648, 3);
+        assert_eq!(timestamp, 10737418240);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(2147483647, 2);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 10737418239,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(0, 3);
+        assert_eq!(timestamp, 12884901888);
+        assert_eq!(fraction, 0);
 
-        let datetime: DateTime = get_datetime_value(-1, 3);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 12884901887,
-                fraction: 0
-            })
-        );
-
-        let datetime: DateTime = get_datetime_value(-2147483648, 3);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 10737418240,
-                fraction: 0
-            })
-        );
-
-        let datetime: DateTime = get_datetime_value(0, 3);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 12884901888,
-                fraction: 0
-            })
-        );
-
-        let datetime: DateTime = get_datetime_value(2147483647, 3);
-        assert_eq!(
-            datetime,
-            DateTime::PosixTime64Ns(PosixTime64Ns {
-                timestamp: 15032385535,
-                fraction: 0
-            })
-        );
+        let (timestamp, fraction): (i64, u32) =
+            Ext4InodeExtension::get_extra_precision_timestamp(2147483647, 3);
+        assert_eq!(timestamp, 15032385535);
+        assert_eq!(fraction, 0);
 
         Ok(())
     }

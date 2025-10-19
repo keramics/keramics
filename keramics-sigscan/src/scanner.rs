@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::rc::Rc;
+use std::sync::Arc;
 
 use super::enums::PatternType;
 use super::errors::BuildError;
@@ -47,7 +47,7 @@ impl Scanner {
 
     /// Adds a new signature.
     pub fn add_signature(&mut self, signature: Signature) {
-        self.signatures.push(Rc::new(signature));
+        self.signatures.push(Arc::new(signature));
     }
 
     /// Builds the scan trees.

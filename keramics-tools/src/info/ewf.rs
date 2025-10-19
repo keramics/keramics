@@ -12,7 +12,6 @@
  */
 
 use std::collections::HashMap;
-use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 

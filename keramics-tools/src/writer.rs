@@ -62,11 +62,12 @@ impl<'a> DataStreamWriter<'a> {
                 loop {
                     let read_count = match data_stream.read(&mut data) {
                         Ok(read_count) => read_count,
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to read data stream",
-                                error
-                            ));
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read data stream"
+                            );
+                            return Err(error);
                         }
                     };
                     if read_count == 0 {

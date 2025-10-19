@@ -54,7 +54,23 @@ impl ExtDirectoryTree {
                 block_range.physical_block_number * (self.block_size as u64);
 
             for _ in 0..block_range.number_of_blocks as usize {
-                self.read_node_at_position(data_stream, SeekFrom::Start(block_offset), entries)?;
+                match self.read_node_at_position(
+                    data_stream,
+                    SeekFrom::Start(block_offset),
+                    entries,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read directory tree node at offset: {} (0x{:08x})",
+                                block_offset, block_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
                 block_offset += self.block_size as u64;
             }
         }
@@ -104,8 +120,13 @@ impl ExtDirectoryTree {
                 self.mediator
                     .debug_print(ExtDirectoryEntry::debug_read_data(&data[data_offset..]));
             }
-            entry.read_data(&data[data_offset..])?;
-
+            match entry.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read directory entry");
+                    return Err(error);
+                }
+            }
             if entry.size == 0 {
                 break;
             }
@@ -117,7 +138,16 @@ impl ExtDirectoryTree {
             }
             data_offset += 8;
 
-            let name: ByteString = entry.read_name(&data[data_offset..])?;
+            let name: ByteString = match entry.read_name(&data[data_offset..]) {
+                Ok(name) => name,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entry name"
+                    );
+                    return Err(error);
+                }
+            };
             data_offset += (entry.size as usize) - 8;
 
             // TODO: print trailing data

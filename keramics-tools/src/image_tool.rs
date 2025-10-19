@@ -17,13 +17,14 @@ use std::io::SeekFrom;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ewf::EwfImage;
+use keramics_formats::ntfs::NtfsAttribute;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::udif::UdifFile;
@@ -32,10 +33,30 @@ use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_formats::{FormatIdentifier, FormatScanner};
 use keramics_hashes::{DigestHashContext, Md5Context};
+use keramics_types::Ucs2String;
 use keramics_vfs::{
-    VfsFileEntry, VfsLocation, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext,
-    VfsScanNode, VfsScanner, VfsType, new_os_vfs_location,
+    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsLocation,
+    VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString,
+    VfsType, new_os_vfs_location,
 };
+
+mod bodyfile;
+mod display_path;
+
+use bodyfile::Bodyfile;
+use display_path::{DisplayPath, DisplayPathType};
+
+pub const FILE_ATTRIBUTE_FLAG_READ_ONLY: u32 = 0x00000001;
+pub const FILE_ATTRIBUTE_FLAG_SYSTEM: u32 = 0x00000004;
+
+#[derive(Clone, Debug, ValueEnum)]
+enum VolumePathType {
+    /// Identifier based volume or partition path, such as /apfs{f449e580-e355-4e74-8880-05e46e4e3b1e}
+    Identifier,
+
+    /// Index based volume or partition path, such as /apfs1 or /p1
+    Index,
+}
 
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]
@@ -53,11 +74,28 @@ struct CommandLineArguments {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    /// Output file entries in bodyfile format
+    Bodyfile(BodyfileCommandArguments),
+
     /// Calculate digest hashes of a storage media image
     Hash,
 
     /// Show the hierarchy of the volumes, partitions and file systems
     Hierarchy,
+}
+
+#[derive(Args, Debug)]
+struct BodyfileCommandArguments {
+    #[arg(long, default_value_t = false)]
+    /// Calculate MD5 hashes of the content of file entries
+    calculate_md5: bool,
+
+    // TODO: allow to set the path component/segment separator
+
+    // TODO: allow to set the data stream name separator
+    /// Volume or partition path type
+    #[arg(long, default_value_t = VolumePathType::Index, value_enum)]
+    volume_path_type: VolumePathType,
 }
 
 /// Storage media image.
@@ -373,20 +411,503 @@ impl DataStream for StorageMediaImage {
 }
 
 /// Tool for analyzing the contents of a storage media image.
-struct ImageTool {}
+struct ImageTool {
+    /// The display path.
+    display_path: DisplayPath,
+}
 
 impl ImageTool {
     /// Creates a new tool.
     fn new() -> Self {
-        Self {}
+        let mut display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
+
+        // Escape | as \|
+        display_path
+            .translation_table
+            .insert('|' as u32, String::from("\\|"));
+
+        Self {
+            display_path: display_path,
+        }
+    }
+
+    /// Output file entries in bodyfile format.
+    fn generate_bodyfile(&self, source: &str, calculate_md5: bool) -> Result<(), ErrorTrace> {
+        let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
+        match vfs_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build VFS scanner",
+                    error
+                ));
+            }
+        }
+        let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
+        let vfs_location: VfsLocation = new_os_vfs_location(source);
+
+        match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to scan file system");
+                return Err(error);
+            }
+        }
+        println!("{}", Bodyfile::FILE_HEADER);
+
+        match vfs_scan_context.root_node {
+            Some(scan_node) => match self.print_scan_node_as_bodyfile(&scan_node, calculate_md5) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
+                    return Err(error);
+                }
+            },
+            None => {}
+        }
+        Ok(())
+    }
+
+    /// Retrieves a file mode string representation.
+    fn get_file_mode_string(file_mode: u16) -> String {
+        let mut string_parts: Vec<&str> = vec!["-"; 10];
+
+        if file_mode & 0x0001 != 0 {
+            string_parts[9] = "x";
+        }
+        if file_mode & 0x0002 != 0 {
+            string_parts[8] = "w";
+        }
+        if file_mode & 0x0004 != 0 {
+            string_parts[7] = "r";
+        }
+        if file_mode & 0x0008 != 0 {
+            string_parts[6] = "x";
+        }
+        if file_mode & 0x0010 != 0 {
+            string_parts[5] = "w";
+        }
+        if file_mode & 0x0020 != 0 {
+            string_parts[4] = "r";
+        }
+        if file_mode & 0x0040 != 0 {
+            string_parts[3] = "x";
+        }
+        if file_mode & 0x0080 != 0 {
+            string_parts[2] = "w";
+        }
+        if file_mode & 0x0100 != 0 {
+            string_parts[1] = "r";
+        }
+        string_parts[0] = match file_mode & 0xf000 {
+            0x1000 => "p",
+            0x2000 => "c",
+            0x4000 => "d",
+            0x6000 => "b",
+            0xa000 => "l",
+            0xc000 => "s",
+            _ => "-",
+        };
+        string_parts.join("")
+    }
+
+    /// Retrieves a file mode string representation of file attribute flags.
+    fn get_file_mode_string_from_file_attribute_flags(
+        file_type: &VfsFileType,
+        file_attribute_flags: u32,
+    ) -> String {
+        let mut string_parts: Vec<&str> = vec!["-", "r", "w", "x", "r", "w", "x", "r", "w", "x"];
+
+        string_parts[0] = match file_type {
+            VfsFileType::Directory => "d",
+            VfsFileType::SymbolicLink => "l",
+            _ => "-",
+        };
+        if file_attribute_flags & FILE_ATTRIBUTE_FLAG_READ_ONLY != 0
+            || file_attribute_flags & FILE_ATTRIBUTE_FLAG_SYSTEM != 0
+        {
+            string_parts[2] = "-";
+            string_parts[5] = "-";
+            string_parts[8] = "-";
+        }
+        string_parts.join("")
+    }
+
+    /// Retrieves a file mode string representation of a file type.
+    fn get_file_mode_string_from_file_type(file_type: &VfsFileType) -> String {
+        let mut string_parts: Vec<&str> = vec!["-", "r", "w", "x", "r", "w", "x", "r", "w", "x"];
+
+        string_parts[0] = match file_type {
+            VfsFileType::BlockDevice => "b",
+            VfsFileType::CharacterDevice => "c",
+            VfsFileType::Directory => "d",
+            VfsFileType::NamedPipe => "p",
+            VfsFileType::Socket => "s",
+            VfsFileType::SymbolicLink => "l",
+            VfsFileType::Whiteout => "w",
+            _ => "-",
+        };
+        string_parts.join("")
+    }
+
+    /// Prints the file entry in bodyfile format.
+    fn print_file_entry_as_bodyfile(
+        &self,
+        file_entry: &mut VfsFileEntry,
+        file_system_display_path: &String,
+        path_components: &Vec<VfsString>,
+        calculate_md5: bool,
+    ) -> Result<(), ErrorTrace> {
+        let md5: String = if !calculate_md5 {
+            String::from("0")
+        } else {
+            let result: Option<DataStreamReference> = match file_entry.get_data_stream() {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
+            match result {
+                Some(data_stream) => match Bodyfile::calculate_md5(&data_stream) {
+                    Ok(md5_string) => md5_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to calculate MD5 of data stream"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => String::from("00000000000000000000000000000000"),
+            }
+        };
+        let display_path: String = self.display_path.join_path_components(path_components);
+
+        let result: Option<VfsPath> = match file_entry.get_symbolic_link_target() {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve symbolic link target"
+                );
+                return Err(error);
+            }
+        };
+        let path_prefix: &str = if file_system_display_path.ends_with('/') {
+            &file_system_display_path[..file_system_display_path.len() - 1]
+        } else {
+            file_system_display_path.as_str()
+        };
+        // TODO: escape symbolic link target.
+        let path_suffix: String = match result {
+            Some(symbolic_link_target) => format!(" -> {}", symbolic_link_target.to_string()),
+            None => String::new(),
+        };
+        let file_identifier: String = match file_entry {
+            VfsFileEntry::Ext(ext_file_entry) => {
+                format!("{}", ext_file_entry.inode_number)
+            }
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                // Note that the directory entry file reference can be differrent
+                // from the values in the MFT entry.
+                let file_reference: u64 = ntfs_file_entry.get_file_reference();
+                format!(
+                    "{}-{}",
+                    file_reference & 0x0000ffffffffffff,
+                    file_reference >> 48,
+                )
+            }
+            _ => String::new(),
+        };
+        let file_type: VfsFileType = file_entry.get_file_type();
+        let file_mode_string: String = match file_entry {
+            VfsFileEntry::Ext(ext_file_entry) => {
+                let file_mode: u16 = ext_file_entry.get_file_mode();
+
+                Self::get_file_mode_string(file_mode)
+            }
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                let file_attribute_flags: u32 = ntfs_file_entry.get_file_attribute_flags();
+
+                Self::get_file_mode_string_from_file_attribute_flags(
+                    &file_type,
+                    file_attribute_flags,
+                )
+            }
+            _ => Self::get_file_mode_string_from_file_type(&file_type),
+        };
+        let owner_identifier: String = match file_entry {
+            VfsFileEntry::Ext(ext_file_entry) => {
+                let owner_identifier: u32 = ext_file_entry.get_owner_identifier();
+
+                format!("{}", owner_identifier)
+            }
+            _ => String::from(""),
+        };
+        let group_identifier: String = match file_entry {
+            VfsFileEntry::Ext(ext_file_entry) => {
+                let group_identifier: u32 = ext_file_entry.get_group_identifier();
+
+                format!("{}", group_identifier)
+            }
+            _ => String::from(""),
+        };
+        let size: u64 = file_entry.get_size();
+
+        let access_time: String = match Bodyfile::format_as_timestamp(file_entry.get_access_time())
+        {
+            Ok(timestamp_string) => timestamp_string,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to format access time");
+                return Err(error);
+            }
+        };
+        let modification_time: String =
+            match Bodyfile::format_as_timestamp(file_entry.get_modification_time()) {
+                Ok(timestamp_string) => timestamp_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to format modification time"
+                    );
+                    return Err(error);
+                }
+            };
+        let change_time: String = match Bodyfile::format_as_timestamp(file_entry.get_change_time())
+        {
+            Ok(timestamp_string) => timestamp_string,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to format change time");
+                return Err(error);
+            }
+        };
+        let creation_time: String =
+            match Bodyfile::format_as_timestamp(file_entry.get_creation_time()) {
+                Ok(timestamp_string) => timestamp_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to format creation time");
+                    return Err(error);
+                }
+            };
+        println!(
+            "{}|{}{}{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+            md5,
+            path_prefix,
+            display_path,
+            path_suffix,
+            file_identifier,
+            file_mode_string,
+            owner_identifier,
+            group_identifier,
+            size,
+            access_time,
+            modification_time,
+            change_time,
+            creation_time
+        );
+        let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
+            Ok(number_of_data_forks) => number_of_data_forks,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of data forks"
+                );
+                return Err(error);
+            }
+        };
+        for data_fork_index in 0..number_of_data_forks {
+            let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
+                Ok(number_of_data_forks) => number_of_data_forks,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve data fork: {}", data_fork_index)
+                    );
+                    return Err(error);
+                }
+            };
+            let data_fork_name: String = match data_fork.get_name() {
+                Some(name) => format!(":{}", self.display_path.escape_string(&name)),
+                None => continue,
+            };
+            let data_stream: DataStreamReference = match data_fork.get_data_stream() {
+                Ok(data_stream) => data_stream,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve data stream from data fork: {}",
+                            data_fork_index
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+            let md5: String = if !calculate_md5 {
+                String::from("0")
+            } else {
+                match Bodyfile::calculate_md5(&data_stream) {
+                    Ok(md5_string) => md5_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to calculate MD5 of data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+            };
+            let data_stream_size: u64 = match data_stream.write() {
+                Ok(mut data_stream) => match data_stream.get_size() {
+                    Ok(size) => size,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to retrieve size");
+                        return Err(error);
+                    }
+                },
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to obtain write lock on data stream",
+                        error
+                    ));
+                }
+            };
+            println!(
+                "{}|{}{}{}{}|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                md5,
+                path_prefix,
+                display_path,
+                data_fork_name,
+                path_suffix,
+                file_identifier,
+                file_mode_string,
+                owner_identifier,
+                group_identifier,
+                data_stream_size,
+                access_time,
+                modification_time,
+                change_time,
+                creation_time
+            );
+        }
+        match file_entry {
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                if let Some(parent_file_reference) = ntfs_file_entry.get_parent_file_reference() {
+                    let name: Option<&Ucs2String> = ntfs_file_entry.get_name();
+                    let number_of_attributes: usize = ntfs_file_entry.get_number_of_attributes();
+
+                    // TODO: print index names
+                    for attribute_index in 0..number_of_attributes {
+                        let attribute: NtfsAttribute =
+                            match ntfs_file_entry.get_attribute_by_index(attribute_index) {
+                                Ok(attribute) => attribute,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to retrieve NTFS MFT entry: {} attribute: {}",
+                                            ntfs_file_entry.mft_entry_number, attribute_index
+                                        )
+                                    );
+                                    return Err(error);
+                                }
+                            };
+                        match attribute {
+                            NtfsAttribute::FileName { file_name } => {
+                                if file_name.parent_file_reference != parent_file_reference
+                                    || Some(&file_name.name) != name
+                                {
+                                    continue;
+                                }
+                                if file_name.name_space == 0x02 {
+                                    continue;
+                                }
+                                let file_name_access_time: String =
+                                    match Bodyfile::format_as_timestamp(Some(
+                                        &file_name.access_time,
+                                    )) {
+                                        Ok(timestamp_string) => timestamp_string,
+                                        Err(mut error) => {
+                                            keramics_core::error_trace_add_frame!(
+                                                error,
+                                                "Unable to format $FILE_NAME access time"
+                                            );
+                                            return Err(error);
+                                        }
+                                    };
+                                let file_name_modification_time: String =
+                                    match Bodyfile::format_as_timestamp(Some(
+                                        &file_name.modification_time,
+                                    )) {
+                                        Ok(timestamp_string) => timestamp_string,
+                                        Err(mut error) => {
+                                            keramics_core::error_trace_add_frame!(
+                                                error,
+                                                "Unable to format $FILE_NAME modification time"
+                                            );
+                                            return Err(error);
+                                        }
+                                    };
+                                let file_name_change_time: String =
+                                    match Bodyfile::format_as_timestamp(Some(
+                                        &file_name.entry_modification_time,
+                                    )) {
+                                        Ok(timestamp_string) => timestamp_string,
+                                        Err(mut error) => {
+                                            keramics_core::error_trace_add_frame!(
+                                                error,
+                                                "Unable to format $FILE_NAME entry modification time"
+                                            );
+                                            return Err(error);
+                                        }
+                                    };
+                                let file_name_creation_time: String =
+                                    match Bodyfile::format_as_timestamp(Some(
+                                        &file_name.creation_time,
+                                    )) {
+                                        Ok(timestamp_string) => timestamp_string,
+                                        Err(mut error) => {
+                                            keramics_core::error_trace_add_frame!(
+                                                error,
+                                                "Unable to format $FILE_NAME creation time"
+                                            );
+                                            return Err(error);
+                                        }
+                                    };
+                                println!(
+                                    "{}|{}{} ($FILE_NAME)|{}|{}|{}|{}|{}|{}|{}|{}|{}",
+                                    md5,
+                                    path_prefix,
+                                    display_path,
+                                    file_identifier,
+                                    file_mode_string,
+                                    owner_identifier,
+                                    group_identifier,
+                                    size,
+                                    file_name_access_time,
+                                    file_name_modification_time,
+                                    file_name_change_time,
+                                    file_name_creation_time
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        Ok(())
     }
 
     /// Prints information about a scan node.
-    fn print_scan_node(&self, scan_node: &VfsScanNode, depth: usize) -> Result<(), ErrorTrace> {
+    fn print_scan_node(&self, vfs_scan_node: &VfsScanNode, depth: usize) -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let result: Option<VfsFileEntry> =
-            match vfs_resolver.get_file_entry_by_path(&scan_node.location) {
+            match vfs_resolver.get_file_entry_by_location(&vfs_scan_node.location) {
                 Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
@@ -404,8 +925,8 @@ impl ImageTool {
             None => String::new(),
         };
         let indentation: String = vec![" "; depth * 4].join("");
-        let vfs_path: &VfsPath = scan_node.location.get_path();
-        let vfs_type: &VfsType = scan_node.get_type();
+        let vfs_path: &VfsPath = vfs_scan_node.location.get_path();
+        let vfs_type: &VfsType = vfs_scan_node.get_type();
 
         println!(
             "{}{}: path: {}{}",
@@ -414,8 +935,87 @@ impl ImageTool {
             vfs_path.to_string(),
             suffix,
         );
-        for sub_scan_node in scan_node.sub_nodes.iter() {
+        for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
             self.print_scan_node(sub_scan_node, depth + 1)?;
+        }
+        Ok(())
+    }
+
+    /// Prints the scan node in bodyfile format.
+    fn print_scan_node_as_bodyfile(
+        &self,
+        vfs_scan_node: &VfsScanNode,
+        calculate_md5: bool,
+    ) -> Result<(), ErrorTrace> {
+        if vfs_scan_node.is_empty() {
+            // Only process scan nodes that contain a file system.
+            match vfs_scan_node.get_type() {
+                VfsType::Ext { .. } | VfsType::Ntfs { .. } => {}
+                _ => return Ok(()),
+            }
+            let vfs_resolver: VfsResolverReference = VfsResolver::current();
+
+            let file_system: VfsFileSystemReference =
+                match vfs_resolver.open_file_system(&vfs_scan_node.location) {
+                    Ok(file_system) => file_system,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                        return Err(error);
+                    }
+                };
+            let display_path: String = match vfs_scan_node.location.get_parent() {
+                Some(parent_path) => match self.display_path.get_path(parent_path) {
+                    Ok(path) => path,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve parent display path"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => String::new(),
+            };
+            for result in VfsFinder::new(&file_system) {
+                match result {
+                    Ok((mut file_entry, path_components)) => match self
+                        .print_file_entry_as_bodyfile(
+                            &mut file_entry,
+                            &display_path,
+                            &path_components,
+                            calculate_md5,
+                        ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to print file entry"
+                            );
+                            return Err(error);
+                        }
+                    },
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve file entry from finder"
+                        );
+                        return Err(error);
+                    }
+                };
+            }
+        } else {
+            for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
+                match self.print_scan_node_as_bodyfile(sub_scan_node, calculate_md5) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to print sub scan node"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -472,7 +1072,7 @@ impl ImageTool {
             Ok(_) => {}
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build file system scanner",
+                    "Unable to build VFS scanner",
                     error
                 ));
             }
@@ -490,10 +1090,21 @@ impl ImageTool {
         // TODO: print source type.
 
         match vfs_scan_context.root_node {
-            Some(scan_node) => self.print_scan_node(&scan_node, 0)?,
+            Some(scan_node) => match self.print_scan_node(&scan_node, 0) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to print root scan node");
+                    return Err(error);
+                }
+            },
             None => {}
         }
         Ok(())
+    }
+
+    /// Sets the volume path type.
+    pub fn set_volume_path_type(&mut self, volume_path_type: &DisplayPathType) {
+        self.display_path.set_volume_path_type(volume_path_type);
     }
 }
 
@@ -512,9 +1123,24 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    let image_tool: ImageTool = ImageTool::new();
+    let mut image_tool: ImageTool = ImageTool::new();
 
     match arguments.command {
+        Some(Commands::Bodyfile(command_arguments)) => {
+            let display_path_type: DisplayPathType = match &command_arguments.volume_path_type {
+                VolumePathType::Identifier => DisplayPathType::Identifier,
+                VolumePathType::Index => DisplayPathType::Index,
+            };
+            image_tool.set_volume_path_type(&display_path_type);
+
+            match image_tool.generate_bodyfile(source, command_arguments.calculate_md5) {
+                Ok(_) => {}
+                Err(error) => {
+                    println!("Unable to generate bodyfile of: {}\n{}", source, error);
+                    return ExitCode::FAILURE;
+                }
+            }
+        }
         Some(Commands::Hash) => {
             let data_stream: DataStreamReference = match open_os_data_stream(&arguments.source) {
                 Ok(data_stream) => data_stream,
@@ -647,13 +1273,100 @@ fn main() -> ExitCode {
         _ => match image_tool.scan_for_hierarchy(source) {
             Ok(_) => {}
             Err(error) => {
-                println!(
-                    "Unable to scan: {} for hierarchy with error:\n{}",
-                    source, error
-                );
+                println!("Unable to determine hierarchy of: {}\n{}", source, error);
                 return ExitCode::FAILURE;
             }
         },
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_file_mode_string() {
+        let string: String = ImageTool::get_file_mode_string(0x1000);
+        assert_eq!(string, "p---------");
+
+        let string: String = ImageTool::get_file_mode_string(0x2000);
+        assert_eq!(string, "c---------");
+
+        let string: String = ImageTool::get_file_mode_string(0x4000);
+        assert_eq!(string, "d---------");
+
+        let string: String = ImageTool::get_file_mode_string(0x6000);
+        assert_eq!(string, "b---------");
+
+        let string: String = ImageTool::get_file_mode_string(0xa000);
+        assert_eq!(string, "l---------");
+
+        let string: String = ImageTool::get_file_mode_string(0xc000);
+        assert_eq!(string, "s---------");
+
+        let string: String = ImageTool::get_file_mode_string(0x81ff);
+        assert_eq!(string, "-rwxrwxrwx");
+    }
+
+    #[test]
+    fn test_get_file_mode_string_from_file_attribute_flags() {
+        let string: String = ImageTool::get_file_mode_string_from_file_attribute_flags(
+            &VfsFileType::File,
+            0x00000020,
+        );
+        assert_eq!(string, "-rwxrwxrwx");
+
+        let string: String = ImageTool::get_file_mode_string_from_file_attribute_flags(
+            &VfsFileType::File,
+            0x00000006,
+        );
+        assert_eq!(string, "-r-xr-xr-x");
+
+        let string: String = ImageTool::get_file_mode_string_from_file_attribute_flags(
+            &VfsFileType::Directory,
+            0x00000020,
+        );
+        assert_eq!(string, "drwxrwxrwx");
+
+        let string: String = ImageTool::get_file_mode_string_from_file_attribute_flags(
+            &VfsFileType::SymbolicLink,
+            0x00000020,
+        );
+        assert_eq!(string, "lrwxrwxrwx");
+    }
+
+    #[test]
+    fn test_get_file_mode_string_from_file_type() {
+        let string: String =
+            ImageTool::get_file_mode_string_from_file_type(&VfsFileType::BlockDevice);
+        assert_eq!(string, "brwxrwxrwx");
+
+        let string: String =
+            ImageTool::get_file_mode_string_from_file_type(&VfsFileType::CharacterDevice);
+        assert_eq!(string, "crwxrwxrwx");
+
+        let string: String =
+            ImageTool::get_file_mode_string_from_file_type(&VfsFileType::Directory);
+        assert_eq!(string, "drwxrwxrwx");
+
+        let string: String = ImageTool::get_file_mode_string_from_file_type(&VfsFileType::File);
+        assert_eq!(string, "-rwxrwxrwx");
+
+        let string: String =
+            ImageTool::get_file_mode_string_from_file_type(&VfsFileType::NamedPipe);
+        assert_eq!(string, "prwxrwxrwx");
+
+        let string: String = ImageTool::get_file_mode_string_from_file_type(&VfsFileType::Socket);
+        assert_eq!(string, "srwxrwxrwx");
+
+        let string: String =
+            ImageTool::get_file_mode_string_from_file_type(&VfsFileType::SymbolicLink);
+        assert_eq!(string, "lrwxrwxrwx");
+
+        let string: String = ImageTool::get_file_mode_string_from_file_type(&VfsFileType::Whiteout);
+        assert_eq!(string, "wrwxrwxrwx");
+    }
+
+    // TODO: add more tests.
 }

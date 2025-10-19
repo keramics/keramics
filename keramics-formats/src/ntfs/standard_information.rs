@@ -60,6 +60,9 @@ pub struct NtfsStandardInformation {
 
     /// Version number.
     pub version_number: u32,
+
+    /// Owner identifier.
+    pub owner_identifier: Option<u32>,
 }
 
 impl NtfsStandardInformation {
@@ -73,12 +76,15 @@ impl NtfsStandardInformation {
             file_attribute_flags: 0,
             maximum_number_of_versions: 0,
             version_number: 0,
+            owner_identifier: None,
         }
     }
 
     /// Reads the standard information from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 48 {
+        let data_size: usize = data.len();
+
+        if data_size < 48 {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported NTFS standard information data size"
             ));
@@ -115,6 +121,9 @@ impl NtfsStandardInformation {
         self.maximum_number_of_versions = bytes_to_u32_le!(data, 36);
         self.version_number = bytes_to_u32_le!(data, 40);
 
+        if data_size >= 52 {
+            self.owner_identifier = Some(bytes_to_u32_le!(data, 48));
+        }
         Ok(())
     }
 
@@ -132,8 +141,14 @@ impl NtfsStandardInformation {
             ));
         }
         let mut standard_information: NtfsStandardInformation = NtfsStandardInformation::new();
-        standard_information.read_data(&mft_attribute.resident_data)?;
 
+        match standard_information.read_data(&mft_attribute.resident_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read standard information");
+                return Err(error);
+            }
+        }
         Ok(standard_information)
     }
 }
@@ -155,7 +170,7 @@ mod tests {
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
-        let mut test_struct = NtfsStandardInformation::new();
+        let mut test_struct: NtfsStandardInformation = NtfsStandardInformation::new();
 
         let test_data: Vec<u8> = get_test_data();
         test_struct.read_data(&test_data)?;
@@ -193,12 +208,35 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let test_data: Vec<u8> = get_test_data();
+        let mut test_struct: NtfsStandardInformation = NtfsStandardInformation::new();
 
-        let mut test_struct = NtfsStandardInformation::new();
+        let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..47]);
         assert!(result.is_err());
     }
 
-    // TODO: add tests for from_attribute
+    #[test]
+    fn test_from_attribute() -> Result<(), ErrorTrace> {
+        let mut mft_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+
+        let test_data: Vec<u8> = vec![
+            0x10, 0x00, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x18, 0x00, 0x00, 0x00, 0xad, 0xca, 0xbc, 0x0c,
+            0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca,
+            0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01, 0xad, 0xca, 0xbc, 0x0c, 0xdc, 0x8e, 0xd0, 0x01,
+            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+        mft_attribute.read_data(&test_data)?;
+
+        let test_struct: NtfsStandardInformation =
+            NtfsStandardInformation::from_attribute(&mft_attribute)?;
+
+        assert_eq!(test_struct.file_attribute_flags, 0x00000006);
+        assert_eq!(test_struct.maximum_number_of_versions, 0);
+        assert_eq!(test_struct.version_number, 0);
+
+        Ok(())
+    }
 }

@@ -23,10 +23,13 @@ pub struct NtfsPath {
 impl NtfsPath {
     const COMPONENT_SEPARATOR: &'static str = "\\";
 
-    /// Creates a new path.
-    pub fn new() -> Self {
+    /// Creates a new path of the current path and additional path components.
+    pub fn new_with_join(&self, path_components: &[Ucs2String]) -> Self {
+        let mut components: Vec<Ucs2String> = self.components.clone();
+        components.extend_from_slice(path_components);
+
         Self {
-            components: vec![Ucs2String::new()],
+            components: components,
         }
     }
 
@@ -43,16 +46,6 @@ impl NtfsPath {
         }
     }
 
-    /// Creates a new path of the current path and additional path components.
-    pub fn new_with_join(&self, path_components: &[Ucs2String]) -> Self {
-        let mut components: Vec<Ucs2String> = self.components.clone();
-        components.extend_from_slice(path_components);
-
-        Self {
-            components: components,
-        }
-    }
-
     /// Retrieves the extension if available.
     pub fn extension(&self) -> Option<Ucs2String> {
         match self.file_name() {
@@ -64,8 +57,9 @@ impl NtfsPath {
                 .position(|value| *value == 0x002e)
             {
                 Some(value_index) => {
-                    // Note that value_index is relative to ucs2_string.element[1..]
-                    Some(Ucs2String::from(&ucs2_string.elements[value_index + 2..]))
+                    // Note that value_index is relative to the end of the string.
+                    let string_index: usize = ucs2_string.elements.len() - value_index;
+                    Some(Ucs2String::from(&ucs2_string.elements[string_index..]))
                 }
                 None => None,
             },
@@ -84,8 +78,9 @@ impl NtfsPath {
                 .position(|value| *value == 0x002e)
             {
                 Some(value_index) => {
-                    // Note that value_index is relative to ucs2_string.element[1..]
-                    Some(Ucs2String::from(&ucs2_string.elements[0..value_index + 1]))
+                    // Note that value_index is relative to the end of the string.
+                    let string_size: usize = ucs2_string.elements.len() - value_index - 1;
+                    Some(Ucs2String::from(&ucs2_string.elements[0..string_size]))
                 }
                 None => Some(ucs2_string.clone()),
             },
@@ -117,30 +112,33 @@ impl NtfsPath {
     pub fn to_string(&self) -> String {
         let number_of_components: usize = self.components.len();
         if number_of_components == 1 && self.components[0].is_empty() {
-            NtfsPath::COMPONENT_SEPARATOR.to_string()
+            Self::COMPONENT_SEPARATOR.to_string()
         } else {
             self.components
                 .iter()
                 .map(|component| component.to_string())
                 .collect::<Vec<String>>()
-                .join(NtfsPath::COMPONENT_SEPARATOR)
+                .join(Self::COMPONENT_SEPARATOR)
         }
     }
 }
 
 impl From<&str> for NtfsPath {
     /// Converts a [`&str`] into a [`NtfsPath`]
-    fn from(string: &str) -> NtfsPath {
-        let components: Vec<Ucs2String> = if string == NtfsPath::COMPONENT_SEPARATOR {
+    fn from(string: &str) -> Self {
+        let components: Vec<Ucs2String> = if string.is_empty() {
+            // Splitting "" results in [""]
+            vec![]
+        } else if string == Self::COMPONENT_SEPARATOR {
             // Splitting "\\" results in ["", ""]
             vec![Ucs2String::new()]
         } else {
             string
-                .split(NtfsPath::COMPONENT_SEPARATOR)
+                .split(Self::COMPONENT_SEPARATOR)
                 .map(|component| Ucs2String::from(component))
                 .collect::<Vec<Ucs2String>>()
         };
-        NtfsPath {
+        Self {
             components: components,
         }
     }
@@ -149,51 +147,73 @@ impl From<&str> for NtfsPath {
 impl From<&String> for NtfsPath {
     /// Converts a [`&String`] into a [`NtfsPath`]
     #[inline]
-    fn from(string: &String) -> NtfsPath {
-        NtfsPath::from(string.as_str())
+    fn from(string: &String) -> Self {
+        Self::from(string.as_str())
     }
 }
 
-impl From<&Vec<Ucs2String>> for NtfsPath {
-    /// Converts a [`&Vec<Ucs2String>`] into a [`NtfsPath`]
+impl From<&[&str]> for NtfsPath {
+    /// Converts a [`&[&str]`] into a [`NtfsPath`]
     #[inline]
-    fn from(path_components: &Vec<Ucs2String>) -> NtfsPath {
-        NtfsPath {
-            components: path_components.clone(),
+    fn from(path_components: &[&str]) -> Self {
+        let components: Vec<Ucs2String> = path_components
+            .iter()
+            .map(|component| Ucs2String::from(*component))
+            .collect::<Vec<Ucs2String>>();
+
+        Self {
+            components: components,
+        }
+    }
+}
+
+impl From<&[String]> for NtfsPath {
+    /// Converts a [`&[String]`] into a [`NtfsPath`]
+    #[inline]
+    fn from(path_components: &[String]) -> Self {
+        let components: Vec<Ucs2String> = path_components
+            .iter()
+            .map(|component| Ucs2String::from(component.as_str()))
+            .collect::<Vec<Ucs2String>>();
+
+        Self {
+            components: components,
+        }
+    }
+}
+
+impl From<&[Ucs2String]> for NtfsPath {
+    /// Converts a [`&[Ucs2String]`] into a [`NtfsPath`]
+    #[inline]
+    fn from(path_components: &[Ucs2String]) -> Self {
+        Self {
+            components: path_components.to_vec(),
         }
     }
 }
 
 impl From<&Vec<&str>> for NtfsPath {
     /// Converts a [`&Vec<&str>`] into a [`NtfsPath`]
-    #[inline]
-    fn from(path_components: &Vec<&str>) -> NtfsPath {
-        let mut components: Vec<Ucs2String> = vec![Ucs2String::new()];
-        components.append(
-            &mut path_components
-                .iter()
-                .map(|component| Ucs2String::from(*component))
-                .collect::<Vec<Ucs2String>>(),
-        );
-        NtfsPath {
-            components: components,
-        }
+    #[inline(always)]
+    fn from(path_components: &Vec<&str>) -> Self {
+        Self::from(path_components.as_slice())
     }
 }
 
 impl From<&Vec<String>> for NtfsPath {
     /// Converts a [`&Vec<String>`] into a [`NtfsPath`]
+    #[inline(always)]
+    fn from(path_components: &Vec<String>) -> Self {
+        Self::from(path_components.as_slice())
+    }
+}
+
+impl From<&Vec<Ucs2String>> for NtfsPath {
+    /// Converts a [`&Vec<Ucs2String>`] into a [`NtfsPath`]
     #[inline]
-    fn from(path_components: &Vec<String>) -> NtfsPath {
-        let mut components: Vec<Ucs2String> = vec![Ucs2String::new()];
-        components.append(
-            &mut path_components
-                .iter()
-                .map(|component| Ucs2String::from(component.as_str()))
-                .collect::<Vec<Ucs2String>>(),
-        );
-        NtfsPath {
-            components: components,
+    fn from(path_components: &Vec<Ucs2String>) -> Self {
+        Self {
+            components: path_components.clone(),
         }
     }
 }
@@ -203,19 +223,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_new_with_parent_directory() {
-        let ntfs_path: NtfsPath = NtfsPath::from("\\directory\\filename.txt");
-
-        let test_struct: NtfsPath = ntfs_path.new_with_parent_directory();
-        assert_eq!(test_struct.to_string(), "\\directory");
-    }
-
-    #[test]
     fn test_new_with_join() {
         let ntfs_path: NtfsPath = NtfsPath::from("\\directory");
 
         let test_struct: NtfsPath = ntfs_path.new_with_join(&[Ucs2String::from("filename.txt")]);
         assert_eq!(test_struct.to_string(), "\\directory\\filename.txt");
+    }
+
+    #[test]
+    fn test_new_with_parent_directory() {
+        let ntfs_path: NtfsPath = NtfsPath::from("\\directory\\filename.txt");
+
+        let test_struct: NtfsPath = ntfs_path.new_with_parent_directory();
+        assert_eq!(test_struct.to_string(), "\\directory");
     }
 
     #[test]
@@ -275,8 +295,38 @@ mod tests {
         assert_eq!(result, Some(&Ucs2String::from("")));
     }
 
-    // TODO: add tests for is_empty
-    // TODO: add tests for push
+    #[test]
+    fn test_is_empty() {
+        let test_struct: NtfsPath = NtfsPath::from("\\directory\\filename.txt");
+        assert_eq!(test_struct.is_empty(), false);
+
+        let test_struct: NtfsPath = NtfsPath::from("");
+        assert_eq!(test_struct.is_empty(), true);
+    }
+
+    #[test]
+    fn test_push() {
+        let mut test_struct: NtfsPath = NtfsPath::from("\\directory");
+        assert_eq!(test_struct.to_string(), "\\directory");
+        assert_eq!(
+            test_struct,
+            NtfsPath {
+                components: vec![Ucs2String::from(""), Ucs2String::from("directory")]
+            }
+        );
+
+        test_struct.push(Ucs2String::from("filename.txt"));
+        assert_eq!(
+            test_struct,
+            NtfsPath {
+                components: vec![
+                    Ucs2String::from(""),
+                    Ucs2String::from("directory"),
+                    Ucs2String::from("filename.txt")
+                ]
+            }
+        );
+    }
 
     #[test]
     fn test_to_string() {
@@ -306,6 +356,9 @@ mod tests {
 
         let test_struct: NtfsPath = NtfsPath::from("\\directory\\");
         assert_eq!(test_struct.components.len(), 3);
+
+        let test_struct: NtfsPath = NtfsPath::from("");
+        assert_eq!(test_struct.components.len(), 0);
     }
 
     #[test]
@@ -313,56 +366,150 @@ mod tests {
         let string: String = String::from("\\");
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 1);
+        assert_eq!(
+            test_struct,
+            NtfsPath {
+                components: vec![Ucs2String::from(""),]
+            }
+        );
 
         let string: String = String::from("\\directory");
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 2);
+        assert_eq!(
+            test_struct,
+            NtfsPath {
+                components: vec![Ucs2String::from(""), Ucs2String::from("directory"),]
+            }
+        );
 
         let string: String = String::from("\\directory\\filename.txt");
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 3);
+        assert_eq!(
+            test_struct,
+            NtfsPath {
+                components: vec![
+                    Ucs2String::from(""),
+                    Ucs2String::from("directory"),
+                    Ucs2String::from("filename.txt")
+                ]
+            }
+        );
 
         let string: String = String::from("\\directory\\");
         let test_struct: NtfsPath = NtfsPath::from(&string);
         assert_eq!(test_struct.components.len(), 3);
+        assert_eq!(
+            test_struct,
+            NtfsPath {
+                components: vec![
+                    Ucs2String::from(""),
+                    Ucs2String::from("directory"),
+                    Ucs2String::from(""),
+                ]
+            }
+        );
+
+        let string: String = String::from("");
+        let test_struct: NtfsPath = NtfsPath::from(&string);
+        assert_eq!(test_struct.components.len(), 0);
+        assert_eq!(test_struct, NtfsPath { components: vec![] });
     }
 
     #[test]
+    fn test_from_str_slice() {
+        let str_array: [&str; 1] = [""];
+        let test_struct: NtfsPath = NtfsPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 1);
+
+        let str_array: [&str; 2] = ["", "directory"];
+        let test_struct: NtfsPath = NtfsPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 2);
+
+        let str_array: [&str; 3] = ["", "directory", "filename.txt"];
+        let test_struct: NtfsPath = NtfsPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+
+        let str_array: [&str; 3] = ["", "directory", ""];
+        let test_struct: NtfsPath = NtfsPath::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+    }
+
+    #[test]
+    fn test_from_string_slice() {
+        let string_array: [String; 1] = [String::from("")];
+        let test_struct: NtfsPath = NtfsPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 1);
+
+        let string_array: [String; 2] = [String::from(""), String::from("directory")];
+        let test_struct: NtfsPath = NtfsPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 2);
+
+        let string_array: [String; 3] = [
+            String::from(""),
+            String::from("directory"),
+            String::from("filename.txt"),
+        ];
+        let test_struct: NtfsPath = NtfsPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+
+        let string_array: [String; 3] = [
+            String::from(""),
+            String::from("directory"),
+            String::from(""),
+        ];
+        let test_struct: NtfsPath = NtfsPath::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+    }
+
+    // TODO: add tests for from_ucs2_string_slice
+
+    #[test]
     fn test_from_str_vector() {
-        let str_vector: Vec<&str> = vec![];
+        let str_vector: Vec<&str> = vec![""];
         let test_struct: NtfsPath = NtfsPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 1);
 
-        let str_vector: Vec<&str> = vec!["directory"];
+        let str_vector: Vec<&str> = vec!["", "directory"];
         let test_struct: NtfsPath = NtfsPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 2);
 
-        let str_vector: Vec<&str> = vec!["directory", "filename.txt"];
+        let str_vector: Vec<&str> = vec!["", "directory", "filename.txt"];
         let test_struct: NtfsPath = NtfsPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 3);
 
-        let str_vector: Vec<&str> = vec!["directory", ""];
+        let str_vector: Vec<&str> = vec!["", "directory", ""];
         let test_struct: NtfsPath = NtfsPath::from(&str_vector);
         assert_eq!(test_struct.components.len(), 3);
     }
 
     #[test]
     fn test_from_string_vector() {
-        let string_vector: Vec<String> = vec![];
+        let string_vector: Vec<String> = vec![String::from("")];
         let test_struct: NtfsPath = NtfsPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 1);
 
-        let string_vector: Vec<String> = vec![String::from("directory")];
+        let string_vector: Vec<String> = vec![String::from(""), String::from("directory")];
         let test_struct: NtfsPath = NtfsPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 2);
 
-        let string_vector: Vec<String> =
-            vec![String::from("directory"), String::from("filename.txt")];
+        let string_vector: Vec<String> = vec![
+            String::from(""),
+            String::from("directory"),
+            String::from("filename.txt"),
+        ];
         let test_struct: NtfsPath = NtfsPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 3);
 
-        let string_vector: Vec<String> = vec![String::from("directory"), String::from("")];
+        let string_vector: Vec<String> = vec![
+            String::from(""),
+            String::from("directory"),
+            String::from(""),
+        ];
         let test_struct: NtfsPath = NtfsPath::from(&string_vector);
         assert_eq!(test_struct.components.len(), 3);
     }
+
+    // TODO: add tests for from_ucs2_string_vector
 }

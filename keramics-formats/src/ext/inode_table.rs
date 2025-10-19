@@ -108,7 +108,7 @@ impl ExtInodeTable {
         data_stream: &DataStreamReference,
         inode_number: u32,
     ) -> Result<ExtInode, ErrorTrace> {
-        let inode_table_offset: u64 = (inode_number as u64) * (self.inode_size as u64);
+        let inode_table_offset: u64 = ((inode_number - 1) as u64) * (self.inode_size as u64);
 
         let group_descriptor: &ExtGroupDescriptor =
             match self.block_tree.get_value(inode_table_offset) {
@@ -146,8 +146,13 @@ impl ExtInodeTable {
             self.mediator
                 .debug_print(inode.debug_read_data(self.format_version, &data));
         }
-        inode.read_data(self.format_version, &data)?;
-
+        match inode.read_data(self.format_version, &data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read inode");
+                return Err(error);
+            }
+        }
         match self.metadata_checksum_seed {
             Some(checksum_seed) => {
                 let mut crc32_context: ReversedCrc32Context =
@@ -168,6 +173,9 @@ impl ExtInodeTable {
                 let mut calculated_checksum: u32 = crc32_context.finalize();
                 calculated_checksum = 0xffffffff - calculated_checksum;
 
+                if inode_size <= 128 {
+                    calculated_checksum &= 0x0000ffff;
+                }
                 if inode.checksum != 0 && (inode.checksum as u32) != calculated_checksum {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Mismatch between stored: 0x{:04x} and calculated: 0x{:04x} checksums",
@@ -177,10 +185,20 @@ impl ExtInodeTable {
             }
             None => {}
         };
-        inode.read_data_reference(self.format_version, data_stream, self.block_size)?;
-
+        match inode.read_data_reference(self.format_version, data_stream, self.block_size) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read inode data reference");
+                return Err(error);
+            }
+        }
         Ok(inode)
     }
 }
 
-// TODO: add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests.
+}

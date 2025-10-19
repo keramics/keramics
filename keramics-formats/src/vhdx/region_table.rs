@@ -48,8 +48,13 @@ impl VhdxRegionTable {
             self.mediator
                 .debug_print(VhdxRegionTableHeader::debug_read_data(data));
         }
-        region_table_header.read_data(data)?;
-
+        match region_table_header.read_data(data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read region table header");
+                return Err(error);
+            }
+        }
         let mut data_offset: usize = 16;
 
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
@@ -78,7 +83,16 @@ impl VhdxRegionTable {
                         &data[data_offset..data_end_offset],
                     ));
             }
-            region_table_entry.read_data(&data[data_offset..data_end_offset])?;
+            match region_table_entry.read_data(&data[data_offset..data_end_offset]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read region table entry"
+                    );
+                    return Err(error);
+                }
+            }
             data_offset = data_end_offset;
 
             self.entries.insert(

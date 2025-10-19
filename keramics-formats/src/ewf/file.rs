@@ -63,8 +63,13 @@ impl EwfFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        self.read_sections(data_stream)?;
-
+        match self.read_sections(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read sections");
+                return Err(error);
+            }
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -76,14 +81,31 @@ impl EwfFile {
 
         let mut file_header: EwfFileHeader = EwfFileHeader::new();
 
-        file_header.read_at_position(data_stream, SeekFrom::Start(0))?;
-
+        match file_header.read_at_position(data_stream, SeekFrom::Start(0)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read file header");
+                return Err(error);
+            }
+        }
         let mut file_offset: u64 = 13;
 
         while file_offset < file_size {
             let mut section_header: EwfSectionHeader = EwfSectionHeader::new();
 
-            section_header.read_at_position(data_stream, SeekFrom::Start(file_offset))?;
+            match section_header.read_at_position(data_stream, SeekFrom::Start(file_offset)) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read section header at offset: {} (0x{:08x})",
+                            file_offset, file_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            }
 
             let mut is_last_section: bool = false;
             let mut section_size: u64 = section_header.size;

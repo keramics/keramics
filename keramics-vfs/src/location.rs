@@ -31,6 +31,14 @@ pub enum VfsLocation {
 }
 
 impl VfsLocation {
+    /// Creates a new location base.
+    pub fn new_base(vfs_type: &VfsType, path: VfsPath) -> Self {
+        VfsLocation::Base {
+            path: path,
+            vfs_type: vfs_type.clone(),
+        }
+    }
+
     /// Creates a new location with an additional layer.
     pub fn new_with_layer(&self, vfs_type: &VfsType, path: VfsPath) -> Self {
         VfsLocation::Layer {
@@ -57,19 +65,19 @@ impl VfsLocation {
         }
     }
 
-    /// Retrieves the path.
-    pub fn get_path(&self) -> &VfsPath {
-        match self {
-            VfsLocation::Base { path, .. } => &path,
-            VfsLocation::Layer { path, .. } => &path,
-        }
-    }
-
     /// Retrieves the parent location.
     pub fn get_parent(&self) -> Option<&Self> {
         match self {
             VfsLocation::Base { .. } => None,
             VfsLocation::Layer { parent, .. } => Some(parent.as_ref()),
+        }
+    }
+
+    /// Retrieves the path.
+    pub fn get_path(&self) -> &VfsPath {
+        match self {
+            VfsLocation::Base { path, .. } => &path,
+            VfsLocation::Layer { path, .. } => &path,
         }
     }
 
@@ -106,7 +114,7 @@ impl VfsLocation {
 /// Creates a new OS VFS location.
 pub fn new_os_vfs_location(path: &str) -> VfsLocation {
     VfsLocation::Base {
-        path: VfsPath::new(&VfsType::Os, path),
+        path: VfsPath::from_path(&VfsType::Os, path),
         vfs_type: VfsType::Os,
     }
 }
@@ -115,10 +123,12 @@ pub fn new_os_vfs_location(path: &str) -> VfsLocation {
 mod tests {
     use super::*;
 
+    // TODO: add tests for new_base
+
     #[test]
     fn test_new_with_layer() {
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
         let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
 
         let vfs_type: &VfsType = test_location.get_type();
@@ -131,7 +141,7 @@ mod tests {
     #[test]
     fn test_new_with_parent() {
         let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Os, "../test_data/bogus.txt");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "../test_data/bogus.txt");
         let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
 
         let vfs_path: &VfsPath = test_location.get_path();
@@ -141,10 +151,10 @@ mod tests {
         assert!(vfs_type == &VfsType::Os);
 
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
         let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
 
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/qcow1");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
         let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
 
         let vfs_path: &VfsPath = test_location.get_path();
@@ -154,8 +164,6 @@ mod tests {
         assert!(vfs_type == &VfsType::Qcow);
     }
 
-    // TODO: add tests for get_path
-
     #[test]
     fn test_get_parent() {
         let test_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
@@ -164,13 +172,15 @@ mod tests {
         assert!(parent.is_none());
 
         let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
-        let vfs_path: VfsPath = VfsPath::new(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
         let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
 
         let parent: Option<&VfsLocation> = test_location.get_parent();
         assert!(parent.is_some());
     }
 
+    // TODO: add tests for get_path
     // TODO: add tests for get_type
     // TODO: add tests for to_string
+    // TODO: add tests for new_os_vfs_location
 }
