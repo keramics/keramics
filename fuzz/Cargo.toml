@@ -36,6 +36,12 @@ test = false
 doc = false
 
 [[bin]]
+name = "ewf"
+path = "fuzz_targets/ewf.rs"
+test = false
+doc = false
+
+[[bin]]
 name = "gpt"
 path = "fuzz_targets/gpt.rs"
 test = false
