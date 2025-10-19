@@ -1,4 +1,4 @@
-# Build from source and collect code coverage data.
+# Generate code coverage report and upload to Codecov.
 name: coverage
 on: [push, pull_request]
 permissions: read-all
