@@ -39,10 +39,7 @@ pub enum DataType {
     SignedInteger16Bit,
     SignedInteger32Bit,
     SignedInteger64Bit,
-    Struct {
-        name: String,
-        size: usize,
-    },
+    Struct { name: String, size: usize },
     Ucs2String,
     Utf16String,
     UnsignedInteger8Bit,
