@@ -17,8 +17,8 @@ use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
 
 use keramics_vfs::{
-    VfsFileEntry, VfsFileSystemReference, VfsLocation, VfsPath, VfsResolver, VfsResolverReference,
-    VfsString, VfsType, VfsFileType
+    VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsLocation, VfsPath, VfsResolver,
+    VfsResolverReference, VfsString, VfsType,
 };
 
 use super::datetime::PyDateTime;
