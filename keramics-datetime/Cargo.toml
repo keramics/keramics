@@ -12,4 +12,4 @@ name = "keramics_datetime"
 path = "src/lib.rs"
 
 [dependencies]
-keramics-types = { version = "0", path = "../keramics-types" }
+keramics-types = { version = "0.0.0", path = "../keramics-types" }
