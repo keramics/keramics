@@ -16,4 +16,4 @@ import pykeramics
 
 
 def test_version() -> None:
-    assert pykeramics.__version__ == "0.0.0"
+    assert pykeramics.__version__ == "0.0.1"

@@ -12,7 +12,7 @@ name = "keramics_compression"
 path = "src/lib.rs"
 
 [dependencies]
-keramics-checksums = { version = "0.0.0", path = "../keramics-checksums" }
-keramics-core = { version = "0.0.0", path = "../keramics-core" }
-keramics-layout-map = { version = "0.0.0", path = "../keramics-layout-map" }
-keramics-types = { version = "0.0.0", path = "../keramics-types" }
+keramics-checksums = { version = "0.0.1", path = "../keramics-checksums" }
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
+keramics-layout-map = { version = "0.0.1", path = "../keramics-layout-map" }
+keramics-types = { version = "0.0.1", path = "../keramics-types" }
