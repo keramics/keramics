@@ -105,10 +105,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_volume_system() -> Result<MbrVolumeSystem, ErrorTrace> {
         let mut volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/mbr/mbr.raw");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("mbr/mbr.raw").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 

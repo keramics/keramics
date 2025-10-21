@@ -418,10 +418,12 @@ mod tests {
     use crate::ext::file_system::ExtFileSystem;
     use crate::ext::path::ExtPath;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 

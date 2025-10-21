@@ -212,12 +212,15 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<QcowFileSystem, ErrorTrace> {
         let mut qcow_file_system: QcowFileSystem = QcowFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
         qcow_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(qcow_file_system)
@@ -314,7 +317,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
         qcow_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(qcow_file_system.number_of_layers, 1);

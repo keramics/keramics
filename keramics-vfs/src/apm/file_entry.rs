@@ -105,10 +105,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_volume_system() -> Result<ApmVolumeSystem, ErrorTrace> {
         let mut volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("apm/apm.dmg").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         volume_system.read_data_stream(&data_stream)?;
 

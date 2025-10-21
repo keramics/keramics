@@ -214,12 +214,15 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<ApmFileSystem, ErrorTrace> {
         let mut apm_file_system: ApmFileSystem = ApmFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation = new_os_vfs_location("../test_data/apm/apm.dmg");
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
         apm_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(apm_file_system)
@@ -316,7 +319,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation = new_os_vfs_location("../test_data/apm/apm.dmg");
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
         apm_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(apm_file_system.number_of_partitions, 2);

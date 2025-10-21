@@ -176,10 +176,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file() -> Result<EwfFile, ErrorTrace> {
         let mut file: EwfFile = EwfFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ewf/ext2.E01");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf/ext2.E01").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -190,7 +192,7 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file = EwfFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ewf/ext2.E01");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf/ext2.E01").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 

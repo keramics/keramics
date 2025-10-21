@@ -288,6 +288,8 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     #[test]
     fn test_build() -> Result<(), BuildError> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
@@ -328,7 +330,7 @@ mod tests {
                 ));
             }
         };
-        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let scan_results: HashSet<FormatIdentifier> =
             format_scanner.scan_data_stream(&data_stream)?;

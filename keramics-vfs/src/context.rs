@@ -146,16 +146,20 @@ mod tests {
 
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     #[test]
     fn test_get_data_stream_by_path_and_name() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("file.txt").as_str());
         let result: Option<DataStreamReference> =
             vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/bogus.txt");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("bogus.txt").as_str());
         let result: Option<DataStreamReference> =
             vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)?;
         assert!(result.is_none());
@@ -167,11 +171,13 @@ mod tests {
     fn test_get_file_entry_by_location() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/file.txt");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("file.txt").as_str());
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_some());
 
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/bogus.txt");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("bogus.txt").as_str());
         let result: Option<VfsFileEntry> = vfs_context.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());
 

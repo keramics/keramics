@@ -55,3 +55,10 @@ pub use resolver::VfsResolver;
 pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
 pub use string::VfsString;
 pub use types::*;
+
+#[cfg(test)]
+mod tests {
+    pub fn get_test_data_path(path: &str) -> String {
+        format!("../test_data/{}", path)
+    }
+}

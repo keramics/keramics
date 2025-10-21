@@ -191,13 +191,15 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<SparseImageFileSystem, ErrorTrace> {
         let mut sparseimage_file_system: SparseImageFileSystem = SparseImageFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let parent_vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/sparseimage/hfsplus.sparseimage");
+            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
         sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(sparseimage_file_system)
@@ -280,7 +282,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let parent_vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/sparseimage/hfsplus.sparseimage");
+            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
         sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(sparseimage_file_system.number_of_layers, 1);

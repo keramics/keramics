@@ -321,10 +321,13 @@ mod tests {
 
     use crate::os_file_resolver::open_os_file_resolver;
 
+    use crate::tests::get_test_data_path;
+
     fn get_image() -> Result<SparseBundleImage, ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("sparsebundle/hfsplus.sparsebundle").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.open(&file_resolver)?;
 
@@ -335,7 +338,8 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("sparsebundle/hfsplus.sparsebundle").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.open(&file_resolver)?;
 
@@ -349,7 +353,8 @@ mod tests {
     fn test_read_info_plist() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("sparsebundle/hfsplus.sparsebundle").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.read_info_plist(&file_resolver, "Info.plist")?;
 

@@ -702,10 +702,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file() -> Result<QcowFile, ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -718,7 +720,7 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -731,7 +733,7 @@ mod tests {
     fn test_read_file_header() -> Result<(), ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_file_header(&data_stream)?;
 

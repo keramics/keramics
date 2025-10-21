@@ -96,10 +96,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file() -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 

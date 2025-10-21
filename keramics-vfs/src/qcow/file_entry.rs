@@ -106,10 +106,12 @@ mod tests {
 
     use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
+    use crate::tests::get_test_data_path;
+
     fn get_image() -> Result<QcowImage, ErrorTrace> {
         let mut image: QcowImage = QcowImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/qcow");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ext2.qcow2");
         image.open(&file_resolver, &file_name)?;

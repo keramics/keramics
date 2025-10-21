@@ -96,10 +96,13 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file() -> Result<SparseImageFile, ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 

@@ -160,10 +160,12 @@ mod tests {
 
     use crate::os_file_resolver::open_os_file_resolver;
 
+    use crate::tests::get_test_data_path;
+
     fn get_image() -> Result<VhdxImage, ErrorTrace> {
         let mut image: VhdxImage = VhdxImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("vhdx").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ntfs-differential.vhdx");
         image.open(&file_resolver, &file_name)?;
@@ -199,7 +201,7 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut image: VhdxImage = VhdxImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("vhdx").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ntfs-differential.vhdx");
         image.open(&file_resolver, &file_name)?;

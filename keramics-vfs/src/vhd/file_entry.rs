@@ -106,10 +106,12 @@ mod tests {
 
     use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
+    use crate::tests::get_test_data_path;
+
     fn get_image() -> Result<VhdImage, ErrorTrace> {
         let mut image: VhdImage = VhdImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhd");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("vhd").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ntfs-differential.vhd");
         image.open(&file_resolver, &file_name)?;

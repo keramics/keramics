@@ -47,3 +47,10 @@ pub use file_resolver::{FileResolver, FileResolverReference};
 pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
 pub use path_component::PathComponent;
 pub use scanner::FormatScanner;
+
+#[cfg(test)]
+mod tests {
+    pub fn get_test_data_path(path: &str) -> String {
+        format!("../test_data/{}", path)
+    }
+}
