@@ -890,10 +890,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file() -> Result<VhdxFile, ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ext2.vhdx");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("vhdx/ext2.vhdx").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -904,7 +906,8 @@ mod tests {
     fn test_get_parent_file_name() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -918,7 +921,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -943,7 +947,8 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ntfs-differential.vhdx");
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_metadata(&data_stream)?;
 

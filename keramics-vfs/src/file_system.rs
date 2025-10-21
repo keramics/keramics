@@ -180,19 +180,15 @@ impl VfsFileSystem {
                 )),
             },
             VfsFileSystem::Os => match vfs_path {
-                VfsPath::Os(string_path) => {
-                    let os_path: &Path = Path::new(&string_path);
-
-                    match os_path.try_exists() {
-                        Ok(result) => Ok(result),
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to determine if OS file entry exists",
-                                error
-                            ));
-                        }
+                VfsPath::Os(path_buf) => match path_buf.try_exists() {
+                    Ok(result) => Ok(result),
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to determine if OS file entry exists",
+                            error
+                        ));
                     }
-                }
+                },
                 _ => Err(keramics_core::error_trace_new!(
                     "Unsupported OS VFS path type"
                 )),
@@ -410,10 +406,8 @@ impl VfsFileSystem {
                 )),
             },
             VfsFileSystem::Os => match vfs_path {
-                VfsPath::Os(string_path) => {
-                    let os_path: &Path = Path::new(&string_path);
-
-                    let result: bool = match os_path.try_exists() {
+                VfsPath::Os(path_buf) => {
+                    let result: bool = match path_buf.try_exists() {
                         Ok(result) => result,
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
@@ -427,7 +421,7 @@ impl VfsFileSystem {
                         true => {
                             let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
-                            match os_file_entry.open(string_path.as_os_str()) {
+                            match os_file_entry.open(path_buf) {
                                 Ok(_) => {}
                                 Err(error) => {
                                     return Err(keramics_core::error_trace_new_with_error!(
@@ -905,12 +899,15 @@ mod tests {
     use crate::fake::FakeFileEntry;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_apm_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apm);
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/apm/apm.dmg");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -921,7 +918,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/ext/ext2.raw");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ext/ext2.raw").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -932,7 +930,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/ewf/ext2.E01");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -957,7 +956,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -968,7 +968,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/mbr/mbr.raw");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("mbr/mbr.raw").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -981,7 +982,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -993,7 +995,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/sparseimage/hfsplus.sparseimage");
+            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1004,7 +1006,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/udif/hfsplus_zlib.dmg");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1016,7 +1019,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/vhd/ntfs-differential.vhd");
+            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1028,7 +1031,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/vhdx/ntfs-differential.vhdx");
+            new_os_vfs_location(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1118,10 +1121,12 @@ mod tests {
     fn test_file_entry_exists_with_os() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "../test_data/file.txt");
+        let vfs_path: VfsPath =
+            VfsPath::from_path(&VfsType::Os, get_test_data_path("file.txt").as_str());
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "../test_data/bogus.txt");
+        let vfs_path: VfsPath =
+            VfsPath::from_path(&VfsType::Os, get_test_data_path("bogus.txt").as_str());
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())

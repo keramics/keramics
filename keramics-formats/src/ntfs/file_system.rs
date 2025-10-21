@@ -495,10 +495,12 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -555,7 +557,7 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -572,7 +574,7 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_metadata(&data_stream)?;
 

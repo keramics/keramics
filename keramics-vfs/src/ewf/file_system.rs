@@ -191,12 +191,15 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<EwfFileSystem, ErrorTrace> {
         let mut ewf_file_system: EwfFileSystem = EwfFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation = new_os_vfs_location("../test_data/ewf/ext2.E01");
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
         ewf_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(ewf_file_system)
@@ -274,7 +277,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation = new_os_vfs_location("../test_data/ewf/ext2.E01");
+        let parent_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
         ewf_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(ewf_file_system.number_of_layers, 1);

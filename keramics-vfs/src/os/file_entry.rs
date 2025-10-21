@@ -11,9 +11,9 @@
  * under the License.
  */
 
-use std::ffi::{OsStr, OsString};
+use std::ffi::OsStr;
 use std::fs::{File, Metadata, metadata};
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 #[cfg(unix)]
@@ -36,7 +36,7 @@ use crate::enums::VfsFileType;
 /// Operating system file entry.
 pub struct OsFileEntry {
     /// Path.
-    path: OsString,
+    path: PathBuf,
 
     /// File type.
     file_type: VfsFileType,
@@ -58,7 +58,7 @@ impl OsFileEntry {
     /// Creates a new file entry.
     pub fn new() -> Self {
         Self {
-            path: OsString::new(),
+            path: PathBuf::new(),
             file_type: VfsFileType::File,
             access_time: None,
             change_time: None,
@@ -106,9 +106,7 @@ impl OsFileEntry {
 
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<&OsStr> {
-        let os_path: &Path = Path::new(self.path.as_os_str());
-
-        os_path.file_name()
+        self.path.file_name()
     }
 
     /// Retrieves the modification time.
@@ -130,10 +128,8 @@ impl OsFileEntry {
 
     /// Opens the file entry.
     #[cfg(unix)]
-    pub(crate) fn open(&mut self, path: &OsStr) -> Result<(), ErrorTrace> {
-        let os_path: &Path = Path::new(path);
-
-        let file_metadata: Metadata = match metadata(os_path) {
+    pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
+        let file_metadata: Metadata = match metadata(path) {
             Ok(file_metadata) => file_metadata,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -183,17 +179,15 @@ impl OsFileEntry {
             },
             Err(_) => None,
         };
-        self.path = path.to_os_string();
+        self.path = path.clone();
 
         Ok(())
     }
 
     /// Opens the file entry.
     #[cfg(windows)]
-    pub(crate) fn open(&mut self, path: &OsStr) -> Result<(), ErrorTrace> {
-        let os_path: &Path = Path::new(path);
-
-        let file_metadata: Metadata = match metadata(os_path) {
+    pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
+        let file_metadata: Metadata = match metadata(path) {
             Ok(file_metadata) => file_metadata,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -223,7 +217,7 @@ impl OsFileEntry {
             file_metadata.creation_time(),
         )));
 
-        self.path = path.to_os_string();
+        self.path = path.clone();
 
         Ok(())
     }
@@ -233,10 +227,14 @@ impl OsFileEntry {
 mod tests {
     use super::*;
 
+    use crate::tests::get_test_data_path;
+
     #[test]
     fn test_get_access_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         let result: Option<&DateTime> = os_file_entry.get_access_time();
         // Note that the actual date and time can vary.
@@ -249,7 +247,9 @@ mod tests {
     #[cfg(unix)]
     fn test_get_change_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         let result: Option<&DateTime> = os_file_entry.get_change_time();
         // Note that the actual date and time can vary.
@@ -262,7 +262,9 @@ mod tests {
     #[cfg(unix)]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         let result: Option<&DateTime> = os_file_entry.get_creation_time();
         // Note that the actual date and time can vary.
@@ -274,7 +276,9 @@ mod tests {
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         let result: Option<DataStreamReference> = os_file_entry.get_data_stream()?;
 
@@ -311,7 +315,9 @@ mod tests {
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         let file_type: VfsFileType = os_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -323,7 +329,9 @@ mod tests {
     #[cfg(unix)]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         let result: Option<&DateTime> = os_file_entry.get_modification_time();
         // Note that the actual date and time can vary.
@@ -340,7 +348,8 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut os_file_entry: OsFileEntry = OsFileEntry::new();
 
-        os_file_entry.open(OsStr::new("../test_data/file.txt"))?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
 
         assert!(os_file_entry.file_type == VfsFileType::File);
 

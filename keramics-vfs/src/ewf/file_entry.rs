@@ -98,10 +98,12 @@ mod tests {
 
     use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
+    use crate::tests::get_test_data_path;
+
     fn get_image() -> Result<EwfImage, ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/ewf");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf").as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ext2.E01");
         image.open(&file_resolver, &file_name)?;

@@ -87,9 +87,12 @@ pub fn open_os_data_stream(path: &PathBuf) -> Result<DataStreamReference, ErrorT
 mod tests {
     use super::*;
 
+    use crate::tests::get_test_data_path;
+
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut file: File = open_file!("../test_data/file.txt");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
 
         let size: u64 = file.get_size()?;
         assert_eq!(size, 202);
@@ -99,7 +102,7 @@ mod tests {
 
     #[test]
     fn test_open_os_data_stream() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from("../test_data/file.txt");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
         let _ = open_os_data_stream(&path_buf)?;
 
         Ok(())

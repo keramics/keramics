@@ -128,12 +128,14 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::tests::get_test_data_path;
+
     fn get_partition() -> Result<ApmPartition, ErrorTrace> {
         let name: ByteString = ByteString::from("identifier");
         let type_identifier: ByteString = ByteString::from("type_identifier");
         let mut partition = ApmPartition::new(32768, 4153344, &type_identifier, &name, 0x40000033);
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("apm/apm.dmg").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 
@@ -146,7 +148,7 @@ mod tests {
         let type_identifier: ByteString = ByteString::from("type_identifier");
         let mut partition = ApmPartition::new(32768, 4153344, &type_identifier, &name, 0x40000033);
 
-        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("apm/apm.dmg").as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 

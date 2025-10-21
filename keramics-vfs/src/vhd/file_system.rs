@@ -215,13 +215,15 @@ mod tests {
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_file_system() -> Result<VhdFileSystem, ErrorTrace> {
         let mut vhd_file_system: VhdFileSystem = VhdFileSystem::new();
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let parent_vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/vhd/ntfs-differential.vhd");
+            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
         vhd_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(vhd_file_system)
@@ -319,7 +321,7 @@ mod tests {
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let parent_vfs_location: VfsLocation =
-            new_os_vfs_location("../test_data/vhd/ntfs-differential.vhd");
+            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
         vhd_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(vhd_file_system.number_of_layers, 2);

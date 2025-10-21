@@ -25,3 +25,10 @@ pub use enums::ByteOrder;
 pub use errors::ErrorTrace;
 pub use fake_data_stream::{FakeDataStream, open_fake_data_stream};
 pub use os_data_stream::open_os_data_stream;
+
+#[cfg(test)]
+mod tests {
+    pub fn get_test_data_path(path: &str) -> String {
+        format!("../test_data/{}", path)
+    }
+}

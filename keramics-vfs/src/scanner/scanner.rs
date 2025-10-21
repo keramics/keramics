@@ -790,6 +790,8 @@ mod tests {
     use crate::context::VfsContext;
     use crate::location::new_os_vfs_location;
 
+    use crate::tests::get_test_data_path;
+
     fn get_data_stream(path: &str) -> Result<DataStreamReference, ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
@@ -828,7 +830,8 @@ mod tests {
                 ));
             }
         }
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
         let mut scan_context: VfsScanContext = VfsScanContext::new();
         format_scanner.scan(&mut scan_context, &vfs_location)?;
 
@@ -864,7 +867,8 @@ mod tests {
         }
         let vfs_file_system: VfsFileSystemReference = get_file_system()?;
 
-        let vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
@@ -888,7 +892,8 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/qcow/ext2.qcow2");
+        let os_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
         let vfs_file_system_path: VfsLocation =
             os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
@@ -920,7 +925,8 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let os_vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/");
         let vfs_file_system_path: VfsLocation =
             os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
@@ -952,7 +958,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/ext/ext2.raw")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("ext/ext2.raw").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_file_system_format(&data_stream)?
             .unwrap();
@@ -974,7 +981,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/ewf/ext2.E01")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("ewf/ext2.E01").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
@@ -996,7 +1004,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/ntfs/ntfs.raw")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("ntfs/ntfs.raw").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_file_system_format(&data_stream)?
             .unwrap();
@@ -1018,7 +1027,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/qcow/ext2.qcow2")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("qcow/ext2.qcow2").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
@@ -1041,7 +1051,7 @@ mod tests {
             }
         }
         let data_stream: DataStreamReference =
-            get_data_stream("../test_data/sparseimage/hfsplus.sparseimage")?;
+            get_data_stream(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
@@ -1064,7 +1074,7 @@ mod tests {
             }
         }
         let data_stream: DataStreamReference =
-            get_data_stream("../test_data/udif/hfsplus_zlib.dmg")?;
+            get_data_stream(get_test_data_path("udif/hfsplus_zlib.dmg").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
@@ -1087,7 +1097,7 @@ mod tests {
             }
         }
         let data_stream: DataStreamReference =
-            get_data_stream("../test_data/vhd/ntfs-differential.vhd")?;
+            get_data_stream(get_test_data_path("vhd/ntfs-differential.vhd").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
@@ -1110,7 +1120,7 @@ mod tests {
             }
         }
         let data_stream: DataStreamReference =
-            get_data_stream("../test_data/vhdx/ntfs-differential.vhdx")?;
+            get_data_stream(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str())?;
         let vfs_type: VfsType = format_scanner
             .scan_for_storage_media_image_format(&data_stream)?
             .unwrap();
@@ -1135,7 +1145,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/apm/apm.dmg")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("apm/apm.dmg").as_str())?;
 
         let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?
@@ -1158,7 +1169,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/gpt/gpt.raw")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("gpt/gpt.raw").as_str())?;
 
         let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?
@@ -1181,7 +1193,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference = get_data_stream("../test_data/mbr/mbr.raw")?;
+        let data_stream: DataStreamReference =
+            get_data_stream(get_test_data_path("mbr/mbr.raw").as_str())?;
 
         let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?
