@@ -19,6 +19,7 @@ pub enum NtfsBlockRangeType {
 }
 
 /// New Technologies File System (NTFS) block range.
+#[derive(Debug)]
 pub struct NtfsBlockRange {
     /// Virtual (or logical) cluster offset.
     pub virtual_cluster_offset: u64,

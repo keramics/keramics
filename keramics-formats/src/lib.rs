@@ -12,6 +12,7 @@
  */
 
 mod block_tree;
+mod block_tree_node;
 mod enums;
 mod errors;
 mod fake_file_resolver;
