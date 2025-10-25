@@ -56,14 +56,14 @@ impl MbrMasterBootRecord {
 
     /// Reads the master boot record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 512 {
+        if data.len() < 512 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported MBR master boot record data size"
+                "Unsupported master boot record data size"
             ));
         }
         if data[510..512] != MBR_BOOT_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported MBR master boot record signature"
+                "Unsupported master boot record signature"
             ));
         }
         self.disk_identity = bytes_to_u32_le!(data, 440);

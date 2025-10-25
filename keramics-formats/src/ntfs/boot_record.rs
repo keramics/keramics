@@ -31,16 +31,16 @@ const SUPPORTED_CLUSTER_BLOCK_SIZE: [u32; 14] = [
         member(field(name = "bytes_per_sector", data_type = "u16")),
         member(field(name = "sectors_per_cluster_block", data_type = "u8")),
         member(field(name = "unknown1", data_type = "[u8; 2]")),
-        member(field(name = "number_of_file_allocation_tables", data_type = "u8")),
+        member(field(name = "number_of_allocation_tables", data_type = "u8")),
         member(field(name = "number_of_root_directory_entries", data_type = "u16")),
         member(field(name = "number_of_sectors_16bit", data_type = "u16")),
         member(field(name = "media_descriptor", data_type = "u8")),
-        member(field(name = "sectors_pre_file_allocation_table", data_type = "u16")),
+        member(field(name = "allocation_table_size_16bit", data_type = "u16")),
         member(field(name = "sectors_per_track", data_type = "u16")),
         member(field(name = "number_of_heads", data_type = "u16")),
         member(field(name = "number_of_hidden_sectors", data_type = "u32")),
         member(field(name = "number_of_sectors_32bit", data_type = "u32")),
-        member(field(name = "unknown3", data_type = "[u8; 4]")),
+        member(field(name = "unknown2", data_type = "[u8; 4]")),
         member(field(name = "number_of_sectors_64bit", data_type = "u64")),
         member(field(name = "mft_cluster_block_number", data_type = "u64")),
         member(field(name = "mirror_mft_cluster_block_number", data_type = "u64")),
@@ -94,9 +94,9 @@ impl NtfsBootRecord {
 
     /// Reads the boot record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 512 {
+        if data.len() < 512 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS boot record data size"
+                "Unsupported boot record data size"
             ));
         }
         if data[3..11] != NTFS_FILE_SYSTEM_SIGNATURE {
@@ -105,9 +105,6 @@ impl NtfsBootRecord {
             ));
         }
         self.bytes_per_sector = bytes_to_u16_le!(data, 11);
-        self.mft_block_number = bytes_to_u64_le!(data, 48);
-        self.mirror_mft_block_number = bytes_to_u64_le!(data, 56);
-        self.volume_serial_number = bytes_to_u64_le!(data, 72);
 
         if !SUPPORTED_BYTES_PER_SECTOR.contains(&self.bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
@@ -167,6 +164,10 @@ impl NtfsBootRecord {
                 mft_entry_size
             )));
         }
+        self.mft_block_number = bytes_to_u64_le!(data, 48);
+        self.mirror_mft_block_number = bytes_to_u64_le!(data, 56);
+        self.volume_serial_number = bytes_to_u64_le!(data, 72);
+
         let index_entry_size: u32 = bytes_to_u32_le!(data, 68);
 
         if index_entry_size == 0 || index_entry_size > 255 {
@@ -265,6 +266,7 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.cluster_block_size, 512);
         assert_eq!(test_struct.mft_block_number, 5355);
         assert_eq!(test_struct.mirror_mft_block_number, 8032);
         assert_eq!(test_struct.mft_entry_size, 1024);
@@ -387,6 +389,7 @@ mod tests {
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.cluster_block_size, 512);
         assert_eq!(test_struct.mft_block_number, 5355);
         assert_eq!(test_struct.mirror_mft_block_number, 8032);
         assert_eq!(test_struct.mft_entry_size, 1024);

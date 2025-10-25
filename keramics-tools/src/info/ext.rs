@@ -461,8 +461,11 @@ impl ExtInfo {
         let format_version: u8 = ext_file_system.get_format_version();
         println!("    Format version\t\t\t: ext{}", format_version);
 
-        let volume_label: &ByteString = ext_file_system.get_volume_label();
-        println!("    Volume label\t\t\t: {}", volume_label.to_string());
+        let volume_label: String = match ext_file_system.get_volume_label() {
+            Some(volume_label) => volume_label.to_string(),
+            None => String::new(),
+        };
+        println!("    Volume label\t\t\t: {}", volume_label);
 
         let feature_flags: u32 = ext_file_system.get_compatible_feature_flags();
         println!("    Compatible features\t\t\t: 0x{:08x}", feature_flags);

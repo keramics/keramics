@@ -53,7 +53,7 @@ pub struct ExtFileSystem {
     metadata_checksum_seed: u32,
 
     /// Volume label.
-    volume_label: ByteString,
+    volume_label: Option<ByteString>,
 
     /// Last mount path.
     pub last_mount_path: ByteString,
@@ -70,7 +70,7 @@ impl ExtFileSystem {
     pub fn new() -> Self {
         Self {
             data_stream: None,
-            volume_label: ByteString::new(),
+            volume_label: None,
             features: ExtFeatures::new(),
             number_of_inodes: 0,
             block_size: 0,
@@ -104,8 +104,8 @@ impl ExtFileSystem {
     }
 
     /// Retrieves the volume label.
-    pub fn get_volume_label(&self) -> &ByteString {
-        &self.volume_label
+    pub fn get_volume_label(&self) -> Option<&ByteString> {
+        self.volume_label.as_ref()
     }
 
     /// Retrieves the file entry for a specific identifier (inode number).
@@ -306,8 +306,9 @@ impl ExtFileSystem {
                     self.block_size = superblock.block_size;
                     self.inode_size = superblock.inode_size;
 
-                    self.volume_label = superblock.volume_label;
-
+                    if !superblock.volume_label.is_empty() {
+                        self.volume_label = Some(superblock.volume_label);
+                    }
                     // TODO: change to ExtPath
                     self.last_mount_path = superblock.last_mount_path;
 

@@ -205,6 +205,14 @@ impl NtfsMasterFileTable {
         }
         let block_tree_size: u64 =
             (data_attribute.allocated_data_size / mft_entry_size as u64) * (mft_entry_size as u64);
+        let number_of_mft_entries: u64 = block_tree_size / (mft_entry_size as u64);
+
+        if number_of_mft_entries >= u32::MAX as u64 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of MFT entries: {} value out of bounds",
+                number_of_mft_entries
+            )));
+        }
         self.block_tree =
             BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, mft_entry_size as u64);
 

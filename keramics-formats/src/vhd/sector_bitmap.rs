@@ -13,7 +13,7 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 /// Virtual Hard Disk (VHD) sector bitmap range.
@@ -37,6 +37,9 @@ impl VhdSectorBitmapRange {
 
 /// Virtual Hard Disk (VHD) sector bitmap.
 pub struct VhdSectorBitmap {
+    /// Mediator.
+    mediator: MediatorReference,
+
     /// Size.
     size: usize,
 
@@ -51,6 +54,7 @@ impl VhdSectorBitmap {
     /// Creates a new sector bitmap.
     pub fn new(size: usize, bytes_per_bit: u16) -> Self {
         Self {
+            mediator: Mediator::current(),
             size: size,
             bytes_per_bit: bytes_per_bit,
             ranges: Vec::new(),
@@ -102,15 +106,14 @@ impl VhdSectorBitmap {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        let mediator = Mediator::current();
-        if mediator.debug_output {
-            mediator.debug_print(format!(
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
                 "VhdSectorBitmap data of size: {} at offset: {} (0x{:08x})\n",
                 data.len(),
                 offset,
                 offset
             ));
-            mediator.debug_print_data(&data, true);
+            self.mediator.debug_print_data(&data, true);
             // TODO: print ranges.
         }
         self.read_data(&data)

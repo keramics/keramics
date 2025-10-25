@@ -169,4 +169,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test with entry index out of bounds
 }

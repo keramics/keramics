@@ -26,7 +26,7 @@ mod formatters;
 mod info;
 mod range_stream;
 
-use info::{ExtInfo, NtfsInfo};
+use info::{ApmInfo, ExtInfo, GptInfo, MbrInfo, NtfsInfo};
 use range_stream::FileRangeDataStream;
 
 #[derive(Parser)]
@@ -241,11 +241,11 @@ fn main() -> ExitCode {
             }
         }
         None => match &format_identifier {
-            FormatIdentifier::Apm => info::print_apm_volume_system(&data_stream),
+            FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ext => ExtInfo::print_file_system(&data_stream),
             FormatIdentifier::Ewf => info::print_ewf_image(&arguments.source),
-            FormatIdentifier::Gpt => info::print_gpt_volume_system(&data_stream),
-            FormatIdentifier::Mbr => info::print_mbr_volume_system(&data_stream),
+            FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
+            FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
             FormatIdentifier::Qcow => info::print_qcow_file(&data_stream),
             // TODO: add support for sparse bundle.
