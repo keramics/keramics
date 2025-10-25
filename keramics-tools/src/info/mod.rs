@@ -23,11 +23,11 @@ mod udif;
 mod vhd;
 mod vhdx;
 
-pub use apm::print_apm_volume_system;
+pub use apm::ApmInfo;
 pub use ewf::print_ewf_image;
 pub use ext::ExtInfo;
-pub use gpt::print_gpt_volume_system;
-pub use mbr::print_mbr_volume_system;
+pub use gpt::GptInfo;
+pub use mbr::MbrInfo;
 pub use ntfs::NtfsInfo;
 pub use qcow::print_qcow_file;
 pub use sparseimage::print_sparseimage_file;

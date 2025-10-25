@@ -120,7 +120,7 @@ The block header is 3 bits in size and consists of:
 
 #### Uncompressed block data
 
-The uncompressed block data is variable of size and consists of:
+The uncompressed block data is of variable size and consists of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
@@ -133,7 +133,7 @@ The uncompressed data size can range between 0 and 65535 bytes.
 
 #### Huffman compressed block data
 
-The uncompressed block data is variable of size and consists of:
+The uncompressed block data is of variable size and consists of:
 
 * Optional dynamic Huffman table
 * Encoded bit-stream

@@ -26,7 +26,7 @@ use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
     ),
     method(name = "debug_read_data")
 )]
-/// Extended File System directory entry.
+/// Extended File System (ext) directory entry.
 pub struct ExtDirectoryEntry {
     /// Inode number.
     pub inode_number: u32,
@@ -56,7 +56,7 @@ impl ExtDirectoryEntry {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 8 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext directory entry data size"
+                "Unsupported directory entry data size"
             ));
         }
         self.inode_number = bytes_to_u32_le!(data, 0);
@@ -126,7 +126,7 @@ mod tests {
 
         let name: ByteString = test_struct.read_name(&test_data[8..])?;
 
-        assert_eq!(name.to_string(), "file1");
+        assert_eq!(name, ByteString::from("file1"));
 
         Ok(())
     }

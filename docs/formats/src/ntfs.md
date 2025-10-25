@@ -132,11 +132,11 @@ file) and contains:
 | 11 | 2 | | Bytes per sector. Note that the following values are supported by mkntfs: 256, 512, 1024, 2048 and 4096
 | 13 | 1 | | Number of sectors per cluster block
 | 14 | 2 | 0 | Unknown (Reserved Sectors), which is not used by NTFS and must be 0
-| 16 | 1 | 0 | Number of File Allocation Tables (FATs), which is not used by NTFS and must be 0
+| 16 | 1 | 0 | Number of cluster block allocation tables, which is not used by NTFS and must be 0
 | 17 | 2 | 0 | Number of root directory entries, which is not not used by NTFS and must be 0
 | 19 | 2 | 0 | Number of sectors (16-bit), which is not used by NTFS must be 0
 | 21 | 1 | | [Media descriptor](#media_descriptor)
-| 22 | 2 | 0 | Sectors Per File Allocation Table (FAT), which is not used by NTFS and must be 0
+| 22 | 2 | 0 | Cluster block allocation table size (16-bit) in number of sectors, which is not used by NTFS and must be 0
 | <td colspan="4"> *DOS version 3.4 BIOS parameter block (BPB)*
 | 24 | 2 | 0x3f | Sectors per track, which is not used by NTFS
 | 26 | 2 | 0xff | Number of heads, which is not used by NTFS

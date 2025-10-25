@@ -180,6 +180,30 @@ mod tests {
     }
 
     #[test]
+    fn test_get_value_with_unsupported_character() {
+        let test_encoded_data: [u8; 22] = [
+            0xff, 0x47, 0x68, 0x70, 0x63, 0x79, 0x42, 0x70, 0x63, 0x79, 0x44, 0x44, 0x6f, 0x53,
+            0x42, 0x30, 0x5a, 0x58, 0x4e, 0x30, 0x4c, 0x67,
+        ];
+        let mut test_stream: Base64Stream = Base64Stream::new(&test_encoded_data, 0, false);
+
+        let result: Result<Option<u8>, ErrorTrace> = test_stream.get_value();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_get_value_with_unsupported_white_space() {
+        let test_encoded_data: [u8; 23] = [
+            0x09, 0x56, 0x47, 0x68, 0x70, 0x63, 0x79, 0x42, 0x70, 0x63, 0x79, 0x44, 0x44, 0x6f,
+            0x53, 0x42, 0x30, 0x5a, 0x58, 0x4e, 0x30, 0x4c, 0x67,
+        ];
+        let mut test_stream: Base64Stream = Base64Stream::new(&test_encoded_data, 0, false);
+
+        let result: Result<Option<u8>, ErrorTrace> = test_stream.get_value();
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_decode() -> Result<(), ErrorTrace> {
         let mut test_context: Base64Context = Base64Context::new();
 
@@ -221,5 +245,31 @@ mod tests {
         assert_eq!(data, expected_data);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decode_with_unsupported_padding_character() {
+        let mut test_context: Base64Context = Base64Context::new();
+
+        let test_encoded_data: [u8; 25] = [
+            0x56, 0x47, 0x68, 0x70, 0x63, 0x79, 0x42, 0x70, 0x63, 0x79, 0x44, 0x44, 0x6f, 0x53,
+            0x42, 0x30, 0x5a, 0x58, 0x4e, 0x30, 0x4c, 0x67, 0x3d, 0xff, 0x0a,
+        ];
+        let mut data: Vec<u8> = vec![0; 16];
+        let result: Result<(), ErrorTrace> = test_context.decode(&test_encoded_data, &mut data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_decode_with_unsupported_padding_size() {
+        let mut test_context: Base64Context = Base64Context::new();
+
+        let test_encoded_data: [u8; 23] = [
+            0x56, 0x47, 0x68, 0x70, 0x63, 0x79, 0x42, 0x70, 0x63, 0x79, 0x44, 0x44, 0x6f, 0x53,
+            0x42, 0x30, 0x5a, 0x58, 0x4e, 0x30, 0x4c, 0x67, 0x3d,
+        ];
+        let mut data: Vec<u8> = vec![0; 16];
+        let result: Result<(), ErrorTrace> = test_context.decode(&test_encoded_data, &mut data);
+        assert!(result.is_err());
     }
 }
