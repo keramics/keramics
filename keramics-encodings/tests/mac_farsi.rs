@@ -12,9 +12,9 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_encodings::{DecoderMacArabic, EncoderMacArabic};
+use keramics_encodings::{DecoderMacFarsi, EncoderMacFarsi};
 
-const MAC_ARABIC_TEST_VECTOR: [(u32, &'static [u8], bool); 256] = [
+const MAC_FARSI_TEST_VECTOR: [(u32, &'static [u8], bool); 256] = [
     (0x0000, &[0x00], false),
     (0x0001, &[0x01], false),
     (0x0002, &[0x02], false),
@@ -191,16 +191,16 @@ const MAC_ARABIC_TEST_VECTOR: [(u32, &'static [u8], bool); 256] = [
     (0x002d, &[0xad], false),
     (0x002e, &[0xae], false),
     (0x002f, &[0xaf], false),
-    (0x0660, &[0xb0], false),
-    (0x0661, &[0xb1], false),
-    (0x0662, &[0xb2], false),
-    (0x0663, &[0xb3], false),
-    (0x0664, &[0xb4], false),
-    (0x0665, &[0xb5], false),
-    (0x0666, &[0xb6], false),
-    (0x0667, &[0xb7], false),
-    (0x0668, &[0xb8], false),
-    (0x0669, &[0xb9], false),
+    (0x06f0, &[0xb0], false),
+    (0x06f1, &[0xb1], false),
+    (0x06f2, &[0xb2], false),
+    (0x06f3, &[0xb3], false),
+    (0x06f4, &[0xb4], false),
+    (0x06f5, &[0xb5], false),
+    (0x06f6, &[0xb6], false),
+    (0x06f7, &[0xb7], false),
+    (0x06f8, &[0xb8], false),
+    (0x06f9, &[0xb9], false),
     (0x003a, &[0xba], false),
     (0x061b, &[0xbb], false),
     (0x003c, &[0xbc], false),
@@ -275,15 +275,15 @@ const MAC_ARABIC_TEST_VECTOR: [(u32, &'static [u8], bool); 256] = [
 
 #[test]
 fn decode() -> Result<(), ErrorTrace> {
-    for (expected_code_point, test_byte_string, _) in MAC_ARABIC_TEST_VECTOR.iter() {
-        let mut decoder: DecoderMacArabic = DecoderMacArabic::new(test_byte_string);
+    for (expected_code_point, test_byte_string, _) in MAC_FARSI_TEST_VECTOR.iter() {
+        let mut decoder: DecoderMacFarsi = DecoderMacFarsi::new(test_byte_string);
 
         let test_code_point: u32 = match decoder.next() {
             Some(Ok(code_point)) => code_point,
             Some(Err(error)) => return Err(error),
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Failed to decode MacArabic as code_point: U+{:04x}",
+                    "Failed to decode MacFarsi as code_point: U+{:04x}",
                     *expected_code_point as u32
                 )));
             }
@@ -295,16 +295,16 @@ fn decode() -> Result<(), ErrorTrace> {
 
 #[test]
 fn encode() -> Result<(), ErrorTrace> {
-    for (test_code_point, expected_byte_string, is_duplicate) in MAC_ARABIC_TEST_VECTOR.iter() {
+    for (test_code_point, expected_byte_string, is_duplicate) in MAC_FARSI_TEST_VECTOR.iter() {
         let code_points: [u32; 1] = [*test_code_point];
-        let mut encoder: EncoderMacArabic = EncoderMacArabic::new(&code_points);
+        let mut encoder: EncoderMacFarsi = EncoderMacFarsi::new(&code_points);
 
         let test_byte_string: Vec<u8> = match encoder.next() {
             Some(Ok(byte_string)) => byte_string,
             Some(Err(error)) => return Err(error),
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Failed to encode code point: U+{:04x} as MacArabic",
+                    "Failed to encode code point: U+{:04x} as MacFarsi",
                     *test_code_point as u32
                 )));
             }

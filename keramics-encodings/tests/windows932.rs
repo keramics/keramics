@@ -7969,7 +7969,6 @@ fn encode() -> Result<(), ErrorTrace> {
             }
         };
         if !is_duplicate {
-            eprintln!("X: U+{:04x}", *test_code_point as u32);
             assert_eq!(test_byte_string, *expected_byte_string);
         }
     }
