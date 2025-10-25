@@ -60,7 +60,6 @@ impl<T> BlockTree<T> {
         };
         let mut root_node: BlockTreeNode<T> = BlockTreeNode::<T>::new(&node_type, 0, element_size);
 
-        println!("X: {}", elements_per_node);
         match node_type {
             BlockTreeNodeType::Branch => {
                 root_node.sub_nodes = (0..elements_per_node).map(|_| None).collect();
