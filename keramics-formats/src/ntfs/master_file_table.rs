@@ -82,7 +82,10 @@ impl NtfsMasterFileTable {
                 data_run.number_of_blocks,
                 range_type,
             );
-            println!("X: {}, {}, {:?}", virtual_cluster_offset, range_size, block_range);
+            println!(
+                "X: {}, {}, {:?}",
+                virtual_cluster_offset, range_size, block_range
+            );
             match self
                 .block_tree
                 .insert_value(virtual_cluster_offset, range_size, block_range)
@@ -209,9 +212,10 @@ impl NtfsMasterFileTable {
         let number_of_mft_entries: u64 = block_tree_size / (mft_entry_size as u64);
 
         if number_of_mft_entries >= u32::MAX as u64 {
-            return Err(keramics_core::error_trace_new!(
-                format!("Invalid number of MFT entries: {} value out of bounds", number_of_mft_entries)
-            ));
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of MFT entries: {} value out of bounds",
+                number_of_mft_entries
+            )));
         }
         self.block_tree =
             BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, mft_entry_size as u64);
