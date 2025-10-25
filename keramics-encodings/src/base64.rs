@@ -13,7 +13,7 @@
 
 //! Base64 encoding.
 //!
-//! Provides decoding support for Base64 data.
+//! Provides support for decoding Base64 data.
 
 use keramics_core::ErrorTrace;
 
@@ -34,7 +34,7 @@ pub struct Base64Stream<'a> {
     /// Number of bits in the bits buffer.
     pub number_of_bits: usize,
 
-    /// Value to indicate white space characters should be skipped.
+    /// Value to indicate white space code_points should be skipped.
     skip_white_space: bool,
 
     /// Value to indicate if padding was found.
@@ -76,7 +76,7 @@ impl<'a> Base64Stream<'a> {
                 0x09 | 0x0a | 0x0b | 0x0d | 0x20 => {
                     if !self.skip_white_space {
                         return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid base64 character value: 0x{:02x}",
+                            "Invalid base64 code_point value: 0x{:02x}",
                             byte_value
                         )));
                     }
@@ -86,7 +86,7 @@ impl<'a> Base64Stream<'a> {
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Invalid base64 character value: 0x{:02x}",
+                        "Invalid base64 code_point value: 0x{:02x}",
                         byte_value
                     )));
                 }
@@ -150,7 +150,7 @@ impl Base64Context {
                 let byte_value: u8 = base64_stream.data[padding_offset];
                 if byte_value != 0x3d {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Invalid base64 padding character value: 0x{:02x}",
+                        "Invalid base64 padding code_point value: 0x{:02x}",
                         byte_value
                     )));
                 }

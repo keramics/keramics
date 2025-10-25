@@ -15,7 +15,7 @@ use std::error::Error;
 use std::fmt;
 
 /// Error with traceback information.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct ErrorTrace {
     /// The error messages.
     messages: Vec<String>,
