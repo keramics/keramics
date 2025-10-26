@@ -18,12 +18,7 @@ use keramics_vfs::{
     VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference, VfsString, VfsType,
 };
 
-/// Digest hash types.
-#[derive(Clone)]
-pub enum DisplayPathType {
-    Identifier,
-    Index,
-}
+use crate::enums::DisplayPathType;
 
 /// Helper for creating human readable path representations.
 pub struct DisplayPath {

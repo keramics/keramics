@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-9 encoding.
+//! ISO-8859-9 (Latin 5 or Turkish) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-9.
 
@@ -27,55 +27,12 @@ pub struct DecoderIso8859_9<'a> {
 }
 
 impl<'a> DecoderIso8859_9<'a> {
-    const BASE_0XD0: [Option<u16>; 48] = [
-        Some(0x011e),
-        Some(0x00d1),
-        Some(0x00d2),
-        Some(0x00d3),
-        Some(0x00d4),
-        Some(0x00d5),
-        Some(0x00d6),
-        Some(0x00d7),
-        Some(0x00d8),
-        Some(0x00d9),
-        Some(0x00da),
-        Some(0x00db),
-        Some(0x00dc),
-        Some(0x0130),
-        Some(0x015e),
-        Some(0x00df),
-        Some(0x00e0),
-        Some(0x00e1),
-        Some(0x00e2),
-        Some(0x00e3),
-        Some(0x00e4),
-        Some(0x00e5),
-        Some(0x00e6),
-        Some(0x00e7),
-        Some(0x00e8),
-        Some(0x00e9),
-        Some(0x00ea),
-        Some(0x00eb),
-        Some(0x00ec),
-        Some(0x00ed),
-        Some(0x00ee),
-        Some(0x00ef),
-        Some(0x011f),
-        Some(0x00f1),
-        Some(0x00f2),
-        Some(0x00f3),
-        Some(0x00f4),
-        Some(0x00f5),
-        Some(0x00f6),
-        Some(0x00f7),
-        Some(0x00f8),
-        Some(0x00f9),
-        Some(0x00fa),
-        Some(0x00fb),
-        Some(0x00fc),
-        Some(0x0131),
-        Some(0x015f),
-        Some(0x00ff),
+    const BASE_0XD0: [u16; 48] = [
+        0x011e, 0x00d1, 0x00d2, 0x00d3, 0x00d4, 0x00d5, 0x00d6, 0x00d7, 0x00d8, 0x00d9, 0x00da,
+        0x00db, 0x00dc, 0x0130, 0x015e, 0x00df, 0x00e0, 0x00e1, 0x00e2, 0x00e3, 0x00e4, 0x00e5,
+        0x00e6, 0x00e7, 0x00e8, 0x00e9, 0x00ea, 0x00eb, 0x00ec, 0x00ed, 0x00ee, 0x00ef, 0x011f,
+        0x00f1, 0x00f2, 0x00f3, 0x00f4, 0x00f5, 0x00f6, 0x00f7, 0x00f8, 0x00f9, 0x00fa, 0x00fb,
+        0x00fc, 0x0131, 0x015f, 0x00ff,
     ];
 
     /// Creates a new decoder.
@@ -96,17 +53,12 @@ impl<'a> Iterator for DecoderIso8859_9<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0xd0 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0xd0 {
+                    *byte_value as u16
                 } else {
-                    match Self::BASE_0XD0[(*byte_value - 0xd0) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode ISO-8859-9: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    }
-                }
+                    Self::BASE_0XD0[(*byte_value - 0xd0) as usize]
+                };
+                Some(Ok(code_point as u32))
             }
             None => None,
         }

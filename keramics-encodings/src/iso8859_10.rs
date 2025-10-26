@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-10 encoding.
+//! ISO-8859-10 (Latin-6 or Nordic) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-10.
 

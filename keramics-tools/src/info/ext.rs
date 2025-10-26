@@ -15,6 +15,7 @@ use std::process::ExitCode;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
+use keramics_encodings::CharacterEncoding;
 use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
 use keramics_types::ByteString;
@@ -366,16 +367,27 @@ impl ExtInfo {
     pub fn print_file_entry_by_identifier(
         data_stream: &DataStreamReference,
         ext_entry_identifier: u64,
+        character_encoding: Option<&CharacterEncoding>,
     ) -> ExitCode {
         let mut ext_file_system = ExtFileSystem::new();
 
+        match character_encoding {
+            Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
+                Ok(_) => {}
+                Err(error) => {
+                    println!("Unable to set character encoding with error: {}", error);
+                    return ExitCode::FAILURE;
+                }
+            },
+            None => {}
+        }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(error) => {
                 println!("Unable to open file system with error: {}", error);
                 return ExitCode::FAILURE;
             }
-        };
+        }
         if ext_entry_identifier > u32::MAX as u64 {
             println!(
                 "Invalid inode number: {} value out of bounds",
@@ -410,17 +422,29 @@ impl ExtInfo {
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
         path_components: &[&str],
+        character_encoding: Option<&CharacterEncoding>,
     ) -> ExitCode {
         let mut ext_file_system = ExtFileSystem::new();
 
+        match character_encoding {
+            Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
+                Ok(_) => {}
+                Err(error) => {
+                    println!("Unable to set character encoding with error: {}", error);
+                    return ExitCode::FAILURE;
+                }
+            },
+            None => {}
+        }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(error) => {
                 println!("Unable to open file system with error: {}", error);
                 return ExitCode::FAILURE;
             }
-        };
+        }
         let ext_path: ExtPath = ExtPath::from(path_components);
+
         let mut file_entry: Option<ExtFileEntry> =
             match ext_file_system.get_file_entry_by_path(&ext_path) {
                 Ok(file_entry) => file_entry,
@@ -446,16 +470,29 @@ impl ExtInfo {
     }
 
     /// Prints information about the file system.
-    pub fn print_file_system(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file_system(
+        data_stream: &DataStreamReference,
+        character_encoding: Option<&CharacterEncoding>,
+    ) -> ExitCode {
         let mut ext_file_system = ExtFileSystem::new();
 
+        match character_encoding {
+            Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
+                Ok(_) => {}
+                Err(error) => {
+                    println!("Unable to set character encoding with error: {}", error);
+                    return ExitCode::FAILURE;
+                }
+            },
+            None => {}
+        }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(error) => {
                 println!("Unable to open file system with error: {}", error);
                 return ExitCode::FAILURE;
             }
-        };
+        }
         println!("Extended File System (ext) information:");
 
         let format_version: u8 = ext_file_system.get_format_version();
@@ -514,16 +551,29 @@ impl ExtInfo {
     }
 
     /// Prints the file system hierarchy.
-    pub fn print_hierarchy(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_hierarchy(
+        data_stream: &DataStreamReference,
+        character_encoding: Option<&CharacterEncoding>,
+    ) -> ExitCode {
         let mut ext_file_system = ExtFileSystem::new();
 
+        match character_encoding {
+            Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
+                Ok(_) => {}
+                Err(error) => {
+                    println!("Unable to set character encoding with error: {}", error);
+                    return ExitCode::FAILURE;
+                }
+            },
+            None => {}
+        }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(error) => {
                 println!("Unable to open file system with error: {}", error);
                 return ExitCode::FAILURE;
             }
-        };
+        }
         println!("Extended File System (ext) hierarchy:");
 
         let mut file_entry: ExtFileEntry = match ext_file_system.get_root_directory() {

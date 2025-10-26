@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-7 encoding.
+//! ISO-8859-7 (Greek) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-7.
 

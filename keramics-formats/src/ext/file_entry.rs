@@ -12,7 +12,6 @@
  */
 
 use std::cmp::max;
-use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
@@ -21,8 +20,7 @@ use keramics_types::{ByteString, bytes_to_u16_le};
 
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
-use super::directory_entry::ExtDirectoryEntry;
-use super::directory_tree::ExtDirectoryTree;
+use super::directory_entries::ExtDirectoryEntries;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 
@@ -43,11 +41,8 @@ pub struct ExtFileEntry {
     /// The name.
     name: Option<ByteString>,
 
-    /// Directory entries.
-    directory_entries: BTreeMap<ByteString, ExtDirectoryEntry>,
-
-    /// Value to indicate the directory entries were read.
-    read_directory_entries: bool,
+    /// Sub directory entries.
+    sub_directory_entries: ExtDirectoryEntries,
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
@@ -68,8 +63,7 @@ impl ExtFileEntry {
             inode_number: inode_number,
             inode: inode,
             name: name,
-            directory_entries: BTreeMap::new(),
-            read_directory_entries: false,
+            sub_directory_entries: ExtDirectoryEntries::new(&inode_table.encoding),
             symbolic_link_target: None,
         }
     }
@@ -247,19 +241,19 @@ impl ExtFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if !self.read_directory_entries {
-            match self.read_directory_entries() {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries"
+                        "Unable to read sub directory entries"
                     );
                     return Err(error);
                 }
             }
         }
-        Ok(self.directory_entries.len())
+        Ok(self.sub_directory_entries.get_number_of_entries())
     }
 
     /// Retrieves a specific sub file entry.
@@ -267,49 +261,49 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<ExtFileEntry, ErrorTrace> {
-        if !self.read_directory_entries {
-            match self.read_directory_entries() {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries"
+                        "Unable to read sub directory entries"
                     );
                     return Err(error);
                 }
             }
         }
-        let (name, directory_entry): (&ByteString, &ExtDirectoryEntry) =
-            match self.directory_entries.iter().nth(sub_file_entry_index) {
-                Some(key_and_value) => key_and_value,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing directory entry: {}",
-                        sub_file_entry_index
-                    )));
-                }
-            };
-        let inode: ExtInode = match self
-            .inode_table
-            .get_inode(&self.data_stream, directory_entry.inode_number)
+        match self
+            .sub_directory_entries
+            .get_entry_by_index(sub_file_entry_index)
         {
-            Ok(inode) => inode,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to retrieve inode: {}", directory_entry.inode_number)
-                );
-                return Err(error);
+            Some((name, directory_entry)) => {
+                let inode: ExtInode = match self
+                    .inode_table
+                    .get_inode(&self.data_stream, directory_entry.inode_number)
+                {
+                    Ok(inode) => inode,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve inode: {}", directory_entry.inode_number)
+                        );
+                        return Err(error);
+                    }
+                };
+                Ok(ExtFileEntry::new(
+                    &self.data_stream,
+                    &self.inode_table,
+                    directory_entry.inode_number,
+                    inode,
+                    Some(name.clone()),
+                ))
             }
-        };
-        let file_entry: ExtFileEntry = ExtFileEntry::new(
-            &self.data_stream,
-            &self.inode_table,
-            directory_entry.inode_number,
-            inode,
-            Some(name.clone()),
-        );
-        Ok(file_entry)
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing directory entry: {}",
+                sub_file_entry_index
+            ))),
+        }
     }
 
     // TODO: add get_sub_file_entries iterator
@@ -319,44 +313,63 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_name: &ByteString,
     ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
-        if !self.read_directory_entries {
-            match self.read_directory_entries() {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries"
+                        "Unable to read sub directory entries"
                     );
                     return Err(error);
                 }
             }
         }
-        let (name, directory_entry): (&ByteString, &ExtDirectoryEntry) =
-            match self.directory_entries.get_key_value(sub_file_entry_name) {
-                Some(key_and_value) => key_and_value,
-                None => return Ok(None),
-            };
-        let inode: ExtInode = match self
-            .inode_table
-            .get_inode(&self.data_stream, directory_entry.inode_number)
+        let mut encoded_name: ByteString =
+            ByteString::new_with_encoding(&self.inode_table.encoding);
+        let lookup_name: &ByteString = if sub_file_entry_name.encoding == self.inode_table.encoding
         {
-            Ok(inode) => inode,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to retrieve inode: {}", directory_entry.inode_number)
-                );
-                return Err(error);
+            sub_file_entry_name
+        } else {
+            match encoded_name.extend(sub_file_entry_name) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to extend encoded name");
+                    return Err(error);
+                }
             }
+            &encoded_name
         };
-        let file_entry: ExtFileEntry = ExtFileEntry::new(
-            &self.data_stream,
-            &self.inode_table,
-            directory_entry.inode_number,
-            inode,
-            Some(name.clone()),
-        );
-        Ok(Some(file_entry))
+        match self.sub_directory_entries.get_entry_by_name(lookup_name) {
+            Some((name, directory_entry)) => {
+                let inode: ExtInode = match self
+                    .inode_table
+                    .get_inode(&self.data_stream, directory_entry.inode_number)
+                {
+                    Ok(inode) => inode,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve inode: {}", directory_entry.inode_number)
+                        );
+                        return Err(error);
+                    }
+                };
+                Ok(Some(ExtFileEntry::new(
+                    &self.data_stream,
+                    &self.inode_table,
+                    directory_entry.inode_number,
+                    inode,
+                    Some(name.clone()),
+                )))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// Determines if the file entry is a directory.
+    pub fn is_directory(&self) -> bool {
+        self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY
     }
 
     /// Determines if the file entry is the root directory.
@@ -364,44 +377,38 @@ impl ExtFileEntry {
         self.inode_number == EXT_ROOT_DIRECTORY_IDENTIFIER
     }
 
-    /// Reads the directory entries.
-    fn read_directory_entries(&mut self) -> Result<(), ErrorTrace> {
-        if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_DIRECTORY {
-            let mut directory_tree: ExtDirectoryTree =
-                ExtDirectoryTree::new(self.inode_table.block_size);
-
-            if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-                match directory_tree
-                    .read_inline_data(&self.inode.data_reference, &mut self.directory_entries)
-                {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read directory entries from inline data"
-                        );
-                        return Err(error);
-                    }
+    /// Reads the sub directory entries.
+    fn read_sub_directory_entries(&mut self) -> Result<(), ErrorTrace> {
+        if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
+            match self
+                .sub_directory_entries
+                .read_inline_data(&self.inode.data_reference, self.inode_table.block_size)
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries from inline data"
+                    );
+                    return Err(error);
                 }
-            } else {
-                match directory_tree.read_block_data(
-                    &self.data_stream,
-                    &self.inode.block_ranges,
-                    &mut self.directory_entries,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read directory entries"
-                        );
-                        return Err(error);
-                    }
+            }
+        } else {
+            match self.sub_directory_entries.read_block_data(
+                &self.data_stream,
+                self.inode_table.block_size,
+                &self.inode.block_ranges,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read directory entries from block data"
+                    );
+                    return Err(error);
                 }
             }
         }
-        self.read_directory_entries = true;
-
         Ok(())
     }
 }
@@ -655,6 +662,13 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
+        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let number_of_sub_file_entries: usize = ext_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 10);
+
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
@@ -662,15 +676,77 @@ mod tests {
         let number_of_sub_file_entries: usize = ext_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 0);
 
-        // TODO: test with directory file entry
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let sub_file_entry: ExtFileEntry = ext_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(ByteString::from("TestFile2")).as_ref()
+        );
 
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
     // TODO: add tests for get_sub_file_entry_by_name
 
-    // TODO: add tests for is_root_directory
+    #[test]
+    fn test_is_directory() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
 
-    // TODO: add tests for read_directory_entries
+        let ext_path: ExtPath = ExtPath::from("/");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.is_directory(), true);
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.is_directory(), true);
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.is_directory(), false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_directory() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.is_root_directory(), true);
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.is_root_directory(), false);
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(ext_file_entry.is_root_directory(), false);
+
+        Ok(())
+    }
+
+    // TODO: add tests for read_sub_directory_entries
 }

@@ -17,6 +17,7 @@ use std::sync::Arc;
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
+use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
 use super::constants::*;
@@ -280,7 +281,8 @@ impl ExtFileSystem {
                     superblock_offset += 1024;
                 }
                 if block_group_number == 0 {
-                    let mut superblock: ExtSuperblock = ExtSuperblock::new();
+                    let mut superblock: ExtSuperblock =
+                        ExtSuperblock::new(&self.inode_table.encoding);
 
                     match superblock
                         .read_at_position(data_stream, SeekFrom::Start(superblock_offset))
@@ -338,7 +340,8 @@ impl ExtFileSystem {
                         }
                     };
                 } else {
-                    let mut superblock: ExtSuperblock = ExtSuperblock::new();
+                    let mut superblock: ExtSuperblock =
+                        ExtSuperblock::new(&self.inode_table.encoding);
 
                     match superblock
                         .read_at_position(data_stream, SeekFrom::Start(superblock_offset))
@@ -469,10 +472,28 @@ impl ExtFileSystem {
                         "Unable to obtain mutable reference to inode table"
                     ));
                 }
-            };
+            }
         }
         // TODO: sanity check self.number_of_inodes and size of inode table.
 
+        Ok(())
+    }
+
+    /// Sets the character encoding.
+    pub fn set_character_encoding(
+        &mut self,
+        character_encoding: &CharacterEncoding,
+    ) -> Result<(), ErrorTrace> {
+        match Arc::get_mut(&mut self.inode_table) {
+            Some(inode_table) => {
+                inode_table.encoding = character_encoding.clone();
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to inode table"
+                ));
+            }
+        }
         Ok(())
     }
 }
@@ -594,6 +615,18 @@ mod tests {
 
         assert_eq!(file_system.block_size, 1024);
         assert_eq!(file_system.inode_size, 128);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_character_encoding() -> Result<(), ErrorTrace> {
+        let mut file_system: ExtFileSystem = ExtFileSystem::new();
+
+        assert_eq!(file_system.inode_table.encoding, CharacterEncoding::Utf8);
+
+        file_system.set_character_encoding(&CharacterEncoding::Ascii)?;
+        assert_eq!(file_system.inode_table.encoding, CharacterEncoding::Ascii);
 
         Ok(())
     }

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum CharacterEncoding {
     Ascii,
     Iso8859_1,
@@ -33,7 +33,7 @@ pub enum CharacterEncoding {
     Koi8R,
     Koi8U,
     MacArabic,
-    MacCentic,
+    MacCeltic,
     MacCentralEurRoman,
     MacChineseSimplified,
     MacChineseTraditional,

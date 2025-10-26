@@ -19,51 +19,63 @@ use keramics_formats::udif::{UdifCompressionMethod, UdifFile};
 
 use crate::formatters::format_as_bytesize;
 
-/// Prints information about an UDIF file.
-pub fn print_udif_file(data_stream: &DataStreamReference) -> ExitCode {
-    let mut udif_file: UdifFile = UdifFile::new();
+/// Information about an Universal Disk Image Format (UDIF) file.
+pub struct UdifInfo {}
 
-    match udif_file.read_data_stream(data_stream) {
-        Ok(_) => {}
-        Err(error) => {
-            println!("Unable to open UDIF file with error: {}", error);
-            return ExitCode::FAILURE;
+impl UdifInfo {
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+        let mut udif_file: UdifFile = UdifFile::new();
+
+        match udif_file.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(error) => {
+                println!("Unable to open UDIF file with error: {}", error);
+                return ExitCode::FAILURE;
+            }
+        };
+        let compression_methods = HashMap::<UdifCompressionMethod, &'static str>::from([
+            (UdifCompressionMethod::Adc, "ADC"),
+            (UdifCompressionMethod::Bzip2, "bzip2"),
+            (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
+            (UdifCompressionMethod::Lzma, "LZMA"),
+            (UdifCompressionMethod::None, "Uncompressed"),
+            (UdifCompressionMethod::Zlib, "zlib"),
+        ]);
+
+        let compression_method_string: &str = compression_methods
+            .get(&udif_file.compression_method)
+            .unwrap();
+
+        println!("Universal Disk Image Format (UDIF) information:");
+
+        if udif_file.media_size < 1024 {
+            println!("    Media size\t\t\t\t: {} bytes", udif_file.media_size);
+        } else {
+            let media_size_string: String = format_as_bytesize(udif_file.media_size, 1024);
+            println!(
+                "    Media size\t\t\t\t: {} ({} bytes)",
+                media_size_string, udif_file.media_size
+            );
         }
-    };
-    let compression_methods = HashMap::<UdifCompressionMethod, &'static str>::from([
-        (UdifCompressionMethod::Adc, "ADC"),
-        (UdifCompressionMethod::Bzip2, "bzip2"),
-        (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
-        (UdifCompressionMethod::Lzma, "LZMA"),
-        (UdifCompressionMethod::None, "Uncompressed"),
-        (UdifCompressionMethod::Zlib, "zlib"),
-    ]);
-
-    let compression_method_string: &str = compression_methods
-        .get(&udif_file.compression_method)
-        .unwrap();
-
-    println!("Universal Disk Image Format (UDIF) information:");
-
-    if udif_file.media_size < 1024 {
-        println!("    Media size\t\t\t\t: {} bytes", udif_file.media_size);
-    } else {
-        let media_size_string: String = format_as_bytesize(udif_file.media_size, 1024);
         println!(
-            "    Media size\t\t\t\t: {} ({} bytes)",
-            media_size_string, udif_file.media_size
+            "    Bytes per sector\t\t\t: {} bytes",
+            udif_file.bytes_per_sector
         );
+        println!(
+            "    Compression method\t\t\t: {}",
+            compression_method_string
+        );
+
+        println!("");
+
+        ExitCode::SUCCESS
     }
-    println!(
-        "    Bytes per sector\t\t\t: {} bytes",
-        udif_file.bytes_per_sector
-    );
-    println!(
-        "    Compression method\t\t\t: {}",
-        compression_method_string
-    );
+}
 
-    println!("");
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    ExitCode::SUCCESS
+    // TODO: add tests for print_file
 }

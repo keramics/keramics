@@ -18,48 +18,61 @@ use keramics_formats::sparseimage::SparseImageFile;
 
 use crate::formatters::format_as_bytesize;
 
-/// Prints information about a sparse image file.
-pub fn print_sparseimage_file(data_stream: &DataStreamReference) -> ExitCode {
-    let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
+/// Information about a Mac OS sparse image (.sparseimage) file.
+pub struct SparseImageInfo {}
 
-    match sparseimage_file.read_data_stream(data_stream) {
-        Ok(_) => {}
-        Err(error) => {
-            println!("Unable to open sparse image file with error: {}", error);
-            return ExitCode::FAILURE;
+impl SparseImageInfo {
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+        let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
+
+        match sparseimage_file.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(error) => {
+                println!("Unable to open sparse image file with error: {}", error);
+                return ExitCode::FAILURE;
+            }
+        };
+        println!("Sparse image (.sparseimage) information:");
+
+        if sparseimage_file.media_size < 1024 {
+            println!(
+                "    Media size\t\t\t\t: {} bytes",
+                sparseimage_file.media_size
+            );
+        } else {
+            let media_size_string: String = format_as_bytesize(sparseimage_file.media_size, 1024);
+            println!(
+                "    Media size\t\t\t\t: {} ({} bytes)",
+                media_size_string, sparseimage_file.media_size
+            );
         }
-    };
-    println!("Sparse image (.sparseimage) information:");
+        println!(
+            "    Bytes per sector\t\t\t: {} bytes",
+            sparseimage_file.bytes_per_sector
+        );
+        if sparseimage_file.block_size < 1024 {
+            println!(
+                "    Band size\t\t\t\t: {} bytes",
+                sparseimage_file.block_size,
+            );
+        } else {
+            let band_size_string: String =
+                format_as_bytesize(sparseimage_file.block_size as u64, 1024);
+            println!(
+                "    Band size\t\t\t\t: {} ({} bytes)",
+                band_size_string, sparseimage_file.block_size,
+            );
+        }
+        println!("");
 
-    if sparseimage_file.media_size < 1024 {
-        println!(
-            "    Media size\t\t\t\t: {} bytes",
-            sparseimage_file.media_size
-        );
-    } else {
-        let media_size_string: String = format_as_bytesize(sparseimage_file.media_size, 1024);
-        println!(
-            "    Media size\t\t\t\t: {} ({} bytes)",
-            media_size_string, sparseimage_file.media_size
-        );
+        ExitCode::SUCCESS
     }
-    println!(
-        "    Bytes per sector\t\t\t: {} bytes",
-        sparseimage_file.bytes_per_sector
-    );
-    if sparseimage_file.block_size < 1024 {
-        println!(
-            "    Band size\t\t\t\t: {} bytes",
-            sparseimage_file.block_size,
-        );
-    } else {
-        let band_size_string: String = format_as_bytesize(sparseimage_file.block_size as u64, 1024);
-        println!(
-            "    Band size\t\t\t\t: {} ({} bytes)",
-            band_size_string, sparseimage_file.block_size,
-        );
-    }
-    println!("");
+}
 
-    ExitCode::SUCCESS
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests for print_image
 }

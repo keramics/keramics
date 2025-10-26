@@ -36,7 +36,7 @@ impl EwfHeaderValue {
         })
     }
 
-    /// Converts the EWF header value to `String`.
+    /// Converts the `EwfHeaderValue` to `String`.
     pub fn to_string(&self) -> String {
         match self {
             EwfHeaderValue::Byte(byte_string) => byte_string.to_string(),

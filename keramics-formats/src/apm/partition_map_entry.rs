@@ -12,6 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterEncoding;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u32_be};
 
@@ -46,23 +47,35 @@ use super::constants::*;
 )]
 /// Apple Partition Map (APM) partition map entry.
 pub struct ApmPartitionMapEntry {
+    /// Number of entries.
     pub number_of_entries: u32,
+
+    /// Start sector.
     pub start_sector: u32,
+
+    /// Number of sectors.
     pub number_of_sectors: u32,
+
+    /// Name.
     pub name: ByteString,
+
+    /// Type identifier.
     pub type_identifier: ByteString,
+
+    /// Status flags.
     pub status_flags: u32,
 }
 
 impl ApmPartitionMapEntry {
     /// Creates a new partition map entry.
     pub fn new() -> Self {
+        let encoding: CharacterEncoding = CharacterEncoding::Ascii;
         Self {
             number_of_entries: 0,
             start_sector: 0,
             number_of_sectors: 0,
-            name: ByteString::new(),
-            type_identifier: ByteString::new(),
+            name: ByteString::new_with_encoding(&encoding),
+            type_identifier: ByteString::new_with_encoding(&encoding),
             status_flags: 0,
         }
     }

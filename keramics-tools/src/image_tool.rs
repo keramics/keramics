@@ -42,21 +42,14 @@ use keramics_vfs::{
 
 mod bodyfile;
 mod display_path;
+mod enums;
 
-use bodyfile::Bodyfile;
-use display_path::{DisplayPath, DisplayPathType};
+use crate::bodyfile::Bodyfile;
+use crate::display_path::DisplayPath;
+use crate::enums::DisplayPathType;
 
 pub const FILE_ATTRIBUTE_FLAG_READ_ONLY: u32 = 0x00000001;
 pub const FILE_ATTRIBUTE_FLAG_SYSTEM: u32 = 0x00000004;
-
-#[derive(Clone, Debug, ValueEnum)]
-enum VolumePathType {
-    /// Identifier based volume or partition path, such as /apfs{f449e580-e355-4e74-8880-05e46e4e3b1e}
-    Identifier,
-
-    /// Index based volume or partition path, such as /apfs1 or /p1
-    Index,
-}
 
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]
@@ -94,8 +87,8 @@ struct BodyfileCommandArguments {
 
     // TODO: allow to set the data stream name separator
     /// Volume or partition path type
-    #[arg(long, default_value_t = VolumePathType::Index, value_enum)]
-    volume_path_type: VolumePathType,
+    #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
+    volume_path_type: DisplayPathType,
 }
 
 /// Storage media image.
@@ -1127,11 +1120,7 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Some(Commands::Bodyfile(command_arguments)) => {
-            let display_path_type: DisplayPathType = match &command_arguments.volume_path_type {
-                VolumePathType::Identifier => DisplayPathType::Identifier,
-                VolumePathType::Index => DisplayPathType::Index,
-            };
-            image_tool.set_volume_path_type(&display_path_type);
+            image_tool.set_volume_path_type(&command_arguments.volume_path_type);
 
             match image_tool.generate_bodyfile(source, command_arguments.calculate_md5) {
                 Ok(_) => {}

@@ -63,14 +63,14 @@ pub struct NtfsFileEntry {
     /// The directory index.
     directory_index: NtfsDirectoryIndex,
 
-    /// Directory entries.
-    directory_entries: NtfsDirectoryEntries,
+    /// Sub directory entries.
+    sub_directory_entries: NtfsDirectoryEntries,
 
-    /// Value to indicate the file entry has directory entries.
-    has_directory_entries: bool,
+    /// Value to indicate the file entry has sub directory entries.
+    has_sub_directory_entries: bool,
 
-    /// Value to indicate the directory entries were read.
-    read_directory_entries: bool,
+    /// Value to indicate the sub directory entries were read.
+    read_sub_directory_entries: bool,
 }
 
 impl NtfsFileEntry {
@@ -97,9 +97,9 @@ impl NtfsFileEntry {
             mft_attributes: NtfsMftAttributes::new(),
             directory_entry: directory_entry,
             directory_index: NtfsDirectoryIndex::new(cluster_block_size, case_folding_mappings),
-            directory_entries: NtfsDirectoryEntries::new(),
-            has_directory_entries: false,
-            read_directory_entries: false,
+            sub_directory_entries: NtfsDirectoryEntries::new(),
+            has_sub_directory_entries: false,
+            read_sub_directory_entries: false,
         }
     }
 
@@ -371,22 +371,22 @@ impl NtfsFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if !self.has_directory_entries {
+        if !self.has_sub_directory_entries {
             return Ok(0);
         }
-        if !self.read_directory_entries {
-            match self.read_directory_entries() {
+        if !self.read_sub_directory_entries {
+            match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries"
+                        "Unable to read sub directory entries"
                     );
                     return Err(error);
                 }
             }
         }
-        Ok(self.directory_entries.get_number_of_entries())
+        Ok(self.sub_directory_entries.get_number_of_entries())
     }
 
     /// Retrieves a specific sub file entry.
@@ -394,20 +394,20 @@ impl NtfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<NtfsFileEntry, ErrorTrace> {
-        if !self.read_directory_entries {
-            match self.read_directory_entries() {
+        if !self.read_sub_directory_entries {
+            match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries"
+                        "Unable to read sub directory entries"
                     );
                     return Err(error);
                 }
             }
         }
         let directory_entry: &NtfsDirectoryEntry = match self
-            .directory_entries
+            .sub_directory_entries
             .get_entry_by_index(sub_file_entry_index)
         {
             Ok(mft_entry) => mft_entry,
@@ -525,7 +525,7 @@ impl NtfsFileEntry {
         };
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from("$I30"));
 
-        self.has_directory_entries = self.mft_attributes.has_attribute_group(&i30_index_name);
+        self.has_sub_directory_entries = self.mft_attributes.has_attribute_group(&i30_index_name);
 
         Ok(())
     }
@@ -535,7 +535,7 @@ impl NtfsFileEntry {
         &mut self,
         sub_file_entry_name: &Ucs2String,
     ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
-        if !self.has_directory_entries {
+        if !self.has_sub_directory_entries {
             return Ok(None);
         }
         if !self.directory_index.is_initialized {
@@ -598,9 +598,10 @@ impl NtfsFileEntry {
         }
     }
 
-    /// Determines if the file entry has directory entries.
+    /// Determines if the file entry has sub directory entries.
+    #[deprecated(since = "0.0.1", note = "please use `is_directory` instead")]
     pub fn has_directory_entries(&self) -> bool {
-        self.has_directory_entries
+        self.has_sub_directory_entries
     }
 
     /// Determines if the file entry is allocated (used).
@@ -611,6 +612,11 @@ impl NtfsFileEntry {
     /// Determines if the file entry is marked as bad.
     pub fn is_bad(&self) -> bool {
         self.mft_entry.is_bad
+    }
+
+    /// Determines if the file entry is a directory.
+    pub fn is_directory(&self) -> bool {
+        self.has_sub_directory_entries
     }
 
     /// Determines if the file entry is empty.
@@ -639,10 +645,12 @@ impl NtfsFileEntry {
         }
     }
 
-    /// Reads the directory entries.
-    fn read_directory_entries(&mut self) -> Result<(), ErrorTrace> {
-        if !self.has_directory_entries {
-            return Err(keramics_core::error_trace_new!("Missing directory entries"));
+    /// Reads the sub directory entries.
+    fn read_sub_directory_entries(&mut self) -> Result<(), ErrorTrace> {
+        if !self.has_sub_directory_entries {
+            return Err(keramics_core::error_trace_new!(
+                "Missing sub directory entries"
+            ));
         }
         if !self.directory_index.is_initialized {
             match self.directory_index.initialize(&self.mft_attributes) {
@@ -658,18 +666,18 @@ impl NtfsFileEntry {
         }
         match self
             .directory_index
-            .get_directory_entries(&self.data_stream, &mut self.directory_entries)
+            .get_directory_entries(&self.data_stream, &mut self.sub_directory_entries)
         {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to retrieve directory entries"
+                    "Unable to retrieve sub directory entries"
                 );
                 return Err(error);
             }
         }
-        self.read_directory_entries = true;
+        self.read_sub_directory_entries = true;
 
         Ok(())
     }
@@ -678,6 +686,25 @@ impl NtfsFileEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    use crate::ntfs::file_system::NtfsFileSystem;
+    use crate::ntfs::path::NtfsPath;
+
+    use crate::tests::get_test_data_path;
+
+    fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
 
     // TODO: add tests for get_access_time
     // TODO: add tests for get_base_record_file_reference
@@ -694,15 +721,115 @@ mod tests {
     // TODO: add tests for get_data_stream_by_name
     // TODO: add tests for get_number_of_data_forks
     // TODO: add tests for get_data_fork_by_index
-    // TODO: add tests for get_number_of_sub_file_entries
-    // TODO: add tests for get_sub_file_entry_by_index
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
+        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        let number_of_sub_file_entries: usize = ntfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 3);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
+        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        let number_of_sub_file_entries: usize = ntfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
+        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        let sub_file_entry: NtfsFileEntry = ntfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(Ucs2String::from(
+                "My long, very long file name, so very long"
+            ))
+            .as_ref()
+        );
+
+        Ok(())
+    }
+
     // TODO: add tests for get_sub_file_entry_by_name
     // TODO: add tests for has_directory_entries
     // TODO: add tests for is_allocated
     // TODO: add tests for is_bad
+
+    #[test]
+    fn test_is_directory() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\");
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        assert_eq!(ntfs_file_entry.is_directory(), true);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        assert_eq!(ntfs_file_entry.is_directory(), true);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        assert_eq!(ntfs_file_entry.is_directory(), false);
+
+        Ok(())
+    }
+
     // TODO: add tests for is_empty
     // TODO: add tests for is_junction
-    // TODO: add tests for is_root_directory
+
+    #[test]
+    fn test_is_root_directory() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\");
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        assert_eq!(ntfs_file_entry.is_root_directory(), true);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        assert_eq!(ntfs_file_entry.is_root_directory(), false);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+            .get_file_entry_by_path(&ntfs_path)?
+            .unwrap();
+
+        assert_eq!(ntfs_file_entry.is_root_directory(), false);
+
+        Ok(())
+    }
+
     // TODO: add tests for is_symbolic_link
-    // TODO: add tests for read_directory_entries
+    // TODO: add tests for read_sub_directory_entries
 }
