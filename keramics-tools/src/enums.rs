@@ -48,9 +48,6 @@ pub enum EncodingType {
     /// ASCII
     Ascii,
 
-    /// Auto detect
-    AutoDetect,
-
     /// ISO 8859-1 (Western European)
     #[value(alias("latin-1"))]
     Iso8859_1,

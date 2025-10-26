@@ -27,103 +27,16 @@ pub struct DecoderIso8859_4<'a> {
 }
 
 impl<'a> DecoderIso8859_4<'a> {
-    const BASE_0XA0: [Option<u16>; 96] = [
-        Some(0x00a0),
-        Some(0x0104),
-        Some(0x0138),
-        Some(0x0156),
-        Some(0x00a4),
-        Some(0x0128),
-        Some(0x013b),
-        Some(0x00a7),
-        Some(0x00a8),
-        Some(0x0160),
-        Some(0x0112),
-        Some(0x0122),
-        Some(0x0166),
-        Some(0x00ad),
-        Some(0x017d),
-        Some(0x00af),
-        Some(0x00b0),
-        Some(0x0105),
-        Some(0x02db),
-        Some(0x0157),
-        Some(0x00b4),
-        Some(0x0129),
-        Some(0x013c),
-        Some(0x02c7),
-        Some(0x00b8),
-        Some(0x0161),
-        Some(0x0113),
-        Some(0x0123),
-        Some(0x0167),
-        Some(0x014a),
-        Some(0x017e),
-        Some(0x014b),
-        Some(0x0100),
-        Some(0x00c1),
-        Some(0x00c2),
-        Some(0x00c3),
-        Some(0x00c4),
-        Some(0x00c5),
-        Some(0x00c6),
-        Some(0x012e),
-        Some(0x010c),
-        Some(0x00c9),
-        Some(0x0118),
-        Some(0x00cb),
-        Some(0x0116),
-        Some(0x00cd),
-        Some(0x00ce),
-        Some(0x012a),
-        Some(0x0110),
-        Some(0x0145),
-        Some(0x014c),
-        Some(0x0136),
-        Some(0x00d4),
-        Some(0x00d5),
-        Some(0x00d6),
-        Some(0x00d7),
-        Some(0x00d8),
-        Some(0x0172),
-        Some(0x00da),
-        Some(0x00db),
-        Some(0x00dc),
-        Some(0x0168),
-        Some(0x016a),
-        Some(0x00df),
-        Some(0x0101),
-        Some(0x00e1),
-        Some(0x00e2),
-        Some(0x00e3),
-        Some(0x00e4),
-        Some(0x00e5),
-        Some(0x00e6),
-        Some(0x012f),
-        Some(0x010d),
-        Some(0x00e9),
-        Some(0x0119),
-        Some(0x00eb),
-        Some(0x0117),
-        Some(0x00ed),
-        Some(0x00ee),
-        Some(0x012b),
-        Some(0x0111),
-        Some(0x0146),
-        Some(0x014d),
-        Some(0x0137),
-        Some(0x00f4),
-        Some(0x00f5),
-        Some(0x00f6),
-        Some(0x00f7),
-        Some(0x00f8),
-        Some(0x0173),
-        Some(0x00fa),
-        Some(0x00fb),
-        Some(0x00fc),
-        Some(0x0169),
-        Some(0x016b),
-        Some(0x02d9),
+    const BASE_0XA0: [u16; 96] = [
+        0x00a0, 0x0104, 0x0138, 0x0156, 0x00a4, 0x0128, 0x013b, 0x00a7, 0x00a8, 0x0160, 0x0112,
+        0x0122, 0x0166, 0x00ad, 0x017d, 0x00af, 0x00b0, 0x0105, 0x02db, 0x0157, 0x00b4, 0x0129,
+        0x013c, 0x02c7, 0x00b8, 0x0161, 0x0113, 0x0123, 0x0167, 0x014a, 0x017e, 0x014b, 0x0100,
+        0x00c1, 0x00c2, 0x00c3, 0x00c4, 0x00c5, 0x00c6, 0x012e, 0x010c, 0x00c9, 0x0118, 0x00cb,
+        0x0116, 0x00cd, 0x00ce, 0x012a, 0x0110, 0x0145, 0x014c, 0x0136, 0x00d4, 0x00d5, 0x00d6,
+        0x00d7, 0x00d8, 0x0172, 0x00da, 0x00db, 0x00dc, 0x0168, 0x016a, 0x00df, 0x0101, 0x00e1,
+        0x00e2, 0x00e3, 0x00e4, 0x00e5, 0x00e6, 0x012f, 0x010d, 0x00e9, 0x0119, 0x00eb, 0x0117,
+        0x00ed, 0x00ee, 0x012b, 0x0111, 0x0146, 0x014d, 0x0137, 0x00f4, 0x00f5, 0x00f6, 0x00f7,
+        0x00f8, 0x0173, 0x00fa, 0x00fb, 0x00fc, 0x0169, 0x016b, 0x02d9,
     ];
 
     /// Creates a new decoder.
@@ -144,17 +57,12 @@ impl<'a> Iterator for DecoderIso8859_4<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0xa0 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0xa0 {
+                    *byte_value as u16
                 } else {
-                    match Self::BASE_0XA0[(*byte_value - 0xa0) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode ISO-8859-4: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    }
-                }
+                    Self::BASE_0XA0[(*byte_value - 0xa0) as usize]
+                };
+                Some(Ok(code_point as u32))
             }
             None => None,
         }
@@ -489,12 +397,18 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a1];
+
+        let mut encoder: EncoderIso8859_4 = EncoderIso8859_4::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderIso8859_4 = EncoderIso8859_4::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

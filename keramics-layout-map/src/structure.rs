@@ -216,6 +216,9 @@ impl StructureLayoutField {
     pub fn get_byte_size(&self) -> Option<usize> {
         match &self.data_type {
             DataType::ByteString => Some(1),
+            DataType::FatDate => Some(2),
+            DataType::FatTimeDate => Some(4),
+            DataType::FatTimeDate10Ms => Some(5),
             DataType::Filetime => Some(8),
             DataType::PosixTime32 => Some(4),
             DataType::SignedInteger8Bit => Some(1),
@@ -381,6 +384,15 @@ impl StructureLayoutField {
         data_offset: TokenStream,
     ) -> TokenStream {
         match &self.data_type {
+            DataType::FatDate => {
+                quote!(keramics_datetime::FatDate::from_bytes(&data[#data_offset..#data_offset + 2]))
+            }
+            DataType::FatTimeDate => {
+                quote!(keramics_datetime::FatTimeDate::from_bytes(&data[#data_offset..#data_offset + 4]))
+            }
+            DataType::FatTimeDate10Ms => {
+                quote!(keramics_datetime::FatTimeDate10Ms::from_bytes(&data[#data_offset..#data_offset + 5]))
+            }
             DataType::Filetime => {
                 quote!(keramics_datetime::Filetime::from_bytes(&data[#data_offset..#data_offset + 8]))
             }
@@ -478,6 +490,9 @@ impl StructureLayoutField {
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
             DataType::ByteString => quote!(keramics_types::ByteString),
+            DataType::FatDate => quote!(keramics_datetime::FatDate),
+            DataType::FatTimeDate => quote!(keramics_datetime::FatTimeDate),
+            DataType::FatTimeDate10Ms => quote!(keramics_datetime::FatTimeDate10Ms),
             DataType::Filetime => quote!(keramics_datetime::Filetime),
             DataType::PosixTime32 => quote!(keramics_datetime::PosixTime32),
             DataType::SignedInteger8Bit => quote!(i8),

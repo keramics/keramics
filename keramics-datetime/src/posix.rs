@@ -80,7 +80,7 @@ impl fmt::Display for PosixTime32 {
     }
 }
 
-/// 64-bit POSIX timestamp in nanoseconds.
+/// 64-bit POSIX timestamp in nanoseconds (struct timespec).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PosixTime64Ns {
     /// Number of seconds since January 1, 1970 (UTC) (POSIX epoch).
@@ -158,7 +158,7 @@ mod tests {
     }
 
     #[test]
-    fn test_posix_time64ns_to_iso8601_string() {
+    fn test_posix_time64_ns_to_iso8601_string() {
         let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591, 987654321);
 
         let string: String = test_struct.to_iso8601_string();
