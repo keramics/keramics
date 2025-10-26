@@ -43,8 +43,8 @@ struct CommandLineArguments {
     debug: bool,
 
     /// Character encoding
-    #[arg(long, default_value_t = EncodingType::AutoDetect, value_enum)]
-    encoding: EncodingType,
+    #[arg(long, value_enum)]
+    encoding: Option<EncodingType>,
 
     #[arg(short, long, default_value_t = 0)]
     /// Offset within the source file
@@ -179,24 +179,24 @@ fn main() -> ExitCode {
         }
     };
     let character_encoding: Option<CharacterEncoding> = match &arguments.encoding {
-        EncodingType::Ascii => Some(CharacterEncoding::Ascii),
-        EncodingType::AutoDetect => None,
-        EncodingType::Iso8859_1 => Some(CharacterEncoding::Iso8859_1),
-        EncodingType::Iso8859_2 => Some(CharacterEncoding::Iso8859_2),
-        EncodingType::Iso8859_3 => Some(CharacterEncoding::Iso8859_3),
-        EncodingType::Iso8859_4 => Some(CharacterEncoding::Iso8859_4),
-        EncodingType::Iso8859_5 => Some(CharacterEncoding::Iso8859_5),
-        EncodingType::Iso8859_6 => Some(CharacterEncoding::Iso8859_6),
-        EncodingType::Iso8859_7 => Some(CharacterEncoding::Iso8859_7),
-        EncodingType::Iso8859_8 => Some(CharacterEncoding::Iso8859_8),
-        EncodingType::Iso8859_9 => Some(CharacterEncoding::Iso8859_9),
-        EncodingType::Iso8859_10 => Some(CharacterEncoding::Iso8859_10),
-        EncodingType::Iso8859_11 => Some(CharacterEncoding::Iso8859_11),
-        EncodingType::Iso8859_13 => Some(CharacterEncoding::Iso8859_13),
-        EncodingType::Iso8859_14 => Some(CharacterEncoding::Iso8859_14),
-        EncodingType::Iso8859_15 => Some(CharacterEncoding::Iso8859_15),
-        EncodingType::Iso8859_16 => Some(CharacterEncoding::Iso8859_16),
-        EncodingType::Utf8 => Some(CharacterEncoding::Utf8),
+        Some(EncodingType::Ascii) => Some(CharacterEncoding::Ascii),
+        Some(EncodingType::Iso8859_1) => Some(CharacterEncoding::Iso8859_1),
+        Some(EncodingType::Iso8859_2) => Some(CharacterEncoding::Iso8859_2),
+        Some(EncodingType::Iso8859_3) => Some(CharacterEncoding::Iso8859_3),
+        Some(EncodingType::Iso8859_4) => Some(CharacterEncoding::Iso8859_4),
+        Some(EncodingType::Iso8859_5) => Some(CharacterEncoding::Iso8859_5),
+        Some(EncodingType::Iso8859_6) => Some(CharacterEncoding::Iso8859_6),
+        Some(EncodingType::Iso8859_7) => Some(CharacterEncoding::Iso8859_7),
+        Some(EncodingType::Iso8859_8) => Some(CharacterEncoding::Iso8859_8),
+        Some(EncodingType::Iso8859_9) => Some(CharacterEncoding::Iso8859_9),
+        Some(EncodingType::Iso8859_10) => Some(CharacterEncoding::Iso8859_10),
+        Some(EncodingType::Iso8859_11) => Some(CharacterEncoding::Iso8859_11),
+        Some(EncodingType::Iso8859_13) => Some(CharacterEncoding::Iso8859_13),
+        Some(EncodingType::Iso8859_14) => Some(CharacterEncoding::Iso8859_14),
+        Some(EncodingType::Iso8859_15) => Some(CharacterEncoding::Iso8859_15),
+        Some(EncodingType::Iso8859_16) => Some(CharacterEncoding::Iso8859_16),
+        Some(EncodingType::Utf8) => Some(CharacterEncoding::Utf8),
+        None => None,
     };
     let mut file_range_stream: FileRangeDataStream = FileRangeDataStream::new(arguments.offset);
 

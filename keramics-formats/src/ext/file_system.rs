@@ -21,6 +21,7 @@ use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
 use super::constants::*;
+use super::directory_entries::ExtDirectoryEntries;
 use super::features::ExtFeatures;
 use super::file_entry::ExtFileEntry;
 use super::group_descriptor::ExtGroupDescriptor;
@@ -34,6 +35,9 @@ use super::superblock::ExtSuperblock;
 pub struct ExtFileSystem {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
+
+    /// Character encoding.
+    character_encoding: CharacterEncoding,
 
     /// Features.
     features: ExtFeatures,
@@ -71,13 +75,14 @@ impl ExtFileSystem {
     pub fn new() -> Self {
         Self {
             data_stream: None,
-            volume_label: None,
+            character_encoding: CharacterEncoding::Utf8,
             features: ExtFeatures::new(),
             number_of_inodes: 0,
             block_size: 0,
             inode_size: 0,
             inode_table: Arc::new(ExtInodeTable::new()),
             metadata_checksum_seed: 0,
+            volume_label: None,
             last_mount_path: ByteString::new(),
             last_mount_time: DateTime::NotSet,
             last_written_time: DateTime::NotSet,
@@ -147,6 +152,7 @@ impl ExtFileSystem {
             inode_number,
             inode,
             None,
+            ExtDirectoryEntries::new(&self.character_encoding),
         ))
     }
 
@@ -282,7 +288,7 @@ impl ExtFileSystem {
                 }
                 if block_group_number == 0 {
                     let mut superblock: ExtSuperblock =
-                        ExtSuperblock::new(&self.inode_table.encoding);
+                        ExtSuperblock::new(&self.character_encoding);
 
                     match superblock
                         .read_at_position(data_stream, SeekFrom::Start(superblock_offset))
@@ -341,7 +347,7 @@ impl ExtFileSystem {
                     };
                 } else {
                     let mut superblock: ExtSuperblock =
-                        ExtSuperblock::new(&self.inode_table.encoding);
+                        ExtSuperblock::new(&self.character_encoding);
 
                     match superblock
                         .read_at_position(data_stream, SeekFrom::Start(superblock_offset))
@@ -484,16 +490,8 @@ impl ExtFileSystem {
         &mut self,
         character_encoding: &CharacterEncoding,
     ) -> Result<(), ErrorTrace> {
-        match Arc::get_mut(&mut self.inode_table) {
-            Some(inode_table) => {
-                inode_table.encoding = character_encoding.clone();
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to inode table"
-                ));
-            }
-        }
+        self.character_encoding = character_encoding.clone();
+
         Ok(())
     }
 }
@@ -623,10 +621,10 @@ mod tests {
     fn test_set_character_encoding() -> Result<(), ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        assert_eq!(file_system.inode_table.encoding, CharacterEncoding::Utf8);
+        assert_eq!(file_system.character_encoding, CharacterEncoding::Utf8);
 
         file_system.set_character_encoding(&CharacterEncoding::Ascii)?;
-        assert_eq!(file_system.inode_table.encoding, CharacterEncoding::Ascii);
+        assert_eq!(file_system.character_encoding, CharacterEncoding::Ascii);
 
         Ok(())
     }

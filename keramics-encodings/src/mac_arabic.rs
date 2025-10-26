@@ -27,135 +27,19 @@ pub struct DecoderMacArabic<'a> {
 }
 
 impl<'a> DecoderMacArabic<'a> {
-    const BASE_0X80: [Option<u16>; 128] = [
-        Some(0x00c4),
-        Some(0x00a0),
-        Some(0x00c7),
-        Some(0x00c9),
-        Some(0x00d1),
-        Some(0x00d6),
-        Some(0x00dc),
-        Some(0x00e1),
-        Some(0x00e0),
-        Some(0x00e2),
-        Some(0x00e4),
-        Some(0x06ba),
-        Some(0x00ab),
-        Some(0x00e7),
-        Some(0x00e9),
-        Some(0x00e8),
-        Some(0x00ea),
-        Some(0x00eb),
-        Some(0x00ed),
-        Some(0x2026),
-        Some(0x00ee),
-        Some(0x00ef),
-        Some(0x00f1),
-        Some(0x00f3),
-        Some(0x00bb),
-        Some(0x00f4),
-        Some(0x00f6),
-        Some(0x00f7),
-        Some(0x00fa),
-        Some(0x00f9),
-        Some(0x00fb),
-        Some(0x00fc),
-        Some(0x0020),
-        Some(0x0021),
-        Some(0x0022),
-        Some(0x0023),
-        Some(0x0024),
-        Some(0x066a),
-        Some(0x0026),
-        Some(0x0027),
-        Some(0x0028),
-        Some(0x0029),
-        Some(0x002a),
-        Some(0x002b),
-        Some(0x060c),
-        Some(0x002d),
-        Some(0x002e),
-        Some(0x002f),
-        Some(0x0660),
-        Some(0x0661),
-        Some(0x0662),
-        Some(0x0663),
-        Some(0x0664),
-        Some(0x0665),
-        Some(0x0666),
-        Some(0x0667),
-        Some(0x0668),
-        Some(0x0669),
-        Some(0x003a),
-        Some(0x061b),
-        Some(0x003c),
-        Some(0x003d),
-        Some(0x003e),
-        Some(0x061f),
-        Some(0x274a),
-        Some(0x0621),
-        Some(0x0622),
-        Some(0x0623),
-        Some(0x0624),
-        Some(0x0625),
-        Some(0x0626),
-        Some(0x0627),
-        Some(0x0628),
-        Some(0x0629),
-        Some(0x062a),
-        Some(0x062b),
-        Some(0x062c),
-        Some(0x062d),
-        Some(0x062e),
-        Some(0x062f),
-        Some(0x0630),
-        Some(0x0631),
-        Some(0x0632),
-        Some(0x0633),
-        Some(0x0634),
-        Some(0x0635),
-        Some(0x0636),
-        Some(0x0637),
-        Some(0x0638),
-        Some(0x0639),
-        Some(0x063a),
-        Some(0x005b),
-        Some(0x005c),
-        Some(0x005d),
-        Some(0x005e),
-        Some(0x005f),
-        Some(0x0640),
-        Some(0x0641),
-        Some(0x0642),
-        Some(0x0643),
-        Some(0x0644),
-        Some(0x0645),
-        Some(0x0646),
-        Some(0x0647),
-        Some(0x0648),
-        Some(0x0649),
-        Some(0x064a),
-        Some(0x064b),
-        Some(0x064c),
-        Some(0x064d),
-        Some(0x064e),
-        Some(0x064f),
-        Some(0x0650),
-        Some(0x0651),
-        Some(0x0652),
-        Some(0x067e),
-        Some(0x0679),
-        Some(0x0686),
-        Some(0x06d5),
-        Some(0x06a4),
-        Some(0x06af),
-        Some(0x0688),
-        Some(0x0691),
-        Some(0x007b),
-        Some(0x007c),
-        Some(0x007d),
-        Some(0x0698),
-        Some(0x06d2),
+    const BASE_0X80: [u16; 128] = [
+        0x00c4, 0x00a0, 0x00c7, 0x00c9, 0x00d1, 0x00d6, 0x00dc, 0x00e1, 0x00e0, 0x00e2, 0x00e4,
+        0x06ba, 0x00ab, 0x00e7, 0x00e9, 0x00e8, 0x00ea, 0x00eb, 0x00ed, 0x2026, 0x00ee, 0x00ef,
+        0x00f1, 0x00f3, 0x00bb, 0x00f4, 0x00f6, 0x00f7, 0x00fa, 0x00f9, 0x00fb, 0x00fc, 0x0020,
+        0x0021, 0x0022, 0x0023, 0x0024, 0x066a, 0x0026, 0x0027, 0x0028, 0x0029, 0x002a, 0x002b,
+        0x060c, 0x002d, 0x002e, 0x002f, 0x0660, 0x0661, 0x0662, 0x0663, 0x0664, 0x0665, 0x0666,
+        0x0667, 0x0668, 0x0669, 0x003a, 0x061b, 0x003c, 0x003d, 0x003e, 0x061f, 0x274a, 0x0621,
+        0x0622, 0x0623, 0x0624, 0x0625, 0x0626, 0x0627, 0x0628, 0x0629, 0x062a, 0x062b, 0x062c,
+        0x062d, 0x062e, 0x062f, 0x0630, 0x0631, 0x0632, 0x0633, 0x0634, 0x0635, 0x0636, 0x0637,
+        0x0638, 0x0639, 0x063a, 0x005b, 0x005c, 0x005d, 0x005e, 0x005f, 0x0640, 0x0641, 0x0642,
+        0x0643, 0x0644, 0x0645, 0x0646, 0x0647, 0x0648, 0x0649, 0x064a, 0x064b, 0x064c, 0x064d,
+        0x064e, 0x064f, 0x0650, 0x0651, 0x0652, 0x067e, 0x0679, 0x0686, 0x06d5, 0x06a4, 0x06af,
+        0x0688, 0x0691, 0x007b, 0x007c, 0x007d, 0x0698, 0x06d2,
     ];
 
     /// Creates a new decoder.
@@ -176,17 +60,12 @@ impl<'a> Iterator for DecoderMacArabic<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0x80 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0x80 {
+                    *byte_value as u16
                 } else {
-                    match Self::BASE_0X80[(*byte_value - 0x80) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode MacArabic: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    }
-                }
+                    Self::BASE_0X80[(*byte_value - 0x80) as usize]
+                };
+                Some(Ok(code_point as u32))
             }
             None => None,
         }
@@ -203,39 +82,39 @@ pub struct EncoderMacArabic<'a> {
 }
 
 impl<'a> EncoderMacArabic<'a> {
-    const BASE_0X0020: [Option<&'static [u8]>; 32] = [
-        Some(&[0xa0]),
-        Some(&[0xa1]),
-        Some(&[0xa2]),
-        Some(&[0xa3]),
-        Some(&[0xa4]),
-        Some(&[0x25]),
-        Some(&[0xa6]),
-        Some(&[0xa7]),
-        Some(&[0xa8]),
-        Some(&[0xa9]),
-        Some(&[0xaa]),
-        Some(&[0xab]),
-        Some(&[0x2c]),
-        Some(&[0xad]),
-        Some(&[0xae]),
-        Some(&[0xaf]),
-        Some(&[0x30]),
-        Some(&[0x31]),
-        Some(&[0x32]),
-        Some(&[0x33]),
-        Some(&[0x34]),
-        Some(&[0x35]),
-        Some(&[0x36]),
-        Some(&[0x37]),
-        Some(&[0x38]),
-        Some(&[0x39]),
-        Some(&[0xba]),
-        Some(&[0x3b]),
-        Some(&[0xbc]),
-        Some(&[0xbd]),
-        Some(&[0xbe]),
-        Some(&[0x3f]),
+    const BASE_0X0020: [&'static [u8]; 32] = [
+        &[0xa0],
+        &[0xa1],
+        &[0xa2],
+        &[0xa3],
+        &[0xa4],
+        &[0x25],
+        &[0xa6],
+        &[0xa7],
+        &[0xa8],
+        &[0xa9],
+        &[0xaa],
+        &[0xab],
+        &[0x2c],
+        &[0xad],
+        &[0xae],
+        &[0xaf],
+        &[0x30],
+        &[0x31],
+        &[0x32],
+        &[0x33],
+        &[0x34],
+        &[0x35],
+        &[0x36],
+        &[0x37],
+        &[0x38],
+        &[0x39],
+        &[0xba],
+        &[0x3b],
+        &[0xbc],
+        &[0xbd],
+        &[0xbe],
+        &[0x3f],
     ];
 
     const BASE_0X00A0: [Option<&'static [u8]>; 96] = [
@@ -547,15 +426,10 @@ impl<'a> Iterator for EncoderMacArabic<'a> {
                         Some(Ok(vec![*code_point as u8]))
                     }
                     0x0020..0x0040 => {
-                        match Self::BASE_0X0020[(*code_point as u32 - 0x0020) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacArabic",
-                                    *code_point as u32
-                                ))));
-                            }
-                        }
+                        let bytes: &[u8] =
+                            Self::BASE_0X0020[(*code_point as u32 - 0x0020) as usize];
+
+                        Some(Ok(bytes.to_vec()))
                     }
                     0x00a0..0x0100 => {
                         match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
@@ -648,12 +522,25 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a1];
+
+        let mut encoder: EncoderMacArabic = EncoderMacArabic::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0608];
+
+        let mut encoder: EncoderMacArabic = EncoderMacArabic::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderMacArabic = EncoderMacArabic::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

@@ -16,7 +16,6 @@ use std::io::SeekFrom;
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_encodings::CharacterEncoding;
 
 use crate::block_tree::BlockTree;
 
@@ -31,9 +30,6 @@ pub struct ExtInodeTable {
 
     /// Format version.
     format_version: u8,
-
-    /// Character encoding.
-    pub encoding: CharacterEncoding,
 
     /// Metadata checksum seed.
     metadata_checksum_seed: Option<u32>,
@@ -57,7 +53,6 @@ impl ExtInodeTable {
         Self {
             mediator: Mediator::current(),
             format_version: 2,
-            encoding: CharacterEncoding::Utf8,
             metadata_checksum_seed: None,
             block_size: 0,
             inode_size: 0,

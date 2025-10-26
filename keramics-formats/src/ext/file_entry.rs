@@ -56,6 +56,7 @@ impl ExtFileEntry {
         inode_number: u32,
         inode: ExtInode,
         name: Option<ByteString>,
+        sub_directory_entries: ExtDirectoryEntries,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
@@ -63,7 +64,7 @@ impl ExtFileEntry {
             inode_number: inode_number,
             inode: inode,
             name: name,
-            sub_directory_entries: ExtDirectoryEntries::new(&inode_table.encoding),
+            sub_directory_entries: sub_directory_entries,
             symbolic_link_target: None,
         }
     }
@@ -297,6 +298,7 @@ impl ExtFileEntry {
                     directory_entry.inode_number,
                     inode,
                     Some(name.clone()),
+                    ExtDirectoryEntries::new(&self.sub_directory_entries.encoding),
                 ))
             }
             None => Err(keramics_core::error_trace_new!(format!(
@@ -326,8 +328,9 @@ impl ExtFileEntry {
             }
         }
         let mut encoded_name: ByteString =
-            ByteString::new_with_encoding(&self.inode_table.encoding);
-        let lookup_name: &ByteString = if sub_file_entry_name.encoding == self.inode_table.encoding
+            ByteString::new_with_encoding(&self.sub_directory_entries.encoding);
+        let lookup_name: &ByteString = if sub_file_entry_name.encoding
+            == self.sub_directory_entries.encoding
         {
             sub_file_entry_name
         } else {
@@ -361,6 +364,7 @@ impl ExtFileEntry {
                     directory_entry.inode_number,
                     inode,
                     Some(name.clone()),
+                    ExtDirectoryEntries::new(&self.sub_directory_entries.encoding),
                 )))
             }
             None => Ok(None),

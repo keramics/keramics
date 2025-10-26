@@ -27,135 +27,19 @@ pub struct DecoderKoi8U<'a> {
 }
 
 impl<'a> DecoderKoi8U<'a> {
-    const BASE_0X80: [Option<u16>; 128] = [
-        Some(0x2500),
-        Some(0x2502),
-        Some(0x250c),
-        Some(0x2510),
-        Some(0x2514),
-        Some(0x2518),
-        Some(0x251c),
-        Some(0x2524),
-        Some(0x252c),
-        Some(0x2534),
-        Some(0x253c),
-        Some(0x2580),
-        Some(0x2584),
-        Some(0x2588),
-        Some(0x258c),
-        Some(0x2590),
-        Some(0x2591),
-        Some(0x2592),
-        Some(0x2593),
-        Some(0x2320),
-        Some(0x25a0),
-        Some(0x2219),
-        Some(0x221a),
-        Some(0x2248),
-        Some(0x2264),
-        Some(0x2265),
-        Some(0x00a0),
-        Some(0x2321),
-        Some(0x00b0),
-        Some(0x00b2),
-        Some(0x00b7),
-        Some(0x00f7),
-        Some(0x2550),
-        Some(0x2551),
-        Some(0x2552),
-        Some(0x0451),
-        Some(0x0454),
-        Some(0x2554),
-        Some(0x0456),
-        Some(0x0457),
-        Some(0x2557),
-        Some(0x2558),
-        Some(0x2559),
-        Some(0x255a),
-        Some(0x255b),
-        Some(0x0491),
-        Some(0x255d),
-        Some(0x255e),
-        Some(0x255f),
-        Some(0x2560),
-        Some(0x2561),
-        Some(0x0401),
-        Some(0x0404),
-        Some(0x2563),
-        Some(0x0406),
-        Some(0x0407),
-        Some(0x2566),
-        Some(0x2567),
-        Some(0x2568),
-        Some(0x2569),
-        Some(0x256a),
-        Some(0x0490),
-        Some(0x256c),
-        Some(0x00a9),
-        Some(0x044e),
-        Some(0x0430),
-        Some(0x0431),
-        Some(0x0446),
-        Some(0x0434),
-        Some(0x0435),
-        Some(0x0444),
-        Some(0x0433),
-        Some(0x0445),
-        Some(0x0438),
-        Some(0x0439),
-        Some(0x043a),
-        Some(0x043b),
-        Some(0x043c),
-        Some(0x043d),
-        Some(0x043e),
-        Some(0x043f),
-        Some(0x044f),
-        Some(0x0440),
-        Some(0x0441),
-        Some(0x0442),
-        Some(0x0443),
-        Some(0x0436),
-        Some(0x0432),
-        Some(0x044c),
-        Some(0x044b),
-        Some(0x0437),
-        Some(0x0448),
-        Some(0x044d),
-        Some(0x0449),
-        Some(0x0447),
-        Some(0x044a),
-        Some(0x042e),
-        Some(0x0410),
-        Some(0x0411),
-        Some(0x0426),
-        Some(0x0414),
-        Some(0x0415),
-        Some(0x0424),
-        Some(0x0413),
-        Some(0x0425),
-        Some(0x0418),
-        Some(0x0419),
-        Some(0x041a),
-        Some(0x041b),
-        Some(0x041c),
-        Some(0x041d),
-        Some(0x041e),
-        Some(0x041f),
-        Some(0x042f),
-        Some(0x0420),
-        Some(0x0421),
-        Some(0x0422),
-        Some(0x0423),
-        Some(0x0416),
-        Some(0x0412),
-        Some(0x042c),
-        Some(0x042b),
-        Some(0x0417),
-        Some(0x0428),
-        Some(0x042d),
-        Some(0x0429),
-        Some(0x0427),
-        Some(0x042a),
+    const BASE_0X80: [u16; 128] = [
+        0x2500, 0x2502, 0x250c, 0x2510, 0x2514, 0x2518, 0x251c, 0x2524, 0x252c, 0x2534, 0x253c,
+        0x2580, 0x2584, 0x2588, 0x258c, 0x2590, 0x2591, 0x2592, 0x2593, 0x2320, 0x25a0, 0x2219,
+        0x221a, 0x2248, 0x2264, 0x2265, 0x00a0, 0x2321, 0x00b0, 0x00b2, 0x00b7, 0x00f7, 0x2550,
+        0x2551, 0x2552, 0x0451, 0x0454, 0x2554, 0x0456, 0x0457, 0x2557, 0x2558, 0x2559, 0x255a,
+        0x255b, 0x0491, 0x255d, 0x255e, 0x255f, 0x2560, 0x2561, 0x0401, 0x0404, 0x2563, 0x0406,
+        0x0407, 0x2566, 0x2567, 0x2568, 0x2569, 0x256a, 0x0490, 0x256c, 0x00a9, 0x044e, 0x0430,
+        0x0431, 0x0446, 0x0434, 0x0435, 0x0444, 0x0433, 0x0445, 0x0438, 0x0439, 0x043a, 0x043b,
+        0x043c, 0x043d, 0x043e, 0x043f, 0x044f, 0x0440, 0x0441, 0x0442, 0x0443, 0x0436, 0x0432,
+        0x044c, 0x044b, 0x0437, 0x0448, 0x044d, 0x0449, 0x0447, 0x044a, 0x042e, 0x0410, 0x0411,
+        0x0426, 0x0414, 0x0415, 0x0424, 0x0413, 0x0425, 0x0418, 0x0419, 0x041a, 0x041b, 0x041c,
+        0x041d, 0x041e, 0x041f, 0x042f, 0x0420, 0x0421, 0x0422, 0x0423, 0x0416, 0x0412, 0x042c,
+        0x042b, 0x0417, 0x0428, 0x042d, 0x0429, 0x0427, 0x042a,
     ];
 
     /// Creates a new decoder.
@@ -176,17 +60,12 @@ impl<'a> Iterator for DecoderKoi8U<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0x80 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0x80 {
+                    *byte_value as u16
                 } else {
-                    match Self::BASE_0X80[(*byte_value - 0x80) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode KOI8-U: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    }
-                }
+                    Self::BASE_0X80[(*byte_value - 0x80) as usize]
+                };
+                Some(Ok(code_point as u32))
             }
             None => None,
         }
@@ -451,12 +330,25 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x0452];
+
+        let mut encoder: EncoderKoi8U = EncoderKoi8U::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2562];
+
+        let mut encoder: EncoderKoi8U = EncoderKoi8U::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderKoi8U = EncoderKoi8U::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

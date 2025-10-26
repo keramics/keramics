@@ -102,3 +102,56 @@ pub fn new_character_decoder<'a>(
         _ => todo!(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_character_decoder() {
+        let encodings: Vec<CharacterEncoding> = vec![
+            CharacterEncoding::Ascii,
+            CharacterEncoding::Iso8859_1,
+            CharacterEncoding::Iso8859_2,
+            CharacterEncoding::Iso8859_3,
+            CharacterEncoding::Iso8859_4,
+            CharacterEncoding::Iso8859_5,
+            CharacterEncoding::Iso8859_6,
+            CharacterEncoding::Iso8859_7,
+            CharacterEncoding::Iso8859_8,
+            CharacterEncoding::Iso8859_9,
+            CharacterEncoding::Iso8859_10,
+            CharacterEncoding::Iso8859_11,
+            CharacterEncoding::Iso8859_13,
+            CharacterEncoding::Iso8859_14,
+            CharacterEncoding::Iso8859_15,
+            CharacterEncoding::Iso8859_16,
+            CharacterEncoding::Koi8R,
+            CharacterEncoding::Koi8U,
+            CharacterEncoding::MacArabic,
+            CharacterEncoding::MacCeltic,
+            CharacterEncoding::MacCentralEurRoman,
+            CharacterEncoding::MacCroatian,
+            CharacterEncoding::MacCyrillic,
+            CharacterEncoding::MacDingbats,
+            CharacterEncoding::MacFarsi,
+            CharacterEncoding::MacGaelic,
+            CharacterEncoding::Windows874,
+            CharacterEncoding::Windows932,
+            CharacterEncoding::Windows1250,
+            CharacterEncoding::Windows1251,
+            CharacterEncoding::Windows1252,
+            CharacterEncoding::Windows1253,
+            CharacterEncoding::Windows1254,
+            CharacterEncoding::Windows1255,
+            CharacterEncoding::Windows1256,
+            CharacterEncoding::Windows1257,
+            CharacterEncoding::Windows1258,
+        ];
+        let byte_string: [u8; 8] = [b'K', b'e', b'r', b'a', b'm', b'i', b'c', b's'];
+
+        for encoding in encodings {
+            let _ = new_character_decoder(&encoding, &byte_string);
+        }
+    }
+}
