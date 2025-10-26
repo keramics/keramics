@@ -11,8 +11,6 @@
  * under the License.
  */
 
-use std::collections::BTreeMap;
-
 use keramics_core::ErrorTrace;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::ByteString;

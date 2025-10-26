@@ -16,21 +16,21 @@ use std::cmp::Ordering;
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
 /// 16-bit Universal Coded Character Set (UCS-2) string.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ucs2String {
     /// Elements.
     pub elements: Vec<u16>,
 }
 
 impl Ucs2String {
-    /// Creates a new UCS-2 string.
+    /// Creates a new string.
     pub fn new() -> Self {
         Self {
             elements: Vec::new(),
         }
     }
 
-    /// Reads a big-endian UCS-2 string from a byte sequence.
+    /// Reads a string from a byte sequence in big-endian.
     pub fn from_be_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
@@ -45,7 +45,7 @@ impl Ucs2String {
         Self { elements: elements }
     }
 
-    /// Reads a little-endian UCS-2 string from a byte sequence.
+    /// Reads a string from a byte sequence in little-endian.
     pub fn from_le_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
@@ -60,19 +60,19 @@ impl Ucs2String {
         Self { elements: elements }
     }
 
-    /// Determines if the UCS-2 string is empty.
+    /// Determines if the string is empty.
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
-    /// Retrieves the length (or size) of the UCS-2 string.
+    /// Retrieves the length (or size) of the string.
     pub fn len(&self) -> usize {
         self.elements.len()
     }
 
     // TODO: add read_data_be
 
-    /// Reads a little-endian UCS-2 string from a buffer.
+    /// Reads a string from a buffer in little-endian.
     pub fn read_data_le(&mut self, data: &[u8]) {
         let data_size: usize = data.len();
 
@@ -85,7 +85,7 @@ impl Ucs2String {
         }
     }
 
-    /// Compares two UCS-2 strings.
+    /// Compares two strings.
     pub fn compare(&self, other: &Self) -> Ordering {
         let self_size: usize = self.elements.len();
         let other_size: usize = other.len();
@@ -112,13 +112,18 @@ impl Ucs2String {
         Ordering::Equal
     }
 
-    /// Converts the UCS-2 string to a `String`.
+    /// Converts a [`Ucs2String`] to a [`String`].
     pub fn to_string(&self) -> String {
-        // TODO: escape the escape character (\)
         self.elements
             .iter()
             .map(|element| match char::from_u32(*element as u32) {
-                Some(unicode_character) => unicode_character.to_string(),
+                Some(unicode_character) => {
+                    if unicode_character == '\\' {
+                        String::from("\\\\")
+                    } else {
+                        unicode_character.to_string()
+                    }
+                }
                 None => format!("\\{{{:04x}}}", element),
             })
             .collect::<Vec<String>>()

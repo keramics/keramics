@@ -13,6 +13,8 @@
 
 mod ascii;
 mod base64;
+mod character_decoder;
+mod character_encoder;
 mod enums;
 mod iso8859_1;
 mod iso8859_10;
@@ -39,6 +41,7 @@ mod mac_cyrillic;
 mod mac_dingbats;
 mod mac_farsi;
 mod mac_gaelic;
+mod utf8;
 mod windows1250;
 mod windows1251;
 mod windows1252;
@@ -53,6 +56,8 @@ mod windows932;
 
 pub use ascii::{DecoderAscii, EncoderAscii};
 pub use base64::{Base64Context, Base64Stream};
+pub use character_decoder::{CharacterDecoder, new_character_decoder};
+pub use character_encoder::{CharacterEncoder, new_character_encoder};
 pub use enums::CharacterEncoding;
 pub use iso8859_1::{DecoderIso8859_1, EncoderIso8859_1};
 pub use iso8859_2::{DecoderIso8859_2, EncoderIso8859_2};
@@ -79,6 +84,7 @@ pub use mac_cyrillic::{DecoderMacCyrillic, EncoderMacCyrillic};
 pub use mac_dingbats::{DecoderMacDingbats, EncoderMacDingbats};
 pub use mac_farsi::{DecoderMacFarsi, EncoderMacFarsi};
 pub use mac_gaelic::{DecoderMacGaelic, EncoderMacGaelic};
+pub use utf8::DecoderUtf8;
 pub use windows874::{DecoderWindows874, EncoderWindows874};
 pub use windows932::{DecoderWindows932, EncoderWindows932};
 pub use windows1250::{DecoderWindows1250, EncoderWindows1250};

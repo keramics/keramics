@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-1 encoding.
+//! ISO-8859-1 (Latin-1 or Western European) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-1.
 

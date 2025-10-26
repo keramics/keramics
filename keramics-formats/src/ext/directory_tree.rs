@@ -16,6 +16,7 @@ use std::io::SeekFrom;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_encodings::CharacterEncoding;
 use keramics_types::{ByteString, bytes_to_u32_le};
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
@@ -26,15 +27,19 @@ pub struct ExtDirectoryTree {
     /// Mediator.
     mediator: MediatorReference,
 
+    /// Character encoding.
+    encoding: CharacterEncoding,
+
     /// Block size.
     block_size: u32,
 }
 
 impl ExtDirectoryTree {
-    /// Creates a new directory.
-    pub fn new(block_size: u32) -> Self {
+    /// Creates a new directory tree.
+    pub fn new(encoding: &CharacterEncoding, block_size: u32) -> Self {
         Self {
             mediator: Mediator::current(),
+            encoding: encoding.clone(),
             block_size: block_size,
         }
     }
@@ -138,7 +143,7 @@ impl ExtDirectoryTree {
             }
             data_offset += 8;
 
-            let name: ByteString = match entry.read_name(&data[data_offset..]) {
+            let name: ByteString = match entry.read_name(&data[data_offset..], &self.encoding) {
                 Ok(name) => name,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -280,7 +285,7 @@ mod tests {
     fn test_read_node_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = ExtDirectoryTree::new(1024);
+        let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 1024);
 
         let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
         test_struct.read_node_data(&test_data, 0, 1024, &mut entries)?;
@@ -295,7 +300,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = ExtDirectoryTree::new(1024);
+        let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 1024);
 
         let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
         test_struct.read_node_at_position(&data_stream, SeekFrom::Start(0), &mut entries)?;

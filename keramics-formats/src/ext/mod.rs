@@ -19,6 +19,7 @@ mod block_numbers_tree;
 mod block_range;
 mod block_stream;
 pub mod constants;
+mod directory_entries;
 mod directory_entry;
 mod directory_tree;
 mod extent_descriptor;

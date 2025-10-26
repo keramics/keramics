@@ -15,7 +15,7 @@ use std::io::{BufReader, Stdin};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
@@ -31,37 +31,12 @@ use keramics_vfs::{
 };
 
 mod display_path;
+mod enums;
 mod hasher;
 
-use display_path::{DisplayPath, DisplayPathType};
-use hasher::{DigestHashType, DigestHasher};
-
-#[derive(Clone, ValueEnum)]
-enum HashType {
-    /// MD5
-    Md5,
-
-    /// SHA1
-    Sha1,
-
-    /// SHA-224
-    Sha224,
-
-    /// SHA-256
-    Sha256,
-
-    /// SHA-512
-    Sha512,
-}
-
-#[derive(Clone, ValueEnum)]
-enum VolumePathType {
-    /// Identifier based volume or partition path, such as /apfs{f449e580-e355-4e74-8880-05e46e4e3b1e}
-    Identifier,
-
-    /// Index based volume or partition path, such as /apfs1 or /p1
-    Index,
-}
+use crate::display_path::DisplayPath;
+use crate::enums::{DigestHashType, DisplayPathType};
+use crate::hasher::DigestHasher;
 
 #[derive(Parser)]
 #[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
@@ -71,8 +46,8 @@ struct CommandLineArguments {
     debug: bool,
 
     /// Digest hash type
-    #[arg(short, long, default_value_t = HashType::Md5, value_enum)]
-    digest_hash_type: HashType,
+    #[arg(short, long, default_value_t = DigestHashType::Md5, value_enum)]
+    digest_hash_type: DigestHashType,
 
     /// Path of the file to read the data from, if not provided the data will be read from standard input
     source: Option<PathBuf>,
@@ -82,8 +57,8 @@ struct CommandLineArguments {
     stop_on_error: bool,
 
     /// Volume or partition path type
-    #[arg(long, default_value_t = VolumePathType::Index, value_enum)]
-    volume_path_type: VolumePathType,
+    #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
+    volume_path_type: DisplayPathType,
 }
 
 // TODO: move DigestHasher into HashTool
@@ -348,20 +323,9 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    let digest_hash_type: DigestHashType = match &arguments.digest_hash_type {
-        HashType::Md5 => DigestHashType::Md5,
-        HashType::Sha1 => DigestHashType::Sha1,
-        HashType::Sha224 => DigestHashType::Sha224,
-        HashType::Sha256 => DigestHashType::Sha256,
-        HashType::Sha512 => DigestHashType::Sha512,
-    };
-    let display_path_type: DisplayPathType = match &arguments.volume_path_type {
-        VolumePathType::Identifier => DisplayPathType::Identifier,
-        VolumePathType::Index => DisplayPathType::Index,
-    };
     let hash_tool: HashTool = HashTool::new(
-        &digest_hash_type,
-        &display_path_type,
+        &arguments.digest_hash_type,
+        &arguments.volume_path_type,
         arguments.stop_on_error,
     );
     match arguments.source {

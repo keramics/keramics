@@ -14,6 +14,7 @@
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::ErrorTrace;
 use keramics_datetime::PosixTime32;
+use keramics_encodings::CharacterEncoding;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
 
@@ -197,7 +198,7 @@ pub struct ExtSuperblock {
 
 impl ExtSuperblock {
     /// Creates a new superblock.
-    pub fn new() -> Self {
+    pub fn new(encoding: &CharacterEncoding) -> Self {
         Self {
             number_of_inodes: 0,
             number_of_blocks: 0,
@@ -212,8 +213,8 @@ impl ExtSuperblock {
             incompatible_feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             file_system_identifier: [0; 16],
-            volume_label: ByteString::new(),
-            last_mount_path: ByteString::new(),
+            volume_label: ByteString::new_with_encoding(encoding),
+            last_mount_path: ByteString::new_with_encoding(encoding),
             group_descriptor_size: 0,
             number_of_block_groups_per_flex_group: 0,
             first_meta_block_group: 0,
@@ -438,7 +439,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = ExtSuperblock::new();
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.number_of_inodes, 1024);
@@ -479,7 +480,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = ExtSuperblock::new();
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
         let result = test_struct.read_data(&test_data[0..1023]);
         assert!(result.is_err());
     }
@@ -489,7 +490,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[56] = 0xff;
 
-        let mut test_struct = ExtSuperblock::new();
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -499,7 +500,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[24] = 0xff;
 
-        let mut test_struct = ExtSuperblock::new();
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -509,7 +510,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[76] = 0xff;
 
-        let mut test_struct = ExtSuperblock::new();
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }

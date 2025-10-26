@@ -19,15 +19,7 @@ use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
 
-/// Digest hash types.
-#[derive(Clone)]
-pub enum DigestHashType {
-    Md5,
-    Sha1,
-    Sha224,
-    Sha256,
-    Sha512,
-}
+use crate::enums::DigestHashType;
 
 /// Calculate message digest hashes of data streams.
 pub struct DigestHasher {

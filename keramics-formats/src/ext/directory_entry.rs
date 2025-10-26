@@ -12,6 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterEncoding;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
 
@@ -68,7 +69,11 @@ impl ExtDirectoryEntry {
     }
 
     /// Reads the name from a buffer.
-    pub fn read_name(&self, data: &[u8]) -> Result<ByteString, ErrorTrace> {
+    pub fn read_name(
+        &self,
+        data: &[u8],
+        encoding: &CharacterEncoding,
+    ) -> Result<ByteString, ErrorTrace> {
         let data_end_offset: usize = self.name_size as usize;
 
         if data_end_offset > data.len() {
@@ -76,7 +81,8 @@ impl ExtDirectoryEntry {
                 "Unsupported ext directory entry name size"
             ));
         }
-        let name: ByteString = ByteString::from(&data[0..data_end_offset]);
+        let mut name: ByteString = ByteString::new_with_encoding(encoding);
+        name.read_data(&data[0..data_end_offset]);
 
         Ok(name)
     }
@@ -124,7 +130,7 @@ mod tests {
         let mut test_struct = ExtDirectoryEntry::new();
         test_struct.read_data(&test_data)?;
 
-        let name: ByteString = test_struct.read_name(&test_data[8..])?;
+        let name: ByteString = test_struct.read_name(&test_data[8..], &CharacterEncoding::Utf8)?;
 
         assert_eq!(name, ByteString::from("file1"));
 

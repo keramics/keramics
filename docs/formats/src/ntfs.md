@@ -439,7 +439,7 @@ consists of:
 | 4 | 4 | | Attribute size (or record length), which includes the 8 bytes of the attribute type and size
 | 8 | 1 | | Non-resident flag (or form code), where RESIDENT_FORM (0) and NONRESIDENT_FORM (1)
 | 9 | 1 | | Name size (or name length), which contains the number of characters without the end-of-string character
-| 10 | 2 | | Name offset, which contains an offset relative from the start of the MFT entry
+| 10 | 2 | | Name offset, which contains an offset relative from the start of the MFT attribute
 | 12 | 2 | | [Attribute data flags](#mft_attribute_data_flags)
 | 14 | 2 | | Attribute identifier (or instance), which contains an unique identifier to distinguish between attributes that contain segmented data.
 

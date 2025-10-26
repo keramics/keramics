@@ -25,6 +25,8 @@ use keramics_vfs::{
 
 mod writer;
 
+use crate::writer::DataStreamWriter;
+
 #[derive(Parser)]
 #[command(version, about = "Extract data streams from a storage media image", long_about = None)]
 struct CommandLineArguments {
@@ -76,7 +78,7 @@ impl ExportTool {
     /// Export data stream from a scan node.
     fn export_data_stream_from_scan_node(
         &self,
-        data_stream_writer: &mut writer::DataStreamWriter,
+        data_stream_writer: &mut DataStreamWriter,
         vfs_scan_node: &VfsScanNode,
         path_components: &[&str],
         name: Option<&str>,
@@ -187,7 +189,7 @@ fn main() -> ExitCode {
         Some(path) => path,
         None => PathBuf::from("."),
     };
-    let mut data_stream_writer: writer::DataStreamWriter = writer::DataStreamWriter::new(&target);
+    let mut data_stream_writer: DataStreamWriter = DataStreamWriter::new(&target);
 
     match arguments.command {
         Commands::Path(command_arguments) => {

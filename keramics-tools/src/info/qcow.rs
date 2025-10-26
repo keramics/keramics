@@ -19,66 +19,78 @@ use keramics_formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFi
 
 use crate::formatters::format_as_bytesize;
 
-/// Prints information about a QCOW file.
-pub fn print_qcow_file(data_stream: &DataStreamReference) -> ExitCode {
-    let mut qcow_file: QcowFile = QcowFile::new();
+/// Information about a QEMU Copy-On-Write (QCOW) file.
+pub struct QcowInfo {}
 
-    match qcow_file.read_data_stream(data_stream) {
-        Ok(_) => {}
-        Err(error) => {
-            println!("Unable to open QCOW file with error: {}", error);
-            return ExitCode::FAILURE;
-        }
-    };
-    let compression_methods = HashMap::<QcowCompressionMethod, &'static str>::from([
-        (QcowCompressionMethod::Unknown, "Unknown"),
-        (QcowCompressionMethod::Zlib, "zlib"),
-    ]);
-    let encryption_methods = HashMap::<QcowEncryptionMethod, &'static str>::from([
-        (QcowEncryptionMethod::AesCbc128, "AES-CBC 128-bit"),
-        (QcowEncryptionMethod::Luks, "Linux Unified Key Setup (LUKS)"),
-        (QcowEncryptionMethod::None, "None"),
-        (QcowEncryptionMethod::Unknown, "Unknown"),
-    ]);
+impl QcowInfo {
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+        let mut qcow_file: QcowFile = QcowFile::new();
 
-    let compression_method_string: &str = compression_methods
-        .get(&qcow_file.compression_method)
-        .unwrap();
-    let encryption_method_string: &str = encryption_methods
-        .get(&qcow_file.encryption_method)
-        .unwrap();
+        match qcow_file.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(error) => {
+                println!("Unable to open QCOW file with error: {}", error);
+                return ExitCode::FAILURE;
+            }
+        };
+        let compression_methods = HashMap::<QcowCompressionMethod, &'static str>::from([
+            (QcowCompressionMethod::Unknown, "Unknown"),
+            (QcowCompressionMethod::Zlib, "zlib"),
+        ]);
+        let encryption_methods = HashMap::<QcowEncryptionMethod, &'static str>::from([
+            (QcowEncryptionMethod::AesCbc128, "AES-CBC 128-bit"),
+            (QcowEncryptionMethod::Luks, "Linux Unified Key Setup (LUKS)"),
+            (QcowEncryptionMethod::None, "None"),
+            (QcowEncryptionMethod::Unknown, "Unknown"),
+        ]);
 
-    println!("QEMU Copy-On-Write (QCOW) information:");
-    println!("    Format version\t\t\t: {}", qcow_file.format_version);
+        let compression_method_string: &str = compression_methods
+            .get(&qcow_file.compression_method)
+            .unwrap();
+        let encryption_method_string: &str = encryption_methods
+            .get(&qcow_file.encryption_method)
+            .unwrap();
 
-    if qcow_file.media_size < 1024 {
-        println!("    Media size\t\t\t\t: {} bytes", qcow_file.media_size);
-    } else {
-        let media_size_string: String = format_as_bytesize(qcow_file.media_size, 1024);
-        println!(
-            "    Media size\t\t\t\t: {} ({} bytes)",
-            media_size_string, qcow_file.media_size
-        );
-    }
-    println!(
-        "    Compression method\t\t\t: {}",
-        compression_method_string
-    );
-    println!("    Encryption method\t\t\t: {}", encryption_method_string);
+        println!("QEMU Copy-On-Write (QCOW) information:");
+        println!("    Format version\t\t\t: {}", qcow_file.format_version);
 
-    match qcow_file.get_backing_file_name() {
-        Some(backing_file_name) => {
+        if qcow_file.media_size < 1024 {
+            println!("    Media size\t\t\t\t: {} bytes", qcow_file.media_size);
+        } else {
+            let media_size_string: String = format_as_bytesize(qcow_file.media_size, 1024);
             println!(
-                "    Backing file name\t\t\t: {}",
-                backing_file_name.to_string()
+                "    Media size\t\t\t\t: {} ({} bytes)",
+                media_size_string, qcow_file.media_size
             );
         }
-        None => {}
+        println!(
+            "    Compression method\t\t\t: {}",
+            compression_method_string
+        );
+        println!("    Encryption method\t\t\t: {}", encryption_method_string);
+
+        match qcow_file.get_backing_file_name() {
+            Some(backing_file_name) => {
+                println!(
+                    "    Backing file name\t\t\t: {}",
+                    backing_file_name.to_string()
+                );
+            }
+            None => {}
+        }
+        // TODO: print feature flags.
+        // TODO: print snapshot information.
+
+        println!("");
+
+        ExitCode::SUCCESS
     }
-    // TODO: print feature flags.
-    // TODO: print snapshot information.
+}
 
-    println!("");
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    ExitCode::SUCCESS
+    // TODO: add tests for print_file
 }

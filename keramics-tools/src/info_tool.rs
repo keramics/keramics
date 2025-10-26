@@ -20,14 +20,20 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_encodings::CharacterEncoding;
 use keramics_formats::{FormatIdentifier, FormatScanner};
 
+mod enums;
 mod formatters;
 mod info;
 mod range_stream;
 
-use info::{ApmInfo, ExtInfo, GptInfo, MbrInfo, NtfsInfo};
-use range_stream::FileRangeDataStream;
+use crate::enums::EncodingType;
+use crate::info::{
+    ApmInfo, EwfInfo, ExtInfo, GptInfo, MbrInfo, NtfsInfo, QcowInfo, SparseImageInfo, UdifInfo,
+    VhdInfo, VhdxInfo,
+};
+use crate::range_stream::FileRangeDataStream;
 
 #[derive(Parser)]
 #[command(version, about = "Provides information about file formats", long_about = None)]
@@ -36,8 +42,12 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
+    /// Character encoding
+    #[arg(long, default_value_t = EncodingType::AutoDetect, value_enum)]
+    encoding: EncodingType,
+
     #[arg(short, long, default_value_t = 0)]
-    /// Offset within the source file.
+    /// Offset within the source file
     offset: u64,
 
     /// Path of the source file
@@ -168,6 +178,26 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    let character_encoding: Option<CharacterEncoding> = match &arguments.encoding {
+        EncodingType::Ascii => Some(CharacterEncoding::Ascii),
+        EncodingType::AutoDetect => None,
+        EncodingType::Iso8859_1 => Some(CharacterEncoding::Iso8859_1),
+        EncodingType::Iso8859_2 => Some(CharacterEncoding::Iso8859_2),
+        EncodingType::Iso8859_3 => Some(CharacterEncoding::Iso8859_3),
+        EncodingType::Iso8859_4 => Some(CharacterEncoding::Iso8859_4),
+        EncodingType::Iso8859_5 => Some(CharacterEncoding::Iso8859_5),
+        EncodingType::Iso8859_6 => Some(CharacterEncoding::Iso8859_6),
+        EncodingType::Iso8859_7 => Some(CharacterEncoding::Iso8859_7),
+        EncodingType::Iso8859_8 => Some(CharacterEncoding::Iso8859_8),
+        EncodingType::Iso8859_9 => Some(CharacterEncoding::Iso8859_9),
+        EncodingType::Iso8859_10 => Some(CharacterEncoding::Iso8859_10),
+        EncodingType::Iso8859_11 => Some(CharacterEncoding::Iso8859_11),
+        EncodingType::Iso8859_13 => Some(CharacterEncoding::Iso8859_13),
+        EncodingType::Iso8859_14 => Some(CharacterEncoding::Iso8859_14),
+        EncodingType::Iso8859_15 => Some(CharacterEncoding::Iso8859_15),
+        EncodingType::Iso8859_16 => Some(CharacterEncoding::Iso8859_16),
+        EncodingType::Utf8 => Some(CharacterEncoding::Utf8),
+    };
     let mut file_range_stream: FileRangeDataStream = FileRangeDataStream::new(arguments.offset);
 
     match file_range_stream.open(source) {
@@ -203,9 +233,11 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => {
-                ExtInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
-            }
+            FormatIdentifier::Ext => ExtInfo::print_file_entry_by_identifier(
+                &data_stream,
+                command_arguments.entry,
+                character_encoding.as_ref(),
+            ),
             FormatIdentifier::Ntfs => {
                 NtfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
@@ -215,7 +247,9 @@ fn main() -> ExitCode {
             }
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Ext => ExtInfo::print_hierarchy(&data_stream),
+            FormatIdentifier::Ext => {
+                ExtInfo::print_hierarchy(&data_stream, character_encoding.as_ref())
+            }
             FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
@@ -228,9 +262,11 @@ fn main() -> ExitCode {
             let path_components: Vec<&str> = command_arguments.path.split('/').collect();
 
             match &format_identifier {
-                FormatIdentifier::Ext => {
-                    ExtInfo::print_file_entry_by_path(&data_stream, &path_components)
-                }
+                FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
+                    &data_stream,
+                    &path_components,
+                    character_encoding.as_ref(),
+                ),
                 FormatIdentifier::Ntfs => {
                     NtfsInfo::print_file_entry_by_path(&data_stream, &path_components)
                 }
@@ -242,17 +278,19 @@ fn main() -> ExitCode {
         }
         None => match &format_identifier {
             FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
-            FormatIdentifier::Ext => ExtInfo::print_file_system(&data_stream),
-            FormatIdentifier::Ewf => info::print_ewf_image(&arguments.source),
+            FormatIdentifier::Ext => {
+                ExtInfo::print_file_system(&data_stream, character_encoding.as_ref())
+            }
+            FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
-            FormatIdentifier::Qcow => info::print_qcow_file(&data_stream),
+            FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
             // TODO: add support for sparse bundle.
-            FormatIdentifier::SparseImage => info::print_sparseimage_file(&data_stream),
-            FormatIdentifier::Udif => info::print_udif_file(&data_stream),
-            FormatIdentifier::Vhd => info::print_vhd_file(&data_stream),
-            FormatIdentifier::Vhdx => info::print_vhdx_file(&data_stream),
+            FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
+            FormatIdentifier::Udif => UdifInfo::print_file(&data_stream),
+            FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
+            FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
                 ExitCode::FAILURE

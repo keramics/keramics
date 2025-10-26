@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-6 encoding.
+//! ISO-8859-6 (Arabic) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-6.
 

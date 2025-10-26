@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::path::Path;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};

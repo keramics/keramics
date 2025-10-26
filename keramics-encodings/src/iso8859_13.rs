@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-13 encoding.
+//! ISO-8859-13 (Latin-7 or Baltic Rim) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-13.
 

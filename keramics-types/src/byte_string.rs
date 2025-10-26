@@ -11,33 +11,85 @@
  * under the License.
  */
 
+use keramics_core::ErrorTrace;
+use keramics_encodings::{
+    CharacterDecoder, CharacterEncoder, CharacterEncoding, new_character_decoder,
+    new_character_encoder,
+};
+
 /// String of 8-bit elements.
-#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ByteString {
+    /// Character encoding.
+    pub encoding: CharacterEncoding,
+
     /// Elements.
     pub elements: Vec<u8>,
 }
 
-// TODO: add support for encoding.
 impl ByteString {
-    /// Creates a new byte string.
+    /// Creates a new string.
     pub fn new() -> Self {
         Self {
+            encoding: CharacterEncoding::Utf8,
             elements: Vec::new(),
         }
     }
 
-    /// Determines if the byte string is empty.
+    /// Creates a new string with a specified character encoding.
+    pub fn new_with_encoding(encoding: &CharacterEncoding) -> Self {
+        Self {
+            encoding: encoding.clone(),
+            elements: Vec::new(),
+        }
+    }
+
+    /// Extends the string from another [`ByteString`].
+    pub fn extend(&mut self, byte_string: &ByteString) -> Result<(), ErrorTrace> {
+        if self.encoding == byte_string.encoding {
+            self.elements.extend_from_slice(&byte_string.elements);
+        } else {
+            let mut character_decoder: CharacterDecoder =
+                new_character_decoder(&byte_string.encoding, &byte_string.elements);
+
+            let mut code_points: Vec<u32> = Vec::new();
+
+            while let Some(result) = character_decoder.next() {
+                match result {
+                    Ok(code_point) => code_points.push(code_point),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode character");
+                        return Err(error);
+                    }
+                }
+            }
+            let mut character_encoder: CharacterEncoder =
+                new_character_encoder(&self.encoding, &code_points);
+
+            while let Some(result) = character_encoder.next() {
+                match result {
+                    Ok(slice) => self.elements.extend_from_slice(&slice),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to encode character");
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Determines if the string is empty.
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
-    /// Retrieves the length (or size) of the byte string.
+    /// Retrieves the length (or size) of the string.
     pub fn len(&self) -> usize {
         self.elements.len()
     }
 
-    /// Reads the byte string from a buffer.
+    /// Reads the string from a buffer.
     pub fn read_data(&mut self, data: &[u8]) {
         let slice: &[u8] = match data.iter().position(|value| *value == 0) {
             Some(data_index) => &data[0..data_index],
@@ -46,10 +98,32 @@ impl ByteString {
         self.elements.extend_from_slice(&slice);
     }
 
-    /// Converts the byte string to a `String`.
+    /// Converts a [`ByteString`] to a [`String`].
     pub fn to_string(&self) -> String {
-        // TODO: add support for encoding.
-        String::from_utf8(self.elements.to_vec()).unwrap()
+        let mut string_parts: Vec<String> = Vec::new();
+
+        let mut character_decoder: CharacterDecoder =
+            new_character_decoder(&self.encoding, &self.elements);
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(code_point) => {
+                    let string: String = match char::from_u32(code_point as u32) {
+                        Some(unicode_character) => {
+                            if unicode_character == '\\' {
+                                String::from("\\\\")
+                            } else {
+                                unicode_character.to_string()
+                            }
+                        }
+                        None => format!("\\{{{:04x}}}", code_point),
+                    };
+                    string_parts.push(string);
+                }
+                Err(error) => todo!(),
+            }
+        }
+        string_parts.join("")
     }
 }
 
@@ -61,6 +135,7 @@ impl From<&[u8]> for ByteString {
             None => &slice,
         };
         Self {
+            encoding: CharacterEncoding::Utf8,
             elements: Vec::from(elements),
         }
     }
@@ -110,7 +185,7 @@ impl PartialEq<&str> for ByteString {
 mod tests {
     use super::*;
 
-    // TODO: add test for elements
+    // TODO: add test for extend
 
     #[test]
     fn test_is_empty() {
@@ -118,6 +193,7 @@ mod tests {
         assert!(byte_string.is_empty());
 
         let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
             elements: vec![
                 0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
             ],
@@ -131,6 +207,7 @@ mod tests {
         assert_eq!(byte_string.len(), 0);
 
         let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Utf8,
             elements: vec![
                 0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
             ],
@@ -198,6 +275,4 @@ mod tests {
         ];
         assert_eq!(byte_string.elements, expected_elements);
     }
-
-    // TODO: add tests for PartialEq
 }

@@ -471,7 +471,7 @@ impl NtfsInfo {
                 println!("Unable to open NTFS file system with error: {}", error);
                 return ExitCode::FAILURE;
             }
-        };
+        }
         if ntfs_entry_identifier > u32::MAX as u64 {
             println!(
                 "Invalid MFT entry number: {} value out of bounds",

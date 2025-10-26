@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! Windows 1252 (Western European/Latin 1) encoding.
+//! Windows 1252 (Western European) encoding.
 //!
 //! Provides support for encoding and decoding Windows 1252.
 

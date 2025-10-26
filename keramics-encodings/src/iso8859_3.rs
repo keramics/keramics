@@ -11,7 +11,7 @@
  * under the License.
  */
 
-//! ISO-8859-3 encoding.
+//! ISO-8859-3 (Latin-3 or South European) encoding.
 //!
 //! Provides support for encoding and decoding ISO-8859-3.
 

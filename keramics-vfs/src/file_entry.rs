@@ -140,7 +140,7 @@ impl VfsFileEntry {
                     VfsFileType::SymbolicLink
                 }
                 // FILE_ATTRIBUTE_DIRECTORY is not used by NTFS.
-                else if ntfs_file_entry.has_directory_entries() {
+                else if ntfs_file_entry.is_directory() {
                     VfsFileType::Directory
                 } else {
                     VfsFileType::File

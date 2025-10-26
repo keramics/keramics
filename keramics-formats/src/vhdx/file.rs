@@ -912,7 +912,7 @@ mod tests {
         file.read_data_stream(&data_stream)?;
 
         let parent_file_name: Option<Ucs2String> = file.get_parent_file_name();
-        assert_eq!(parent_file_name.unwrap().to_string(), "ntfs-parent.vhdx");
+        assert_eq!(parent_file_name, Some(Ucs2String::from("ntfs-parent.vhdx")));
 
         Ok(())
     }
@@ -937,8 +937,10 @@ mod tests {
             "7584f8fb-36d3-4091-afb5-b1afe587bfa8"
         );
         assert_eq!(
-            file.parent_name.unwrap().to_string(),
-            "C:\\Projects\\dfvfs\\test_data\\ntfs-parent.vhdx",
+            file.parent_name,
+            Some(Ucs2String::from(
+                "C:\\Projects\\dfvfs\\test_data\\ntfs-parent.vhdx"
+            ))
         );
         Ok(())
     }
@@ -963,8 +965,10 @@ mod tests {
             "7584f8fb-36d3-4091-afb5-b1afe587bfa8"
         );
         assert_eq!(
-            file.parent_name.unwrap().to_string(),
-            "C:\\Projects\\dfvfs\\test_data\\ntfs-parent.vhdx",
+            file.parent_name,
+            Some(Ucs2String::from(
+                "C:\\Projects\\dfvfs\\test_data\\ntfs-parent.vhdx"
+            ))
         );
         Ok(())
     }

@@ -19,63 +19,75 @@ use keramics_formats::vhd::{VhdDiskType, VhdFile};
 
 use crate::formatters::format_as_bytesize;
 
-/// Prints information about a VHD file.
-pub fn print_vhd_file(data_stream: &DataStreamReference) -> ExitCode {
-    let mut vhd_file: VhdFile = VhdFile::new();
+/// Information about a Virtual Hard Disk (VHD) file.
+pub struct VhdInfo {}
 
-    match vhd_file.read_data_stream(data_stream) {
-        Ok(_) => {}
-        Err(error) => {
-            println!("Unable to open VHD file with error: {}", error);
-            return ExitCode::FAILURE;
-        }
-    };
-    let disk_types = HashMap::<VhdDiskType, &'static str>::from([
-        (VhdDiskType::Differential, "Differential"),
-        (VhdDiskType::Dynamic, "Dynamic"),
-        (VhdDiskType::Fixed, "Fixed"),
-        (VhdDiskType::Unknown, "Unknown"),
-    ]);
-    let disk_type_string: &str = disk_types.get(&vhd_file.disk_type).unwrap();
+impl VhdInfo {
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+        let mut vhd_file: VhdFile = VhdFile::new();
 
-    println!("Virtual Hard Disk (VHD) information:");
-    println!("    Format version\t\t\t: 1.0");
-    println!("    Disk type\t\t\t\t: {}", disk_type_string);
+        match vhd_file.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(error) => {
+                println!("Unable to open VHD file with error: {}", error);
+                return ExitCode::FAILURE;
+            }
+        };
+        let disk_types = HashMap::<VhdDiskType, &'static str>::from([
+            (VhdDiskType::Differential, "Differential"),
+            (VhdDiskType::Dynamic, "Dynamic"),
+            (VhdDiskType::Fixed, "Fixed"),
+            (VhdDiskType::Unknown, "Unknown"),
+        ]);
+        let disk_type_string: &str = disk_types.get(&vhd_file.disk_type).unwrap();
 
-    if vhd_file.media_size < 1024 {
-        println!("    Media size\t\t\t\t: {} bytes", vhd_file.media_size);
-    } else {
-        let media_size_string: String = format_as_bytesize(vhd_file.media_size, 1024);
-        println!(
-            "    Media size\t\t\t\t: {} ({} bytes)",
-            media_size_string, vhd_file.media_size
-        );
-    }
-    println!(
-        "    Bytes per sector\t\t\t: {} bytes",
-        vhd_file.bytes_per_sector
-    );
-    println!(
-        "    Identifier\t\t\t\t: {}",
-        vhd_file.identifier.to_string()
-    );
+        println!("Virtual Hard Disk (VHD) information:");
+        println!("    Format version\t\t\t: 1.0");
+        println!("    Disk type\t\t\t\t: {}", disk_type_string);
 
-    match &vhd_file.parent_identifier {
-        Some(parent_identifier) => {
+        if vhd_file.media_size < 1024 {
+            println!("    Media size\t\t\t\t: {} bytes", vhd_file.media_size);
+        } else {
+            let media_size_string: String = format_as_bytesize(vhd_file.media_size, 1024);
             println!(
-                "    Parent identifier\t\t\t: {}",
-                parent_identifier.to_string()
+                "    Media size\t\t\t\t: {} ({} bytes)",
+                media_size_string, vhd_file.media_size
             );
         }
-        None => {}
-    }
-    match &vhd_file.parent_name {
-        Some(parent_name) => {
-            println!("    Parent name\t\t\t\t: {}", parent_name.to_string());
-        }
-        None => {}
-    }
-    println!("");
+        println!(
+            "    Bytes per sector\t\t\t: {} bytes",
+            vhd_file.bytes_per_sector
+        );
+        println!(
+            "    Identifier\t\t\t\t: {}",
+            vhd_file.identifier.to_string()
+        );
 
-    ExitCode::SUCCESS
+        match &vhd_file.parent_identifier {
+            Some(parent_identifier) => {
+                println!(
+                    "    Parent identifier\t\t\t: {}",
+                    parent_identifier.to_string()
+                );
+            }
+            None => {}
+        }
+        match &vhd_file.parent_name {
+            Some(parent_name) => {
+                println!("    Parent name\t\t\t\t: {}", parent_name.to_string());
+            }
+            None => {}
+        }
+        println!("");
+
+        ExitCode::SUCCESS
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests for print_file
 }
