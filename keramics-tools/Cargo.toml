@@ -29,6 +29,7 @@ path = "src/info_tool.rs"
 
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
+clap-num = { version = "1.2.0" }
 indicatif = { version = "0.18" }
 keramics-core = { version = "0.0.1", path = "../keramics-core" }
 keramics-datetime = { version = "0.0.1", path = "../keramics-datetime" }

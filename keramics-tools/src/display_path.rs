@@ -166,7 +166,7 @@ impl DisplayPath {
                 let path_string: String = path.to_string();
                 match vfs_type {
                     VfsType::Apm => path_string.replace("apm", "p"),
-                    VfsType::Ext => {
+                    VfsType::Ext | VfsType::Ntfs => {
                         let parent_display_path: String = match self.get_path(parent) {
                             Ok(path) => path,
                             Err(mut error) => {
@@ -180,19 +180,6 @@ impl DisplayPath {
                         format!("{}{}", parent_display_path, path_string)
                     }
                     VfsType::Gpt => path_string.replace("gpt", "p"),
-                    VfsType::Ntfs => {
-                        let parent_display_path: String = match self.get_path(parent) {
-                            Ok(path) => path,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to retrieve parent display path"
-                                );
-                                return Err(error);
-                            }
-                        };
-                        format!("{}{}", parent_display_path, path_string)
-                    }
                     VfsType::Mbr => path_string.replace("mbr", "p"),
                     _ => String::new(),
                 }

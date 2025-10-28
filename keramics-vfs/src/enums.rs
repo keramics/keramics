@@ -25,7 +25,7 @@ pub enum VfsFileType {
     Whiteout,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VfsType {
     Apm,
     Ext,

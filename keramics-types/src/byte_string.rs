@@ -63,20 +63,40 @@ impl ByteString {
                     }
                 }
             }
-            let mut character_encoder: CharacterEncoder =
-                new_character_encoder(&self.encoding, &code_points);
-
-            while let Some(result) = character_encoder.next() {
-                match result {
-                    Ok(slice) => self.elements.extend_from_slice(&slice),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to encode character");
-                        return Err(error);
-                    }
+            match self.extend_from_codepoints(&code_points) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to extend from code points"
+                    );
+                    return Err(error);
                 }
             }
         }
         Ok(())
+    }
+
+    /// Extends the string from code points.
+    pub fn extend_from_codepoints(&mut self, code_points: &Vec<u32>) -> Result<(), ErrorTrace> {
+        let mut character_encoder: CharacterEncoder =
+            new_character_encoder(&self.encoding, code_points);
+
+        while let Some(result) = character_encoder.next() {
+            match result {
+                Ok(slice) => self.elements.extend_from_slice(&slice),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to encode character");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Retrieves a character decoder for the string.
+    pub fn get_character_decoder(&self) -> CharacterDecoder<'_> {
+        new_character_decoder(&self.encoding, &self.elements)
     }
 
     /// Determines if the string is empty.
@@ -100,10 +120,9 @@ impl ByteString {
 
     /// Converts a [`ByteString`] to a [`String`].
     pub fn to_string(&self) -> String {
-        let mut string_parts: Vec<String> = Vec::new();
+        let mut character_decoder: CharacterDecoder = self.get_character_decoder();
 
-        let mut character_decoder: CharacterDecoder =
-            new_character_decoder(&self.encoding, &self.elements);
+        let mut string_parts: Vec<String> = Vec::new();
 
         while let Some(result) = character_decoder.next() {
             match result {
