@@ -12,6 +12,7 @@
  */
 
 use std::cmp::Ordering;
+use std::collections::HashMap;
 
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
@@ -28,6 +29,20 @@ impl Ucs2String {
         Self {
             elements: Vec::new(),
         }
+    }
+
+    /// Creates a new string with case folding applied.
+    pub fn new_with_case_folding(source: &Ucs2String, mappings: &HashMap<u16, u16>) -> Self {
+        let elements: Vec<u16> = source
+            .elements
+            .iter()
+            .map(|element| match mappings.get(element) {
+                Some(&value) => value,
+                None => *element,
+            })
+            .collect();
+
+        Self { elements: elements }
     }
 
     /// Reads a string from a byte sequence in big-endian.
@@ -173,6 +188,8 @@ impl From<&Vec<u16>> for Ucs2String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO: add tests for new_with_case_folding
 
     #[test]
     fn test_from_be_bytes() {

@@ -17,7 +17,7 @@ use super::enums::VfsType;
 use super::path::VfsPath;
 
 /// Virtual File System (VFS) location.
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VfsLocation {
     Base {
         path: VfsPath,

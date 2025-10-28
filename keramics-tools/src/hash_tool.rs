@@ -26,8 +26,7 @@ use keramics_hashes::{
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
-    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
-    new_os_vfs_location,
+    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, new_os_vfs_location,
 };
 
 mod display_path;
@@ -245,9 +244,8 @@ impl HashTool {
     fn calculate_hash_from_scan_node(&self, vfs_scan_node: &VfsScanNode) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
-            match vfs_scan_node.get_type() {
-                VfsType::Ext { .. } | VfsType::Ntfs { .. } => {}
-                _ => return Ok(()),
+            if !vfs_scan_node.is_file_system() {
+                return Ok(());
             }
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
 

@@ -19,7 +19,7 @@ use crate::block_tree::BlockTree;
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
 
-/// Extended File System block stream.
+/// Extended File System (ext) block stream.
 pub struct ExtBlockStream {
     /// The data stream.
     data_stream: Option<DataStreamReference>,

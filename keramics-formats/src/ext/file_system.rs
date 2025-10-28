@@ -542,14 +542,27 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_volume_label
+    #[test]
+    fn test_get_volume_label() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let volume_label: Option<&ByteString> = file_system.get_volume_label();
+        assert_eq!(volume_label, Some(ByteString::from("ext2_test")).as_ref());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_entry_by_identifier() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(12)?;
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(2)?;
+        assert_eq!(file_entry.inode_number, 2);
 
+        let name: Option<&ByteString> = file_entry.get_name();
+        assert!(name.is_none());
+
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(12)?;
         assert_eq!(file_entry.inode_number, 12);
 
         let name: Option<&ByteString> = file_entry.get_name();
@@ -562,6 +575,11 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
+        let ext_path: ExtPath = ExtPath::from("/");
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        assert_eq!(file_entry.inode_number, 2);
+
         let ext_path: ExtPath = ExtPath::from("/emptyfile");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
@@ -572,8 +590,8 @@ mod tests {
 
         assert_eq!(file_entry.inode_number, 14);
 
-        let name: &ByteString = file_entry.get_name().unwrap();
-        assert_eq!(name.to_string(), "testfile1");
+        let name: Option<&ByteString> = file_entry.get_name();
+        assert_eq!(name, Some(ByteString::from("testfile1")).as_ref());
 
         Ok(())
     }

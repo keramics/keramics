@@ -210,12 +210,31 @@ impl NtfsFileSystem {
                 return Err(error);
             }
         }
+        match self.read_volume_information(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read volume information");
+                return Err(error);
+            }
+        }
+        match self.read_case_folding_mappings(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read case folding mappings"
+                );
+                return Err(error);
+            }
+        }
+        // TODO: read security descriptors, MFT entry 9 ($Secure)
+
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
 
-    /// Reads the boot record, master file table and security descriptors.
+    /// Reads the boot record and master file table.
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut boot_record: NtfsBootRecord = NtfsBootRecord::new();
 
@@ -239,25 +258,6 @@ impl NtfsFileSystem {
                 return Err(error);
             }
         }
-        match self.read_volume_information(data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read volume information");
-                return Err(error);
-            }
-        }
-        match self.read_case_folding_mappings(data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read case folding mappings"
-                );
-                return Err(error);
-            }
-        }
-        // TODO: read security descriptors, MFT entry 9 ($Secure)
-
         Ok(())
     }
 
@@ -538,8 +538,49 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_file_entry_by_identifier
-    // TODO: add tests for get_file_entry_by_path
+    #[test]
+    fn test_get_file_entry_by_identifier() -> Result<(), ErrorTrace> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_identifier(5)?;
+        assert_eq!(file_entry.mft_entry_number, 5);
+
+        let name: Option<&Ucs2String> = file_entry.get_name();
+        assert!(name.is_none());
+
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_identifier(64)?;
+        assert_eq!(file_entry.mft_entry_number, 64);
+
+        let name: Option<&Ucs2String> = file_entry.get_name();
+        assert!(name.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
+        let file_system: NtfsFileSystem = get_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\");
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+
+        assert_eq!(file_entry.mft_entry_number, 5);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\emptyfile");
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+
+        assert_eq!(file_entry.mft_entry_number, 64);
+
+        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+
+        assert_eq!(file_entry.mft_entry_number, 66);
+
+        let name: Option<&Ucs2String> = file_entry.get_name();
+        assert_eq!(name, Some(Ucs2String::from("testfile1")).as_ref());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_root_directory() -> Result<(), ErrorTrace> {
@@ -587,7 +628,52 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for read_case_folding_mappings
-    // TODO: add tests for read_master_file_table
-    // TODO: add tests for read_volume_information
+    #[test]
+    fn test_read_case_folding_mappings() -> Result<(), ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_metadata(&data_stream)?;
+
+        assert_eq!(file_system.case_folding_mappings.len(), 0);
+
+        file_system.read_case_folding_mappings(&data_stream)?;
+
+        assert_eq!(file_system.case_folding_mappings.len(), 973);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_master_file_table() -> Result<(), ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        file_system.cluster_block_size = 4096;
+        file_system.mft_entry_size = 1024;
+
+        file_system.read_master_file_table(&data_stream, 4)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_volume_information() -> Result<(), ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_metadata(&data_stream)?;
+
+        assert!(file_system.volume_information.is_none());
+
+        file_system.read_volume_information(&data_stream)?;
+
+        assert!(file_system.volume_information.is_some());
+
+        Ok(())
+    }
 }

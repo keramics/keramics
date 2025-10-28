@@ -12,6 +12,7 @@
  */
 
 mod byte_string;
+pub mod constants;
 mod errors;
 pub mod macros;
 mod ucs2_string;

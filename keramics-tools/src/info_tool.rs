@@ -17,6 +17,7 @@ use std::process::ExitCode;
 use std::sync::{Arc, RwLock};
 
 use clap::{Args, Parser, Subcommand};
+use clap_num::maybe_hex;
 
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -46,7 +47,7 @@ struct CommandLineArguments {
     #[arg(long, value_enum)]
     encoding: Option<EncodingType>,
 
-    #[arg(short, long, default_value_t = 0)]
+    #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]
     /// Offset within the source file
     offset: u64,
 
@@ -72,6 +73,7 @@ enum Commands {
 #[derive(Args, Debug)]
 struct EntryCommandArguments {
     /// Format specific entry identifier
+    #[arg(value_parser=maybe_hex::<u64>)]
     entry: u64,
 }
 
@@ -259,8 +261,13 @@ fn main() -> ExitCode {
         Some(Commands::Path(command_arguments)) => {
             // TODO: detect leading partion path component and suggest/check path exists without
             // it.
-            let path_components: Vec<&str> = command_arguments.path.split('/').collect();
-
+            let path_components: Vec<&str> = if command_arguments.path.is_empty() {
+                vec![]
+            } else if command_arguments.path == "/" {
+                vec![""]
+            } else {
+                command_arguments.path.split('/').collect()
+            };
             match &format_identifier {
                 FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
                     &data_stream,

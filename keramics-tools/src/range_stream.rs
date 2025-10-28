@@ -62,8 +62,15 @@ impl FileRangeDataStream {
                 ));
             }
         };
+        let file_size: u64 = metadata.len();
+
+        if self.range_offset >= file_size {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid range offset value exceeds file size"
+            ));
+        }
         self.file = Some(file);
-        self.range_size = metadata.len() - self.range_offset;
+        self.range_size = file_size - self.range_offset;
 
         Ok(())
     }

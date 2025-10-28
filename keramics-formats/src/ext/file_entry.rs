@@ -455,7 +455,6 @@ mod tests {
                 timestamp: 1735977482
             }))
         );
-
         Ok(())
     }
 
@@ -473,7 +472,6 @@ mod tests {
                 timestamp: 1735977481
             }))
         );
-
         Ok(())
     }
 
@@ -559,7 +557,6 @@ mod tests {
                 timestamp: 1735977481
             }))
         );
-
         Ok(())
     }
 
@@ -571,8 +568,8 @@ mod tests {
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        let name: &ByteString = ext_file_entry.get_name().unwrap();
-        assert_eq!(name.to_string(), "testfile1");
+        let name: Option<&ByteString> = ext_file_entry.get_name();
+        assert_eq!(name, Some(ByteString::from("testfile1")).as_ref());
 
         Ok(())
     }
@@ -628,7 +625,16 @@ mod tests {
             ext_file_entry.get_symbolic_link_target()?;
         assert_eq!(symbolic_link_target, None);
 
-        // TODO: test with symbolic link file entry
+        let ext_path: ExtPath = ExtPath::from("/file_symboliclink1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let symbolic_link_target: Option<&ByteString> =
+            ext_file_entry.get_symbolic_link_target()?;
+        assert_eq!(
+            symbolic_link_target,
+            Some(ByteString::from("/mnt/keramics/testdir1/testfile1")).as_ref()
+        );
 
         Ok(())
     }
@@ -637,11 +643,19 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
+        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = ext_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
         let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
-        ext_file_entry.get_data_stream()?;
+        let result: Option<DataStreamReference> = ext_file_entry.get_data_stream()?;
+        assert!(result.is_some());
 
         Ok(())
     }
@@ -692,15 +706,31 @@ mod tests {
             ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
 
         let sub_file_entry: ExtFileEntry = ext_file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(
-            sub_file_entry.get_name(),
-            Some(ByteString::from("TestFile2")).as_ref()
-        );
+
+        let name: Option<&ByteString> = sub_file_entry.get_name();
+        assert_eq!(name, Some(ByteString::from("TestFile2")).as_ref());
 
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_name
+    #[test]
+    fn test_get_sub_file_entry_by_name() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+
+        let name: ByteString = ByteString::from("TestFile2");
+        let result: Option<ExtFileEntry> = ext_file_entry.get_sub_file_entry_by_name(&name)?;
+        assert!(result.is_some());
+
+        let name: ByteString = ByteString::from("bogus");
+        let result: Option<ExtFileEntry> = ext_file_entry.get_sub_file_entry_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_is_directory() -> Result<(), ErrorTrace> {

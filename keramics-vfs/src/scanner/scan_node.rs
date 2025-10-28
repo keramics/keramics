@@ -15,6 +15,7 @@ use crate::enums::VfsType;
 use crate::location::VfsLocation;
 
 /// Virtual File System (VFS) scan node.
+#[derive(Debug)]
 pub struct VfsScanNode {
     /// Location.
     pub location: VfsLocation,
@@ -40,5 +41,25 @@ impl VfsScanNode {
     /// Determines if the scan node is empty.
     pub fn is_empty(&self) -> bool {
         self.sub_nodes.is_empty()
+    }
+
+    /// Determines if the scan node contains a file system format.
+    pub fn is_file_system(&self) -> bool {
+        // Note that below a catch all match is not used to ensure a compiler
+        // error is raised when a new VFS type is added.
+        match self.location.get_type() {
+            VfsType::Apm
+            | VfsType::Ewf
+            | VfsType::Fake
+            | VfsType::Gpt
+            | VfsType::Mbr
+            | VfsType::Os
+            | VfsType::Qcow
+            | VfsType::SparseImage
+            | VfsType::Udif
+            | VfsType::Vhd
+            | VfsType::Vhdx => false,
+            VfsType::Ext | VfsType::Ntfs => true,
+        }
     }
 }
