@@ -93,8 +93,10 @@ impl VfsScanner {
         self.storage_media_image_scanner.build()?;
 
         // The Master Boot Record (MBR) signatures are used in other volume
-        // system formats, such as BitLocker drive encryption (BDE) and
-        // New Technologies File System (NTFS).
+        // system or file formats, such as:
+        // * BitLocker drive encryption (BDE)
+        // * File Allocation Table (FAT)
+        // * New Technologies File System (NTFS)
 
         // The scanner:
         // * first looks for non-overlapping volume system signatures (phase 1)
@@ -105,6 +107,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_gpt_signatures();
         self.phase1_volume_system_scanner.build()?;
 
+        self.phase2_volume_system_scanner.add_fat_signatures();
         self.phase2_volume_system_scanner.add_ntfs_signatures();
         self.phase2_volume_system_scanner.build()?;
 
@@ -112,6 +115,7 @@ impl VfsScanner {
         self.phase3_volume_system_scanner.build()?;
 
         self.file_system_scanner.add_ext_signatures();
+        self.file_system_scanner.add_fat_signatures();
         self.file_system_scanner.add_ntfs_signatures();
         self.file_system_scanner.build()?;
 
@@ -232,6 +236,7 @@ impl VfsScanner {
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
                 FormatIdentifier::Ext => Ok(Some(VfsType::Ext)),
+                FormatIdentifier::Fat => Ok(Some(VfsType::Fat)),
                 FormatIdentifier::Ntfs => Ok(Some(VfsType::Ntfs)),
                 _ => Err(keramics_core::error_trace_new!(
                     "Found unsupported file system format signature"
@@ -397,6 +402,7 @@ impl VfsScanner {
                     }
                 }
             }
+            VfsType::Fat { .. } => {}
             VfsType::Gpt { .. } => {
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
@@ -680,6 +686,7 @@ impl VfsScanner {
                 }
                 match scan_results.iter().next() {
                     Some(format_identifier) => match format_identifier {
+                        FormatIdentifier::Fat => Ok(None),
                         FormatIdentifier::Ntfs => Ok(None),
                         _ => Err(keramics_core::error_trace_new!(
                             "Found unsupported exclusion volume system format signature"

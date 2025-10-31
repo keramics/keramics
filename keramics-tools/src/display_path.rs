@@ -14,6 +14,7 @@
 use std::collections::HashMap;
 
 use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterDecoder;
 use keramics_vfs::{
     VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference, VfsString, VfsType,
 };
@@ -57,9 +58,28 @@ impl DisplayPath {
     pub fn escape_string(&self, vfs_string: &VfsString) -> String {
         match vfs_string {
             VfsString::Byte(byte_string) => {
-                // TODO: handle codepage
-                let string: String = byte_string.to_string();
-                self.internal_escape_string(&string)
+                let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+
+                let mut string_parts: Vec<String> = Vec::new();
+
+                while let Some(result) = character_decoder.next() {
+                    match result {
+                        Ok(code_point) => {
+                            let string: String = match char::from_u32(code_point as u32) {
+                                Some(unicode_character) => {
+                                    match self.translation_table.get(&(unicode_character as u32)) {
+                                        Some(escaped_character) => escaped_character.clone(),
+                                        None => unicode_character.to_string(),
+                                    }
+                                }
+                                None => format!("\\U{{{:08x}}}", code_point),
+                            };
+                            string_parts.push(string);
+                        }
+                        Err(error) => todo!(),
+                    }
+                }
+                string_parts.join("")
             }
             VfsString::Empty => String::new(),
             VfsString::OsString(_) => todo!(),
@@ -166,7 +186,7 @@ impl DisplayPath {
                 let path_string: String = path.to_string();
                 match vfs_type {
                     VfsType::Apm => path_string.replace("apm", "p"),
-                    VfsType::Ext | VfsType::Ntfs => {
+                    VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {
                         let parent_display_path: String = match self.get_path(parent) {
                             Ok(path) => path,
                             Err(mut error) => {

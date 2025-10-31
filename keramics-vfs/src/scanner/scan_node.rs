@@ -59,7 +59,7 @@ impl VfsScanNode {
             | VfsType::Udif
             | VfsType::Vhd
             | VfsType::Vhdx => false,
-            VfsType::Ext | VfsType::Ntfs => true,
+            VfsType::Ext | VfsType::Fat | VfsType::Ntfs => true,
         }
     }
 }

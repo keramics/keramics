@@ -16,7 +16,7 @@ use std::ffi::OsString;
 use keramics_types::{ByteString, Ucs2String};
 
 /// Virtual File System (VFS) string.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VfsString {
     Byte(ByteString),
     Empty,

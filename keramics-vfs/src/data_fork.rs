@@ -19,6 +19,7 @@ use super::string::VfsString;
 /// Virtual File System (VFS) data fork.
 pub enum VfsDataFork<'a> {
     Ext(DataStreamReference),
+    Fat(DataStreamReference),
     Ntfs(NtfsDataFork<'a>),
 }
 
@@ -27,6 +28,7 @@ impl<'a> VfsDataFork<'a> {
     pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
         match self {
             VfsDataFork::Ext(data_stream) => Ok(data_stream.clone()),
+            VfsDataFork::Fat(data_stream) => Ok(data_stream.clone()),
             VfsDataFork::Ntfs(data_fork) => data_fork.get_data_stream(),
         }
     }
@@ -35,6 +37,7 @@ impl<'a> VfsDataFork<'a> {
     pub fn get_name(&self) -> Option<VfsString> {
         match self {
             VfsDataFork::Ext(_) => None,
+            VfsDataFork::Fat(_) => None,
             VfsDataFork::Ntfs(data_fork) => match data_fork.get_name() {
                 Some(name) => Some(VfsString::Ucs2(name.clone())),
                 None => None,

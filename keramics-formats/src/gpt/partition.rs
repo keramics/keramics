@@ -156,6 +156,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut partition: GptPartition = get_partition()?;
+
+        let size: u64 = partition.get_size()?;
+        assert_eq!(size, 65536);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let mut partition: GptPartition = get_partition()?;
 
@@ -262,6 +272,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for get_size.
 }

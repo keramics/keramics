@@ -571,6 +571,12 @@ mod tests {
 
         assert_eq!(file_entry.mft_entry_number, 64);
 
+        // TODO: add support for short names
+        // let ntfs_path: NtfsPath = NtfsPath::from("\\EMPTYF~1");
+        // let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+
+        // assert_eq!(file_entry.mft_entry_number, 64);
+
         let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
         let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
 
