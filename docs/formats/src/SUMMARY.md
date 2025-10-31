@@ -17,6 +17,8 @@
     - [Master Boot Record (MBR)](mbr.md)
 - [File system formats](file_system.md)
     - [Extended File System (ext)](ext.md)
+    - [Extensible File Allocation Table (exFAT)](exfat.md)
+    - [File Allocation Table (FAT)](fat.md)
     - [New Technologies File System (NTFS)](ntfs.md)
 - [Assorted formats](assorted.md)
     - [Property list (plist)](plist.md)

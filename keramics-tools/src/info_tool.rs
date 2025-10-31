@@ -31,8 +31,8 @@ mod range_stream;
 
 use crate::enums::EncodingType;
 use crate::info::{
-    ApmInfo, EwfInfo, ExtInfo, GptInfo, MbrInfo, NtfsInfo, QcowInfo, SparseImageInfo, UdifInfo,
-    VhdInfo, VhdxInfo,
+    ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, MbrInfo, NtfsInfo, QcowInfo, SparseImageInfo,
+    UdifInfo, VhdInfo, VhdxInfo,
 };
 use crate::range_stream::FileRangeDataStream;
 
@@ -97,6 +97,7 @@ fn scan_for_formats(
     format_scanner.add_apm_signatures();
     format_scanner.add_ext_signatures();
     format_scanner.add_ewf_signatures();
+    format_scanner.add_fat_signatures();
     format_scanner.add_gpt_signatures();
     format_scanner.add_ntfs_signatures();
     format_scanner.add_qcow_signatures();
@@ -240,6 +241,9 @@ fn main() -> ExitCode {
                 command_arguments.entry,
                 character_encoding.as_ref(),
             ),
+            FormatIdentifier::Fat => {
+                FatInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
+            }
             FormatIdentifier::Ntfs => {
                 NtfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
@@ -252,6 +256,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Ext => {
                 ExtInfo::print_hierarchy(&data_stream, character_encoding.as_ref())
             }
+            FormatIdentifier::Fat => FatInfo::print_hierarchy(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
             _ => {
                 println!("Unsupported format: {}", format_identifier.to_string());
@@ -274,6 +279,9 @@ fn main() -> ExitCode {
                     &path_components,
                     character_encoding.as_ref(),
                 ),
+                FormatIdentifier::Fat => {
+                    FatInfo::print_file_entry_by_path(&data_stream, &path_components)
+                }
                 FormatIdentifier::Ntfs => {
                     NtfsInfo::print_file_entry_by_path(&data_stream, &path_components)
                 }
@@ -289,6 +297,7 @@ fn main() -> ExitCode {
                 ExtInfo::print_file_system(&data_stream, character_encoding.as_ref())
             }
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
+            FormatIdentifier::Fat => FatInfo::print_file_system(&data_stream),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),

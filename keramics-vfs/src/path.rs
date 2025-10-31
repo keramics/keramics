@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use keramics_core::ErrorTrace;
 use keramics_formats::PathComponent;
 use keramics_formats::ext::ExtPath;
+use keramics_formats::fat::{FatPath, FatString};
 use keramics_formats::ntfs::NtfsPath;
 use keramics_types::{ByteString, Ucs2String};
 
@@ -26,6 +27,7 @@ use super::string_path::StringPath;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VfsPath {
     Ext(ExtPath),
+    Fat(FatPath),
     Ntfs(NtfsPath),
     Os(PathBuf),
     String(StringPath),
@@ -46,6 +48,7 @@ impl VfsPath {
             | VfsType::Vhd
             | VfsType::Vhdx => VfsPath::String(StringPath::from(path)),
             VfsType::Ext => VfsPath::Ext(ExtPath::from(path)),
+            VfsType::Fat => VfsPath::Fat(FatPath::from(path)),
             VfsType::Ntfs => VfsPath::Ntfs(NtfsPath::from(path)),
             VfsType::Os => VfsPath::Os(PathBuf::from(path)),
         }
@@ -65,6 +68,7 @@ impl VfsPath {
             | VfsType::Vhd
             | VfsType::Vhdx => VfsPath::String(StringPath::from(path_components)),
             VfsType::Ext => VfsPath::Ext(ExtPath::from(path_components)),
+            VfsType::Fat => VfsPath::Fat(FatPath::from(path_components)),
             VfsType::Ntfs => VfsPath::Ntfs(NtfsPath::from(path_components)),
             VfsType::Os => VfsPath::Os(PathBuf::from_iter(path_components)),
         }
@@ -90,6 +94,25 @@ impl VfsPath {
                 }
                 VfsPath::Ext(ExtPath {
                     components: ext_path_components,
+                })
+            }
+            VfsPath::Fat(fat_path) => {
+                let mut fat_path_components: Vec<FatString> = fat_path.components.clone();
+
+                for path_component in path_components {
+                    let fat_string: FatString = match path_component {
+                        PathComponent::ByteString(byte_string) => {
+                            FatString::ByteString(byte_string.clone())
+                        }
+                        PathComponent::Ucs2String(ucs2_string) => {
+                            FatString::Ucs2String(ucs2_string.clone())
+                        }
+                        PathComponent::String(string) => FatString::from(string),
+                    };
+                    fat_path_components.push(fat_string);
+                }
+                VfsPath::Fat(FatPath {
+                    components: fat_path_components,
                 })
             }
             VfsPath::Ntfs(ntfs_path) => {
@@ -156,6 +179,10 @@ impl VfsPath {
                 let parent_ext_path: ExtPath = ext_path.new_with_parent_directory();
                 VfsPath::Ext(parent_ext_path)
             }
+            VfsPath::Fat(fat_path) => {
+                let parent_fat_path: FatPath = fat_path.new_with_parent_directory();
+                VfsPath::Fat(parent_fat_path)
+            }
             VfsPath::Ntfs(ntfs_path) => {
                 let parent_ntfs_path: NtfsPath = ntfs_path.new_with_parent_directory();
                 VfsPath::Ntfs(parent_ntfs_path)
@@ -180,6 +207,17 @@ impl VfsPath {
                 Some(byte_string) => Some(PathComponent::ByteString(byte_string.clone())),
                 None => None,
             },
+            VfsPath::Fat(fat_path) => match fat_path.file_name() {
+                Some(fat_string) => match fat_string {
+                    FatString::ByteString(byte_string) => {
+                        Some(PathComponent::ByteString(byte_string.clone()))
+                    }
+                    FatString::Ucs2String(ucs2_string) => {
+                        Some(PathComponent::Ucs2String(ucs2_string.clone()))
+                    }
+                },
+                None => None,
+            },
             VfsPath::Ntfs(ntfs_path) => match ntfs_path.file_name() {
                 Some(ucs2_string) => Some(PathComponent::Ucs2String(ucs2_string.clone())),
                 None => None,
@@ -199,6 +237,7 @@ impl VfsPath {
     pub fn to_string(&self) -> String {
         match self {
             VfsPath::Ext(ext_path) => ext_path.to_string(),
+            VfsPath::Fat(fat_path) => fat_path.to_string(),
             VfsPath::Ntfs(ntfs_path) => ntfs_path.to_string(),
             // TODO: change to_string_lossy to a non-lossy conversion
             VfsPath::Os(path_buf) => path_buf.to_string_lossy().to_string(),
@@ -216,6 +255,9 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/ext1");
         assert!(matches!(vfs_path, VfsPath::Ext(_)));
 
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/fat1");
+        assert!(matches!(vfs_path, VfsPath::Fat(_)));
+
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\ntfs1");
         assert!(matches!(vfs_path, VfsPath::Ntfs(_)));
 
@@ -231,6 +273,10 @@ mod tests {
         let path_components: [&str; 1] = ["ext1"];
         let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Ext, &path_components);
         assert!(matches!(vfs_path, VfsPath::Ext(_)));
+
+        let path_components: [&str; 1] = ["fat1"];
+        let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Fat, &path_components);
+        assert!(matches!(vfs_path, VfsPath::Fat(_)));
 
         let path_components: [&str; 1] = ["ntfs1"];
         let vfs_path: VfsPath = VfsPath::from_path_components(&VfsType::Ntfs, &path_components);
@@ -252,6 +298,12 @@ mod tests {
         let test_path_components: [PathComponent; 1] = [PathComponent::from("ext1")];
         let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
         assert_eq!(test_path.to_string(), "/ext1");
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/");
+
+        let test_path_components: [PathComponent; 1] = [PathComponent::from("fat1")];
+        let test_path: VfsPath = vfs_path.new_with_join(&test_path_components)?;
+        assert_eq!(test_path.to_string(), "/fat1");
 
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\");
 
@@ -283,6 +335,13 @@ mod tests {
         assert_eq!(
             result,
             Some(PathComponent::ByteString(ByteString::from("ext1")))
+        );
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/fat1");
+        let result: Option<PathComponent> = vfs_path.get_file_name();
+        assert_eq!(
+            result,
+            Some(PathComponent::Ucs2String(Ucs2String::from("fat1")))
         );
 
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\ntfs1");

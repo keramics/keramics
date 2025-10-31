@@ -72,6 +72,31 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds File Allocation Table (FAT) signatures.
+    pub fn add_fat_signatures(&mut self) {
+        // FAT-12 file system hint in boot record.
+        self.signature_scanner.add_signature(Signature::new(
+            "fat1",
+            PatternType::BoundToStart,
+            54,
+            &[0x46, 0x41, 0x54, 0x31, 0x32, 0x20, 0x20, 0x20],
+        ));
+        // FAT-16 file system hint in boot record.
+        self.signature_scanner.add_signature(Signature::new(
+            "fat2",
+            PatternType::BoundToStart,
+            54,
+            &[0x46, 0x41, 0x54, 0x31, 0x36, 0x20, 0x20, 0x20],
+        ));
+        // FAT-32 file system hint in boot record.
+        self.signature_scanner.add_signature(Signature::new(
+            "fat3",
+            PatternType::BoundToStart,
+            82,
+            &[0x46, 0x41, 0x54, 0x33, 0x32, 0x20, 0x20, 0x20],
+        ));
+    }
+
     /// Adds GUID Partition Table (GPT) signatures.
     pub fn add_gpt_signatures(&mut self) {
         // Signature for 512 bytes per sector.
@@ -264,6 +289,7 @@ impl FormatScanner {
                 "apm1" => FormatIdentifier::Apm,
                 "ext1" => FormatIdentifier::Ext,
                 "ewf1" => FormatIdentifier::Ewf,
+                "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
@@ -296,6 +322,7 @@ mod tests {
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_ewf_signatures();
+        format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_qcow_signatures();
@@ -313,6 +340,7 @@ mod tests {
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_ewf_signatures();
+        format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_qcow_signatures();

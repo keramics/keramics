@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
+use keramics_formats::fat::{FatFileEntry, FatFileSystem};
 use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
 
 use super::apm::{ApmFileEntry, ApmFileSystem};
@@ -40,6 +41,7 @@ pub enum VfsFileSystem {
     Ext(ExtFileSystem),
     Ewf(EwfFileSystem),
     Fake(FakeFileSystem),
+    Fat(FatFileSystem),
     Gpt(GptFileSystem),
     Mbr(MbrFileSystem),
     Ntfs(NtfsFileSystem),
@@ -59,6 +61,7 @@ impl VfsFileSystem {
             VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
             VfsType::Ewf => VfsFileSystem::Ewf(EwfFileSystem::new()),
             VfsType::Fake => VfsFileSystem::Fake(FakeFileSystem::new()),
+            VfsType::Fat => VfsFileSystem::Fat(FatFileSystem::new()),
             VfsType::Gpt => VfsFileSystem::Gpt(GptFileSystem::new()),
             VfsType::Mbr => VfsFileSystem::Mbr(MbrFileSystem::new()),
             VfsType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
@@ -132,6 +135,28 @@ impl VfsFileSystem {
                     }
                 }
             }
+            VfsFileSystem::Fat(fat_file_system) => match vfs_path {
+                VfsPath::Fat(fat_path) => {
+                    let result: Option<FatFileEntry> =
+                        match fat_file_system.get_file_entry_by_path(&fat_path) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve FAT file entry"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    match result {
+                        Some(_) => Ok(true),
+                        None => Ok(false),
+                    }
+                }
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported FAT VFS path type"
+                )),
+            },
             VfsFileSystem::Gpt(gpt_file_system) => {
                 match gpt_file_system.file_entry_exists(vfs_path) {
                     Ok(result) => Ok(result),
@@ -348,6 +373,28 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::Fat(fat_file_system) => match vfs_path {
+                VfsPath::Fat(fat_path) => {
+                    let result: Option<FatFileEntry> =
+                        match fat_file_system.get_file_entry_by_path(&fat_path) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve FAT file entry"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    match result {
+                        Some(file_entry) => Ok(Some(VfsFileEntry::Fat(file_entry))),
+                        None => Ok(None),
+                    }
+                }
+                _ => Err(keramics_core::error_trace_new!(
+                    "Unsupported FAT VFS path type"
+                )),
+            },
             VfsFileSystem::Gpt(gpt_file_system) => {
                 let result: Option<GptFileEntry> =
                     match gpt_file_system.get_file_entry_by_path(vfs_path) {
@@ -570,6 +617,16 @@ impl VfsFileSystem {
                 Ok(Some(VfsFileEntry::Ewf(ewf_file_entry)))
             }
             VfsFileSystem::Fake(_) => todo!(),
+            VfsFileSystem::Fat(fat_file_system) => match fat_file_system.get_root_directory() {
+                Ok(fat_file_entry) => Ok(Some(VfsFileEntry::Fat(fat_file_entry))),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve FAT root directory"
+                    );
+                    return Err(error);
+                }
+            },
             VfsFileSystem::Gpt(gpt_file_system) => {
                 let gpt_file_entry: GptFileEntry = match gpt_file_system.get_root_file_entry() {
                     Ok(file_entry) => file_entry,
@@ -757,6 +814,48 @@ impl VfsFileSystem {
                     return Err(keramics_core::error_trace_new!(
                         "Unsupported parent file system"
                     ));
+                }
+            }
+            VfsFileSystem::Fat(fat_file_system) => {
+                let file_system: &VfsFileSystemReference = match parent_file_system {
+                    Some(file_system) => file_system,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Missing parent file system"
+                        ));
+                    }
+                };
+                let vfs_path: &VfsPath = vfs_location.get_path();
+
+                let result: Option<DataStreamReference> =
+                    match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let data_stream: DataStreamReference = match result {
+                    Some(data_stream) => data_stream,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "No such file: {}",
+                            vfs_location.to_string()
+                        )));
+                    }
+                };
+                match fat_file_system.read_data_stream(&data_stream) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read FAT file system from data stream"
+                        );
+                        return Err(error);
+                    }
                 }
             }
             VfsFileSystem::Gpt(gpt_file_system) => {
@@ -950,6 +1049,18 @@ mod tests {
         Ok(vfs_file_system)
     }
 
+    fn get_fat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fat);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("fat/fat12.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
     fn get_gpt_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Gpt);
 
@@ -1087,6 +1198,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test_file_entry_exists_with_fat
 
     #[test]
     fn test_file_entry_exists_with_gpt() -> Result<(), ErrorTrace> {
@@ -1338,6 +1451,10 @@ mod tests {
     }
 
     // TODO: add tests fir get_file_entry of fake root
+
+    // TODO: add test_get_file_entry_by_path_with_fat_non_existing
+    // TODO: add test_get_file_entry_by_path_with_fat_partition
+    // TODO: add test_get_file_entry_by_path_with_fat_root
 
     #[test]
     fn test_get_file_entry_by_path_with_gpt_non_existing() -> Result<(), ErrorTrace> {

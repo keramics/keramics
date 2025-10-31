@@ -57,6 +57,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "fat"
+path = "fuzz_targets/fat.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "gpt"
 path = "fuzz_targets/gpt.rs"
 test = false

@@ -14,6 +14,7 @@
 mod apm;
 mod ewf;
 mod ext;
+mod fat;
 mod gpt;
 mod mbr;
 mod ntfs;
@@ -26,6 +27,7 @@ mod vhdx;
 pub use apm::ApmInfo;
 pub use ewf::EwfInfo;
 pub use ext::ExtInfo;
+pub use fat::FatInfo;
 pub use gpt::GptInfo;
 pub use mbr::MbrInfo;
 pub use ntfs::NtfsInfo;

@@ -602,6 +602,9 @@ impl ImageTool {
             VfsFileEntry::Ext(ext_file_entry) => {
                 format!("{}", ext_file_entry.inode_number)
             }
+            VfsFileEntry::Fat(fat_file_entry) => {
+                format!("0x{:08x}", fat_file_entry.identifier)
+            }
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 // Note that the directory entry file reference can be differrent
                 // from the values in the MFT entry.
@@ -620,6 +623,14 @@ impl ImageTool {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
 
                 Self::get_file_mode_string(file_mode)
+            }
+            VfsFileEntry::Fat(fat_file_entry) => {
+                let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
+
+                Self::get_file_mode_string_from_file_attribute_flags(
+                    &file_type,
+                    file_attribute_flags as u32,
+                )
             }
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 let file_attribute_flags: u32 = ntfs_file_entry.get_file_attribute_flags();
@@ -907,20 +918,21 @@ impl ImageTool {
                     return Err(error);
                 }
             };
-        let suffix: String = match result {
+        let indentation: String = vec![" "; depth * 4].join("");
+        let vfs_path: &VfsPath = vfs_scan_node.location.get_path();
+
+        let vfs_type: &VfsType = vfs_scan_node.get_type();
+
+        let suffix: String = match result.as_ref() {
             Some(file_entry) => match file_entry {
                 VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
-                    Some(identifier) => format!(" (identifier: {})", identifier.to_string()),
+                    Some(identifier) => format!(" (alias: /gpt{{{}}})", identifier.to_string()),
                     _ => String::new(),
                 },
                 _ => String::new(),
             },
             None => String::new(),
         };
-        let indentation: String = vec![" "; depth * 4].join("");
-        let vfs_path: &VfsPath = vfs_scan_node.location.get_path();
-        let vfs_type: &VfsType = vfs_scan_node.get_type();
-
         println!(
             "{}{}: path: {}{}",
             indentation,
@@ -943,7 +955,7 @@ impl ImageTool {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
             match vfs_scan_node.get_type() {
-                VfsType::Ext { .. } | VfsType::Ntfs { .. } => {}
+                VfsType::Ext { .. } | VfsType::Fat { .. } | VfsType::Ntfs { .. } => {}
                 _ => return Ok(()),
             }
             let vfs_resolver: VfsResolverReference = VfsResolver::current();

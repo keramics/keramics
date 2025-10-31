@@ -17,6 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtFileEntry, ExtPath};
+use keramics_formats::fat::{FatFileEntry, FatPath, FatString};
 use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry, NtfsPath};
 use keramics_types::{ByteString, Ucs2String};
 
@@ -43,6 +44,7 @@ pub enum VfsFileEntry {
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
     Fake(Arc<FakeFileEntry>),
+    Fat(FatFileEntry),
     Gpt(GptFileEntry),
     Mbr(MbrFileEntry),
     Ntfs(NtfsFileEntry),
@@ -69,6 +71,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_access_time(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_access_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_access_time(),
         }
@@ -79,6 +82,7 @@ impl VfsFileEntry {
         match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
@@ -107,6 +111,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_creation_time(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_creation_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_creation_time(),
         }
@@ -132,15 +137,19 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_file_type(),
+            VfsFileEntry::Fat(fat_file_entry) => {
+                if fat_file_entry.is_directory() {
+                    VfsFileType::Directory
+                } else {
+                    VfsFileType::File
+                }
+            }
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_file_type(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_file_type(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                // FILE_ATTRIBUTE_DEVICE is not used by NTFS.
                 if ntfs_file_entry.is_symbolic_link() {
                     VfsFileType::SymbolicLink
-                }
-                // FILE_ATTRIBUTE_DIRECTORY is not used by NTFS.
-                else if ntfs_file_entry.is_directory() {
+                } else if ntfs_file_entry.is_directory() {
                     VfsFileType::Directory
                 } else {
                     VfsFileType::File
@@ -171,6 +180,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_modification_time(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_modification_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_modification_time(),
         }
@@ -194,6 +204,13 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(_) => todo!(),
             VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_name() {
                 Some(name) => Some(VfsString::String(name)),
+                None => None,
+            },
+            VfsFileEntry::Fat(fat_file_entry) => match fat_file_entry.get_name() {
+                Some(name) => match name {
+                    FatString::ByteString(byte_string) => Some(VfsString::Byte(byte_string)),
+                    FatString::Ucs2String(ucs2_string) => Some(VfsString::Ucs2(ucs2_string)),
+                },
                 None => None,
             },
             VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_name() {
@@ -247,6 +264,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => 1,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_size(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_size(),
             VfsFileEntry::Os(_) => todo!(),
         }
@@ -258,6 +276,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
@@ -338,6 +357,13 @@ impl VfsFileEntry {
                 VfsFileType::File => 1,
                 _ => 0,
             },
+            VfsFileEntry::Fat(fat_file_entry) => {
+                if fat_file_entry.is_directory() {
+                    0
+                } else {
+                    1
+                }
+            }
             VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry {
                 GptFileEntry::Partition { .. } => 1,
                 GptFileEntry::Root { .. } => 0,
@@ -419,6 +445,30 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Ewf(_) => todo!(),
             VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Fat(fat_file_entry) => {
+                if data_fork_index != 0 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid data fork index: {}",
+                        data_fork_index
+                    )));
+                }
+                let result: Option<DataStreamReference> = match fat_file_entry.get_data_stream() {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve FAT data stream"
+                        );
+                        return Err(error);
+                    }
+                };
+                match result {
+                    Some(data_stream) => VfsDataFork::Fat(data_stream),
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Missing FAT data stream"));
+                    }
+                }
+            }
             VfsFileEntry::Gpt(_) => todo!(),
             VfsFileEntry::Mbr(_) => todo!(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
@@ -484,6 +534,16 @@ impl VfsFileEntry {
                     keramics_core::error_trace_add_frame!(
                         error,
                         "Unable to retrieve fake data stream"
+                    );
+                    return Err(error);
+                }
+            },
+            VfsFileEntry::Fat(fat_file_entry) => match fat_file_entry.get_data_stream() {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve FAT data stream"
                     );
                     return Err(error);
                 }
@@ -594,6 +654,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ext(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Os(_)
@@ -674,6 +735,18 @@ impl VfsFileEntry {
                 }
             }
             VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Fat(fat_file_entry) => {
+                match fat_file_entry.get_number_of_sub_file_entries() {
+                    Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve number of FAT sub file entries"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             VfsFileEntry::Gpt(gpt_file_entry) => {
                 match gpt_file_entry.get_number_of_sub_file_entries() {
                     Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
@@ -827,6 +900,21 @@ impl VfsFileEntry {
                 }
             }
             VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Fat(fat_file_entry) => {
+                match fat_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
+                    Ok(sub_file_entry) => VfsFileEntry::Fat(sub_file_entry),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve FAT sub file entry: {}",
+                                sub_file_entry_index
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             VfsFileEntry::Gpt(gpt_file_entry) => {
                 match gpt_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
                     Ok(sub_file_entry) => VfsFileEntry::Gpt(sub_file_entry),
@@ -968,6 +1056,7 @@ impl VfsFileEntry {
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
             VfsFileEntry::Ewf(ewf_file_entry) => todo!(),
             VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
             VfsFileEntry::Gpt(gpt_file_entry) => todo!(),
             VfsFileEntry::Mbr(mbr_file_entry) => todo!(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
@@ -985,7 +1074,7 @@ impl VfsFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_datetime::PosixTime32;
+    use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms, PosixTime32};
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
@@ -1062,6 +1151,30 @@ mod tests {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    fn get_fat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fat);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("fat/fat12.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_fat_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1271,7 +1384,6 @@ mod tests {
                 timestamp: 1735977482
             }))
         );
-
         Ok(())
     }
 
@@ -1285,6 +1397,17 @@ mod tests {
     }
 
     // TODO: add test_get_access_time_with_fake
+
+    #[test]
+    fn test_get_access_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_access_time(),
+            Some(&DateTime::FatDate(FatDate { date: 0x5b53 }))
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_get_access_time_with_gpt() -> Result<(), ErrorTrace> {
@@ -1396,6 +1519,15 @@ mod tests {
     // TODO: add test_get_change_time_with_fake
 
     #[test]
+    fn test_get_change_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_change_time_with_gpt() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
@@ -1490,6 +1622,21 @@ mod tests {
     }
 
     // TODO: add test_get_creation_time_with_fake
+
+    #[test]
+    fn test_get_creation_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_creation_time(),
+            Some(&DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
+                date: 0x5b53,
+                time: 0x958f,
+                fraction: 0x7d,
+            }))
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_get_creation_time_with_gpt() -> Result<(), ErrorTrace> {
@@ -1616,6 +1763,25 @@ mod tests {
     }
 
     // TODO: add test_get_file_type_with_fake
+
+    #[test]
+    fn test_get_file_type_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_type_with_gpt() -> Result<(), ErrorTrace> {
@@ -1775,7 +1941,6 @@ mod tests {
                 timestamp: 1735977481
             }))
         );
-
         Ok(())
     }
 
@@ -1789,6 +1954,20 @@ mod tests {
     }
 
     // TODO: add test_get_modification_time_with_fake
+
+    #[test]
+    fn test_get_modification_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_modification_time(),
+            Some(&DateTime::FatTimeDate(FatTimeDate {
+                date: 0x5b53,
+                time: 0x958f
+            }))
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_get_modification_time_with_gpt() -> Result<(), ErrorTrace> {
@@ -1927,6 +2106,27 @@ mod tests {
     }
 
     // TODO: add test_get_data_stream_with_fake
+
+    #[test]
+    fn test_get_data_stream_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_gpt() -> Result<(), ErrorTrace> {
