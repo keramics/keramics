@@ -180,6 +180,27 @@ mod tests {
         assert_eq!(decoder.next(), Some(Ok(0x73)));
         assert_eq!(decoder.next(), None);
 
+        let byte_string: [u8; 2] = [0xc2, 0x80];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        assert_eq!(decoder.next(), Some(Ok(0x80)));
+        assert_eq!(decoder.next(), None);
+
+        let byte_string: [u8; 3] = [0xe0, 0xa0, 0x80];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        assert_eq!(decoder.next(), Some(Ok(0x800)));
+        assert_eq!(decoder.next(), None);
+
+        let byte_string: [u8; 4] = [0xf0, 0x90, 0x80, 0x80];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        assert_eq!(decoder.next(), Some(Ok(0x10000)));
+        assert_eq!(decoder.next(), None);
+
         Ok(())
     }
 }

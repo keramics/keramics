@@ -609,6 +609,16 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 1] = [0x8e];
+
+        let mut decoder: DecoderMacDingbats = DecoderMacDingbats::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encode() -> Result<(), ErrorTrace> {
         let code_points: [u32; 8] = [
             0x272b, 0x2745, 0x2752, 0x2741, 0x274d, 0x2749, 0x2743, 0x25b2,
@@ -631,12 +641,25 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x246a];
+
+        let mut encoder: EncoderMacDingbats = EncoderMacDingbats::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2700];
+
+        let mut encoder: EncoderMacDingbats = EncoderMacDingbats::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderMacDingbats = EncoderMacDingbats::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

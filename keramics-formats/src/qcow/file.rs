@@ -23,10 +23,7 @@ use crate::block_tree::BlockTree;
 use super::block_range::{QcowBlockRange, QcowBlockRangeType};
 use super::cluster_table::{QcowClusterTable, QcowClusterTableEntry};
 use super::enums::{QcowCompressionMethod, QcowEncryptionMethod};
-use super::file_header_common::QcowFileHeaderCommon;
-use super::file_header_v1::QcowFileHeaderV1;
-use super::file_header_v2::QcowFileHeaderV2;
-use super::file_header_v3::QcowFileHeaderV3;
+use super::file_header::QcowFileHeader;
 
 /// QEMU Copy-On-Write (QCOW) file.
 pub struct QcowFile {
@@ -46,7 +43,7 @@ pub struct QcowFile {
     offset_bit_mask: u64,
 
     /// Level 1 index bit shift.
-    level1_index_bit_shift: u8,
+    level1_index_bit_shift: u32,
 
     /// Level 1 cluster table.
     level1_cluster_table: QcowClusterTable,
@@ -61,7 +58,7 @@ pub struct QcowFile {
     level2_cluster_table: QcowClusterTable,
 
     /// Number of cluster block bits.
-    number_of_cluster_block_bits: u8,
+    number_of_cluster_block_bits: u32,
 
     /// Cluster block bit mask.
     cluster_block_bit_mask: u64,
@@ -70,7 +67,7 @@ pub struct QcowFile {
     cluster_block_size: u64,
 
     /// Compression bit shift.
-    compression_bit_shift: u8,
+    compression_bit_shift: u32,
 
     /// Compression bit mask.
     compression_bit_mask: u64,
@@ -154,146 +151,31 @@ impl QcowFile {
 
     /// Reads the file header.
     fn read_file_header(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let mut data: [u8; 112] = [0; 112];
+        let mut file_header: QcowFileHeader = QcowFileHeader::new();
 
-        let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
-            &mut data,
-            SeekFrom::Start(0)
-        );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "QcowFileHeader data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
-        let mut file_header_common: QcowFileHeaderCommon = QcowFileHeaderCommon::new();
-
-        match file_header_common.read_data(&data) {
+        match file_header.read_at_position(data_stream, SeekFrom::Start(0)) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read common file header");
+                keramics_core::error_trace_add_frame!(error, "Unable to read file header");
                 return Err(error);
             }
         }
-        self.format_version = file_header_common.format_version;
+        self.format_version = file_header.format_version;
+        self.file_header_size = file_header.header_size;
+        self.number_of_cluster_block_bits = file_header.number_of_cluster_block_bits;
+        self.media_size = file_header.media_size;
 
-        let backing_file_name_offset: u64;
-        let backing_file_name_size: u32;
-        let number_of_level2_table_bits: u8;
-        let level1_table_offset: u64;
-
-        let mut level1_table_number_of_references: u64 = 0;
-
-        if self.format_version == 1 {
-            let mut file_header_v1: QcowFileHeaderV1 = QcowFileHeaderV1::new();
-
-            match file_header_v1.read_data(&data) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read version 1 file header"
-                    );
-                    return Err(error);
-                }
-            }
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(QcowFileHeaderV1::debug_read_data(&data));
-            }
-            self.media_size = file_header_v1.media_size;
-            self.number_of_cluster_block_bits = file_header_v1.number_of_cluster_block_bits;
-            self.encryption_method = match file_header_v1.encryption_method {
-                0 => QcowEncryptionMethod::None,
-                1 => QcowEncryptionMethod::AesCbc128,
-                2 => QcowEncryptionMethod::Luks,
-                _ => QcowEncryptionMethod::Unknown,
-            };
-            self.file_header_size = 48;
-
-            backing_file_name_offset = file_header_v1.backing_file_name_offset;
-            backing_file_name_size = file_header_v1.backing_file_name_size;
-            number_of_level2_table_bits = file_header_v1.number_of_level2_table_bits;
-            level1_table_offset = file_header_v1.level1_table_offset;
-        } else if self.format_version == 2 {
-            let mut file_header_v2: QcowFileHeaderV2 = QcowFileHeaderV2::new();
-
-            match file_header_v2.read_data(&data) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read version 2 file header"
-                    );
-                    return Err(error);
-                }
-            }
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(QcowFileHeaderV2::debug_read_data(&data));
-            }
-            self.media_size = file_header_v2.media_size;
-            self.number_of_cluster_block_bits = file_header_v2.number_of_cluster_block_bits as u8;
-            self.encryption_method = match file_header_v2.encryption_method {
-                0 => QcowEncryptionMethod::None,
-                1 => QcowEncryptionMethod::AesCbc128,
-                2 => QcowEncryptionMethod::Luks,
-                _ => QcowEncryptionMethod::Unknown,
-            };
-            self.file_header_size = 72;
-
-            backing_file_name_offset = file_header_v2.backing_file_name_offset;
-            backing_file_name_size = file_header_v2.backing_file_name_size;
-            number_of_level2_table_bits = self.number_of_cluster_block_bits - 3;
-            level1_table_offset = file_header_v2.level1_table_offset;
-            level1_table_number_of_references =
-                file_header_v2.level1_table_number_of_references as u64;
-        } else if self.format_version == 3 {
-            let mut file_header_v3: QcowFileHeaderV3 = QcowFileHeaderV3::new();
-
-            match file_header_v3.read_data(&data) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read version 3 file header"
-                    );
-                    return Err(error);
-                }
-            }
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(QcowFileHeaderV3::debug_read_data(&data));
-            }
-            self.media_size = file_header_v3.media_size;
-            self.number_of_cluster_block_bits = file_header_v3.number_of_cluster_block_bits as u8;
-            self.encryption_method = match file_header_v3.encryption_method {
-                0 => QcowEncryptionMethod::None,
-                1 => QcowEncryptionMethod::AesCbc128,
-                2 => QcowEncryptionMethod::Luks,
-                _ => QcowEncryptionMethod::Unknown,
-            };
-            self.compression_method = match file_header_v3.compression_method {
+        self.encryption_method = match file_header.encryption_method {
+            0 => QcowEncryptionMethod::None,
+            1 => QcowEncryptionMethod::AesCbc128,
+            2 => QcowEncryptionMethod::Luks,
+            _ => QcowEncryptionMethod::Unknown,
+        };
+        if self.format_version == 3 {
+            self.compression_method = match file_header.compression_method {
                 0 => QcowCompressionMethod::Zlib,
                 _ => QcowCompressionMethod::Unknown,
             };
-            self.file_header_size = file_header_v3.header_size;
-
-            backing_file_name_offset = file_header_v3.backing_file_name_offset;
-            backing_file_name_size = file_header_v3.backing_file_name_size;
-            number_of_level2_table_bits = self.number_of_cluster_block_bits - 3;
-            level1_table_offset = file_header_v3.level1_table_offset;
-            level1_table_number_of_references =
-                file_header_v3.level1_table_number_of_references as u64;
-        } else {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported format version: {}",
-                self.format_version
-            )));
         }
         if self.format_version == 1 {
             self.offset_bit_mask = 0x7fffffffffffffff;
@@ -305,7 +187,7 @@ impl QcowFile {
             self.compression_bit_shift = 62 - self.number_of_cluster_block_bits;
         }
         self.level1_index_bit_shift =
-            self.number_of_cluster_block_bits + number_of_level2_table_bits;
+            self.number_of_cluster_block_bits + file_header.number_of_level2_table_bits;
 
         if self.level1_index_bit_shift > 63 {
             return Err(keramics_core::error_trace_new!(format!(
@@ -313,12 +195,17 @@ impl QcowFile {
                 self.level1_index_bit_shift
             )));
         }
-        self.level2_index_bit_mask = !(u64::MAX << number_of_level2_table_bits);
+        self.level2_index_bit_mask =
+            !(u64::MAX << (file_header.number_of_level2_table_bits as u64));
         self.cluster_block_bit_mask = !(u64::MAX << self.number_of_cluster_block_bits);
         self.compression_bit_mask = !(u64::MAX << self.compression_bit_shift);
         self.cluster_block_size = 1 << self.number_of_cluster_block_bits;
 
-        self.level2_table_number_of_references = 1 << number_of_level2_table_bits;
+        self.level2_table_number_of_references =
+            1 << (file_header.number_of_level2_table_bits as u64);
+
+        let mut level1_table_number_of_references: u64 =
+            file_header.level1_table_number_of_references as u64;
 
         if self.format_version == 1 {
             if self.cluster_block_size > u64::MAX / self.level2_table_number_of_references {
@@ -355,7 +242,7 @@ impl QcowFile {
             self.mediator.debug_print(format!("}}\n\n"));
         }
         self.level1_cluster_table.set_range(
-            level1_table_offset,
+            file_header.level1_table_offset,
             level1_table_number_of_references as u32,
         );
 
@@ -366,11 +253,11 @@ impl QcowFile {
             self.level2_table_number_of_references,
             self.cluster_block_size,
         );
-        if backing_file_name_offset > 0 && backing_file_name_size > 0 {
+        if file_header.backing_file_name_offset > 0 && file_header.backing_file_name_size > 0 {
             match self.read_backing_file_name(
                 data_stream,
-                backing_file_name_offset,
-                backing_file_name_size,
+                file_header.backing_file_name_offset,
+                file_header.backing_file_name_size,
             ) {
                 Ok(_) => {}
                 Err(mut error) => {

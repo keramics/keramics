@@ -12,132 +12,9 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 
-#[derive(LayoutMap)]
-#[layout_map(
-    structure(
-        byte_order = "little",
-        field(name = "block_bitmap_block_number", data_type = "u32"),
-        field(name = "inode_bitmap_block_number", data_type = "u32"),
-        field(name = "inode_table_block_number", data_type = "u32"),
-        field(name = "number_of_unallocated_blocks", data_type = "u16"),
-        field(name = "number_of_unallocated_inodes", data_type = "u16"),
-        field(name = "number_of_directories", data_type = "u16"),
-        field(name = "padding1", data_type = "[u8; 2]"),
-        field(name = "unknown1", data_type = "[u8; 12]"),
-    ),
-    method(name = "debug_read_data")
-)]
-/// Extended File System (ext2 and ext3) group descriptor.
-struct Ext2GroupDescriptor {}
-
-impl Ext2GroupDescriptor {
-    /// Creates a new group descriptor.
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    /// Reads the group descriptor from a buffer.
-    pub fn read_data(
-        &self,
-        group_descriptor: &mut ExtGroupDescriptor,
-        data: &[u8],
-    ) -> Result<(), ErrorTrace> {
-        if data.len() != 32 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported group descriptor data size"
-            ));
-        }
-        group_descriptor.inode_table_block_number = bytes_to_u32_le!(data, 8) as u64;
-        group_descriptor.checksum = bytes_to_u16_le!(data, 30);
-
-        Ok(())
-    }
-}
-
-#[derive(LayoutMap)]
-#[layout_map(
-    structure(
-        byte_order = "little",
-        member(field(name = "block_bitmap_block_number_lower", data_type = "u32")),
-        member(field(name = "inode_bitmap_block_number_lower", data_type = "u32")),
-        member(field(name = "inode_table_block_number_lower", data_type = "u32")),
-        member(field(name = "number_of_unallocated_blocks_lower", data_type = "u16")),
-        member(field(name = "number_of_unallocated_inodes_lower", data_type = "u16")),
-        member(field(name = "number_of_directories_lower", data_type = "u16")),
-        member(field(name = "block_group_flags", data_type = "u16", format = "hex")),
-        member(field(name = "exclude_bitmap_block_number", data_type = "u32")),
-        member(field(
-            name = "block_bitmap_checksum_lower",
-            data_type = "u16",
-            format = "hex"
-        )),
-        member(field(
-            name = "inode_bitmap_checksum_lower",
-            data_type = "u16",
-            format = "hex"
-        )),
-        member(field(name = "number_of_unused_inodes_lower", data_type = "u16")),
-        member(field(name = "checksum", data_type = "u16", format = "hex")),
-        member(group(
-            size_condition = "> 32",
-            field(name = "block_bitmap_block_number_upper", data_type = "u32"),
-            field(name = "inode_bitmap_block_number_upper", data_type = "u32"),
-            field(name = "inode_table_block_number_upper", data_type = "u32"),
-            field(name = "number_of_unallocated_blocks_upper", data_type = "u16"),
-            field(name = "number_of_unallocated_inodes_upper", data_type = "u16"),
-            field(name = "number_of_directories_upper", data_type = "u16"),
-            field(name = "number_of_unused_inodes_upper", data_type = "u16"),
-            field(name = "exclude_bitmap_block_number_upper", data_type = "u32"),
-            field(
-                name = "block_bitmap_checksum_upper",
-                data_type = "u16",
-                format = "hex"
-            ),
-            field(
-                name = "inode_bitmap_checksum_upper",
-                data_type = "u16",
-                format = "hex"
-            ),
-            field(name = "padding1", data_type = "[u8; 4]"),
-        )),
-    ),
-    method(name = "debug_read_data")
-)]
-/// Extended File System (ext4) group descriptor.
-struct Ext4GroupDescriptor {}
-
-impl Ext4GroupDescriptor {
-    /// Creates a new group descriptor.
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    /// Reads the group descriptor from a buffer.
-    pub fn read_data(
-        &self,
-        group_descriptor: &mut ExtGroupDescriptor,
-        data: &[u8],
-    ) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
-        if data_size != 32 && data_size != 64 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported group descriptor data size"
-            ));
-        }
-        let lower_32bit: u32 = bytes_to_u32_le!(data, 8);
-        group_descriptor.inode_table_block_number = lower_32bit as u64;
-        if data_size >= 44 {
-            let upper_32bit: u32 = bytes_to_u32_le!(data, 40);
-            group_descriptor.inode_table_block_number |= (upper_32bit as u64) << 32;
-        }
-        group_descriptor.checksum = bytes_to_u16_le!(data, 30);
-
-        Ok(())
-    }
-}
+use super::group_descriptor_ext2::Ext2GroupDescriptor;
+use super::group_descriptor_ext4::Ext4GroupDescriptor;
 
 /// Extended File System group descriptor.
 pub struct ExtGroupDescriptor {
@@ -169,11 +46,9 @@ impl ExtGroupDescriptor {
     /// Reads the group descriptor from a buffer.
     pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> Result<(), ErrorTrace> {
         if format_version == 4 {
-            let group_descriptor: Ext4GroupDescriptor = Ext4GroupDescriptor::new();
-            group_descriptor.read_data(self, data)
+            Ext4GroupDescriptor::read_data(self, data)
         } else {
-            let group_descriptor: Ext2GroupDescriptor = Ext2GroupDescriptor::new();
-            group_descriptor.read_data(self, data)
+            Ext2GroupDescriptor::read_data(self, data)
         }
     }
 }
