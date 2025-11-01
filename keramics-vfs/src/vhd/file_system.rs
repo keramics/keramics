@@ -245,6 +245,18 @@ mod tests {
         let result: bool = vhd_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd1/bogus1");
+        let result: bool = vhd_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "bogus1");
+        let result: bool = vhd_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let result: Result<bool, ErrorTrace> = vhd_file_system.file_entry_exists(&vfs_path);
+        assert!(result.is_err());
+
         Ok(())
     }
 

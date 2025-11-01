@@ -12,9 +12,8 @@
  */
 
 use std::collections::HashMap;
-use std::process::ExitCode;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::udif::{UdifCompressionMethod, UdifFile};
 
 use crate::formatters::format_as_bytesize;
@@ -24,14 +23,14 @@ pub struct UdifInfo {}
 
 impl UdifInfo {
     /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut udif_file: UdifFile = UdifFile::new();
 
         match udif_file.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open UDIF file with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
+                return Err(error);
             }
         };
         let compression_methods = HashMap::<UdifCompressionMethod, &'static str>::from([
@@ -69,7 +68,7 @@ impl UdifInfo {
 
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 

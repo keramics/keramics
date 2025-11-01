@@ -178,15 +178,7 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file() -> Result<EwfFile, ErrorTrace> {
-        let mut file: EwfFile = EwfFile::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf/ext2.E01").as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        file.read_data_stream(&data_stream)?;
-
-        Ok(file)
-    }
+    // TODO: add tests for read_exact_at_position
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
@@ -201,4 +193,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read_sections
 }

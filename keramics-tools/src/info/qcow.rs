@@ -12,9 +12,8 @@
  */
 
 use std::collections::HashMap;
-use std::process::ExitCode;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
 
 use crate::formatters::format_as_bytesize;
@@ -24,14 +23,14 @@ pub struct QcowInfo {}
 
 impl QcowInfo {
     /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut qcow_file: QcowFile = QcowFile::new();
 
         match qcow_file.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open QCOW file with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open QCOW file");
+                return Err(error);
             }
         };
         let compression_methods = HashMap::<QcowCompressionMethod, &'static str>::from([
@@ -84,7 +83,7 @@ impl QcowInfo {
 
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 

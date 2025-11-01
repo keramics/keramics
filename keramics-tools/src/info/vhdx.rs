@@ -12,9 +12,8 @@
  */
 
 use std::collections::HashMap;
-use std::process::ExitCode;
 
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::vhdx::{VhdxDiskType, VhdxFile};
 
 use crate::formatters::format_as_bytesize;
@@ -24,14 +23,14 @@ pub struct VhdxInfo {}
 
 impl VhdxInfo {
     /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut vhdx_file: VhdxFile = VhdxFile::new();
 
         match vhdx_file.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open VHDX file with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open VHDX file");
+                return Err(error);
             }
         };
         let disk_types = HashMap::<VhdxDiskType, &'static str>::from([
@@ -81,7 +80,7 @@ impl VhdxInfo {
         }
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 

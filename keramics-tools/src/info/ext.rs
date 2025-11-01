@@ -11,8 +11,6 @@
  * under the License.
  */
 
-use std::process::ExitCode;
-
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
@@ -368,54 +366,59 @@ impl ExtInfo {
         data_stream: &DataStreamReference,
         ext_entry_identifier: u64,
         character_encoding: Option<&CharacterEncoding>,
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut ext_file_system = ExtFileSystem::new();
 
         match character_encoding {
             Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
                 Ok(_) => {}
-                Err(error) => {
-                    println!("Unable to set character encoding with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open set character encoding"
+                    );
+                    return Err(error);
                 }
             },
             None => {}
         }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open ext file file system");
+                return Err(error);
             }
         }
         if ext_entry_identifier > u32::MAX as u64 {
-            println!(
-                "Invalid inode number: {} value out of bounds",
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported identifier: {} value out of bounds",
                 ext_entry_identifier
-            );
-            return ExitCode::FAILURE;
+            )));
         }
         let mut file_entry: ExtFileEntry =
             match ext_file_system.get_file_entry_by_identifier(ext_entry_identifier as u32) {
                 Ok(file_entry) => file_entry,
-                Err(error) => {
-                    println!(
-                        "Unable to retrive file entry: {} with error: {}",
-                        ext_entry_identifier, error
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve file entry: {}", ext_entry_identifier)
                     );
-                    return ExitCode::FAILURE;
+                    return Err(error);
                 }
             };
         println!("Extended File System (ext) file entry information:");
 
         match Self::print_file_entry(&mut file_entry) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to print file entry: {}", ext_entry_identifier)
+                );
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints information about a specific file entry.
@@ -423,24 +426,27 @@ impl ExtInfo {
         data_stream: &DataStreamReference,
         path_components: &[&str],
         character_encoding: Option<&CharacterEncoding>,
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut ext_file_system = ExtFileSystem::new();
 
         match character_encoding {
             Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
                 Ok(_) => {}
-                Err(error) => {
-                    println!("Unable to set character encoding with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open set character encoding"
+                    );
+                    return Err(error);
                 }
             },
             None => {}
         }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open ext file file system");
+                return Err(error);
             }
         }
         let ext_path: ExtPath = ExtPath::from(path_components);
@@ -448,49 +454,51 @@ impl ExtInfo {
         let mut file_entry: Option<ExtFileEntry> =
             match ext_file_system.get_file_entry_by_path(&ext_path) {
                 Ok(file_entry) => file_entry,
-                Err(error) => {
-                    println!("Unable to retrive file entry with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                    return Err(error);
                 }
             };
         if file_entry.is_none() {
-            println!("No such file entry");
-            return ExitCode::FAILURE;
+            return Err(keramics_core::error_trace_new!("No such file entry"));
         }
         println!("Extended File System (ext) file entry information:");
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints information about the file system.
     pub fn print_file_system(
         data_stream: &DataStreamReference,
         character_encoding: Option<&CharacterEncoding>,
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut ext_file_system = ExtFileSystem::new();
 
         match character_encoding {
             Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
                 Ok(_) => {}
-                Err(error) => {
-                    println!("Unable to set character encoding with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open set character encoding"
+                    );
+                    return Err(error);
                 }
             },
             None => {}
         }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open ext file file system");
+                return Err(error);
             }
         }
         println!("Extended File System (ext) information:");
@@ -531,8 +539,9 @@ impl ExtInfo {
             DateTime::NotSet => String::from("Not set (0)"),
             DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
             _ => {
-                println!("Unsupported last mount time");
-                return ExitCode::FAILURE;
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported last mount time"
+                ));
             }
         };
         println!("    Last mount time\t\t\t: {}", date_time_string);
@@ -540,38 +549,42 @@ impl ExtInfo {
             DateTime::NotSet => String::from("Not set (0)"),
             DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
             _ => {
-                println!("Unsupported last written time");
-                return ExitCode::FAILURE;
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported last written time"
+                ));
             }
         };
         println!("    Last written time\t\t\t: {}", date_time_string);
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 
     /// Prints the file system hierarchy.
     pub fn print_hierarchy(
         data_stream: &DataStreamReference,
         character_encoding: Option<&CharacterEncoding>,
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut ext_file_system = ExtFileSystem::new();
 
         match character_encoding {
             Some(encoding) => match ext_file_system.set_character_encoding(encoding) {
                 Ok(_) => {}
-                Err(error) => {
-                    println!("Unable to set character encoding with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open set character encoding"
+                    );
+                    return Err(error);
                 }
             },
             None => {}
         }
         match ext_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open ext file file system");
+                return Err(error);
             }
         }
         println!("Extended File System (ext) hierarchy:");
@@ -581,24 +594,27 @@ impl ExtInfo {
                 Some(file_entry) => file_entry,
                 None => {
                     println!("No root directory found");
-                    return ExitCode::SUCCESS;
+                    return Ok(());
                 }
             },
-            Err(error) => {
-                println!("Unable to retrieve root directory with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                return Err(error);
             }
         };
         let mut path_components: Vec<String> = Vec::new();
 
         match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to print file entry hierarchy"
+                );
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints the file entry hierarchy.

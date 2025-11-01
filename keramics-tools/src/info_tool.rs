@@ -234,7 +234,7 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    match arguments.command {
+    let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
             FormatIdentifier::Ext => ExtInfo::print_file_entry_by_identifier(
                 &data_stream,
@@ -247,10 +247,10 @@ fn main() -> ExitCode {
             FormatIdentifier::Ntfs => {
                 NtfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
-            _ => {
-                println!("Unsupported format: {}", format_identifier.to_string());
-                ExitCode::FAILURE
-            }
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format: {}",
+                format_identifier.to_string()
+            ))),
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
             FormatIdentifier::Ext => {
@@ -258,10 +258,10 @@ fn main() -> ExitCode {
             }
             FormatIdentifier::Fat => FatInfo::print_hierarchy(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
-            _ => {
-                println!("Unsupported format: {}", format_identifier.to_string());
-                ExitCode::FAILURE
-            }
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format: {}",
+                format_identifier.to_string()
+            ))),
         },
         Some(Commands::Path(command_arguments)) => {
             // TODO: detect leading partion path component and suggest/check path exists without
@@ -285,10 +285,10 @@ fn main() -> ExitCode {
                 FormatIdentifier::Ntfs => {
                     NtfsInfo::print_file_entry_by_path(&data_stream, &path_components)
                 }
-                _ => {
-                    println!("Unsupported format: {}", format_identifier.to_string());
-                    ExitCode::FAILURE
-                }
+                _ => Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported format: {}",
+                    format_identifier.to_string()
+                ))),
             }
         }
         None => match &format_identifier {
@@ -307,10 +307,17 @@ fn main() -> ExitCode {
             FormatIdentifier::Udif => UdifInfo::print_file(&data_stream),
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
-            _ => {
-                println!("Unsupported format: {}", format_identifier.to_string());
-                ExitCode::FAILURE
-            }
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format: {}",
+                format_identifier.to_string()
+            ))),
         },
+    };
+    match result {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(error) => {
+            println!("Unable to provide information about: {}\n{}", source, error);
+            ExitCode::FAILURE
+        }
     }
 }

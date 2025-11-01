@@ -221,6 +221,18 @@ mod tests {
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1/bogus1");
+        let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "bogus1");
+        let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let result: Result<bool, ErrorTrace> = sparseimage_file_system.file_entry_exists(&vfs_path);
+        assert!(result.is_err());
+
         Ok(())
     }
 

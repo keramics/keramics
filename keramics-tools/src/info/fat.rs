@@ -11,8 +11,6 @@
  * under the License.
  */
 
-use std::process::ExitCode;
-
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat, FatPath};
@@ -128,58 +126,63 @@ impl FatInfo {
     pub fn print_file_entry_by_identifier(
         data_stream: &DataStreamReference,
         fat_entry_identifier: u64,
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut fat_file_system = FatFileSystem::new();
 
         match fat_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                return Err(error);
             }
         }
         if fat_entry_identifier > u32::MAX as u64 {
-            println!(
-                "Invalid identifier: 0x{:08x} value out of bounds",
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported identifier: {} value out of bounds",
                 fat_entry_identifier
-            );
-            return ExitCode::FAILURE;
+            )));
         }
         let mut file_entry: FatFileEntry =
             match fat_file_system.get_file_entry_by_identifier(fat_entry_identifier as u32) {
                 Ok(file_entry) => file_entry,
-                Err(error) => {
-                    println!(
-                        "Unable to retrive file entry: 0x{:08x} with error: {}",
-                        fat_entry_identifier, error
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve file entry: 0x{:08x}",
+                            fat_entry_identifier
+                        )
                     );
-                    return ExitCode::FAILURE;
+                    return Err(error);
                 }
             };
         println!("File Allocation Table (FAT) file entry information:");
 
         match Self::print_file_entry(&mut file_entry) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to print file entry: {}", fat_entry_identifier)
+                );
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
         path_components: &[&str],
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut fat_file_system = FatFileSystem::new();
 
         match fat_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                return Err(error);
             }
         }
         let fat_path: FatPath = FatPath::from(path_components);
@@ -187,57 +190,59 @@ impl FatInfo {
         let mut file_entry: Option<FatFileEntry> =
             match fat_file_system.get_file_entry_by_path(&fat_path) {
                 Ok(file_entry) => file_entry,
-                Err(error) => {
-                    println!("Unable to retrive file entry with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                    return Err(error);
                 }
             };
         if file_entry.is_none() {
-            println!("No such file entry");
-            return ExitCode::FAILURE;
+            return Err(keramics_core::error_trace_new!("No such file entry"));
         }
         println!("File Allocation Table (FAT) file entry information:");
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints the file system hierarchy.
-    pub fn print_hierarchy(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut fat_file_system = FatFileSystem::new();
 
         match fat_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                return Err(error);
             }
         }
         println!("File Allocation Table (FAT) hierarchy:");
 
         let mut file_entry: FatFileEntry = match fat_file_system.get_root_directory() {
             Ok(file_entry) => file_entry,
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                return Err(error);
             }
         };
         let mut path_components: Vec<String> = Vec::new();
 
         match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to print file entry hierarchy"
+                );
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints the file entry hierarchy.
@@ -303,14 +308,14 @@ impl FatInfo {
     }
 
     /// Prints information about the file system.
-    pub fn print_file_system(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut fat_file_system = FatFileSystem::new();
 
         match fat_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                return Err(error);
             }
         }
         println!("File Allocation Table (FAT) information:");
@@ -330,7 +335,7 @@ impl FatInfo {
 
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 

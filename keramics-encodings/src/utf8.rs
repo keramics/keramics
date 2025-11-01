@@ -203,4 +203,56 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 4] = [0xff, 0x90, 0x80, 0x80];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 1] = [0xc0];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xc0, 0xff];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe0, 0xa0];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 3] = [0xe0, 0xa0, 0xff];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 3] = [0xf0, 0x90, 0x80];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 4] = [0xf0, 0x90, 0x80, 0xff];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+    }
 }
