@@ -17,6 +17,7 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
+use super::constants::*;
 use super::file_header_v1::QcowFileHeaderV1;
 use super::file_header_v2::QcowFileHeaderV2;
 use super::file_header_v3::QcowFileHeaderV3;
@@ -108,6 +109,11 @@ impl QcowFileHeader {
                 offset
             ));
             self.mediator.debug_print_data(&data, true);
+        }
+        if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW file header signature"
+            ));
         }
         self.format_version = bytes_to_u32_be!(data, 4);
 

@@ -66,13 +66,10 @@ impl QcowFileHeaderV3 {
                 "Unsupported QCOW file header version 3 signature"
             ));
         }
-        let format_version: u32 = bytes_to_u32_be!(data, 4);
-
-        if format_version != 3 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported format version: {}",
-                format_version
-            )));
+        if data[4..8] != [0x00, 0x00, 0x00, 0x03] {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported format version"
+            ));
         }
         let supported_flags: u64 = 1;
 

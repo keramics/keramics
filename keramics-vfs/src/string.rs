@@ -50,9 +50,40 @@ impl VfsString {
     }
 }
 
+impl From<&str> for VfsString {
+    /// Converts a [`&str`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(string: &str) -> Self {
+        Self::String(string.to_string())
+    }
+}
+
+impl From<&String> for VfsString {
+    /// Converts a [`&String`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(string: &String) -> Self {
+        Self::String(string.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_from_str() {
+        let vfs_string: VfsString = VfsString::from("VFS string");
+
+        assert_eq!(vfs_string, VfsString::String(String::from("VFS string")));
+    }
+
+    #[test]
+    fn test_from_string() {
+        let test_string: String = String::from("VFS string");
+        let vfs_string: VfsString = VfsString::from(&test_string);
+
+        assert_eq!(vfs_string, VfsString::String(String::from("VFS string")));
+    }
 
     // TODO: add tests
 }

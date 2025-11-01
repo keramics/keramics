@@ -118,5 +118,26 @@ impl From<&String> for FatString {
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_from_str() {
+        let fat_string: FatString = FatString::from("FAT string");
+
+        assert_eq!(
+            fat_string,
+            FatString::Ucs2String(Ucs2String::from("FAT string"))
+        );
+    }
+
+    #[test]
+    fn test_from_string() {
+        let test_string: String = String::from("FAT string");
+        let fat_string: FatString = FatString::from(&test_string);
+
+        assert_eq!(
+            fat_string,
+            FatString::Ucs2String(Ucs2String::from("FAT string"))
+        );
+    }
+
     // TODO: add tests.
 }

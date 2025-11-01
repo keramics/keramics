@@ -57,13 +57,10 @@ impl QcowFileHeaderV1 {
                 "Unsupported QCOW file header version 1 signature"
             ));
         }
-        let format_version: u32 = bytes_to_u32_be!(data, 4);
-
-        if format_version != 1 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported format version: {}",
-                format_version
-            )));
+        if data[4..8] != [0x00, 0x00, 0x00, 0x01] {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported format version"
+            ));
         }
         file_header.backing_file_name_offset = bytes_to_u64_be!(data, 8);
         file_header.backing_file_name_size = bytes_to_u32_be!(data, 16);
