@@ -59,7 +59,7 @@ impl UdifFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
             UdifFileEntry::Layer { .. } => Ok(0),
             UdifFileEntry::Root { .. } => Ok(1),
@@ -145,6 +145,26 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_number_of_sub_file_entries
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let udif_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(get_file()?));
+
+        let file_entry = UdifFileEntry::Root {
+            file: udif_file.clone(),
+        };
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let file_entry = UdifFileEntry::Layer {
+            file: udif_file.clone(),
+        };
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
     // TODO: add tests for get_sub_file_entry_by_index
 }

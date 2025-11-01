@@ -16,7 +16,7 @@ mod cluster_table;
 mod constants;
 mod enums;
 mod file;
-mod file_header_common;
+mod file_header;
 mod file_header_v1;
 mod file_header_v2;
 mod file_header_v3;

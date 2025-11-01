@@ -14,7 +14,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use keramics_core::ErrorTrace;
 use keramics_types::Ucs2String;
 
 use super::long_name_directory_entry::FatLongNameDirectoryEntry;

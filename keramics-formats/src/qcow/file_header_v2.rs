@@ -16,6 +16,7 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
+use super::file_header::QcowFileHeader;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -38,36 +39,11 @@ use super::constants::*;
     method(name = "debug_read_data")
 )]
 /// QEMU Copy-On-Write (QCOW) file header version 2.
-pub struct QcowFileHeaderV2 {
-    pub backing_file_name_offset: u64,
-    pub backing_file_name_size: u32,
-    pub number_of_cluster_block_bits: u32,
-    pub media_size: u64,
-    pub encryption_method: u32,
-    pub level1_table_number_of_references: u32,
-    pub level1_table_offset: u64,
-    pub number_of_snapshots: u32,
-    pub snapshots_offset: u64,
-}
+pub struct QcowFileHeaderV2 {}
 
 impl QcowFileHeaderV2 {
-    /// Creates a new file header.
-    pub fn new() -> Self {
-        Self {
-            backing_file_name_offset: 0,
-            backing_file_name_size: 0,
-            number_of_cluster_block_bits: 0,
-            media_size: 0,
-            encryption_method: 0,
-            level1_table_number_of_references: 0,
-            level1_table_offset: 0,
-            number_of_snapshots: 0,
-            snapshots_offset: 0,
-        }
-    }
-
     /// Reads the file header from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+    pub fn read_data(file_header: &mut QcowFileHeader, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 72 {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported QCOW file header version 2 data size"
@@ -78,28 +54,27 @@ impl QcowFileHeaderV2 {
                 "Unsupported QCOW file header version 2 signature"
             ));
         }
-        let format_version: u32 = bytes_to_u32_be!(data, 4);
-
-        if format_version != 2 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported format version: {}",
-                format_version
-            )));
+        if data[4..8] != [0x00, 0x00, 0x00, 0x02] {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported format version"
+            ));
         }
-        self.backing_file_name_offset = bytes_to_u64_be!(data, 8);
-        self.backing_file_name_size = bytes_to_u32_be!(data, 16);
-        self.number_of_cluster_block_bits = bytes_to_u32_be!(data, 20);
-        self.media_size = bytes_to_u64_be!(data, 24);
-        self.encryption_method = bytes_to_u32_be!(data, 32);
-        self.level1_table_number_of_references = bytes_to_u32_be!(data, 36);
-        self.level1_table_offset = bytes_to_u64_be!(data, 40);
-        self.number_of_snapshots = bytes_to_u32_be!(data, 60);
-        self.snapshots_offset = bytes_to_u64_be!(data, 64);
+        file_header.backing_file_name_offset = bytes_to_u64_be!(data, 8);
+        file_header.backing_file_name_size = bytes_to_u32_be!(data, 16);
+        file_header.number_of_cluster_block_bits = bytes_to_u32_be!(data, 20);
+        file_header.media_size = bytes_to_u64_be!(data, 24);
+        file_header.encryption_method = bytes_to_u32_be!(data, 32);
+        file_header.level1_table_number_of_references = bytes_to_u32_be!(data, 36);
+        file_header.level1_table_offset = bytes_to_u64_be!(data, 40);
+        file_header.number_of_snapshots = bytes_to_u32_be!(data, 60);
+        file_header.snapshots_offset = bytes_to_u64_be!(data, 64);
 
-        if self.number_of_cluster_block_bits <= 8 || self.number_of_cluster_block_bits > 63 {
+        if file_header.number_of_cluster_block_bits <= 8
+            || file_header.number_of_cluster_block_bits > 63
+        {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid number of cluster block bits: {} value out of bounds",
-                self.number_of_cluster_block_bits
+                file_header.number_of_cluster_block_bits
             )));
         }
         Ok(())
@@ -125,10 +100,18 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = QcowFileHeaderV2::new();
-        test_struct.read_data(&test_data)?;
+        let mut test_struct = QcowFileHeader::new();
+        QcowFileHeaderV2::read_data(&mut test_struct, &test_data)?;
 
+        assert_eq!(test_struct.backing_file_name_offset, 0);
+        assert_eq!(test_struct.backing_file_name_size, 0);
+        assert_eq!(test_struct.number_of_cluster_block_bits, 16);
         assert_eq!(test_struct.media_size, 4194304);
+        assert_eq!(test_struct.encryption_method, 0);
+        assert_eq!(test_struct.level1_table_number_of_references, 1);
+        assert_eq!(test_struct.level1_table_offset, 196608);
+        assert_eq!(test_struct.number_of_snapshots, 0);
+        assert_eq!(test_struct.snapshots_offset, 0);
 
         Ok(())
     }
@@ -137,8 +120,8 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = QcowFileHeaderV2::new();
-        let result = test_struct.read_data(&test_data[0..71]);
+        let mut test_struct = QcowFileHeader::new();
+        let result = QcowFileHeaderV2::read_data(&mut test_struct, &test_data[0..71]);
         assert!(result.is_err());
     }
 
@@ -147,8 +130,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = QcowFileHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct = QcowFileHeader::new();
+        let result = QcowFileHeaderV2::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }
 
@@ -157,8 +140,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[4] = 0xff;
 
-        let mut test_struct = QcowFileHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct = QcowFileHeader::new();
+        let result = QcowFileHeaderV2::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }
 
@@ -167,8 +150,8 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[20] = 0xff;
 
-        let mut test_struct = QcowFileHeaderV2::new();
-        let result = test_struct.read_data(&test_data);
+        let mut test_struct = QcowFileHeader::new();
+        let result = QcowFileHeaderV2::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }
 }

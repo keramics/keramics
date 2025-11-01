@@ -999,6 +999,8 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
+    // Tests with APM.
+
     fn get_apm_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apm);
 
@@ -1006,142 +1008,6 @@ mod tests {
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
         let vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ext/ext2.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_fake_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);
-        if let VfsFileSystem::Fake(fake_file_system) = &mut vfs_file_system {
-            let data: [u8; 4] = [1, 2, 3, 4];
-            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
-            _ = fake_file_system.add_file_entry("/fake1", fake_file_entry);
-
-            let data: [u8; 4] = [5, 6, 7, 8];
-            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
-            _ = fake_file_system.add_file_entry("/fake2", fake_file_entry);
-        }
-        Ok(vfs_file_system)
-    }
-
-    fn get_fat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fat);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("fat/fat12.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_gpt_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Gpt);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("mbr/mbr.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    // TODO: add get_ntfs_file_system
-
-    fn get_qcow_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Qcow);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_sparseimage_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseImage);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_udif_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Udif);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_vhd_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_vhdx_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhdx);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1159,157 +1025,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn test_file_entry_exists_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1/testfile1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/bogus");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/bogus");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_fake() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/bogus");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    // TODO: add test_file_entry_exists_with_fat
-
-    #[test]
-    fn test_file_entry_exists_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/bogus2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/mbr2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/bogus2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    // TODO: add test_file_entry_exists_with_ntfs
-
-    #[test]
-    fn test_file_entry_exists_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
-
-        let vfs_path: VfsPath =
-            VfsPath::from_path(&VfsType::Os, get_test_data_path("file.txt").as_str());
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath =
-            VfsPath::from_path(&VfsType::Os, get_test_data_path("bogus.txt").as_str());
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/bogus1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/bogus1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/udif1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/bogus1");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/bogus2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/bogus2");
-        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
-
-        Ok(())
-    }
-
-    // TODO: add test for get_data_stream_by_path_and_name
 
     #[test]
     fn test_get_file_entry_by_path_with_apm_non_existing() -> Result<(), ErrorTrace> {
@@ -1349,6 +1064,33 @@ mod tests {
         Ok(())
     }
 
+    // Tests with ext.
+
+    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ext/ext2.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1/testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_file_entry_by_path_with_ext_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
@@ -1362,7 +1104,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_entry_by_path_with_ext_partition() -> Result<(), ErrorTrace> {
+    fn test_get_file_entry_by_path_with_ext_file() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, "/testdir1/testfile1");
@@ -1383,6 +1125,33 @@ mod tests {
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with EWF.
+
+    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
     }
@@ -1425,6 +1194,35 @@ mod tests {
         Ok(())
     }
 
+    // Tests with fake.
+
+    fn get_fake_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);
+        if let VfsFileSystem::Fake(fake_file_system) = &mut vfs_file_system {
+            let data: [u8; 4] = [1, 2, 3, 4];
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
+            _ = fake_file_system.add_file_entry("/fake1", fake_file_entry);
+
+            let data: [u8; 4] = [5, 6, 7, 8];
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
+            _ = fake_file_system.add_file_entry("/fake2", fake_file_entry);
+        }
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_file_entry_by_path_with_fake_file() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
@@ -1450,11 +1248,99 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests fir get_file_entry of fake root
+    // TODO: add tests for get_file_entry of fake root
 
-    // TODO: add test_get_file_entry_by_path_with_fat_non_existing
-    // TODO: add test_get_file_entry_by_path_with_fat_partition
-    // TODO: add test_get_file_entry_by_path_with_fat_root
+    // Tests with FAT.
+
+    fn get_fat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fat);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("fat/fat12.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1/testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_fat_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&vfs_path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_fat_file() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_fat_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with GPT.
+
+    fn get_gpt_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Gpt);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_entry_by_path_with_gpt_non_existing() -> Result<(), ErrorTrace> {
@@ -1490,6 +1376,33 @@ mod tests {
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with MBR.
+
+    fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("mbr/mbr.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/mbr2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
     }
@@ -1532,9 +1445,114 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test_get_file_entry_by_path_with_ntfs_non_existing
-    // TODO: add test_get_file_entry_by_path_with_ntfs_partition
-    // TODO: add test_get_file_entry_by_path_with_ntfs_root
+    // Tests with NTFS.
+
+    fn get_ntfs_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ntfs);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ntfs/ntfs.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\testdir1\\testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_ntfs_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&vfs_path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_ntfs_file() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\testdir1\\testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_ntfs_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with OS.
+
+    #[test]
+    fn test_file_entry_exists_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
+
+        let vfs_path: VfsPath =
+            VfsPath::from_path(&VfsType::Os, get_test_data_path("file.txt").as_str());
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath =
+            VfsPath::from_path(&VfsType::Os, get_test_data_path("bogus.txt").as_str());
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
+    // Tests with QCOW.
+
+    fn get_qcow_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Qcow);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/bogus1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_entry_by_path_with_qcow_non_existing() -> Result<(), ErrorTrace> {
@@ -1570,6 +1588,33 @@ mod tests {
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with sparse image.
+
+    fn get_sparseimage_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseImage);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/bogus1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
     }
@@ -1612,6 +1657,33 @@ mod tests {
         Ok(())
     }
 
+    // Tests with UDIF.
+
+    fn get_udif_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Udif);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/udif1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/bogus1");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_file_entry_by_path_with_udif_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
@@ -1646,6 +1718,33 @@ mod tests {
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with VHD.
+
+    fn get_vhd_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
     }
@@ -1688,6 +1787,33 @@ mod tests {
         Ok(())
     }
 
+    // Tests with VHDX.
+
+    fn get_vhdx_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhdx);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_file_entry_by_path_with_vhdx_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
@@ -1725,6 +1851,10 @@ mod tests {
 
         Ok(())
     }
+
+    // Other tests.
+
+    // TODO: add test for get_data_stream_by_path_and_name
 
     #[test]
     fn test_get_file_entry_by_path_with_unsupported_location_type() -> Result<(), ErrorTrace> {

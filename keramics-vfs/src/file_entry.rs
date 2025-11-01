@@ -17,7 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtFileEntry, ExtPath};
-use keramics_formats::fat::{FatFileEntry, FatPath, FatString};
+use keramics_formats::fat::{FatFileEntry, FatString};
 use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry, NtfsPath};
 use keramics_types::{ByteString, Ucs2String};
 
@@ -1074,7 +1074,7 @@ impl VfsFileEntry {
 mod tests {
     use super::*;
 
-    use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms, PosixTime32};
+    use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, PosixTime32};
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
@@ -1087,6 +1087,8 @@ mod tests {
     fn get_parent_file_system() -> VfsFileSystemReference {
         VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os))
     }
+
+    // Tests with APM.
 
     fn get_apm_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apm);
@@ -1112,372 +1114,9 @@ mod tests {
         }
     }
 
-    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ext/ext2.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_fat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fat);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("fat/fat12.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_fat_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_gpt_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Gpt);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_gpt_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("mbr/mbr.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_mbr_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_os_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_qcow_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Qcow);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_qcow_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_sparseimage_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseImage);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_sparseimage_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_udif_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Udif);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_udif_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_vhd_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_vhd_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    fn get_vhdx_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhdx);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_vhdx_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
-                path
-            ))),
-        }
-    }
-
     #[test]
     fn test_get_access_time_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
-
-        assert_eq!(
-            vfs_file_entry.get_access_time(),
-            Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1735977482
-            }))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_access_time_with_fake
-
-    #[test]
-    fn test_get_access_time_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
-
-        assert_eq!(
-            vfs_file_entry.get_access_time(),
-            Some(&DateTime::FatDate(FatDate { date: 0x5b53 }))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_access_time_with_ntfs
-
-    #[test]
-    fn test_get_access_time_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("file.txt").as_str())?;
-
-        assert_ne!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd1")?;
-
-        assert_eq!(vfs_file_entry.get_access_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_access_time_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx1")?;
 
         assert_eq!(vfs_file_entry.get_access_time(), None);
 
@@ -1494,211 +1133,8 @@ mod tests {
     }
 
     #[test]
-    fn test_get_change_time_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
-
-        assert_eq!(
-            vfs_file_entry.get_change_time(),
-            Some(&DateTime::PosixTime32(PosixTime32 {
-                timestamp: 1735977481
-            }))
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_change_time_with_fake
-
-    #[test]
-    fn test_get_change_time_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_change_time_with_ntfs
-
-    #[test]
-    fn test_get_change_time_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_change_time_with_os
-
-    #[test]
-    fn test_get_change_time_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
-
-        assert_eq!(vfs_file_entry.get_change_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_get_creation_time_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_creation_time_with_fake
-
-    #[test]
-    fn test_get_creation_time_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
-
-        assert_eq!(
-            vfs_file_entry.get_creation_time(),
-            Some(&DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
-                date: 0x5b53,
-                time: 0x958f,
-                fraction: 0x7d,
-            }))
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_creation_time_with_ntfs
-
-    #[test]
-    fn test_get_creation_time_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_creation_time_with_os
-
-    #[test]
-    fn test_get_creation_time_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
-
-        assert_eq!(vfs_file_entry.get_creation_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
         assert_eq!(vfs_file_entry.get_creation_time(), None);
 
@@ -1725,6 +1161,107 @@ mod tests {
     }
 
     #[test]
+    fn test_get_modification_time_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("apm2")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/apm2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // Tests with ext.
+
+    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ext/ext2.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_access_time(),
+            Some(&DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977482
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_change_time(),
+            Some(&DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977481
+            }))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
@@ -1744,194 +1281,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_file_type_with_fake
-
-    #[test]
-    fn test_get_file_type_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1/testfile1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_type_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_file_type_with_ntfs
-
-    #[test]
-    fn test_get_file_type_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/mbr2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_file_type_with_os
-
-    #[test]
-    fn test_get_file_type_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_type_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_type_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/udif1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_type_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_type_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
-
-        Ok(())
-    }
-
-    // TODO: add tests for get_group_identifier
-
-    #[test]
-    fn test_get_modification_time_with_apm() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_get_modification_time_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
@@ -1945,120 +1294,13 @@ mod tests {
     }
 
     #[test]
-    fn test_get_modification_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_modification_time_with_fake
-
-    #[test]
-    fn test_get_modification_time_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+    fn test_get_name_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         assert_eq!(
-            vfs_file_entry.get_modification_time(),
-            Some(&DateTime::FatTimeDate(FatTimeDate {
-                date: 0x5b53,
-                time: 0x958f
-            }))
+            vfs_file_entry.get_name(),
+            Some(VfsString::Byte(ByteString::from("testfile1")))
         );
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_modification_time_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_modification_time_with_ntfs
-
-    #[test]
-    fn test_get_modification_time_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add test_get_modification_time_with_os
-
-    #[test]
-    fn test_get_modification_time_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_modification_time_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_modification_time_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_modification_time_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_modification_time_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
-
-        assert_eq!(vfs_file_entry.get_modification_time(), None);
-
-        Ok(())
-    }
-
-    // TODO: add tests for get_name
-    // TODO: add tests for get_number_of_links
-    // TODO: add tests for get_size
-    // TODO: add tests for get_symbolic_link_target
-    // TODO: add tests for get_number_of_data_forks
-
-    #[test]
-    fn test_get_data_stream_with_apm() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
-        assert!(result.is_none());
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, "/apm2");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
-
-        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
-        assert!(result.is_some());
 
         Ok(())
     }
@@ -2084,6 +1326,96 @@ mod tests {
         Ok(())
     }
 
+    // Tests with EWF.
+
+    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("ewf1")));
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
@@ -2105,7 +1437,127 @@ mod tests {
         Ok(())
     }
 
+    // Tests with FAKE.
+
+    // TODO: add test_get_access_time_with_fake
+
+    // TODO: add test_get_change_time_with_fake
+
+    // TODO: add test_get_creation_time_with_fake
+
+    // TODO: add test_get_file_type_with_fake
+
+    // TODO: add test_get_modification_time_with_fake
+
+    // TODO: add test_get_name_with_fake
+
     // TODO: add test_get_data_stream_with_fake
+
+    // Tests with FAT.
+
+    fn get_fat_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fat);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("fat/fat12.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_fat_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_access_time(),
+            Some(&DateTime::FatDate(FatDate { date: 0x5b53 }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_creation_time(),
+            Some(&DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
+                date: 0x5b53,
+                time: 0x958f,
+                fraction: 0x7d,
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fat_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fat, "/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_modification_time(),
+            Some(&DateTime::FatTimeDate(FatTimeDate {
+                date: 0x5b53,
+                time: 0x958f
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_name(),
+            Some(VfsString::Ucs2(Ucs2String::from("testfile1")))
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_fat() -> Result<(), ErrorTrace> {
@@ -2124,6 +1576,96 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // Tests with GPT.
+
+    fn get_gpt_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Gpt);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_gpt_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("gpt2")));
 
         Ok(())
     }
@@ -2149,7 +1691,95 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test_get_data_stream_with_ntfs
+    // Tests with MBR.
+
+    fn get_mbr_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("mbr/mbr.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_mbr_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, "/mbr2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("mbr2")));
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_mbr() -> Result<(), ErrorTrace> {
@@ -2172,7 +1802,262 @@ mod tests {
         Ok(())
     }
 
+    // Tests with NTFS.
+
+    fn get_ntfs_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ntfs);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("ntfs/ntfs.raw").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_ntfs_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_access_time(),
+            Some(&DateTime::Filetime(Filetime {
+                timestamp: 0x1db5e8ba6892474
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_creation_time(),
+            Some(&DateTime::Filetime(Filetime {
+                timestamp: 0x1db5e8ba6892474
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_creation_time(),
+            Some(&DateTime::Filetime(Filetime {
+                timestamp: 0x1db5e8ba6892474
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\testdir1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\testdir1\\testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_modification_time(),
+            Some(&DateTime::Filetime(Filetime {
+                timestamp: 0x1db5e8ba689275d
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_name(),
+            Some(VfsString::Ucs2(Ucs2String::from("testfile1")))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ntfs_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\testdir1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ntfs, "\\testdir1\\testfile1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // Tests with OS.
+
+    fn get_os_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry =
+            get_os_file_entry(get_test_data_path("file.txt").as_str())?;
+
+        assert_ne!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    // TODO: add test_get_change_time_with_os
+
+    // TODO: add test_get_creation_time_with_os
+
+    // TODO: add test_get_file_type_with_os
+
+    // TODO: add test_get_modification_time_with_os
+
+    // TODO: add test_get_name_with_os
+
     // TODO: add test_get_data_stream_with_os
+
+    // Tests with QCOW.
+
+    fn get_qcow_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Qcow);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_qcow_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("qcow1")));
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_qcow() -> Result<(), ErrorTrace> {
@@ -2191,6 +2076,99 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // Tests with sparse image.
+
+    fn get_sparseimage_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseImage);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_sparseimage_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_sparseiamge() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        assert_eq!(
+            vfs_file_entry.get_name(),
+            Some(VfsString::from("sparseimage1"))
+        );
 
         Ok(())
     }
@@ -2216,6 +2194,96 @@ mod tests {
         Ok(())
     }
 
+    // Tests with UDIF.
+
+    fn get_udif_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Udif);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_udif_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, "/udif1");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("udif1")));
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_data_stream_with_udif() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
@@ -2233,6 +2301,96 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // Tests with VHD.
+
+    fn get_vhd_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_vhd_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, "/vhd2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("vhd2")));
 
         Ok(())
     }
@@ -2258,6 +2416,96 @@ mod tests {
         Ok(())
     }
 
+    // Tests with VHDX.
+
+    fn get_vhdx_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhdx);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let vfs_location: VfsLocation =
+            new_os_vfs_location(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_vhdx_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, path);
+        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx1")?;
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx2");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        assert_eq!(vfs_file_entry.get_name(), Some(VfsString::from("vhdx2")));
+
+        Ok(())
+    }
+
     #[test]
     fn test_get_data_stream_with_vhdx() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
@@ -2278,6 +2526,15 @@ mod tests {
 
         Ok(())
     }
+
+    // Other tests.
+
+    // TODO: add tests for get_group_identifier
+
+    // TODO: add tests for get_number_of_links
+    // TODO: add tests for get_size
+    // TODO: add tests for get_symbolic_link_target
+    // TODO: add tests for get_number_of_data_forks
 
     // TODO: add tests for get_number_of_sub_file_entries
     // TODO: add tests for get_sub_file_entry_by_index

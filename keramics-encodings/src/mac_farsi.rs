@@ -82,39 +82,39 @@ pub struct EncoderMacFarsi<'a> {
 }
 
 impl<'a> EncoderMacFarsi<'a> {
-    const BASE_0X0020: [Option<&'static [u8]>; 32] = [
-        Some(&[0xa0]),
-        Some(&[0xa1]),
-        Some(&[0xa2]),
-        Some(&[0xa3]),
-        Some(&[0xa4]),
-        Some(&[0x25]),
-        Some(&[0xa6]),
-        Some(&[0xa7]),
-        Some(&[0xa8]),
-        Some(&[0xa9]),
-        Some(&[0xaa]),
-        Some(&[0xab]),
-        Some(&[0x2c]),
-        Some(&[0xad]),
-        Some(&[0xae]),
-        Some(&[0xaf]),
-        Some(&[0x30]),
-        Some(&[0x31]),
-        Some(&[0x32]),
-        Some(&[0x33]),
-        Some(&[0x34]),
-        Some(&[0x35]),
-        Some(&[0x36]),
-        Some(&[0x37]),
-        Some(&[0x38]),
-        Some(&[0x39]),
-        Some(&[0xba]),
-        Some(&[0x3b]),
-        Some(&[0xbc]),
-        Some(&[0xbd]),
-        Some(&[0xbe]),
-        Some(&[0x3f]),
+    const BASE_0X0020: [&'static [u8]; 32] = [
+        &[0xa0],
+        &[0xa1],
+        &[0xa2],
+        &[0xa3],
+        &[0xa4],
+        &[0x25],
+        &[0xa6],
+        &[0xa7],
+        &[0xa8],
+        &[0xa9],
+        &[0xaa],
+        &[0xab],
+        &[0x2c],
+        &[0xad],
+        &[0xae],
+        &[0xaf],
+        &[0x30],
+        &[0x31],
+        &[0x32],
+        &[0x33],
+        &[0x34],
+        &[0x35],
+        &[0x36],
+        &[0x37],
+        &[0x38],
+        &[0x39],
+        &[0xba],
+        &[0x3b],
+        &[0xbc],
+        &[0xbd],
+        &[0xbe],
+        &[0x3f],
     ];
 
     const BASE_0X00A0: [Option<&'static [u8]>; 96] = [
@@ -431,17 +431,9 @@ impl<'a> Iterator for EncoderMacFarsi<'a> {
                     0x0000..0x0020 | 0x0040..0x005b | 0x0060..0x007b | 0x007e..0x0080 => {
                         Some(Ok(vec![*code_point as u8]))
                     }
-                    0x0020..0x0040 => {
-                        match Self::BASE_0X0020[(*code_point as u32 - 0x0020) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacFarsi",
-                                    *code_point as u32
-                                ))));
-                            }
-                        }
-                    }
+                    0x0020..0x0040 => Some(Ok(Self::BASE_0X0020
+                        [(*code_point as u32 - 0x0020) as usize]
+                        .to_vec())),
                     0x00a0..0x0100 => {
                         match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
                             Some(bytes) => Some(Ok(bytes.to_vec())),
@@ -555,12 +547,39 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a1];
+
+        let mut encoder: EncoderMacFarsi = EncoderMacFarsi::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0608];
+
+        let mut encoder: EncoderMacFarsi = EncoderMacFarsi::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0668];
+
+        let mut encoder: EncoderMacFarsi = EncoderMacFarsi::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x06fa];
+
+        let mut encoder: EncoderMacFarsi = EncoderMacFarsi::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderMacFarsi = EncoderMacFarsi::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

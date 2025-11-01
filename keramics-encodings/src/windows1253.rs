@@ -444,6 +444,16 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 1] = [0x81];
+
+        let mut decoder: DecoderWindows1253 = DecoderWindows1253::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encode() -> Result<(), ErrorTrace> {
         let code_points: [u32; 8] = [0x4b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73];
 
@@ -464,12 +474,32 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a1];
+
+        let mut encoder: EncoderWindows1253 = EncoderWindows1253::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0380];
+
+        let mut encoder: EncoderWindows1253 = EncoderWindows1253::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2010];
+
+        let mut encoder: EncoderWindows1253 = EncoderWindows1253::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderWindows1253 = EncoderWindows1253::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

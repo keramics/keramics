@@ -27,135 +27,19 @@ pub struct DecoderWindows1256<'a> {
 }
 
 impl<'a> DecoderWindows1256<'a> {
-    const BASE_0X80: [Option<u16>; 128] = [
-        Some(0x20ac),
-        Some(0x067e),
-        Some(0x201a),
-        Some(0x0192),
-        Some(0x201e),
-        Some(0x2026),
-        Some(0x2020),
-        Some(0x2021),
-        Some(0x02c6),
-        Some(0x2030),
-        Some(0x0679),
-        Some(0x2039),
-        Some(0x0152),
-        Some(0x0686),
-        Some(0x0698),
-        Some(0x0688),
-        Some(0x06af),
-        Some(0x2018),
-        Some(0x2019),
-        Some(0x201c),
-        Some(0x201d),
-        Some(0x2022),
-        Some(0x2013),
-        Some(0x2014),
-        Some(0x06a9),
-        Some(0x2122),
-        Some(0x0691),
-        Some(0x203a),
-        Some(0x0153),
-        Some(0x200c),
-        Some(0x200d),
-        Some(0x06ba),
-        Some(0x00a0),
-        Some(0x060c),
-        Some(0x00a2),
-        Some(0x00a3),
-        Some(0x00a4),
-        Some(0x00a5),
-        Some(0x00a6),
-        Some(0x00a7),
-        Some(0x00a8),
-        Some(0x00a9),
-        Some(0x06be),
-        Some(0x00ab),
-        Some(0x00ac),
-        Some(0x00ad),
-        Some(0x00ae),
-        Some(0x00af),
-        Some(0x00b0),
-        Some(0x00b1),
-        Some(0x00b2),
-        Some(0x00b3),
-        Some(0x00b4),
-        Some(0x00b5),
-        Some(0x00b6),
-        Some(0x00b7),
-        Some(0x00b8),
-        Some(0x00b9),
-        Some(0x061b),
-        Some(0x00bb),
-        Some(0x00bc),
-        Some(0x00bd),
-        Some(0x00be),
-        Some(0x061f),
-        Some(0x06c1),
-        Some(0x0621),
-        Some(0x0622),
-        Some(0x0623),
-        Some(0x0624),
-        Some(0x0625),
-        Some(0x0626),
-        Some(0x0627),
-        Some(0x0628),
-        Some(0x0629),
-        Some(0x062a),
-        Some(0x062b),
-        Some(0x062c),
-        Some(0x062d),
-        Some(0x062e),
-        Some(0x062f),
-        Some(0x0630),
-        Some(0x0631),
-        Some(0x0632),
-        Some(0x0633),
-        Some(0x0634),
-        Some(0x0635),
-        Some(0x0636),
-        Some(0x00d7),
-        Some(0x0637),
-        Some(0x0638),
-        Some(0x0639),
-        Some(0x063a),
-        Some(0x0640),
-        Some(0x0641),
-        Some(0x0642),
-        Some(0x0643),
-        Some(0x00e0),
-        Some(0x0644),
-        Some(0x00e2),
-        Some(0x0645),
-        Some(0x0646),
-        Some(0x0647),
-        Some(0x0648),
-        Some(0x00e7),
-        Some(0x00e8),
-        Some(0x00e9),
-        Some(0x00ea),
-        Some(0x00eb),
-        Some(0x0649),
-        Some(0x064a),
-        Some(0x00ee),
-        Some(0x00ef),
-        Some(0x064b),
-        Some(0x064c),
-        Some(0x064d),
-        Some(0x064e),
-        Some(0x00f4),
-        Some(0x064f),
-        Some(0x0650),
-        Some(0x00f7),
-        Some(0x0651),
-        Some(0x00f9),
-        Some(0x0652),
-        Some(0x00fb),
-        Some(0x00fc),
-        Some(0x200e),
-        Some(0x200f),
-        Some(0x06d2),
+    const BASE_0X80: [u16; 128] = [
+        0x20ac, 0x067e, 0x201a, 0x0192, 0x201e, 0x2026, 0x2020, 0x2021, 0x02c6, 0x2030, 0x0679,
+        0x2039, 0x0152, 0x0686, 0x0698, 0x0688, 0x06af, 0x2018, 0x2019, 0x201c, 0x201d, 0x2022,
+        0x2013, 0x2014, 0x06a9, 0x2122, 0x0691, 0x203a, 0x0153, 0x200c, 0x200d, 0x06ba, 0x00a0,
+        0x060c, 0x00a2, 0x00a3, 0x00a4, 0x00a5, 0x00a6, 0x00a7, 0x00a8, 0x00a9, 0x06be, 0x00ab,
+        0x00ac, 0x00ad, 0x00ae, 0x00af, 0x00b0, 0x00b1, 0x00b2, 0x00b3, 0x00b4, 0x00b5, 0x00b6,
+        0x00b7, 0x00b8, 0x00b9, 0x061b, 0x00bb, 0x00bc, 0x00bd, 0x00be, 0x061f, 0x06c1, 0x0621,
+        0x0622, 0x0623, 0x0624, 0x0625, 0x0626, 0x0627, 0x0628, 0x0629, 0x062a, 0x062b, 0x062c,
+        0x062d, 0x062e, 0x062f, 0x0630, 0x0631, 0x0632, 0x0633, 0x0634, 0x0635, 0x0636, 0x00d7,
+        0x0637, 0x0638, 0x0639, 0x063a, 0x0640, 0x0641, 0x0642, 0x0643, 0x00e0, 0x0644, 0x00e2,
+        0x0645, 0x0646, 0x0647, 0x0648, 0x00e7, 0x00e8, 0x00e9, 0x00ea, 0x00eb, 0x0649, 0x064a,
+        0x00ee, 0x00ef, 0x064b, 0x064c, 0x064d, 0x064e, 0x00f4, 0x064f, 0x0650, 0x00f7, 0x0651,
+        0x00f9, 0x0652, 0x00fb, 0x00fc, 0x200e, 0x200f, 0x06d2,
     ];
 
     /// Creates a new decoder.
@@ -176,17 +60,12 @@ impl<'a> Iterator for DecoderWindows1256<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0x80 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0x80 {
+                    *byte_value as u16
                 } else {
-                    match Self::BASE_0X80[(*byte_value - 0x80) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 1256: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    }
-                }
+                    Self::BASE_0X80[(*byte_value - 0x80) as usize]
+                };
+                Some(Ok(code_point as u32))
             }
             None => None,
         }
@@ -519,12 +398,39 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a1];
+
+        let mut encoder: EncoderWindows1256 = EncoderWindows1256::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x00e1];
+
+        let mut encoder: EncoderWindows1256 = EncoderWindows1256::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0618];
+
+        let mut encoder: EncoderWindows1256 = EncoderWindows1256::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2008];
+
+        let mut encoder: EncoderWindows1256 = EncoderWindows1256::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderWindows1256 = EncoderWindows1256::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

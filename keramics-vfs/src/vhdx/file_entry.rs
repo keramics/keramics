@@ -62,7 +62,7 @@ impl VhdxFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
             VhdxFileEntry::Layer { .. } => Ok(0),
             VhdxFileEntry::Root { image } => Ok(image.get_number_of_layers()),
@@ -158,6 +158,28 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_number_of_sub_file_entries
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+
+        let file_entry = VhdxFileEntry::Root {
+            image: vhdx_image.clone(),
+        };
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 2);
+
+        let vhdx_layer: VhdxImageLayer = vhdx_image.get_layer_by_index(0)?;
+        let file_entry = VhdxFileEntry::Layer {
+            index: 0,
+            layer: vhdx_layer.clone(),
+        };
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
     // TODO: add tests for get_sub_file_entry_by_index
 }

@@ -15,7 +15,6 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_encodings::CharacterEncoding;
 
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::block_stream::FatBlockStream;
