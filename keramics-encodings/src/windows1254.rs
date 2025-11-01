@@ -62,42 +62,14 @@ impl<'a> DecoderWindows1254<'a> {
         Some(0x0178),
     ];
 
-    const BASE_0XD0: [Option<u16>; 16] = [
-        Some(0x011e),
-        Some(0x00d1),
-        Some(0x00d2),
-        Some(0x00d3),
-        Some(0x00d4),
-        Some(0x00d5),
-        Some(0x00d6),
-        Some(0x00d7),
-        Some(0x00d8),
-        Some(0x00d9),
-        Some(0x00da),
-        Some(0x00db),
-        Some(0x00dc),
-        Some(0x0130),
-        Some(0x015e),
-        Some(0x00df),
+    const BASE_0XD0: [u16; 16] = [
+        0x011e, 0x00d1, 0x00d2, 0x00d3, 0x00d4, 0x00d5, 0x00d6, 0x00d7, 0x00d8, 0x00d9, 0x00da,
+        0x00db, 0x00dc, 0x0130, 0x015e, 0x00df,
     ];
 
-    const BASE_0XF0: [Option<u16>; 16] = [
-        Some(0x011f),
-        Some(0x00f1),
-        Some(0x00f2),
-        Some(0x00f3),
-        Some(0x00f4),
-        Some(0x00f5),
-        Some(0x00f6),
-        Some(0x00f7),
-        Some(0x00f8),
-        Some(0x00f9),
-        Some(0x00fa),
-        Some(0x00fb),
-        Some(0x00fc),
-        Some(0x0131),
-        Some(0x015f),
-        Some(0x00ff),
+    const BASE_0XF0: [u16; 16] = [
+        0x011f, 0x00f1, 0x00f2, 0x00f3, 0x00f4, 0x00f5, 0x00f6, 0x00f7, 0x00f8, 0x00f9, 0x00fa,
+        0x00fb, 0x00fc, 0x0131, 0x015f, 0x00ff,
     ];
 
     /// Creates a new decoder.
@@ -127,20 +99,8 @@ impl<'a> Iterator for DecoderWindows1254<'a> {
                             *byte_value
                         )))),
                     },
-                    0xd0..0xe0 => match Self::BASE_0XD0[(*byte_value - 0xd0) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 1254: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    },
-                    0xf0..=0xff => match Self::BASE_0XF0[(*byte_value - 0xf0) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 1254: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
-                    },
+                    0xd0..0xe0 => Some(Ok(Self::BASE_0XD0[(*byte_value - 0xd0) as usize] as u32)),
+                    0xf0..=0xff => Some(Ok(Self::BASE_0XF0[(*byte_value - 0xf0) as usize] as u32)),
                 }
             }
             None => None,
@@ -331,6 +291,16 @@ mod tests {
         assert_eq!(decoder.next(), None);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 1] = [0x81];
+
+        let mut decoder: DecoderWindows1254 = DecoderWindows1254::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
     }
 
     #[test]
