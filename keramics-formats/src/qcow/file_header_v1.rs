@@ -40,11 +40,6 @@ use super::file_header::QcowFileHeader;
 pub struct QcowFileHeaderV1 {}
 
 impl QcowFileHeaderV1 {
-    /// Creates a new file header.
-    pub fn new() -> Self {
-        Self {}
-    }
-
     /// Reads the file header from a buffer.
     pub fn read_data(file_header: &mut QcowFileHeader, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 48 {

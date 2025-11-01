@@ -14,7 +14,7 @@
 use std::cmp::max;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_datetime::{DateTime, PosixTime32, PosixTime64Ns};
+use keramics_datetime::DateTime;
 
 use super::attribute::ExtAttribute;
 use super::block_numbers_tree::ExtBlockNumbersTree;

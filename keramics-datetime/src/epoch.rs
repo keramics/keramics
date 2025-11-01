@@ -32,3 +32,16 @@ impl Epoch {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new() {
+        let test_struct: Epoch = Epoch::new(1970, 1, 1);
+        assert_eq!(test_struct.year, 1970);
+        assert_eq!(test_struct.month, 1);
+        assert_eq!(test_struct.day_of_month, 1);
+    }
+}

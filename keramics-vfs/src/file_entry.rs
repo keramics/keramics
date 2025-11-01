@@ -17,7 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtFileEntry, ExtPath};
-use keramics_formats::fat::{FatFileEntry, FatPath, FatString};
+use keramics_formats::fat::{FatFileEntry, FatString};
 use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry, NtfsPath};
 use keramics_types::{ByteString, Ucs2String};
 
