@@ -12,7 +12,6 @@
  */
 
 use std::collections::HashMap;
-use std::process::ExitCode;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
@@ -468,32 +467,34 @@ impl NtfsInfo {
     pub fn print_file_entry_by_identifier(
         data_stream: &DataStreamReference,
         ntfs_entry_identifier: u64,
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut ntfs_file_system = NtfsFileSystem::new();
 
         match ntfs_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open NTFS file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to open NTFS file file system"
+                );
+                return Err(error);
             }
         }
         if ntfs_entry_identifier > u32::MAX as u64 {
-            println!(
-                "Invalid MFT entry number: {} value out of bounds",
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported identifier: {} value out of bounds",
                 ntfs_entry_identifier
-            );
-            return ExitCode::FAILURE;
+            )));
         }
         let file_entry: NtfsFileEntry =
             match ntfs_file_system.get_file_entry_by_identifier(ntfs_entry_identifier) {
                 Ok(file_entry) => file_entry,
-                Err(error) => {
-                    println!(
-                        "Unable to retrive NTFS MFT entry: {} with error: {}",
-                        ntfs_entry_identifier, error
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve file entry: {}", ntfs_entry_identifier)
                     );
-                    return ExitCode::FAILURE;
+                    return Err(error);
                 }
             };
         println!(
@@ -534,74 +535,85 @@ impl NtfsInfo {
                 let attribute: NtfsAttribute =
                     match file_entry.get_attribute_by_index(attribute_index) {
                         Ok(attribute) => attribute,
-                        Err(error) => {
-                            println!(
-                                "Unable to retrive NTFS MFT entry: {} attribute: {} with error: {}",
-                                ntfs_entry_identifier, attribute_index, error
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve file entry: {} attribute: {}",
+                                    ntfs_entry_identifier, attribute_index
+                                )
                             );
-                            return ExitCode::FAILURE;
+                            return Err(error);
                         }
                     };
                 match Self::print_attribute(&attribute) {
                     Ok(_) => {}
-                    Err(error) => {
-                        println!("{}", error);
-                        return ExitCode::FAILURE;
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to print attribute: {}", attribute_index)
+                        );
+                        return Err(error);
                     }
-                };
+                }
             }
         }
-        ExitCode::SUCCESS
+        Ok(())
     }
 
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
         path_components: &[&str],
-    ) -> ExitCode {
+    ) -> Result<(), ErrorTrace> {
         let mut ntfs_file_system = NtfsFileSystem::new();
 
         match ntfs_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open NTFS file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to open NTFS file file system"
+                );
+                return Err(error);
             }
         };
         let ntfs_path: NtfsPath = NtfsPath::from(path_components);
         let mut file_entry: Option<NtfsFileEntry> =
             match ntfs_file_system.get_file_entry_by_path(&ntfs_path) {
                 Ok(file_entry) => file_entry,
-                Err(error) => {
-                    println!("Unable to retrive NTFS file entry with error: {}", error);
-                    return ExitCode::FAILURE;
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                    return Err(error);
                 }
             };
         if file_entry.is_none() {
-            println!("No such NTFS file entry");
-            return ExitCode::FAILURE;
+            return Err(keramics_core::error_trace_new!("No such file entry"));
         }
         println!("New Technologies File System (NTFS) file entry information:");
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
+                return Err(error);
             }
-        };
-        ExitCode::SUCCESS
+        }
+        Ok(())
     }
 
     /// Prints information about the file system.
-    pub fn print_file_system(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut ntfs_file_system = NtfsFileSystem::new();
 
         match ntfs_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open NTFS file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to open NTFS file file system"
+                );
+                return Err(error);
             }
         }
         println!("New Technologies File System (NTFS) information:");
@@ -659,42 +671,45 @@ impl NtfsInfo {
         );
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 
     /// Prints the file system hierarchy.
-    pub fn print_hierarchy(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut ntfs_file_system = NtfsFileSystem::new();
 
         match ntfs_file_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open NTFS file system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to open NTFS file file system"
+                );
+                return Err(error);
             }
         };
         println!("New Technologies File System (NTFS) hierarchy:");
 
         let mut file_entry: NtfsFileEntry = match ntfs_file_system.get_root_directory() {
             Ok(file_entry) => file_entry,
-            Err(error) => {
-                println!(
-                    "Unable to retrieve NTFS root directory with error: {}",
-                    error
-                );
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                return Err(error);
             }
         };
         let mut path_components: Vec<String> = Vec::new();
 
         match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
             Ok(_) => {}
-            Err(error) => {
-                println!("{}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to print file entry hierarchy"
+                );
+                return Err(error);
             }
         }
-        ExitCode::SUCCESS
+        Ok(())
     }
 
     /// Prints the file entry hierarchy.

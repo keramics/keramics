@@ -11,9 +11,7 @@
  * under the License.
  */
 
-use std::process::ExitCode;
-
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
 
 use crate::formatters::format_as_bytesize;
@@ -23,14 +21,14 @@ pub struct GptInfo {}
 
 impl GptInfo {
     /// Prints information about a volume system.
-    pub fn print_volume_system(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_volume_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut gpt_volume_system = GptVolumeSystem::new();
 
         match gpt_volume_system.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open GPT volume system with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open GPT volume system");
+                return Err(error);
             }
         };
         println!("GUID Partition Table (GPT) information:");
@@ -51,12 +49,12 @@ impl GptInfo {
             let gpt_partition: GptPartition =
                 match gpt_volume_system.get_partition_by_index(partition_index) {
                     Ok(partition) => partition,
-                    Err(error) => {
-                        println!(
-                            "Unable to retrieve GPT partition: {} with error: {}",
-                            partition_index, error
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve GPT partition: {}", partition_index)
                         );
-                        return ExitCode::FAILURE;
+                        return Err(error);
                     }
                 };
             println!("Partition: {}", partition_index + 1);
@@ -84,7 +82,7 @@ impl GptInfo {
         }
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 

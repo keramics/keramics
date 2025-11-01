@@ -244,6 +244,18 @@ mod tests {
         let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt1/bogus1");
+        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "bogus1");
+        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let result: Result<bool, ErrorTrace> = gpt_file_system.file_entry_exists(&vfs_path);
+        assert!(result.is_err());
+
         Ok(())
     }
 

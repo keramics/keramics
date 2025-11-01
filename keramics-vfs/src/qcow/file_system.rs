@@ -242,6 +242,18 @@ mod tests {
         let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1/bogus1");
+        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "bogus1");
+        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        assert_eq!(result, false);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let result: Result<bool, ErrorTrace> = qcow_file_system.file_entry_exists(&vfs_path);
+        assert!(result.is_err());
+
         Ok(())
     }
 

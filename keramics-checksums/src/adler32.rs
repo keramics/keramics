@@ -17,7 +17,10 @@
 
 /// Context for calculating an Adler-32 checksum.
 pub struct Adler32Context {
+    /// The initial checksum value.
     initial_value: u32,
+
+    /// The checksum value.
     checksum: u32,
 }
 
@@ -41,7 +44,7 @@ impl Adler32Context {
 
     /// Optimized modulus 65521 (0xfff1) calculation.
     #[inline(always)]
-    fn mod_65521(&self, mut value: u32) -> u32 {
+    fn mod_65521(mut value: u32) -> u32 {
         let value_32bit: u32 = value >> 16;
         value &= 0x0000ffff;
         value += (value_32bit << 4) - value_32bit;
@@ -72,8 +75,8 @@ impl Adler32Context {
 
                 data_offset += 1;
             }
-            lower_word = self.mod_65521(lower_word);
-            upper_word = self.mod_65521(upper_word);
+            lower_word = Self::mod_65521(lower_word);
+            upper_word = Self::mod_65521(upper_word);
         }
         if data_offset < data_size {
             while data_offset < data_size {
@@ -82,8 +85,8 @@ impl Adler32Context {
 
                 data_offset += 1;
             }
-            lower_word = self.mod_65521(lower_word);
-            upper_word = self.mod_65521(upper_word);
+            lower_word = Self::mod_65521(lower_word);
+            upper_word = Self::mod_65521(upper_word);
         }
         self.checksum = (upper_word << 16) | lower_word;
     }
@@ -97,6 +100,13 @@ mod tests {
         (0..data_size)
             .map(|value| (value % 256) as u8)
             .collect::<Vec<u8>>()
+    }
+
+    #[test]
+    fn test_mod_65521() {
+        assert_eq!(Adler32Context::mod_65521(1), 1);
+        assert_eq!(Adler32Context::mod_65521(65522), 1);
+        assert_eq!(Adler32Context::mod_65521(0xffffff20), 1);
     }
 
     #[test]

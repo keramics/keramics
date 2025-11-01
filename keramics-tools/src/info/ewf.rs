@@ -13,8 +13,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::ExitCode;
 
+use keramics_core::ErrorTrace;
 use keramics_core::formatters::format_as_string;
 use keramics_formats::ewf::{EwfHeaderValueType, EwfImage, EwfMediaType};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
@@ -26,15 +26,15 @@ pub struct EwfInfo {}
 
 impl EwfInfo {
     /// Prints information about an image.
-    pub fn print_image(path: &PathBuf) -> ExitCode {
+    pub fn print_image(path: &PathBuf) -> Result<(), ErrorTrace> {
         let mut base_path: PathBuf = path.clone();
         base_path.pop();
 
         let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
             Ok(file_resolver) => file_resolver,
-            Err(error) => {
-                println!("Unable to create file resolver with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
+                return Err(error);
             }
         };
         let mut ewf_image: EwfImage = EwfImage::new();
@@ -43,20 +43,18 @@ impl EwfInfo {
             Some(file_name) => match file_name.to_str() {
                 Some(file_name) => PathComponent::from(file_name),
                 None => {
-                    println!("Invalid file name");
-                    return ExitCode::FAILURE;
+                    return Err(keramics_core::error_trace_new!("Unsupported file name"));
                 }
             },
             None => {
-                println!("Missing file name");
-                return ExitCode::FAILURE;
+                return Err(keramics_core::error_trace_new!("Missing file name"));
             }
         };
         match ewf_image.open(&file_resolver, &file_name) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open EWF image with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
+                return Err(error);
             }
         };
         println!("Expert Witness Compression Format (EWF) information:");
@@ -172,7 +170,7 @@ impl EwfInfo {
 
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 

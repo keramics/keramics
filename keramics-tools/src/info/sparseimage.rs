@@ -11,9 +11,7 @@
  * under the License.
  */
 
-use std::process::ExitCode;
-
-use keramics_core::DataStreamReference;
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::sparseimage::SparseImageFile;
 
 use crate::formatters::format_as_bytesize;
@@ -23,14 +21,14 @@ pub struct SparseImageInfo {}
 
 impl SparseImageInfo {
     /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> ExitCode {
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
         match sparseimage_file.read_data_stream(data_stream) {
             Ok(_) => {}
-            Err(error) => {
-                println!("Unable to open sparse image file with error: {}", error);
-                return ExitCode::FAILURE;
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open sparse image file");
+                return Err(error);
             }
         };
         println!("Sparse image (.sparseimage) information:");
@@ -66,7 +64,7 @@ impl SparseImageInfo {
         }
         println!("");
 
-        ExitCode::SUCCESS
+        Ok(())
     }
 }
 
