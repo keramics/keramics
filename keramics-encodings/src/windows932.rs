@@ -29934,6 +29934,310 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 2] = [0x81, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x84, 0x61];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x87, 0x5e];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x88, 0x98];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x89, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x8a, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x8b, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x8c, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x8d, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x8e, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x8f, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x90, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x91, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x92, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x93, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x94, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x95, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x96, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x97, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x98, 0x73];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x99, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x9a, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x9b, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x9c, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x9d, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x9e, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x9f, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe0, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe1, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe2, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe3, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe4, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe5, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe6, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe7, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe8, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe9, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xea, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xed, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xee, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfa, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfb, 0x7f];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfc, 0x4e];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_encode() -> Result<(), ErrorTrace> {
         let code_points: [u32; 8] = [0x4b, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x73];
 
@@ -29959,7 +30263,6 @@ mod tests {
         let mut encoder: EncoderWindows932 = EncoderWindows932::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }
