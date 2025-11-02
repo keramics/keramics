@@ -67,9 +67,7 @@ impl NtfsIndex {
             * (self.cluster_block_size as u64))
             + range_relative_offset;
 
-        let remaining_range_size: u64 = (block_range.number_of_blocks
-            * (self.cluster_block_size as u64))
-            - range_relative_offset;
+        let remaining_range_size: u64 = block_range.size - range_relative_offset;
         if remaining_range_size < (self.index_entry_size as u64) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Block range too small for index entry of size: {}",
@@ -142,7 +140,7 @@ impl NtfsIndex {
                 let block_range: NtfsBlockRange = NtfsBlockRange::new(
                     virtual_cluster_offset,
                     data_run.block_number,
-                    data_run.number_of_blocks,
+                    range_size,
                     range_type,
                 );
                 match self

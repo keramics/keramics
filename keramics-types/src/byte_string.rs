@@ -139,7 +139,7 @@ impl ByteString {
                     };
                     string_parts.push(string);
                 }
-                Err(error) => todo!(),
+                Err(error) => return String::from(format!("{}", error)),
             }
         }
         string_parts.join("")

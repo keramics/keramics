@@ -259,7 +259,7 @@ impl ExtSuperblock {
         }
         self.block_size = bytes_to_u32_le!(data, 24);
 
-        if self.block_size > 32 - 10 {
+        if self.block_size > 31 - 10 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid block size: {} value out of bounds",
                 self.block_size
@@ -288,6 +288,14 @@ impl ExtSuperblock {
         self.last_mount_time = PosixTime32::from_le_bytes(&data[44..48]);
         self.last_written_time = PosixTime32::from_le_bytes(&data[48..52]);
         self.inode_size = bytes_to_u16_le!(data, 88);
+
+        // inode size & (inode size - 1) is 0 when inode size is a power of 2
+        if self.inode_size < 128 || self.inode_size & (self.inode_size - 1) != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid inode size: {} value out of bounds",
+                self.inode_size
+            )));
+        }
         self.group_descriptor_size = bytes_to_u16_le!(data, 254);
         self.first_meta_block_group = bytes_to_u32_le!(data, 260);
         self.file_system_identifier.copy_from_slice(&data[104..120]);
@@ -496,9 +504,29 @@ mod tests {
     }
 
     #[test]
+    fn test_read_data_with_invalid_number_of_blocks() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[5] = 0x00;
+
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn test_read_data_with_invalid_block_size() {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[24] = 0xff;
+
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_invalid_number_of_blocks_per_block_group() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[33] = 0x00;
 
         let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
         let result = test_struct.read_data(&test_data);
@@ -514,4 +542,26 @@ mod tests {
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_read_data_with_invalid_inode_size() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[88] = 0x00;
+
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_invalid_number_of_block_groups_per_flex_group() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[372] = 0xff;
+
+        let mut test_struct = ExtSuperblock::new(&CharacterEncoding::Utf8);
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    // TODO: add test_read_data_with_unsupported_checksum_type
 }

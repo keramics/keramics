@@ -17,8 +17,6 @@ use keramics_checksums::ReversedCrc32Context;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use crate::block_tree::BlockTree;
-
 use super::features::ExtFeatures;
 use super::group_descriptor::ExtGroupDescriptor;
 use super::inode::ExtInode;
@@ -43,8 +41,11 @@ pub struct ExtInodeTable {
     /// Number of inodes per block group.
     number_of_inodes_per_block_group: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<ExtGroupDescriptor>,
+    /// Group size.
+    group_size: u64,
+
+    /// Group descriptors.
+    group_descriptors: Vec<ExtGroupDescriptor>,
 }
 
 impl ExtInodeTable {
@@ -57,7 +58,8 @@ impl ExtInodeTable {
             block_size: 0,
             inode_size: 0,
             number_of_inodes_per_block_group: 0,
-            block_tree: BlockTree::<ExtGroupDescriptor>::new(0, 0, 0),
+            group_size: 0,
+            group_descriptors: Vec::new(),
         }
     }
 
@@ -68,37 +70,16 @@ impl ExtInodeTable {
         block_size: u32,
         inode_size: u16,
         number_of_inodes_per_block_group: u32,
-        group_descriptors: &mut Vec<ExtGroupDescriptor>,
+        group_descriptors: Vec<ExtGroupDescriptor>,
     ) -> Result<(), ErrorTrace> {
         self.format_version = features.get_format_version();
         self.metadata_checksum_seed = features.get_metadata_checksum_seed();
         self.block_size = block_size;
         self.inode_size = inode_size;
         self.number_of_inodes_per_block_group = number_of_inodes_per_block_group;
+        self.group_size = (number_of_inodes_per_block_group as u64) * (inode_size as u64);
+        self.group_descriptors = group_descriptors;
 
-        let group_size: u64 = (number_of_inodes_per_block_group as u64) * (inode_size as u64);
-        let block_tree_size: u64 = (group_descriptors.len() as u64) * group_size;
-        self.block_tree = BlockTree::<ExtGroupDescriptor>::new(
-            block_tree_size,
-            number_of_inodes_per_block_group as u64,
-            inode_size as u64,
-        );
-        let mut inode_table_offset: u64 = 0;
-        for group_descriptor in group_descriptors.drain(0..) {
-            match self
-                .block_tree
-                .insert_value(inode_table_offset, group_size, group_descriptor)
-            {
-                Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
-                }
-            };
-            inode_table_offset += group_size;
-        }
         Ok(())
     }
 
@@ -108,18 +89,18 @@ impl ExtInodeTable {
         data_stream: &DataStreamReference,
         inode_number: u32,
     ) -> Result<ExtInode, ErrorTrace> {
-        let inode_table_offset: u64 = ((inode_number - 1) as u64) * (self.inode_size as u64);
+        let group_index: usize = (((inode_number - 1) as usize) * (self.inode_size as usize))
+            / (self.group_size as usize);
 
-        let group_descriptor: &ExtGroupDescriptor =
-            match self.block_tree.get_value(inode_table_offset) {
-                Some(value) => value,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing group descriptor for inode: {}",
-                        inode_number
-                    )));
-                }
-            };
+        let group_descriptor: &ExtGroupDescriptor = match self.group_descriptors.get(group_index) {
+            Some(group_descriptor) => group_descriptor,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing group descriptor for inode: {}",
+                    inode_number
+                )));
+            }
+        };
         let inode_group_index: u32 = (inode_number - 1) % self.number_of_inodes_per_block_group;
 
         let mut inode_data_offset: u64 = (inode_group_index as u64) * (self.inode_size as u64);

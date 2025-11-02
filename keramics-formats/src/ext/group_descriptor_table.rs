@@ -64,12 +64,22 @@ impl ExtGroupDescriptorTable {
         features: &ExtFeatures,
         first_group_number: u32,
         number_of_group_descriptors: u32,
-    ) {
+    ) -> Result<(), ErrorTrace> {
+        let group_descriptor_size: u32 = features.get_group_descriptor_size();
+
+        if group_descriptor_size == 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid group descriptor size: {} value out of bounds",
+                group_descriptor_size
+            )));
+        }
         self.format_version = features.get_format_version();
         self.metadata_checksum_seed = features.get_metadata_checksum_seed();
-        self.group_descriptor_size = features.get_group_descriptor_size() as usize;
+        self.group_descriptor_size = group_descriptor_size as usize;
         self.first_group_number = first_group_number;
         self.number_of_group_descriptors = number_of_group_descriptors;
+
+        Ok(())
     }
 
     /// Reads the group descriptor table from a buffer.
@@ -142,6 +152,14 @@ impl ExtGroupDescriptorTable {
     ) -> Result<(), ErrorTrace> {
         let data_size: usize =
             (self.number_of_group_descriptors as usize) * self.group_descriptor_size;
+
+        // Note that 16777216 is an arbitrary chosen limit.
+        if data_size == 0 || data_size > 16777216 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported parent locator data size: {} value out of bounds",
+                data_size
+            )));
+        }
         let mut data: Vec<u8> = vec![0; data_size];
 
         let offset: u64 =
@@ -177,7 +195,7 @@ mod tests {
 
         let features: ExtFeatures = ExtFeatures::new();
         let mut test_struct: ExtGroupDescriptorTable = ExtGroupDescriptorTable::new();
-        test_struct.initialize(&features, 0, 1);
+        test_struct.initialize(&features, 0, 1)?;
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.entries.len(), 1);

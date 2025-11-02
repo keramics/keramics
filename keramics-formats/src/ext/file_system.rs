@@ -308,6 +308,13 @@ impl ExtFileSystem {
                     self.features.initialize(&superblock);
 
                     number_of_block_groups = superblock.get_number_of_block_groups();
+
+                    if number_of_block_groups > 2097152 {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Invalid number of block groups: {} value out of bounds",
+                            number_of_block_groups
+                        )));
+                    }
                     block_group_size = superblock.get_block_group_size();
 
                     self.number_of_inodes = superblock.number_of_inodes;
@@ -331,8 +338,23 @@ impl ExtFileSystem {
 
                     if self.features.has_meta_block_groups() {
                         let group_descriptor_size: u32 = self.features.get_group_descriptor_size();
+
+                        if group_descriptor_size == 0 {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Invalid group descriptor size: {} value out of bounds",
+                                group_descriptor_size
+                            )));
+                        }
                         number_of_block_groups_per_meta_group =
-                            superblock.block_size / group_descriptor_size;
+                            self.block_size / group_descriptor_size;
+
+                        if superblock.first_meta_block_group
+                            > u32::MAX / number_of_block_groups_per_meta_group
+                        {
+                            return Err(keramics_core::error_trace_new!(
+                                "Invalid first meta block group value out of bounds"
+                            ));
+                        }
                         meta_group_start_block_number = superblock.first_meta_block_group
                             * number_of_block_groups_per_meta_group;
                     }
@@ -408,11 +430,21 @@ impl ExtFileSystem {
                 };
                 let mut group_descriptor_table: ExtGroupDescriptorTable =
                     ExtGroupDescriptorTable::new();
-                group_descriptor_table.initialize(
+
+                match group_descriptor_table.initialize(
                     &self.features,
                     first_group_number,
                     number_of_group_descriptors,
-                );
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to initialize group descriptor table"
+                        );
+                        return Err(error);
+                    }
+                }
                 match group_descriptor_table
                     .read_at_position(data_stream, SeekFrom::Start(group_descriptor_offset))
                 {
@@ -462,7 +494,7 @@ impl ExtFileSystem {
                     self.block_size,
                     self.inode_size,
                     number_of_inodes_per_block_group,
-                    &mut group_descriptors,
+                    group_descriptors,
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {

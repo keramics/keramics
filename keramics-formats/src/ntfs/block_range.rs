@@ -27,8 +27,8 @@ pub struct NtfsBlockRange {
     /// (Physical) cluster block number.
     pub cluster_block_number: u64,
 
-    /// Number of blocks.
-    pub number_of_blocks: u64,
+    /// Size.
+    pub size: u64,
 
     /// Range type.
     pub range_type: NtfsBlockRangeType,
@@ -39,13 +39,13 @@ impl NtfsBlockRange {
     pub fn new(
         virtual_cluster_offset: u64,
         cluster_block_number: u64,
-        number_of_blocks: u64,
+        size: u64,
         range_type: NtfsBlockRangeType,
     ) -> Self {
         Self {
             virtual_cluster_offset: virtual_cluster_offset,
             cluster_block_number: cluster_block_number,
-            number_of_blocks: number_of_blocks,
+            size: size,
             range_type: range_type,
         }
     }

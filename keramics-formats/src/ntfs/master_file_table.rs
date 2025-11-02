@@ -16,8 +16,6 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use crate::block_tree::BlockTree;
-
 use super::attribute_list::NtfsAttributeList;
 use super::block_range::{NtfsBlockRange, NtfsBlockRangeType};
 use super::cluster_group::NtfsClusterGroup;
@@ -38,8 +36,8 @@ pub struct NtfsMasterFileTable {
     /// Number of entries.
     pub number_of_entries: u64,
 
-    /// Block tree.
-    block_tree: BlockTree<NtfsBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<NtfsBlockRange>,
 }
 
 impl NtfsMasterFileTable {
@@ -49,8 +47,22 @@ impl NtfsMasterFileTable {
             cluster_block_size: 0,
             mft_entry_size: 0,
             number_of_entries: 0,
-            block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
         }
+    }
+
+    /// Retrieves a specific block range.
+    fn get_block_range(&self, virtual_cluster_offset: u64) -> Option<&NtfsBlockRange> {
+        for block_range in self.block_ranges.iter() {
+            let block_end_offset: u64 = block_range.virtual_cluster_offset + block_range.size;
+
+            if virtual_cluster_offset >= block_range.virtual_cluster_offset
+                && virtual_cluster_offset < block_end_offset
+            {
+                return Some(block_range);
+            }
+        }
+        None
     }
 
     /// Adds a cluster group to the master file table.
@@ -68,8 +80,6 @@ impl NtfsMasterFileTable {
                     range_size, self.mft_entry_size,
                 )));
             }
-            self.number_of_entries += range_size / (self.mft_entry_size as u64);
-
             let range_type: NtfsBlockRangeType = match &data_run.run_type {
                 NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
                 _ => {
@@ -79,21 +89,13 @@ impl NtfsMasterFileTable {
             let block_range: NtfsBlockRange = NtfsBlockRange::new(
                 virtual_cluster_offset,
                 data_run.block_number,
-                data_run.number_of_blocks,
+                range_size,
                 range_type,
             );
-            match self
-                .block_tree
-                .insert_value(virtual_cluster_offset, range_size, block_range)
-            {
-                Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
-                }
-            };
+            self.block_ranges.push(block_range);
+
+            self.number_of_entries += range_size / (self.mft_entry_size as u64);
+
             virtual_cluster_number += data_run.number_of_blocks;
             virtual_cluster_offset += range_size;
         }
@@ -116,8 +118,8 @@ impl NtfsMasterFileTable {
     ) -> Result<NtfsMftEntry, ErrorTrace> {
         let virtual_cluster_offset: u64 = entry_number * (self.mft_entry_size as u64);
 
-        let block_range: &NtfsBlockRange = match self.block_tree.get_value(virtual_cluster_offset) {
-            Some(value) => value,
+        let block_range: &NtfsBlockRange = match self.get_block_range(virtual_cluster_offset) {
+            Some(block_range) => block_range,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Missing block range for MFT entry: {}",
@@ -203,19 +205,6 @@ impl NtfsMasterFileTable {
                 "Unsupported compressed $DATA attribute"
             ));
         }
-        let block_tree_size: u64 =
-            (data_attribute.allocated_data_size / mft_entry_size as u64) * (mft_entry_size as u64);
-        let number_of_mft_entries: u64 = block_tree_size / (mft_entry_size as u64);
-
-        if number_of_mft_entries >= u32::MAX as u64 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid number of MFT entries: {} value out of bounds",
-                number_of_mft_entries
-            )));
-        }
-        self.block_tree =
-            BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, mft_entry_size as u64);
-
         self.cluster_block_size = cluster_block_size;
         self.mft_entry_size = mft_entry_size;
 
@@ -286,7 +275,6 @@ impl NtfsMasterFileTable {
                     return Err(error);
                 }
             }
-
             match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => {
                     match self.add_cluster_group(&mft_attribute.data_cluster_groups[0]) {
@@ -329,14 +317,12 @@ mod tests {
         data_attribute.read_data(&test_mft_attribute_data)?;
 
         let mut test_struct: NtfsMasterFileTable = NtfsMasterFileTable::new();
-
-        let block_tree_size: u64 = (data_attribute.allocated_data_size / 1024) * 1024;
-        test_struct.block_tree = BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, 1024);
-
         test_struct.cluster_block_size = 4096;
         test_struct.mft_entry_size = 1024;
 
         test_struct.add_cluster_group(&data_attribute.data_cluster_groups[0])?;
+
+        assert_eq!(test_struct.block_ranges.len(), 1);
 
         Ok(())
     }

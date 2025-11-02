@@ -71,13 +71,13 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     ))));
                 }
             };
-            let is_valid: bool = match byte_value1 {
+            let is_invalid: bool = match byte_value1 {
                 0xe0 => byte_value < 0xa0 || byte_value > 0xbf,
                 0xed => byte_value < 0x80 || byte_value > 0x9f,
                 0xf0 => byte_value < 0x90 || byte_value > 0xbf,
                 _ => byte_value < 0x80 || byte_value > 0xbf,
             };
-            if is_valid {
+            if is_invalid {
                 return Some(Err(keramics_core::error_trace_new!(format!(
                     "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
                     byte_value1, byte_value
@@ -101,12 +101,12 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     ))));
                 }
             };
-            let is_valid: bool = match byte_value2 {
+            let is_invalid: bool = match byte_value2 {
                 0xe0 => byte_value < 0xa0 || byte_value > 0xbf,
                 0xed => byte_value < 0x80 || byte_value > 0x9f,
                 _ => byte_value < 0x80 || byte_value > 0xbf,
             };
-            if is_valid {
+            if is_invalid {
                 return Some(Err(keramics_core::error_trace_new!(format!(
                     "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
                     byte_value1, byte_value2, byte_value
@@ -235,6 +235,20 @@ mod tests {
         assert!(result.is_err());
 
         let byte_string: [u8; 3] = [0xe0, 0xa0, 0xff];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 3] = [0xed, 0xe0, 0xff];
+
+        let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
+
+        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 3] = [0xed, 0xed, 0xff];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 

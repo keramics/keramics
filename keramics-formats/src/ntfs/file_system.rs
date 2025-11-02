@@ -459,6 +459,11 @@ impl NtfsFileSystem {
                         "Unsupported compressed $VOLUME_NAME attribute"
                     ));
                 }
+                if mft_attribute.resident_data.len() % 2 != 0 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported compressed $VOLUME_NAME attribute resident data - not a multiple of 2"
+                    ));
+                }
                 let volume_label: Ucs2String =
                     Ucs2String::from_le_bytes(&mft_attribute.resident_data);
 

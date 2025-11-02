@@ -16,8 +16,6 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
-use crate::block_tree::BlockTree;
-
 use super::block_range::{NtfsBlockRange, NtfsBlockRangeType};
 use super::data_run::NtfsDataRunType;
 use super::mft_attribute::NtfsMftAttribute;
@@ -30,8 +28,8 @@ pub struct NtfsBlockStream {
     /// Cluster block size.
     cluster_block_size: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<NtfsBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<NtfsBlockRange>,
 
     /// The current offset.
     current_offset: u64,
@@ -49,11 +47,25 @@ impl NtfsBlockStream {
         Self {
             data_stream: None,
             cluster_block_size: cluster_block_size,
-            block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
             current_offset: 0,
             size: 0,
             valid_data_size: 0,
         }
+    }
+
+    /// Retrieves a specific block range.
+    fn get_block_range(&self, virtual_cluster_offset: u64) -> Option<&NtfsBlockRange> {
+        for block_range in self.block_ranges.iter() {
+            let block_end_offset: u64 = block_range.virtual_cluster_offset + block_range.size;
+
+            if virtual_cluster_offset >= block_range.virtual_cluster_offset
+                && virtual_cluster_offset < block_end_offset
+            {
+                return Some(block_range);
+            }
+        }
+        None
     }
 
     /// Opens a block stream.
@@ -67,13 +79,6 @@ impl NtfsBlockStream {
                 "Unsupported resident $DATA attribute"
             ));
         }
-        let block_tree_size: u64 = data_attribute
-            .allocated_data_size
-            .div_ceil(self.cluster_block_size as u64)
-            * (self.cluster_block_size as u64);
-        self.block_tree =
-            BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, self.cluster_block_size as u64);
-
         if data_attribute.allocated_data_size > 0 {
             let mut virtual_cluster_number: u64 = 0;
             let mut virtual_cluster_offset: u64 = 0;
@@ -101,22 +106,11 @@ impl NtfsBlockStream {
                     let block_range: NtfsBlockRange = NtfsBlockRange::new(
                         virtual_cluster_offset,
                         data_run.block_number,
-                        data_run.number_of_blocks,
+                        range_size,
                         range_type,
                     );
-                    match self.block_tree.insert_value(
-                        virtual_cluster_offset,
-                        range_size,
-                        block_range,
-                    ) {
-                        Ok(_) => {}
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to insert block range into block tree",
-                                error
-                            ));
-                        }
-                    };
+                    self.block_ranges.push(block_range);
+
                     virtual_cluster_number += data_run.number_of_blocks as u64;
                     virtual_cluster_offset += range_size;
                 }
@@ -163,8 +157,8 @@ impl NtfsBlockStream {
 
                 range_read_size
             } else {
-                let block_range: &NtfsBlockRange = match self.block_tree.get_value(current_offset) {
-                    Some(value) => value,
+                let block_range: &NtfsBlockRange = match self.get_block_range(current_offset) {
+                    Some(block_range) => block_range,
                     None => {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Missing block range for offset: {}",
@@ -172,17 +166,16 @@ impl NtfsBlockStream {
                         )));
                     }
                 };
-                let range_logical_offset: u64 = block_range.virtual_cluster_offset;
-                let range_size: u64 =
-                    block_range.number_of_blocks * (self.cluster_block_size as u64);
-
-                let mut range_logical_end_offset: u64 = range_logical_offset + range_size;
+                let mut range_logical_end_offset: u64 =
+                    block_range.virtual_cluster_offset + block_range.size;
                 if range_logical_end_offset > self.valid_data_size {
                     range_logical_end_offset = self.valid_data_size;
                 };
-                let range_relative_offset: u64 = current_offset - range_logical_offset;
-                let range_remainder_size: u64 =
-                    (range_logical_end_offset - range_logical_offset) - range_relative_offset;
+                let range_relative_offset: u64 =
+                    current_offset - block_range.virtual_cluster_offset;
+                let range_remainder_size: u64 = (range_logical_end_offset
+                    - block_range.virtual_cluster_offset)
+                    - range_relative_offset;
                 let read_remainder_size: usize = read_size - data_offset;
                 let range_read_size: usize =
                     min(read_remainder_size, range_remainder_size as usize);
