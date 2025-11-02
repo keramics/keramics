@@ -47,13 +47,15 @@ impl FatString {
 
                 while let Some(result) = character_decoder.next() {
                     match result {
-                        Ok(code_point) => {
-                            if code_point > 0xffff {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Unable to encode string - code point outside of UCS-2 range"
-                                ));
+                        Ok(code_points) => {
+                            for code_point in code_points {
+                                if code_point > 0xffff {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unable to encode string - code point outside of UCS-2 range"
+                                    ));
+                                }
+                                lookup_name.elements.push(code_point as u16);
                             }
-                            lookup_name.elements.push(code_point as u16);
                         }
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(

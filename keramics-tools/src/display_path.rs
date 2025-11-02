@@ -64,19 +64,24 @@ impl DisplayPath {
 
                 while let Some(result) = character_decoder.next() {
                     match result {
-                        Ok(code_point) => {
-                            let string: String = match char::from_u32(code_point as u32) {
-                                Some(unicode_character) => {
-                                    match self.translation_table.get(&(unicode_character as u32)) {
-                                        Some(escaped_character) => escaped_character.clone(),
-                                        None => unicode_character.to_string(),
+                        Ok(code_points) => {
+                            for code_point in code_points {
+                                let string: String = match char::from_u32(code_point as u32) {
+                                    Some(unicode_character) => {
+                                        match self
+                                            .translation_table
+                                            .get(&(unicode_character as u32))
+                                        {
+                                            Some(escaped_character) => escaped_character.clone(),
+                                            None => unicode_character.to_string(),
+                                        }
                                     }
-                                }
-                                None => format!("\\U{{{:08x}}}", code_point),
-                            };
-                            string_parts.push(string);
+                                    None => format!("\\U{{{:08x}}}", code_point),
+                                };
+                                string_parts.push(string);
+                            }
                         }
-                        Err(error) => todo!(),
+                        Err(error) => return String::from(format!("{}", error)),
                     }
                 }
                 string_parts.join("")

@@ -37,7 +37,7 @@ impl<'a> DecoderAscii<'a> {
 }
 
 impl<'a> Iterator for DecoderAscii<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next decoded code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -45,7 +45,14 @@ impl<'a> Iterator for DecoderAscii<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                Some(Ok(*byte_value as u32))
+                if *byte_value < 0x80 {
+                    Some(Ok(vec![*byte_value as u32]))
+                } else {
+                    Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to decode ASCII: 0x{:02x} as Unicode",
+                        *byte_value
+                    ))))
+                }
             }
             None => None,
         }
@@ -104,17 +111,27 @@ mod tests {
 
         let mut decoder: DecoderAscii = DecoderAscii::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x4b)));
-        assert_eq!(decoder.next(), Some(Ok(0x65)));
-        assert_eq!(decoder.next(), Some(Ok(0x72)));
-        assert_eq!(decoder.next(), Some(Ok(0x61)));
-        assert_eq!(decoder.next(), Some(Ok(0x6d)));
-        assert_eq!(decoder.next(), Some(Ok(0x69)));
-        assert_eq!(decoder.next(), Some(Ok(0x63)));
-        assert_eq!(decoder.next(), Some(Ok(0x73)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000004b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000065])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000072])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000061])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000006d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000069])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000063])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 1] = [0x80];
+
+        let mut decoder: DecoderAscii = DecoderAscii::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
     }
 
     #[test]

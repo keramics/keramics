@@ -49,7 +49,7 @@ impl<'a> DecoderIso8859_10<'a> {
 }
 
 impl<'a> Iterator for DecoderIso8859_10<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next next decoded code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -62,7 +62,7 @@ impl<'a> Iterator for DecoderIso8859_10<'a> {
                 } else {
                     Self::BASE_0XA0[(*byte_value - 0xa0) as usize]
                 };
-                Some(Ok(code_point as u32))
+                Some(Ok(vec![code_point as u32]))
             }
             None => None,
         }
@@ -319,14 +319,14 @@ mod tests {
 
         let mut decoder: DecoderIso8859_10 = DecoderIso8859_10::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x4b)));
-        assert_eq!(decoder.next(), Some(Ok(0x65)));
-        assert_eq!(decoder.next(), Some(Ok(0x72)));
-        assert_eq!(decoder.next(), Some(Ok(0x61)));
-        assert_eq!(decoder.next(), Some(Ok(0x6d)));
-        assert_eq!(decoder.next(), Some(Ok(0x69)));
-        assert_eq!(decoder.next(), Some(Ok(0x63)));
-        assert_eq!(decoder.next(), Some(Ok(0x73)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000004b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000065])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000072])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000061])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000006d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000069])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000063])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
         Ok(())

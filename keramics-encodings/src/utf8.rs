@@ -37,7 +37,7 @@ impl<'a> DecoderUtf8<'a> {
 }
 
 impl<'a> Iterator for DecoderUtf8<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next decoded code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -156,7 +156,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
         };
         self.byte_index = byte_index;
 
-        Some(Ok(code_point))
+        Some(Ok(vec![code_point]))
     }
 }
 
@@ -170,35 +170,35 @@ mod tests {
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x4b)));
-        assert_eq!(decoder.next(), Some(Ok(0x65)));
-        assert_eq!(decoder.next(), Some(Ok(0x72)));
-        assert_eq!(decoder.next(), Some(Ok(0x61)));
-        assert_eq!(decoder.next(), Some(Ok(0x6d)));
-        assert_eq!(decoder.next(), Some(Ok(0x69)));
-        assert_eq!(decoder.next(), Some(Ok(0x63)));
-        assert_eq!(decoder.next(), Some(Ok(0x73)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000004b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000065])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000072])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000061])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000006d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000069])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000063])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
         let byte_string: [u8; 2] = [0xc2, 0x80];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x80)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000080])));
         assert_eq!(decoder.next(), None);
 
         let byte_string: [u8; 3] = [0xe0, 0xa0, 0x80];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x800)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000800])));
         assert_eq!(decoder.next(), None);
 
         let byte_string: [u8; 4] = [0xf0, 0x90, 0x80, 0x80];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x10000)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00010000])));
         assert_eq!(decoder.next(), None);
 
         Ok(())
@@ -210,63 +210,63 @@ mod tests {
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 1] = [0xc0];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xc0, 0xff];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe0, 0xa0];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 3] = [0xe0, 0xa0, 0xff];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 3] = [0xed, 0xe0, 0xff];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 3] = [0xed, 0xed, 0xff];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 3] = [0xf0, 0x90, 0x80];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 4] = [0xf0, 0x90, 0x80, 0xff];
 
         let mut decoder: DecoderUtf8 = DecoderUtf8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
     }
 }

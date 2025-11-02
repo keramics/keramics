@@ -264,7 +264,7 @@ impl<'a> DecoderMacDingbats<'a> {
 }
 
 impl<'a> Iterator for DecoderMacDingbats<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next next decoded code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -272,17 +272,20 @@ impl<'a> Iterator for DecoderMacDingbats<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0x20 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0x20 {
+                    *byte_value as u16
                 } else {
                     match Self::BASE_0X20[(*byte_value - 0x20) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode MacDingbats: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
+                        Some(code_point) => code_point,
+                        None => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode MacDingbats: 0x{:02x} as Unicode",
+                                *byte_value
+                            ))));
+                        }
                     }
-                }
+                };
+                Some(Ok(vec![code_point as u32]))
             }
             None => None,
         }
@@ -595,14 +598,14 @@ mod tests {
 
         let mut decoder: DecoderMacDingbats = DecoderMacDingbats::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x272b)));
-        assert_eq!(decoder.next(), Some(Ok(0x2745)));
-        assert_eq!(decoder.next(), Some(Ok(0x2752)));
-        assert_eq!(decoder.next(), Some(Ok(0x2741)));
-        assert_eq!(decoder.next(), Some(Ok(0x274d)));
-        assert_eq!(decoder.next(), Some(Ok(0x2749)));
-        assert_eq!(decoder.next(), Some(Ok(0x2743)));
-        assert_eq!(decoder.next(), Some(Ok(0x25b2)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000272b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00002745])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00002752])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00002741])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000274d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00002749])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00002743])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x000025b2])));
         assert_eq!(decoder.next(), None);
 
         Ok(())
@@ -614,7 +617,7 @@ mod tests {
 
         let mut decoder: DecoderMacDingbats = DecoderMacDingbats::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
     }
 

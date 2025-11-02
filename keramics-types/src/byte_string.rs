@@ -56,7 +56,7 @@ impl ByteString {
 
             while let Some(result) = character_decoder.next() {
                 match result {
-                    Ok(code_point) => code_points.push(code_point),
+                    Ok(mut decoded_code_points) => code_points.append(&mut decoded_code_points),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to decode character");
                         return Err(error);
@@ -126,18 +126,20 @@ impl ByteString {
 
         while let Some(result) = character_decoder.next() {
             match result {
-                Ok(code_point) => {
-                    let string: String = match char::from_u32(code_point as u32) {
-                        Some(unicode_character) => {
-                            if unicode_character == '\\' {
-                                String::from("\\\\")
-                            } else {
-                                unicode_character.to_string()
+                Ok(code_points) => {
+                    for code_point in code_points {
+                        let string: String = match char::from_u32(code_point as u32) {
+                            Some(unicode_character) => {
+                                if unicode_character == '\\' {
+                                    String::from("\\\\")
+                                } else {
+                                    unicode_character.to_string()
+                                }
                             }
-                        }
-                        None => format!("\\{{{:04x}}}", code_point),
-                    };
-                    string_parts.push(string);
+                            None => format!("\\{{{:04x}}}", code_point),
+                        };
+                        string_parts.push(string);
+                    }
                 }
                 Err(error) => return String::from(format!("{}", error)),
             }

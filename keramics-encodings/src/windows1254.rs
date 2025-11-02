@@ -82,7 +82,7 @@ impl<'a> DecoderWindows1254<'a> {
 }
 
 impl<'a> Iterator for DecoderWindows1254<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next next decoded code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -90,18 +90,21 @@ impl<'a> Iterator for DecoderWindows1254<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                match *byte_value {
-                    0x00..0x80 | 0xa0..0xd0 | 0xe0..0xf0 => Some(Ok(*byte_value as u32)),
+                let code_point: u16 = match *byte_value {
+                    0x00..0x80 | 0xa0..0xd0 | 0xe0..0xf0 => *byte_value as u16,
                     0x80..0xa0 => match Self::BASE_0X80[(*byte_value - 0x80) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 1254: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
+                        Some(code_point) => code_point,
+                        None => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 1254: 0x{:02x} as Unicode",
+                                *byte_value
+                            ))));
+                        }
                     },
-                    0xd0..0xe0 => Some(Ok(Self::BASE_0XD0[(*byte_value - 0xd0) as usize] as u32)),
-                    0xf0..=0xff => Some(Ok(Self::BASE_0XF0[(*byte_value - 0xf0) as usize] as u32)),
-                }
+                    0xd0..0xe0 => Self::BASE_0XD0[(*byte_value - 0xd0) as usize],
+                    0xf0..=0xff => Self::BASE_0XF0[(*byte_value - 0xf0) as usize],
+                };
+                Some(Ok(vec![code_point as u32]))
             }
             None => None,
         }
@@ -280,14 +283,14 @@ mod tests {
 
         let mut decoder: DecoderWindows1254 = DecoderWindows1254::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x4b)));
-        assert_eq!(decoder.next(), Some(Ok(0x65)));
-        assert_eq!(decoder.next(), Some(Ok(0x72)));
-        assert_eq!(decoder.next(), Some(Ok(0x61)));
-        assert_eq!(decoder.next(), Some(Ok(0x6d)));
-        assert_eq!(decoder.next(), Some(Ok(0x69)));
-        assert_eq!(decoder.next(), Some(Ok(0x63)));
-        assert_eq!(decoder.next(), Some(Ok(0x73)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000004b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000065])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000072])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000061])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000006d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000069])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000063])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
         Ok(())
@@ -299,7 +302,7 @@ mod tests {
 
         let mut decoder: DecoderWindows1254 = DecoderWindows1254::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
     }
 
@@ -324,12 +327,25 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00d0];
+
+        let mut encoder: EncoderWindows1254 = EncoderWindows1254::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2010];
+
+        let mut encoder: EncoderWindows1254 = EncoderWindows1254::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
 
         let mut encoder: EncoderWindows1254 = EncoderWindows1254::new(&code_points);
 
         let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
-
         assert!(result.is_err());
     }
 }

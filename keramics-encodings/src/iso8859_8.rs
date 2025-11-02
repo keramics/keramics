@@ -136,7 +136,7 @@ impl<'a> DecoderIso8859_8<'a> {
 }
 
 impl<'a> Iterator for DecoderIso8859_8<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next next decoded code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -144,17 +144,20 @@ impl<'a> Iterator for DecoderIso8859_8<'a> {
             Some(byte_value) => {
                 self.byte_index += 1;
 
-                if *byte_value < 0xa0 {
-                    Some(Ok(*byte_value as u32))
+                let code_point: u16 = if *byte_value < 0xa0 {
+                    *byte_value as u16
                 } else {
                     match Self::BASE_0XA0[(*byte_value - 0xa0) as usize] {
-                        Some(code_point) => Some(Ok(code_point as u32)),
-                        None => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode ISO-8859-8: 0x{:02x} as Unicode",
-                            *byte_value
-                        )))),
+                        Some(code_point) => code_point,
+                        None => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode ISO-8859-8: 0x{:02x} as Unicode",
+                                *byte_value
+                            ))));
+                        }
                     }
-                }
+                };
+                Some(Ok(vec![code_point as u32]))
             }
             None => None,
         }
@@ -311,14 +314,14 @@ mod tests {
 
         let mut decoder: DecoderIso8859_8 = DecoderIso8859_8::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x4b)));
-        assert_eq!(decoder.next(), Some(Ok(0x65)));
-        assert_eq!(decoder.next(), Some(Ok(0x72)));
-        assert_eq!(decoder.next(), Some(Ok(0x61)));
-        assert_eq!(decoder.next(), Some(Ok(0x6d)));
-        assert_eq!(decoder.next(), Some(Ok(0x69)));
-        assert_eq!(decoder.next(), Some(Ok(0x63)));
-        assert_eq!(decoder.next(), Some(Ok(0x73)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000004b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000065])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000072])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000061])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000006d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000069])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000063])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
         Ok(())
@@ -330,7 +333,7 @@ mod tests {
 
         let mut decoder: DecoderIso8859_8 = DecoderIso8859_8::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
     }
 

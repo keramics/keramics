@@ -63,7 +63,7 @@ use super::windows1256::DecoderWindows1256;
 use super::windows1257::DecoderWindows1257;
 use super::windows1258::DecoderWindows1258;
 
-pub type CharacterDecoder<'a> = Box<dyn Iterator<Item = Result<u32, ErrorTrace>> + 'a>;
+pub type CharacterDecoder<'a> = Box<dyn Iterator<Item = Result<Vec<u32>, ErrorTrace>> + 'a>;
 
 /// Creates a new character decoder.
 pub fn new_character_decoder<'a>(

@@ -7957,7 +7957,7 @@ impl<'a> DecoderWindows932<'a> {
 }
 
 impl<'a> Iterator for DecoderWindows932<'a> {
-    type Item = Result<u32, ErrorTrace>;
+    type Item = Result<Vec<u32>, ErrorTrace>;
 
     /// Retrieves the next decoded Unicode code point.
     fn next(&mut self) -> Option<Self::Item> {
@@ -7983,99 +7983,109 @@ impl<'a> Iterator for DecoderWindows932<'a> {
                     }
                     _ => 0,
                 };
-                match *byte_value {
-                    0x00..=0x7f => Some(Ok(*byte_value as u32)),
+                let code_point: u16 = match *byte_value {
+                    0x00..=0x7f => *byte_value as u16,
                     0x81 => match additional_byte_value {
                         0x40..=0xff => {
                             match Self::BASE_0X8140[(additional_byte_value - 0x40) as usize] {
-                                Some(code_point) => Some(Ok(code_point as u32)),
-                                None => Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                )))),
+                                Some(code_point) => code_point,
+                                None => {
+                                    return Some(Err(keramics_core::error_trace_new!(format!(
+                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                        *byte_value, additional_byte_value
+                                    ))));
+                                }
                             }
                         }
-                        _ => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                            *byte_value, additional_byte_value
-                        )))),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
                     },
-                    0x82 => {
-                        let code_point: u32 = match additional_byte_value {
-                            0x4f..0x59 => 0xff10 + ((additional_byte_value - 0x4f) as u32),
-                            0x60..0x7a => 0xff21 + ((additional_byte_value - 0x60) as u32),
-                            0x81..0x9b => 0xff41 + ((additional_byte_value - 0x81) as u32),
-                            0x9f..0xf2 => 0x3041 + ((additional_byte_value - 0x9f) as u32),
-                            _ => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                ))));
-                            }
-                        };
-                        Some(Ok(code_point as u32))
-                    }
-                    0x83 => {
-                        let code_point: u32 = match additional_byte_value {
-                            0x40..=0x7e => 0x30a1 + ((additional_byte_value - 0x40) as u32),
-                            0x80..0x97 => 0x30e0 + ((additional_byte_value - 0x80) as u32),
-                            0x9f..0xb0 => 0x0391 + ((additional_byte_value - 0x9f) as u32),
-                            0xb0..0xb7 => 0x03a3 + ((additional_byte_value - 0xb0) as u32),
-                            0xbf..0xd0 => 0x03b1 + ((additional_byte_value - 0xbf) as u32),
-                            0xd0..0xd7 => 0x03c3 + ((additional_byte_value - 0xd0) as u32),
-                            _ => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                ))));
-                            }
-                        };
-                        Some(Ok(code_point as u32))
-                    }
+                    0x82 => match additional_byte_value {
+                        0x4f..0x59 => 0xff10 + ((additional_byte_value - 0x4f) as u16),
+                        0x60..0x7a => 0xff21 + ((additional_byte_value - 0x60) as u16),
+                        0x81..0x9b => 0xff41 + ((additional_byte_value - 0x81) as u16),
+                        0x9f..0xf2 => 0x3041 + ((additional_byte_value - 0x9f) as u16),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
+                    },
+                    0x83 => match additional_byte_value {
+                        0x40..=0x7e => 0x30a1 + ((additional_byte_value - 0x40) as u16),
+                        0x80..0x97 => 0x30e0 + ((additional_byte_value - 0x80) as u16),
+                        0x9f..0xb0 => 0x0391 + ((additional_byte_value - 0x9f) as u16),
+                        0xb0..0xb7 => 0x03a3 + ((additional_byte_value - 0xb0) as u16),
+                        0xbf..0xd0 => 0x03b1 + ((additional_byte_value - 0xbf) as u16),
+                        0xd0..0xd7 => 0x03c3 + ((additional_byte_value - 0xd0) as u16),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
+                    },
                     0x84 => match additional_byte_value {
                         0x40..0xc0 => {
                             match Self::BASE_0X8440[(additional_byte_value - 0x40) as usize] {
-                                Some(code_point) => Some(Ok(code_point as u32)),
-                                None => Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                )))),
+                                Some(code_point) => code_point,
+                                None => {
+                                    return Some(Err(keramics_core::error_trace_new!(format!(
+                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                        *byte_value, additional_byte_value
+                                    ))));
+                                }
                             }
                         }
-                        _ => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                            *byte_value, additional_byte_value
-                        )))),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
                     },
                     0x87 => match additional_byte_value {
                         0x40..0xa0 => {
                             match Self::BASE_0X8740[(additional_byte_value - 0x40) as usize] {
-                                Some(code_point) => Some(Ok(code_point as u32)),
-                                None => Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                )))),
+                                Some(code_point) => code_point,
+                                None => {
+                                    return Some(Err(keramics_core::error_trace_new!(format!(
+                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                        *byte_value, additional_byte_value
+                                    ))));
+                                }
                             }
                         }
-                        _ => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                            *byte_value, additional_byte_value
-                        )))),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
                     },
                     0x88 => match additional_byte_value {
                         0x98..=0xff => {
                             match Self::BASE_0X8898[(additional_byte_value - 0x98) as usize] {
-                                Some(code_point) => Some(Ok(code_point as u32)),
-                                None => Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                )))),
+                                Some(code_point) => code_point,
+                                None => {
+                                    return Some(Err(keramics_core::error_trace_new!(format!(
+                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                        *byte_value, additional_byte_value
+                                    ))));
+                                }
                             }
                         }
-                        _ => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                            *byte_value, additional_byte_value
-                        )))),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
                     },
                     0x89..=0x9f => {
                         let lookup_table: &[Option<u16>] =
@@ -8084,24 +8094,26 @@ impl<'a> Iterator for DecoderWindows932<'a> {
                         match additional_byte_value {
                             0x40..=0xff => {
                                 match lookup_table[(additional_byte_value - 0x40) as usize] {
-                                    Some(code_point) => Some(Ok(code_point as u32)),
-                                    None => Some(Err(keramics_core::error_trace_new!(format!(
-                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                        *byte_value, additional_byte_value
-                                    )))),
+                                    Some(code_point) => code_point,
+                                    None => {
+                                        return Some(Err(keramics_core::error_trace_new!(
+                                            format!(
+                                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                                *byte_value, additional_byte_value
+                                            )
+                                        )));
+                                    }
                                 }
                             }
-                            _ => Some(Err(keramics_core::error_trace_new!(format!(
-                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                *byte_value, additional_byte_value
-                            )))),
+                            _ => {
+                                return Some(Err(keramics_core::error_trace_new!(format!(
+                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                    *byte_value, additional_byte_value
+                                ))));
+                            }
                         }
                     }
-                    0xa1..0xe0 => {
-                        let code_point: u32 = 0xff61 + ((*byte_value - 0xa1) as u32);
-
-                        Some(Ok(code_point as u32))
-                    }
+                    0xa1..0xe0 => 0xff61 + ((*byte_value - 0xa1) as u16),
                     0xe0..0xea => {
                         let lookup_table: &[Option<u16>] =
                             Self::LOOKUP_TABLES_0XE0[(*byte_value - 0xe0) as usize];
@@ -8109,33 +8121,43 @@ impl<'a> Iterator for DecoderWindows932<'a> {
                         match additional_byte_value {
                             0x40..=0xff => {
                                 match lookup_table[(additional_byte_value - 0x40) as usize] {
-                                    Some(code_point) => Some(Ok(code_point as u32)),
-                                    None => Some(Err(keramics_core::error_trace_new!(format!(
-                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                        *byte_value, additional_byte_value
-                                    )))),
+                                    Some(code_point) => code_point,
+                                    None => {
+                                        return Some(Err(keramics_core::error_trace_new!(
+                                            format!(
+                                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                                *byte_value, additional_byte_value
+                                            )
+                                        )));
+                                    }
                                 }
                             }
-                            _ => Some(Err(keramics_core::error_trace_new!(format!(
-                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                *byte_value, additional_byte_value
-                            )))),
+                            _ => {
+                                return Some(Err(keramics_core::error_trace_new!(format!(
+                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                    *byte_value, additional_byte_value
+                                ))));
+                            }
                         }
                     }
                     0xea => match additional_byte_value {
                         0x40..0xa8 => {
                             match Self::BASE_0XEA40[(additional_byte_value - 0x40) as usize] {
-                                Some(code_point) => Some(Ok(code_point as u32)),
-                                None => Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                )))),
+                                Some(code_point) => code_point,
+                                None => {
+                                    return Some(Err(keramics_core::error_trace_new!(format!(
+                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                        *byte_value, additional_byte_value
+                                    ))));
+                                }
                             }
                         }
-                        _ => Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                            *byte_value, additional_byte_value
-                        )))),
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
                     },
                     0xed..0xef => {
                         let lookup_table: &[Option<u16>] =
@@ -8144,17 +8166,23 @@ impl<'a> Iterator for DecoderWindows932<'a> {
                         match additional_byte_value {
                             0x40..=0xff => {
                                 match lookup_table[(additional_byte_value - 0x40) as usize] {
-                                    Some(code_point) => Some(Ok(code_point as u32)),
-                                    None => Some(Err(keramics_core::error_trace_new!(format!(
-                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                        *byte_value, additional_byte_value
-                                    )))),
+                                    Some(code_point) => code_point,
+                                    None => {
+                                        return Some(Err(keramics_core::error_trace_new!(
+                                            format!(
+                                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                                *byte_value, additional_byte_value
+                                            )
+                                        )));
+                                    }
                                 }
                             }
-                            _ => Some(Err(keramics_core::error_trace_new!(format!(
-                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                *byte_value, additional_byte_value
-                            )))),
+                            _ => {
+                                return Some(Err(keramics_core::error_trace_new!(format!(
+                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                    *byte_value, additional_byte_value
+                                ))));
+                            }
                         }
                     }
                     0xfa..0xfc => {
@@ -8164,39 +8192,52 @@ impl<'a> Iterator for DecoderWindows932<'a> {
                         match additional_byte_value {
                             0x40..=0xff => {
                                 match lookup_table[(additional_byte_value - 0x40) as usize] {
-                                    Some(code_point) => Some(Ok(code_point as u32)),
-                                    None => Some(Err(keramics_core::error_trace_new!(format!(
-                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                        *byte_value, additional_byte_value
-                                    )))),
+                                    Some(code_point) => code_point,
+                                    None => {
+                                        return Some(Err(keramics_core::error_trace_new!(
+                                            format!(
+                                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                                *byte_value, additional_byte_value
+                                            )
+                                        )));
+                                    }
                                 }
                             }
-                            _ => Some(Err(keramics_core::error_trace_new!(format!(
-                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                *byte_value, additional_byte_value
-                            )))),
+                            _ => {
+                                return Some(Err(keramics_core::error_trace_new!(format!(
+                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                    *byte_value, additional_byte_value
+                                ))));
+                            }
                         }
                     }
                     0xfc => match additional_byte_value {
                         0x40..0x50 => {
                             match Self::BASE_0XFC40[(additional_byte_value - 0x40) as usize] {
-                                Some(code_point) => Some(Ok(code_point as u32)),
-                                None => Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                                    *byte_value, additional_byte_value
-                                )))),
+                                Some(code_point) => code_point,
+                                None => {
+                                    return Some(Err(keramics_core::error_trace_new!(format!(
+                                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                        *byte_value, additional_byte_value
+                                    ))));
+                                }
                             }
                         }
-                        _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        _ => {
+                            return Some(Err(keramics_core::error_trace_new!(format!(
+                                "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
+                                *byte_value, additional_byte_value
+                            ))));
+                        }
+                    },
+                    _ => {
+                        return Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
                             *byte_value, additional_byte_value
-                        )))),
-                    },
-                    _ => Some(Err(keramics_core::error_trace_new!(format!(
-                        "Unable to decode Windows 932: 0x{:02x}, 0x{:02x} as Unicode",
-                        *byte_value, additional_byte_value
-                    )))),
-                }
+                        ))));
+                    }
+                };
+                Some(Ok(vec![code_point as u32]))
             }
             None => None,
         }
@@ -29920,14 +29961,14 @@ mod tests {
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        assert_eq!(decoder.next(), Some(Ok(0x4b)));
-        assert_eq!(decoder.next(), Some(Ok(0x65)));
-        assert_eq!(decoder.next(), Some(Ok(0x72)));
-        assert_eq!(decoder.next(), Some(Ok(0x61)));
-        assert_eq!(decoder.next(), Some(Ok(0x6d)));
-        assert_eq!(decoder.next(), Some(Ok(0x69)));
-        assert_eq!(decoder.next(), Some(Ok(0x63)));
-        assert_eq!(decoder.next(), Some(Ok(0x73)));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000004b])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000065])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000072])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000061])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x0000006d])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000069])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000063])));
+        assert_eq!(decoder.next(), Some(Ok(vec![0x00000073])));
         assert_eq!(decoder.next(), None);
 
         Ok(())
@@ -29935,305 +29976,403 @@ mod tests {
 
     #[test]
     fn test_decode_with_unsupported_bytes() {
+        let byte_string: [u8; 1] = [0x81];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
         let byte_string: [u8; 2] = [0x81, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x81, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x82, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x83, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x84, 0x61];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x84, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x87, 0x5e];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x87, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x88, 0x98];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x88, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x89, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x89, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x8a, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x8b, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x8c, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x8d, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x8e, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x8f, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x90, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x91, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x92, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x93, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x94, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x95, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x96, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x97, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x98, 0x73];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x99, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x9a, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x9b, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x9c, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x9d, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x9e, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0x9f, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe0, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xe0, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe1, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe2, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe3, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe4, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe5, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe6, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe7, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe8, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xe9, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xea, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xea, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xed, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xed, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xee, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xfa, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfa, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xfb, 0x7f];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
         let byte_string: [u8; 2] = [0xfc, 0x4e];
 
         let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
 
-        let result: Result<u32, ErrorTrace> = decoder.next().unwrap();
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfc, 0x00];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xff, 0xff];
+
+        let mut decoder: DecoderWindows932 = DecoderWindows932::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
     }
 
