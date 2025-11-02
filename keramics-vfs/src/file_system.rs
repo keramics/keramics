@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -666,7 +667,22 @@ impl VfsFileSystem {
                 };
                 Ok(Some(VfsFileEntry::Ntfs(ntfs_file_entry)))
             }
-            VfsFileSystem::Os => todo!(),
+            VfsFileSystem::Os => {
+                let path_buf: PathBuf = PathBuf::from("/");
+
+                let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+                match os_file_entry.open(&path_buf) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to open OS root directory",
+                            error
+                        ));
+                    }
+                }
+                Ok(Some(VfsFileEntry::Os(os_file_entry)))
+            }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 let qcow_file_entry: QcowFileEntry = match qcow_file_system.get_root_file_entry() {
                     Ok(file_entry) => file_entry,
@@ -1194,7 +1210,7 @@ mod tests {
         Ok(())
     }
 
-    // Tests with fake.
+    // Tests with FAKE.
 
     fn get_fake_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);

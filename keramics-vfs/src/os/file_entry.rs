@@ -52,6 +52,9 @@ pub struct OsFileEntry {
 
     /// Modification time.
     modification_time: Option<DateTime>,
+
+    /// Size in bytes.
+    size: u64,
 }
 
 impl OsFileEntry {
@@ -64,6 +67,7 @@ impl OsFileEntry {
             change_time: None,
             creation_time: None,
             modification_time: None,
+            size: 0,
         }
     }
 
@@ -126,6 +130,11 @@ impl OsFileEntry {
         }
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        self.size
+    }
+
     /// Opens the file entry.
     #[cfg(unix)]
     pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
@@ -179,6 +188,8 @@ impl OsFileEntry {
             },
             Err(_) => None,
         };
+        self.size = file_metadata.len();
+
         self.path = path.clone();
 
         Ok(())
@@ -216,6 +227,8 @@ impl OsFileEntry {
         self.creation_time = Some(DateTime::Filetime(Filetime::new(
             file_metadata.creation_time(),
         )));
+
+        self.size = file_metadata.len();
 
         self.path = path.clone();
 
@@ -354,6 +367,19 @@ mod tests {
     }
 
     // TODO: add tests for get_posix_datetime_value
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
+
+        let size: u64 = os_file_entry.get_size();
+        assert_eq!(size, 202);
+
+        Ok(())
+    }
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
