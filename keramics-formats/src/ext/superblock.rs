@@ -226,12 +226,12 @@ impl ExtSuperblock {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 1024 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext superblock data size"
+                "Unsupported superblock data size"
             ));
         }
         if data[56..58] != EXT_SUPERBLOCK_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext superblock signature"
+                "Unsupported superblock signature"
             ));
         }
         self.format_revision = bytes_to_u32_le!(data, 76);

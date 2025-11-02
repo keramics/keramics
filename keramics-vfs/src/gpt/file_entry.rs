@@ -83,7 +83,7 @@ impl GptFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<GptFileEntry, ErrorTrace> {
         match self {
@@ -146,7 +146,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = GptFileEntry::Root {
@@ -191,5 +191,20 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = GptFileEntry::Root {
+            volume_system: gpt_volume_system.clone(),
+        };
+
+        let sub_file_entry: GptFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(String::from("gpt1")));
+
+        let result: Result<GptFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

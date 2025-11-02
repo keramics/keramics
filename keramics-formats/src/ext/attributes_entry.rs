@@ -62,7 +62,7 @@ impl ExtAttributesEntry {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext attributes entry data size"
+                "Unsupported attributes entry data size"
             ));
         }
         self.name_size = data[0];
@@ -80,7 +80,7 @@ impl ExtAttributesEntry {
 
         if data.len() < data_end_offset {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext attributes entry name size"
+                "Unsupported attributes entry name size"
             ));
         }
         let name_prefix: &str = match self.name_index {

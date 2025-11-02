@@ -47,12 +47,12 @@ impl ExtExtentsHeader {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 12 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext extents header data size"
+                "Unsupported extents header data size"
             ));
         }
         if data[0..2] != EXT_EXTENTS_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext extents header signature"
+                "Unsupported extents header signature"
             ));
         }
         self.number_of_entries = bytes_to_u16_le!(data, 2);

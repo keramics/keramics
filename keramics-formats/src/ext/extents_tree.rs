@@ -110,9 +110,15 @@ impl ExtExtentsTree {
         let mut data_offset: usize = 12;
 
         if extents_header.depth > 0 {
-            for _ in 0..extents_header.number_of_entries {
+            for entry_index in 0..extents_header.number_of_entries {
                 let data_end_offset: usize = data_offset + 12;
 
+                if data_end_offset > data_size {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported extent index entry: {} data size",
+                        entry_index
+                    )));
+                }
                 let mut entry: ExtExtentIndex = ExtExtentIndex::new();
 
                 if self.mediator.debug_output {
@@ -125,7 +131,7 @@ impl ExtExtentsTree {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read extent index entry"
+                            format!("Unable to read extent index entry: {}", entry_index)
                         );
                         return Err(error);
                     }
@@ -155,9 +161,15 @@ impl ExtExtentsTree {
                 }
             }
         } else {
-            for _ in 0..extents_header.number_of_entries {
+            for entry_index in 0..extents_header.number_of_entries {
                 let data_end_offset: usize = data_offset + 12;
 
+                if data_end_offset > data_size {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported extent descriptor entry: {} data size",
+                        entry_index
+                    )));
+                }
                 let mut entry: ExtExtentDescriptor = ExtExtentDescriptor::new();
 
                 if self.mediator.debug_output {
@@ -171,7 +183,7 @@ impl ExtExtentsTree {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read extent descriptor entry"
+                            format!("Unable to read extent descriptor entry: {}", entry_index)
                         );
                         return Err(error);
                     }

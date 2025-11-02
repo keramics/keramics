@@ -59,7 +59,7 @@ impl EwfFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
             EwfFileEntry::Layer { .. } => Ok(0),
             EwfFileEntry::Root { .. } => Ok(1),
@@ -68,7 +68,7 @@ impl EwfFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<EwfFileEntry, ErrorTrace> {
         match self {
@@ -128,7 +128,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
 
         let file_entry = EwfFileEntry::Root {
@@ -148,6 +148,41 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_number_of_sub_file_entries
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
+
+        let file_entry = EwfFileEntry::Root {
+            image: ewf_image.clone(),
+        };
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let file_entry = EwfFileEntry::Layer {
+            image: ewf_image.clone(),
+        };
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
+
+        let file_entry = EwfFileEntry::Root {
+            image: ewf_image.clone(),
+        };
+
+        let sub_file_entry: EwfFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(String::from("ewf1")));
+
+        let result: Result<EwfFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

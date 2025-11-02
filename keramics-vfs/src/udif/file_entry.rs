@@ -68,7 +68,7 @@ impl UdifFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<UdifFileEntry, ErrorTrace> {
         match self {
@@ -125,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let udif_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(get_file()?));
 
         let file_entry = UdifFileEntry::Root {
@@ -166,5 +166,20 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let udif_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(get_file()?));
+
+        let file_entry = UdifFileEntry::Root {
+            file: udif_file.clone(),
+        };
+
+        let sub_file_entry: UdifFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(String::from("udif1")));
+
+        let result: Result<UdifFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

@@ -1199,13 +1199,15 @@ mod tests {
     fn get_fake_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);
         if let VfsFileSystem::Fake(fake_file_system) = &mut vfs_file_system {
+            let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+
             let data: [u8; 4] = [1, 2, 3, 4];
-            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
-            _ = fake_file_system.add_file_entry("/fake1", fake_file_entry);
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("fake1", &data);
+            _ = fake_file_system.add_file_entry(&vfs_path, fake_file_entry);
 
             let data: [u8; 4] = [5, 6, 7, 8];
-            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&data);
-            _ = fake_file_system.add_file_entry("/fake2", fake_file_entry);
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("fake2", &data);
+            _ = fake_file_system.add_file_entry(&vfs_path, fake_file_entry);
         }
         Ok(vfs_file_system)
     }

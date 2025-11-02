@@ -201,7 +201,10 @@ impl VfsFileEntry {
                 Some(name) => Some(VfsString::String(name)),
                 None => None,
             },
-            VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Fake(fake_file_entry) => match fake_file_entry.get_name() {
+                Some(name) => Some(VfsString::String(name.clone())),
+                None => None,
+            },
             VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_name() {
                 Some(name) => Some(VfsString::String(name)),
                 None => None,
@@ -1439,15 +1442,49 @@ mod tests {
 
     // Tests with FAKE.
 
-    // TODO: add test_get_access_time_with_fake
+    fn get_fake_file_entry() -> VfsFileEntry {
+        let test_data: Vec<u8> = Vec::new();
 
-    // TODO: add test_get_change_time_with_fake
+        VfsFileEntry::Fake(Arc::new(FakeFileEntry::new_file("file.txt", &test_data)))
+    }
 
-    // TODO: add test_get_creation_time_with_fake
+    #[test]
+    fn test_get_access_time_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        assert_eq!(vfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        assert_eq!(vfs_file_entry.get_change_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        assert_eq!(vfs_file_entry.get_creation_time(), None);
+
+        Ok(())
+    }
 
     // TODO: add test_get_file_type_with_fake
 
-    // TODO: add test_get_modification_time_with_fake
+    #[test]
+    fn test_get_modification_time_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        assert_eq!(vfs_file_entry.get_modification_time(), None);
+
+        Ok(())
+    }
 
     // TODO: add test_get_name_with_fake
 

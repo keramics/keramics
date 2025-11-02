@@ -20,7 +20,9 @@ use crate::enums::VfsFileType;
 
 /// Fake (or virtual) file entry.
 pub struct FakeFileEntry {
-    // TODO: add name
+    /// Name.
+    name: Option<String>,
+
     /// File type.
     file_type: VfsFileType,
 
@@ -42,9 +44,10 @@ pub struct FakeFileEntry {
 
 impl FakeFileEntry {
     /// Creates a new file entry.
-    pub fn new() -> Self {
-        // TODO: test timestamps with current time
+    pub fn new(name: &str) -> Self {
+        // TODO: use SystemTime to determine current time for timestamps
         Self {
+            name: Some(name.to_string()),
             data_stream: None,
             file_type: VfsFileType::File,
             access_time: None,
@@ -55,12 +58,13 @@ impl FakeFileEntry {
     }
 
     /// Creates a new file entry.
-    pub fn new_file(data: &[u8]) -> Self {
+    pub fn new_file(name: &str, data: &[u8]) -> Self {
         let data_size: u64 = data.len() as u64;
         let data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
 
-        // TODO: test timestamps with current time
+        // TODO: use SystemTime to determine current time for timestamps
         Self {
+            name: Some(name.to_string()),
             data_stream: Some(Arc::new(RwLock::new(data_stream))),
             file_type: VfsFileType::File,
             access_time: None,
@@ -107,6 +111,11 @@ impl FakeFileEntry {
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         self.modification_time.as_ref()
     }
+
+    /// Retrieves the name.
+    pub fn get_name(&self) -> Option<&String> {
+        self.name.as_ref()
+    }
 }
 
 #[cfg(test)]
@@ -133,16 +142,48 @@ mod tests {
         ];
     }
 
-    // TODO: add tests for FakeFileEntry::get_access_time
-    // TODO: add tests for FakeFileEntry::get_change_time
-    // TODO: add tests for FakeFileEntry::get_creation_time
-    // TODO: add tests for FakeFileEntry::get_file_type
-    // TODO: add tests for FakeFileEntry::get_modification_time
+    fn get_fake_file_entry() -> FakeFileEntry {
+        let test_data: Vec<u8> = get_test_data();
+
+        FakeFileEntry::new_file("file.txt", &test_data)
+    }
+
+    #[test]
+    fn test_get_access_time() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let result: Option<&DateTime> = fake_file_entry.get_access_time();
+        // TODO: use SystemTime to determine current time for timestamps
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let result: Option<&DateTime> = fake_file_entry.get_change_time();
+        // TODO: use SystemTime to determine current time for timestamps
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let result: Option<&DateTime> = fake_file_entry.get_creation_time();
+        // TODO: use SystemTime to determine current time for timestamps
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data();
-        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
         let result: Option<DataStreamReference> = fake_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -167,6 +208,37 @@ mod tests {
         .join("");
 
         assert_eq!(test_data, expected_data.as_bytes());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let file_type: VfsFileType = fake_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let result: Option<&DateTime> = fake_file_entry.get_modification_time();
+        // TODO: use SystemTime to determine current time for timestamps
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let name: Option<&String> = fake_file_entry.get_name();
+        assert_eq!(name, Some(String::from("file.txt")).as_ref());
 
         Ok(())
     }

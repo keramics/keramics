@@ -71,7 +71,7 @@ impl VhdxFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<VhdxFileEntry, ErrorTrace> {
         match self {
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
 
         let file_entry = VhdxFileEntry::Root {
@@ -181,5 +181,20 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+
+        let file_entry = VhdxFileEntry::Root {
+            image: vhdx_image.clone(),
+        };
+
+        let sub_file_entry: VhdxFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(String::from("vhdx1")));
+
+        let result: Result<VhdxFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

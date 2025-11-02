@@ -68,7 +68,7 @@ impl SparseImageFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<SparseImageFileEntry, ErrorTrace> {
         match self {
@@ -126,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let sparseimage_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(get_file()?));
 
         let file_entry = SparseImageFileEntry::Root {
@@ -167,5 +167,24 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let sparseimage_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(get_file()?));
+
+        let file_entry = SparseImageFileEntry::Root {
+            file: sparseimage_file.clone(),
+        };
+
+        let sub_file_entry: SparseImageFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(String::from("sparseimage1"))
+        );
+
+        let result: Result<SparseImageFileEntry, ErrorTrace> =
+            file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

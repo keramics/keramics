@@ -78,7 +78,7 @@ impl ExtDirectoryEntry {
 
         if data_end_offset > data.len() {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext directory entry name size"
+                "Unsupported directory entry name size"
             ));
         }
         let mut name: ByteString = ByteString::new_with_encoding(encoding);

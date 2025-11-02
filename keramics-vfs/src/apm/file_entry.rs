@@ -71,7 +71,7 @@ impl ApmFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<ApmFileEntry, ErrorTrace> {
         match self {
@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
 
         let file_entry = ApmFileEntry::Root {
@@ -179,5 +179,20 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = ApmFileEntry::Root {
+            volume_system: apm_volume_system.clone(),
+        };
+
+        let sub_file_entry: ApmFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(String::from("apm1")));
+
+        let result: Result<ApmFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

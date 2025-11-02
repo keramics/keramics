@@ -64,8 +64,16 @@ impl NtfsAttributeListEntry {
         if data.len() < 26 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
+        let attribute_size: u16 = bytes_to_u16_le!(data, 4);
+
+        if attribute_size < 26 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attribute size: {}",
+                attribute_size
+            )));
+        }
         self.attribute_type = bytes_to_u32_le!(data, 0);
-        self.attribute_size = bytes_to_u16_le!(data, 4);
+        self.attribute_size = attribute_size;
         self.name_size = data[6];
         self.name_offset = data[7];
         self.file_reference = bytes_to_u64_le!(data, 16);
@@ -108,6 +116,16 @@ mod tests {
 
         let mut test_struct = NtfsAttributeListEntry::new();
         let result = test_struct.read_data(&test_data[0..25]);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_invalid_attribute_size() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[4] = 0x00;
+
+        let mut test_struct = NtfsAttributeListEntry::new();
+        let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
 }

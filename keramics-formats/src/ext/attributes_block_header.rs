@@ -43,12 +43,12 @@ impl ExtAttributesBlockHeader {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext attributes block header data size"
+                "Unsupported attributes block header data size"
             ));
         }
         if data[0..4] != EXT_ATTRIBUTES_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported ext attributes block header signature"
+                "Unsupported attributes block header signature"
             ));
         }
         let number_of_blocks: u32 = bytes_to_u32_le!(data, 8);

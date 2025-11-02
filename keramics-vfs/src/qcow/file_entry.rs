@@ -71,7 +71,7 @@ impl QcowFileEntry {
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        &self,
         sub_file_entry_index: usize,
     ) -> Result<QcowFileEntry, ErrorTrace> {
         match self {
@@ -136,7 +136,7 @@ mod tests {
     }
 
     #[test]
-    fn test_name() -> Result<(), ErrorTrace> {
+    fn test_get_name() -> Result<(), ErrorTrace> {
         let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
 
         let file_entry = QcowFileEntry::Root {
@@ -181,5 +181,20 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_sub_file_entry_by_index
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
+
+        let file_entry = QcowFileEntry::Root {
+            image: qcow_image.clone(),
+        };
+
+        let sub_file_entry: QcowFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(String::from("qcow1")));
+
+        let result: Result<QcowFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 }

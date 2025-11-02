@@ -340,7 +340,18 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_name
+    #[test]
+    fn test_get_name() -> Result<(), ErrorTrace> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
+        os_file_entry.open(&path_buf)?;
+
+        let name: Option<&OsStr> = os_file_entry.get_name();
+        assert_eq!(name, Some(OsStr::new("file.txt")));
+
+        Ok(())
+    }
 
     // TODO: add tests for get_posix_datetime_value
 

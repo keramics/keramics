@@ -15,6 +15,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
+use keramics_formats::PathComponent;
 
 use crate::path::VfsPath;
 
@@ -22,8 +23,8 @@ use super::file_entry::FakeFileEntry;
 
 /// Fake (or virtual) file system.
 pub struct FakeFileSystem {
-    /// Paths.
-    paths: HashMap<String, Arc<FakeFileEntry>>,
+    /// File entries per path.
+    paths: HashMap<VfsPath, Arc<FakeFileEntry>>,
 }
 
 impl FakeFileSystem {
@@ -37,10 +38,31 @@ impl FakeFileSystem {
     /// Adds a new file entry.
     pub fn add_file_entry(
         &mut self,
-        path: &str,
-        file_entry: FakeFileEntry,
+        vfs_path: &VfsPath,
+        mut file_entry: FakeFileEntry,
     ) -> Result<(), ErrorTrace> {
-        match self.paths.insert(path.to_string(), Arc::new(file_entry)) {
+        let file_entry_path: VfsPath = match file_entry.get_name() {
+            Some(file_name) => {
+                let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
+
+                match vfs_path.new_with_join(&path_components) {
+                    Ok(path) => path,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to create file entry path"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve file entry name"
+                ));
+            }
+        };
+        match self.paths.insert(file_entry_path, Arc::new(file_entry)) {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
                     "Unable to add file entry given path is already set"
@@ -53,10 +75,7 @@ impl FakeFileSystem {
 
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
-        // TODO: use string path components as key
-        let path: String = vfs_path.to_string();
-
-        Ok(self.paths.contains_key(&path))
+        Ok(self.paths.contains_key(vfs_path))
     }
 
     /// Retrieves the file entry for a specific path.
@@ -64,10 +83,7 @@ impl FakeFileSystem {
         &self,
         vfs_path: &VfsPath,
     ) -> Result<Option<Arc<FakeFileEntry>>, ErrorTrace> {
-        // TODO: use string path components as key
-        let path: String = vfs_path.to_string();
-
-        let result: Option<Arc<FakeFileEntry>> = match self.paths.get(&path) {
+        let result: Option<Arc<FakeFileEntry>> = match self.paths.get(vfs_path) {
             Some(file_entry) => Some(file_entry.clone()),
             None => None,
         };
@@ -84,12 +100,15 @@ mod tests {
     fn get_file_system() -> Result<FakeFileSystem, ErrorTrace> {
         let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
 
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake");
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
-        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file(&test_data);
-        fake_file_system.add_file_entry("/fake/file.txt", fake_file_entry)?;
+        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("file.txt", &test_data);
+        fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
 
         Ok(fake_file_system)
     }
+
+    // TODO: add tests for add_file_entry
 
     #[test]
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
@@ -105,4 +124,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_file_entry_by_path
 }
