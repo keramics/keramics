@@ -17,7 +17,7 @@ use std::io::SeekFrom;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
 use keramics_core::formatters::format_as_string;

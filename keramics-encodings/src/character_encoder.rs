@@ -40,6 +40,16 @@ use super::mac_cyrillic::EncoderMacCyrillic;
 use super::mac_dingbats::EncoderMacDingbats;
 use super::mac_farsi::EncoderMacFarsi;
 use super::mac_gaelic::EncoderMacGaelic;
+use super::mac_greek::EncoderMacGreek;
+use super::mac_icelandic::EncoderMacIcelandic;
+use super::mac_inuit::EncoderMacInuit;
+use super::mac_roman::EncoderMacRoman;
+use super::mac_romanian::EncoderMacRomanian;
+use super::mac_russian::EncoderMacRussian;
+use super::mac_symbol::EncoderMacSymbol;
+use super::mac_thai::EncoderMacThai;
+use super::mac_turkish::EncoderMacTurkish;
+use super::mac_ukrainian::EncoderMacUkrainian;
 use super::windows874::EncoderWindows874;
 use super::windows932::EncoderWindows932;
 use super::windows1250::EncoderWindows1250;
@@ -88,6 +98,16 @@ pub fn new_character_encoder<'a>(
         CharacterEncoding::MacDingbats => Box::new(EncoderMacDingbats::new(code_points)),
         CharacterEncoding::MacFarsi => Box::new(EncoderMacFarsi::new(code_points)),
         CharacterEncoding::MacGaelic => Box::new(EncoderMacGaelic::new(code_points)),
+        CharacterEncoding::MacGreek => Box::new(EncoderMacGreek::new(code_points)),
+        CharacterEncoding::MacIcelandic => Box::new(EncoderMacIcelandic::new(code_points)),
+        CharacterEncoding::MacInuit => Box::new(EncoderMacInuit::new(code_points)),
+        CharacterEncoding::MacRoman => Box::new(EncoderMacRoman::new(code_points)),
+        CharacterEncoding::MacRomanian => Box::new(EncoderMacRomanian::new(code_points)),
+        CharacterEncoding::MacRussian => Box::new(EncoderMacRussian::new(code_points)),
+        CharacterEncoding::MacSymbol => Box::new(EncoderMacSymbol::new(code_points)),
+        CharacterEncoding::MacThai => Box::new(EncoderMacThai::new(code_points)),
+        CharacterEncoding::MacTurkish => Box::new(EncoderMacTurkish::new(code_points)),
+        CharacterEncoding::MacUkrainian => Box::new(EncoderMacUkrainian::new(code_points)),
         CharacterEncoding::Windows874 => Box::new(EncoderWindows874::new(code_points)),
         CharacterEncoding::Windows932 => Box::new(EncoderWindows932::new(code_points)),
         CharacterEncoding::Windows1250 => Box::new(EncoderWindows1250::new(code_points)),
@@ -136,6 +156,16 @@ mod tests {
             CharacterEncoding::MacDingbats,
             CharacterEncoding::MacFarsi,
             CharacterEncoding::MacGaelic,
+            CharacterEncoding::MacGreek,
+            CharacterEncoding::MacIcelandic,
+            CharacterEncoding::MacInuit,
+            CharacterEncoding::MacRoman,
+            CharacterEncoding::MacRomanian,
+            CharacterEncoding::MacRussian,
+            CharacterEncoding::MacSymbol,
+            CharacterEncoding::MacThai,
+            CharacterEncoding::MacTurkish,
+            CharacterEncoding::MacUkrainian,
             CharacterEncoding::Windows874,
             CharacterEncoding::Windows932,
             CharacterEncoding::Windows1250,

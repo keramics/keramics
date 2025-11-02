@@ -40,6 +40,16 @@ use super::mac_cyrillic::DecoderMacCyrillic;
 use super::mac_dingbats::DecoderMacDingbats;
 use super::mac_farsi::DecoderMacFarsi;
 use super::mac_gaelic::DecoderMacGaelic;
+use super::mac_greek::DecoderMacGreek;
+use super::mac_icelandic::DecoderMacIcelandic;
+use super::mac_inuit::DecoderMacInuit;
+use super::mac_roman::DecoderMacRoman;
+use super::mac_romanian::DecoderMacRomanian;
+use super::mac_russian::DecoderMacRussian;
+use super::mac_symbol::DecoderMacSymbol;
+use super::mac_thai::DecoderMacThai;
+use super::mac_turkish::DecoderMacTurkish;
+use super::mac_ukrainian::DecoderMacUkrainian;
 use super::utf8::DecoderUtf8;
 use super::windows874::DecoderWindows874;
 use super::windows932::DecoderWindows932;
@@ -87,6 +97,16 @@ pub fn new_character_decoder<'a>(
         CharacterEncoding::MacDingbats => Box::new(DecoderMacDingbats::new(bytes)),
         CharacterEncoding::MacFarsi => Box::new(DecoderMacFarsi::new(bytes)),
         CharacterEncoding::MacGaelic => Box::new(DecoderMacGaelic::new(bytes)),
+        CharacterEncoding::MacGreek => Box::new(DecoderMacGreek::new(bytes)),
+        CharacterEncoding::MacIcelandic => Box::new(DecoderMacIcelandic::new(bytes)),
+        CharacterEncoding::MacInuit => Box::new(DecoderMacInuit::new(bytes)),
+        CharacterEncoding::MacRoman => Box::new(DecoderMacRoman::new(bytes)),
+        CharacterEncoding::MacRomanian => Box::new(DecoderMacRomanian::new(bytes)),
+        CharacterEncoding::MacRussian => Box::new(DecoderMacRussian::new(bytes)),
+        CharacterEncoding::MacSymbol => Box::new(DecoderMacSymbol::new(bytes)),
+        CharacterEncoding::MacThai => Box::new(DecoderMacThai::new(bytes)),
+        CharacterEncoding::MacTurkish => Box::new(DecoderMacTurkish::new(bytes)),
+        CharacterEncoding::MacUkrainian => Box::new(DecoderMacUkrainian::new(bytes)),
         CharacterEncoding::Utf8 => Box::new(DecoderUtf8::new(bytes)),
         CharacterEncoding::Windows874 => Box::new(DecoderWindows874::new(bytes)),
         CharacterEncoding::Windows932 => Box::new(DecoderWindows932::new(bytes)),
@@ -136,6 +156,16 @@ mod tests {
             CharacterEncoding::MacDingbats,
             CharacterEncoding::MacFarsi,
             CharacterEncoding::MacGaelic,
+            CharacterEncoding::MacGreek,
+            CharacterEncoding::MacIcelandic,
+            CharacterEncoding::MacInuit,
+            CharacterEncoding::MacRoman,
+            CharacterEncoding::MacRomanian,
+            CharacterEncoding::MacRussian,
+            CharacterEncoding::MacSymbol,
+            CharacterEncoding::MacThai,
+            CharacterEncoding::MacTurkish,
+            CharacterEncoding::MacUkrainian,
             CharacterEncoding::Windows874,
             CharacterEncoding::Windows932,
             CharacterEncoding::Windows1250,

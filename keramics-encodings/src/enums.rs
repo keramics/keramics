@@ -49,6 +49,7 @@ pub enum CharacterEncoding {
     MacJapanese,
     MacKorean,
     MacRoman,
+    MacRomanian,
     MacRussian,
     MacSymbol,
     MacThai,
