@@ -250,7 +250,7 @@ impl<'a> Iterator for EncoderMacGaelic<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as MacGaelic",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -261,7 +261,7 @@ impl<'a> Iterator for EncoderMacGaelic<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as MacGaelic",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -314,7 +314,7 @@ impl<'a> Iterator for EncoderMacGaelic<'a> {
                     _ => {
                         return Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as MacGaelic",
-                            *code_point as u32
+                            *code_point
                         ))));
                     }
                 }

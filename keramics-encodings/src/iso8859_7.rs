@@ -310,7 +310,7 @@ impl<'a> Iterator for EncoderIso8859_7<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as ISO-8859-7",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -321,7 +321,7 @@ impl<'a> Iterator for EncoderIso8859_7<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as ISO-8859-7",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -337,7 +337,7 @@ impl<'a> Iterator for EncoderIso8859_7<'a> {
                     _ => {
                         return Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as ISO-8859-7",
-                            *code_point as u32
+                            *code_point
                         ))));
                     }
                 }

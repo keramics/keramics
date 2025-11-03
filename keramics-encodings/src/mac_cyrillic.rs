@@ -269,7 +269,7 @@ impl<'a> Iterator for EncoderMacCyrillic<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as MacCyrillic",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -280,7 +280,7 @@ impl<'a> Iterator for EncoderMacCyrillic<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as MacCyrillic",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -291,7 +291,7 @@ impl<'a> Iterator for EncoderMacCyrillic<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as MacCyrillic",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -313,7 +313,7 @@ impl<'a> Iterator for EncoderMacCyrillic<'a> {
                     _ => {
                         return Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as MacCyrillic",
-                            *code_point as u32
+                            *code_point
                         ))));
                     }
                 }

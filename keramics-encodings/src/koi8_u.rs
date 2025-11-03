@@ -218,7 +218,7 @@ impl<'a> Iterator for EncoderKoi8U<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as KOI8-U",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -229,7 +229,7 @@ impl<'a> Iterator for EncoderKoi8U<'a> {
                             None => {
                                 return Some(Err(keramics_core::error_trace_new!(format!(
                                     "Unable to encode code point: U+{:04x} as KOI8-U",
-                                    *code_point as u32
+                                    *code_point
                                 ))));
                             }
                         }
@@ -276,7 +276,7 @@ impl<'a> Iterator for EncoderKoi8U<'a> {
                     _ => {
                         return Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as KOI8-U",
-                            *code_point as u32
+                            *code_point
                         ))));
                     }
                 }

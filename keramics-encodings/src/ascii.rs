@@ -92,7 +92,7 @@ impl<'a> Iterator for EncoderAscii<'a> {
                 } else {
                     Some(Err(keramics_core::error_trace_new!(format!(
                         "Unable to encode code point: U+{:04x} as ISO-8859-1",
-                        *code_point as u32
+                        *code_point
                     ))))
                 }
             }
