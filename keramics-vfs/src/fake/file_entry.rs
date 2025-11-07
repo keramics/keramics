@@ -40,6 +40,9 @@ pub struct FakeFileEntry {
 
     /// Modification time.
     modification_time: Option<DateTime>,
+
+    /// Size.
+    size: u64,
 }
 
 impl FakeFileEntry {
@@ -54,6 +57,7 @@ impl FakeFileEntry {
             change_time: None,
             creation_time: None,
             modification_time: None,
+            size: 0,
         }
     }
 
@@ -71,6 +75,7 @@ impl FakeFileEntry {
             change_time: None,
             creation_time: None,
             modification_time: None,
+            size: data_size,
         }
     }
 
@@ -115,6 +120,11 @@ impl FakeFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<&String> {
         self.name.as_ref()
+    }
+
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        self.size
     }
 }
 
@@ -239,6 +249,16 @@ mod tests {
 
         let name: Option<&String> = fake_file_entry.get_name();
         assert_eq!(name, Some(String::from("file.txt")).as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let fake_file_entry: FakeFileEntry = get_fake_file_entry();
+
+        let size: u64 = fake_file_entry.get_size();
+        assert_eq!(size, 202);
 
         Ok(())
     }

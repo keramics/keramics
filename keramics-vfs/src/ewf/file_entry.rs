@@ -24,6 +24,9 @@ pub enum EwfFileEntry {
     Layer {
         /// File.
         image: Arc<RwLock<EwfImage>>,
+
+        /// Size.
+        size: u64,
     },
 
     /// Root file entry.
@@ -58,6 +61,14 @@ impl EwfFileEntry {
         }
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self {
+            EwfFileEntry::Layer { size, .. } => *size,
+            EwfFileEntry::Root { .. } => 0,
+        }
+    }
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
@@ -82,8 +93,18 @@ impl EwfFileEntry {
                         sub_file_entry_index
                     )));
                 }
+                let media_size: u64 = match image.read() {
+                    Ok(ewf_image) => ewf_image.media_size,
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to obtain read lock on EWF image",
+                            error
+                        ));
+                    }
+                };
                 Ok(EwfFileEntry::Layer {
                     image: image.clone(),
+                    size: media_size,
                 })
             }
         }
@@ -115,10 +136,12 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
+        let ewf_image: EwfImage = get_image()?;
+
+        let test_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(ewf_image));
 
         let file_entry = EwfFileEntry::Root {
-            image: ewf_image.clone(),
+            image: test_image.clone(),
         };
 
         let file_type: VfsFileType = file_entry.get_file_type();
@@ -129,17 +152,21 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
+        let ewf_image: EwfImage = get_image()?;
+        let media_size: u64 = ewf_image.media_size;
+
+        let test_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(ewf_image));
 
         let file_entry = EwfFileEntry::Root {
-            image: ewf_image.clone(),
+            image: test_image.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();
         assert!(name.is_none());
 
         let file_entry = EwfFileEntry::Layer {
-            image: ewf_image.clone(),
+            image: test_image.clone(),
+            size: media_size,
         };
 
         let name: Option<String> = file_entry.get_name();
@@ -149,18 +176,47 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let ewf_image: EwfImage = get_image()?;
+        let media_size: u64 = ewf_image.media_size;
+
+        let test_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(ewf_image));
 
         let file_entry = EwfFileEntry::Root {
-            image: ewf_image.clone(),
+            image: test_image.clone(),
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let file_entry = EwfFileEntry::Layer {
+            image: test_image.clone(),
+            size: media_size,
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let ewf_image: EwfImage = get_image()?;
+        let media_size: u64 = ewf_image.media_size;
+
+        let test_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(ewf_image));
+
+        let file_entry = EwfFileEntry::Root {
+            image: test_image.clone(),
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 1);
 
         let file_entry = EwfFileEntry::Layer {
-            image: ewf_image.clone(),
+            image: test_image.clone(),
+            size: media_size,
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
@@ -171,10 +227,11 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let ewf_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(get_image()?));
+        let ewf_image: EwfImage = get_image()?;
+        let test_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(ewf_image));
 
         let file_entry = EwfFileEntry::Root {
-            image: ewf_image.clone(),
+            image: test_image.clone(),
         };
 
         let sub_file_entry: EwfFileEntry = file_entry.get_sub_file_entry_by_index(0)?;

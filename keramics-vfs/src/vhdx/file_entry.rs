@@ -27,6 +27,9 @@ pub enum VhdxFileEntry {
 
         /// Layer.
         layer: VhdxImageLayer,
+
+        /// Size.
+        size: u64,
     },
 
     /// Root file entry.
@@ -61,6 +64,14 @@ impl VhdxFileEntry {
         }
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self {
+            VhdxFileEntry::Layer { size, .. } => *size,
+            VhdxFileEntry::Root { .. } => 0,
+        }
+    }
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
@@ -79,10 +90,22 @@ impl VhdxFileEntry {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
             VhdxFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(vhdx_layer) => Ok(VhdxFileEntry::Layer {
-                    index: sub_file_entry_index,
-                    layer: vhdx_layer.clone(),
-                }),
+                Ok(vhdx_layer) => {
+                    let media_size: u64 = match vhdx_layer.read() {
+                        Ok(vhd_file) => vhd_file.media_size,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain read lock on VHDX layer",
+                                error
+                            ));
+                        }
+                    };
+                    Ok(VhdxFileEntry::Layer {
+                        index: sub_file_entry_index,
+                        layer: vhdx_layer.clone(),
+                        size: media_size,
+                    })
+                }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -123,10 +146,12 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+        let vhdx_image: VhdxImage = get_image()?;
+
+        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
 
         let file_entry = VhdxFileEntry::Root {
-            image: vhdx_image.clone(),
+            image: test_image.clone(),
         };
 
         let file_type: VfsFileType = file_entry.get_file_type();
@@ -137,19 +162,22 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+        let vhdx_image: VhdxImage = get_image()?;
+
+        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
 
         let file_entry = VhdxFileEntry::Root {
-            image: vhdx_image.clone(),
+            image: test_image.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();
         assert!(name.is_none());
 
-        let vhdx_layer: VhdxImageLayer = vhdx_image.get_layer_by_index(0)?;
+        let vhdx_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = VhdxFileEntry::Layer {
             index: 0,
             layer: vhdx_layer.clone(),
+            size: 4194304,
         };
 
         let name: Option<String> = file_entry.get_name();
@@ -159,20 +187,49 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let vhdx_image: VhdxImage = get_image()?;
+
+        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
 
         let file_entry = VhdxFileEntry::Root {
-            image: vhdx_image.clone(),
+            image: test_image.clone(),
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let vhdx_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
+        let file_entry = VhdxFileEntry::Layer {
+            index: 0,
+            layer: vhdx_layer.clone(),
+            size: 4194304,
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let vhdx_image: VhdxImage = get_image()?;
+
+        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+
+        let file_entry = VhdxFileEntry::Root {
+            image: test_image.clone(),
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 2);
 
-        let vhdx_layer: VhdxImageLayer = vhdx_image.get_layer_by_index(0)?;
+        let vhdx_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = VhdxFileEntry::Layer {
             index: 0,
             layer: vhdx_layer.clone(),
+            size: 4194304,
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
@@ -183,10 +240,12 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let vhdx_image: Arc<VhdxImage> = Arc::new(get_image()?);
+        let vhdx_image: VhdxImage = get_image()?;
+
+        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
 
         let file_entry = VhdxFileEntry::Root {
-            image: vhdx_image.clone(),
+            image: test_image.clone(),
         };
 
         let sub_file_entry: VhdxFileEntry = file_entry.get_sub_file_entry_by_index(0)?;

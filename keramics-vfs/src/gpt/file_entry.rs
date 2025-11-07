@@ -28,6 +28,9 @@ pub enum GptFileEntry {
 
         /// Partition.
         partition: Arc<RwLock<GptPartition>>,
+
+        /// Size.
+        size: u64,
     },
 
     /// Root file entry.
@@ -73,6 +76,14 @@ impl GptFileEntry {
         }
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self {
+            GptFileEntry::Partition { size, .. } => *size,
+            GptFileEntry::Root { .. } => 0,
+        }
+    }
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
@@ -92,10 +103,15 @@ impl GptFileEntry {
             }
             GptFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(gpt_partition) => Ok(GptFileEntry::Partition {
-                        index: sub_file_entry_index,
-                        partition: Arc::new(RwLock::new(gpt_partition)),
-                    }),
+                    Ok(gpt_partition) => {
+                        let partition_size: u64 = gpt_partition.size;
+
+                        Ok(GptFileEntry::Partition {
+                            index: sub_file_entry_index,
+                            partition: Arc::new(RwLock::new(gpt_partition)),
+                            size: partition_size,
+                        })
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -157,13 +173,40 @@ mod tests {
         assert!(name.is_none());
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
         let file_entry = GptFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
         };
 
         let name: Option<String> = file_entry.get_name();
         assert_eq!(name, Some(String::from("gpt1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = GptFileEntry::Root {
+            volume_system: gpt_volume_system.clone(),
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
+        let file_entry = GptFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 1048576);
 
         Ok(())
     }
@@ -180,9 +223,11 @@ mod tests {
         assert_eq!(number_of_sub_file_entries, 2);
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
         let file_entry = GptFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;

@@ -92,10 +92,15 @@ impl GptFileSystem {
                         None => return Ok(None),
                     };
                 match self.volume_system.get_partition_by_index(partition_index) {
-                    Ok(gpt_partition) => Ok(Some(GptFileEntry::Partition {
-                        index: partition_index,
-                        partition: Arc::new(RwLock::new(gpt_partition)),
-                    })),
+                    Ok(gpt_partition) => {
+                        let partition_size: u64 = gpt_partition.size;
+
+                        Ok(Some(GptFileEntry::Partition {
+                            index: partition_index,
+                            partition: Arc::new(RwLock::new(gpt_partition)),
+                            size: partition_size,
+                        }))
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,

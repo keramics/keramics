@@ -89,9 +89,19 @@ impl SparseImageFileSystem {
                     return Ok(Some(sparseimage_file_entry));
                 }
                 if string_path.components[1] == "sparseimage1" {
+                    let media_size: u64 = match self.file.read() {
+                        Ok(sparseimage_file) => sparseimage_file.media_size,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain read lock on sparseimage file",
+                                error
+                            ));
+                        }
+                    };
                     let sparseimage_file_entry: SparseImageFileEntry =
                         SparseImageFileEntry::Layer {
                             file: self.file.clone(),
+                            size: media_size,
                         };
                     Ok(Some(sparseimage_file_entry))
                 } else {

@@ -92,10 +92,15 @@ impl MbrFileSystem {
                         None => return Ok(None),
                     };
                 match self.volume_system.get_partition_by_index(partition_index) {
-                    Ok(mbr_partition) => Ok(Some(MbrFileEntry::Partition {
-                        index: partition_index,
-                        partition: Arc::new(RwLock::new(mbr_partition)),
-                    })),
+                    Ok(mbr_partition) => {
+                        let partition_size: u64 = mbr_partition.size;
+
+                        Ok(Some(MbrFileEntry::Partition {
+                            index: partition_index,
+                            partition: Arc::new(RwLock::new(mbr_partition)),
+                            size: partition_size,
+                        }))
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,

@@ -27,6 +27,9 @@ pub enum ApmFileEntry {
 
         /// Partition.
         partition: Arc<RwLock<ApmPartition>>,
+
+        /// Size.
+        size: u64,
     },
 
     /// Root file entry.
@@ -61,6 +64,14 @@ impl ApmFileEntry {
         }
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self {
+            ApmFileEntry::Partition { size, .. } => *size,
+            ApmFileEntry::Root { .. } => 0,
+        }
+    }
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
@@ -80,10 +91,15 @@ impl ApmFileEntry {
             }
             ApmFileEntry::Root { volume_system } => {
                 match volume_system.get_partition_by_index(sub_file_entry_index) {
-                    Ok(apm_partition) => Ok(ApmFileEntry::Partition {
-                        index: sub_file_entry_index,
-                        partition: Arc::new(RwLock::new(apm_partition)),
-                    }),
+                    Ok(apm_partition) => {
+                        let partition_size: u64 = apm_partition.size;
+
+                        Ok(ApmFileEntry::Partition {
+                            index: sub_file_entry_index,
+                            partition: Arc::new(RwLock::new(apm_partition)),
+                            size: partition_size,
+                        })
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -145,13 +161,40 @@ mod tests {
         assert!(name.is_none());
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = apm_partition.size;
         let file_entry = ApmFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
         };
 
         let name: Option<String> = file_entry.get_name();
         assert_eq!(name, Some(String::from("apm1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = ApmFileEntry::Root {
+            volume_system: apm_volume_system.clone(),
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = apm_partition.size;
+        let file_entry = ApmFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 4153344);
 
         Ok(())
     }
@@ -168,9 +211,11 @@ mod tests {
         assert_eq!(number_of_sub_file_entries, 2);
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = apm_partition.size;
         let file_entry = ApmFileEntry::Partition {
             index: 0,
             partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;

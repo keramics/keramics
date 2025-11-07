@@ -39,7 +39,7 @@ impl FakeFileSystem {
     pub fn add_file_entry(
         &mut self,
         vfs_path: &VfsPath,
-        mut file_entry: FakeFileEntry,
+        file_entry: FakeFileEntry,
     ) -> Result<(), ErrorTrace> {
         let file_entry_path: VfsPath = match file_entry.get_name() {
             Some(file_name) => {

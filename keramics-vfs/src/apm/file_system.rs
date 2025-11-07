@@ -92,10 +92,15 @@ impl ApmFileSystem {
                         None => return Ok(None),
                     };
                 match self.volume_system.get_partition_by_index(partition_index) {
-                    Ok(apm_partition) => Ok(Some(ApmFileEntry::Partition {
-                        index: partition_index,
-                        partition: Arc::new(RwLock::new(apm_partition)),
-                    })),
+                    Ok(apm_partition) => {
+                        let partition_size: u64 = apm_partition.size;
+
+                        Ok(Some(ApmFileEntry::Partition {
+                            index: partition_index,
+                            partition: Arc::new(RwLock::new(apm_partition)),
+                            size: partition_size,
+                        }))
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,

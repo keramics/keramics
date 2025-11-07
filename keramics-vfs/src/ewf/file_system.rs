@@ -90,8 +90,18 @@ impl EwfFileSystem {
                     return Ok(Some(ewf_file_entry));
                 }
                 if string_path.components[1] == "ewf1" {
+                    let media_size: u64 = match self.image.read() {
+                        Ok(ewf_image) => ewf_image.media_size,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain read lock on EWF image",
+                                error
+                            ));
+                        }
+                    };
                     let ewf_file_entry: EwfFileEntry = EwfFileEntry::Layer {
                         image: self.image.clone(),
+                        size: media_size,
                     };
                     Ok(Some(ewf_file_entry))
                 } else {

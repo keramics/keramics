@@ -130,12 +130,6 @@ impl ExtFileSystem {
                 "Ext file system has unsupported features"
             ));
         }
-        if inode_number == 0 || inode_number > self.number_of_inodes {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid inode number: {} value out of bounds",
-                inode_number
-            )));
-        }
         let inode: ExtInode = match self.inode_table.get_inode(data_stream, inode_number) {
             Ok(inode) => inode,
             Err(mut error) => {
@@ -495,6 +489,7 @@ impl ExtFileSystem {
                     self.inode_size,
                     number_of_inodes_per_block_group,
                     group_descriptors,
+                    self.number_of_inodes,
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -512,8 +507,6 @@ impl ExtFileSystem {
                 }
             }
         }
-        // TODO: sanity check self.number_of_inodes and size of inode table.
-
         Ok(())
     }
 

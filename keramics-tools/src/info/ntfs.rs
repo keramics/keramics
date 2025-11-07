@@ -220,8 +220,8 @@ impl NtfsInfo {
                                 entry_index + 1,
                                 attribute_type_string,
                                 entry.attribute_type,
-                                entry.file_reference >> 48,
                                 entry.file_reference & 0x0000ffffffffffff,
+                                entry.file_reference >> 48,
                             );
                         }
                         None => {
@@ -229,8 +229,8 @@ impl NtfsInfo {
                                 "    Entry: {}\t\t\t\t: 0x{:08x} with file reference: {}-{}",
                                 entry_index + 1,
                                 entry.attribute_type,
-                                entry.file_reference >> 48,
                                 entry.file_reference & 0x0000ffffffffffff,
+                                entry.file_reference >> 48,
                             );
                         }
                     };
@@ -517,8 +517,8 @@ impl NtfsInfo {
             } else {
                 println!(
                     "    Base record file reference\t\t: {}-{}",
-                    base_record_file_reference >> 48,
                     base_record_file_reference & 0x0000ffffffffffff,
+                    base_record_file_reference >> 48,
                 );
             }
             println!(

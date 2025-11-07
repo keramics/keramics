@@ -25,6 +25,9 @@ pub struct NtfsDataFork<'a> {
     /// Cluster block size.
     cluster_block_size: u32,
 
+    /// Base record file reference.
+    base_record_file_reference: u64,
+
     /// The MFT attributes.
     mft_attributes: &'a NtfsMftAttributes,
 
@@ -37,12 +40,14 @@ impl<'a> NtfsDataFork<'a> {
     pub fn new(
         data_stream: &DataStreamReference,
         cluster_block_size: u32,
+        base_record_file_reference: u64,
         mft_attributes: &'a NtfsMftAttributes,
         data_attribute: &'a NtfsMftAttribute,
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
             cluster_block_size: cluster_block_size,
+            base_record_file_reference: base_record_file_reference,
             mft_attributes: mft_attributes,
             data_attribute: data_attribute,
         }
@@ -50,6 +55,13 @@ impl<'a> NtfsDataFork<'a> {
 
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
+        if self.base_record_file_reference != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT entry with base record file reference: {}-{}",
+                self.base_record_file_reference & 0x0000ffffffffffff,
+                self.base_record_file_reference >> 48,
+            )));
+        }
         let result: Option<DataStreamReference> = match self.mft_attributes.get_data_stream_by_name(
             &self.data_attribute.name,
             &self.data_stream,

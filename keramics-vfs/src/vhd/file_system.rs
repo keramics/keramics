@@ -93,10 +93,22 @@ impl VhdFileSystem {
                     None => return Ok(None),
                 };
                 match self.image.get_layer_by_index(layer_index) {
-                    Ok(vhd_layer) => Ok(Some(VhdFileEntry::Layer {
-                        index: layer_index,
-                        layer: vhd_layer.clone(),
-                    })),
+                    Ok(vhd_layer) => {
+                        let media_size: u64 = match vhd_layer.read() {
+                            Ok(vhd_file) => vhd_file.media_size,
+                            Err(error) => {
+                                return Err(keramics_core::error_trace_new_with_error!(
+                                    "Unable to obtain read lock on VHD layer",
+                                    error
+                                ));
+                            }
+                        };
+                        Ok(Some(VhdFileEntry::Layer {
+                            index: layer_index,
+                            layer: vhd_layer.clone(),
+                            size: media_size,
+                        }))
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,

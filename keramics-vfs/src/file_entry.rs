@@ -256,20 +256,20 @@ impl VfsFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            VfsFileEntry::Apm(_)
-            | VfsFileEntry::Ewf(_)
-            | VfsFileEntry::Fake(_)
-            | VfsFileEntry::Gpt(_)
-            | VfsFileEntry::Mbr(_)
-            | VfsFileEntry::Qcow(_)
-            | VfsFileEntry::SparseImage(_)
-            | VfsFileEntry::Udif(_)
-            | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => 1,
+            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_size(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_size(),
+            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_size(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_size(),
+            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_size(),
+            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_size(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_size(),
-            VfsFileEntry::Os(_) => todo!(),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_size(),
+            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_size(),
+            VfsFileEntry::SparseImage(sparseimage_file_entry) => sparseimage_file_entry.get_size(),
+            VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_size(),
+            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_size(),
+            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_size(),
         }
     }
 

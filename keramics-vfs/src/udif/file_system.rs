@@ -88,8 +88,18 @@ impl UdifFileSystem {
                     return Ok(Some(udif_file_entry));
                 }
                 if string_path.components[1] == "udif1" {
+                    let media_size: u64 = match self.file.read() {
+                        Ok(udif_file) => udif_file.media_size,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain read lock on UDIF file",
+                                error
+                            ));
+                        }
+                    };
                     let udif_file_entry: UdifFileEntry = UdifFileEntry::Layer {
                         file: self.file.clone(),
+                        size: media_size,
                     };
                     Ok(Some(udif_file_entry))
                 } else {

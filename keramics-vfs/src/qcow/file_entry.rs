@@ -27,6 +27,9 @@ pub enum QcowFileEntry {
 
         /// Layer.
         layer: QcowImageLayer,
+
+        /// Size.
+        size: u64,
     },
 
     /// Root file entry.
@@ -61,6 +64,14 @@ impl QcowFileEntry {
         }
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        match self {
+            QcowFileEntry::Layer { size, .. } => *size,
+            QcowFileEntry::Root { .. } => 0,
+        }
+    }
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
         match self {
@@ -79,10 +90,22 @@ impl QcowFileEntry {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
             QcowFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(qcow_layer) => Ok(QcowFileEntry::Layer {
-                    index: sub_file_entry_index,
-                    layer: qcow_layer.clone(),
-                }),
+                Ok(qcow_layer) => {
+                    let media_size: u64 = match qcow_layer.read() {
+                        Ok(qcow_file) => qcow_file.media_size,
+                        Err(error) => {
+                            return Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain read lock on QCOW layer",
+                                error
+                            ));
+                        }
+                    };
+                    Ok(QcowFileEntry::Layer {
+                        index: sub_file_entry_index,
+                        layer: qcow_layer.clone(),
+                        size: media_size,
+                    })
+                }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -123,10 +146,12 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
+        let qcow_image: QcowImage = get_image()?;
+
+        let test_image: Arc<QcowImage> = Arc::new(qcow_image);
 
         let file_entry = QcowFileEntry::Root {
-            image: qcow_image.clone(),
+            image: test_image.clone(),
         };
 
         let file_type: VfsFileType = file_entry.get_file_type();
@@ -137,19 +162,22 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
+        let qcow_image: QcowImage = get_image()?;
+
+        let test_image: Arc<QcowImage> = Arc::new(qcow_image);
 
         let file_entry = QcowFileEntry::Root {
-            image: qcow_image.clone(),
+            image: test_image.clone(),
         };
 
         let name: Option<String> = file_entry.get_name();
         assert!(name.is_none());
 
-        let qcow_layer: QcowImageLayer = qcow_image.get_layer_by_index(0)?;
+        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
             index: 0,
             layer: qcow_layer.clone(),
+            size: 4194304,
         };
 
         let name: Option<String> = file_entry.get_name();
@@ -159,20 +187,49 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let qcow_image: QcowImage = get_image()?;
+
+        let test_image: Arc<QcowImage> = Arc::new(qcow_image);
 
         let file_entry = QcowFileEntry::Root {
-            image: qcow_image.clone(),
+            image: test_image.clone(),
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 0);
+
+        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
+        let file_entry = QcowFileEntry::Layer {
+            index: 0,
+            layer: qcow_layer.clone(),
+            size: 4194304,
+        };
+
+        let size: u64 = file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let qcow_image: QcowImage = get_image()?;
+
+        let test_image: Arc<QcowImage> = Arc::new(qcow_image);
+
+        let file_entry = QcowFileEntry::Root {
+            image: test_image.clone(),
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 1);
 
-        let qcow_layer: QcowImageLayer = qcow_image.get_layer_by_index(0)?;
+        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
             index: 0,
             layer: qcow_layer.clone(),
+            size: 4194304,
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
@@ -183,10 +240,12 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let qcow_image: Arc<QcowImage> = Arc::new(get_image()?);
+        let qcow_image: QcowImage = get_image()?;
+
+        let test_image: Arc<QcowImage> = Arc::new(qcow_image);
 
         let file_entry = QcowFileEntry::Root {
-            image: qcow_image.clone(),
+            image: test_image.clone(),
         };
 
         let sub_file_entry: QcowFileEntry = file_entry.get_sub_file_entry_by_index(0)?;

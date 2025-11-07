@@ -46,6 +46,9 @@ pub struct ExtInodeTable {
 
     /// Group descriptors.
     group_descriptors: Vec<ExtGroupDescriptor>,
+
+    /// Number of inodes.
+    number_of_inodes: u32,
 }
 
 impl ExtInodeTable {
@@ -60,6 +63,7 @@ impl ExtInodeTable {
             number_of_inodes_per_block_group: 0,
             group_size: 0,
             group_descriptors: Vec::new(),
+            number_of_inodes: 0,
         }
     }
 
@@ -71,6 +75,7 @@ impl ExtInodeTable {
         inode_size: u16,
         number_of_inodes_per_block_group: u32,
         group_descriptors: Vec<ExtGroupDescriptor>,
+        number_of_inodes: u32,
     ) -> Result<(), ErrorTrace> {
         self.format_version = features.get_format_version();
         self.metadata_checksum_seed = features.get_metadata_checksum_seed();
@@ -79,6 +84,9 @@ impl ExtInodeTable {
         self.number_of_inodes_per_block_group = number_of_inodes_per_block_group;
         self.group_size = (number_of_inodes_per_block_group as u64) * (inode_size as u64);
         self.group_descriptors = group_descriptors;
+        self.number_of_inodes = number_of_inodes;
+
+        // TODO: sanity check self.number_of_inodes and size of inode table.
 
         Ok(())
     }
@@ -89,6 +97,12 @@ impl ExtInodeTable {
         data_stream: &DataStreamReference,
         inode_number: u32,
     ) -> Result<ExtInode, ErrorTrace> {
+        if inode_number == 0 || inode_number > self.number_of_inodes {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid inode number: {} value out of bounds",
+                inode_number
+            )));
+        }
         let group_index: usize = (((inode_number - 1) as usize) * (self.inode_size as usize))
             / (self.group_size as usize);
 
@@ -96,7 +110,7 @@ impl ExtInodeTable {
             Some(group_descriptor) => group_descriptor,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing group descriptor for inode: {}",
+                    "Missing group descriptor for inode number: {}",
                     inode_number
                 )));
             }

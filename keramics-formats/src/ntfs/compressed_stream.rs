@@ -52,6 +52,9 @@ pub struct NtfsCompressedStream {
 
     /// The size.
     size: u64,
+
+    /// The valid data size.
+    valid_data_size: u64,
 }
 
 impl NtfsCompressedStream {
@@ -66,6 +69,7 @@ impl NtfsCompressedStream {
             block_cache: LruCache::new(8),
             current_offset: 0,
             size: 0,
+            valid_data_size: 0,
         }
     }
 
@@ -207,7 +211,8 @@ impl NtfsCompressedStream {
                 };
             }
         }
-        self.size = data_attribute.valid_data_size;
+        self.size = data_attribute.data_size;
+        self.valid_data_size = data_attribute.valid_data_size;
 
         Ok(())
     }
@@ -222,101 +227,118 @@ impl NtfsCompressedStream {
             if current_offset >= self.size {
                 break;
             }
-            let compression_unit: &NtfsCompressionRange =
-                match self.block_tree.get_value(current_offset) {
-                    Some(value) => value,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing compression unit for offset: {}",
-                            current_offset
-                        )));
+            let read_count: usize = if current_offset >= self.valid_data_size {
+                let range_remainder_size: u64 = self.size - current_offset;
+                let read_remainder_size: usize = read_size - data_offset;
+                let range_read_size: usize =
+                    min(read_remainder_size, range_remainder_size as usize);
+                let data_end_offset: usize = data_offset + range_read_size;
+
+                data[data_offset..data_end_offset].fill(0);
+
+                range_read_size
+            } else {
+                let compression_unit: &NtfsCompressionRange =
+                    match self.block_tree.get_value(current_offset) {
+                        Some(value) => value,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing compression unit for offset: {}",
+                                current_offset
+                            )));
+                        }
+                    };
+                let range_offset: u64 = compression_unit.offset;
+                let range_size: u64 = compression_unit.size;
+
+                let range_relative_offset: u64 = current_offset - range_offset;
+                let range_end_offset: u64 = min(range_offset + range_size, self.size);
+
+                let range_remainder_size: u64 =
+                    (range_end_offset - range_offset) - range_relative_offset;
+                let read_remainder_size: usize = read_size - data_offset;
+
+                let range_read_size: usize =
+                    min(read_remainder_size, range_remainder_size as usize);
+
+                let data_end_offset: usize = data_offset + range_read_size;
+
+                match compression_unit.range_type {
+                    NtfsCompressionRangeType::Compressed => {
+                        let range_read_size: usize =
+                            min(read_remainder_size, self.compression_unit_size);
+                        let data_end_offset: usize = data_offset + range_read_size;
+
+                        if !self.block_cache.contains(&range_offset) {
+                            let data_stream: &DataStreamReference = match self.data_stream.as_ref()
+                            {
+                                Some(data_stream) => data_stream,
+                                None => {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Missing data stream"
+                                    ));
+                                }
+                            };
+                            let mut compressed_data: Vec<u8> = vec![0; range_size as usize];
+
+                            keramics_core::data_stream_read_exact_at_position!(
+                                data_stream,
+                                &mut compressed_data,
+                                SeekFrom::Start(range_offset)
+                            );
+                            if self.mediator.debug_output {
+                                self.mediator.debug_print(format!(
+                                    "Compressed data of size: {} at offset: {} (0x{:08x})\n",
+                                    range_size, range_offset, range_offset,
+                                ));
+                                self.mediator.debug_print_data(&compressed_data, true);
+                            }
+                            let mut block_data: Vec<u8> = vec![0; self.compression_unit_size];
+
+                            let mut lznt1_context: Lznt1Context = Lznt1Context::new();
+
+                            match lznt1_context.decompress(&compressed_data, &mut block_data) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to decompress LZNT1 data"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                            self.block_cache.insert(range_offset, block_data);
+                        }
+                        let block_data: &Vec<u8> = match self.block_cache.get(&range_offset) {
+                            Some(data) => data,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unable to retrieve data from cache"
+                                ));
+                            }
+                        };
+                        let block_data_offset: usize = range_relative_offset as usize;
+                        let block_data_end_offset: usize = block_data_offset + range_read_size;
+
+                        data[data_offset..data_end_offset]
+                            .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+
+                        range_read_size
                     }
-                };
-            let range_offset: u64 = compression_unit.offset;
-            let range_size: u64 = compression_unit.size;
-
-            let range_relative_offset: u64 = current_offset - range_offset;
-            let range_end_offset: u64 = min(range_offset + range_size, self.size);
-
-            let range_remainder_size: u64 =
-                (range_end_offset - range_offset) - range_relative_offset;
-            let read_remainder_size: usize = read_size - data_offset;
-
-            let range_read_size: usize = min(read_remainder_size, range_remainder_size as usize);
-
-            let data_end_offset: usize = data_offset + range_read_size;
-            let read_count: usize = match compression_unit.range_type {
-                NtfsCompressionRangeType::Compressed => {
-                    let range_read_size: usize =
-                        min(read_remainder_size, self.compression_unit_size);
-                    let data_end_offset: usize = data_offset + range_read_size;
-
-                    if !self.block_cache.contains(&range_offset) {
+                    NtfsCompressionRangeType::Uncompressed => {
                         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
                             Some(data_stream) => data_stream,
                             None => {
                                 return Err(keramics_core::error_trace_new!("Missing data stream"));
                             }
                         };
-                        let mut compressed_data: Vec<u8> = vec![0; range_size as usize];
-
-                        keramics_core::data_stream_read_exact_at_position!(
+                        let read_count: usize = keramics_core::data_stream_read_at_position!(
                             data_stream,
-                            &mut compressed_data,
-                            SeekFrom::Start(range_offset)
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(range_offset + range_relative_offset)
                         );
-                        if self.mediator.debug_output {
-                            self.mediator.debug_print(format!(
-                                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                                range_size, range_offset, range_offset,
-                            ));
-                            self.mediator.debug_print_data(&compressed_data, true);
-                        }
-                        let mut block_data: Vec<u8> = vec![0; self.compression_unit_size];
-
-                        let mut lznt1_context: Lznt1Context = Lznt1Context::new();
-
-                        match lznt1_context.decompress(&compressed_data, &mut block_data) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to decompress LZNT1 data"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        self.block_cache.insert(range_offset, block_data);
+                        read_count
                     }
-                    let block_data: &Vec<u8> = match self.block_cache.get(&range_offset) {
-                        Some(data) => data,
-                        None => {
-                            return Err(keramics_core::error_trace_new!(
-                                "Unable to retrieve data from cache"
-                            ));
-                        }
-                    };
-                    let block_data_offset: usize = range_relative_offset as usize;
-                    let block_data_end_offset: usize = block_data_offset + range_read_size;
-
-                    data[data_offset..data_end_offset]
-                        .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
-
-                    range_read_size
-                }
-                NtfsCompressionRangeType::Uncompressed => {
-                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                        Some(data_stream) => data_stream,
-                        None => {
-                            return Err(keramics_core::error_trace_new!("Missing data stream"));
-                        }
-                    };
-                    let read_count: usize = keramics_core::data_stream_read_at_position!(
-                        data_stream,
-                        &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(range_offset + range_relative_offset)
-                    );
-                    read_count
                 }
             };
             if read_count == 0 {

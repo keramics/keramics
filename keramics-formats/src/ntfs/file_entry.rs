@@ -198,6 +198,13 @@ impl NtfsFileEntry {
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        if self.mft_entry.base_record_file_reference != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT entry with base record file reference: {}-{}",
+                self.mft_entry.base_record_file_reference & 0x0000ffffffffffff,
+                self.mft_entry.base_record_file_reference >> 48,
+            )));
+        }
         self.mft_attributes.get_data_stream_by_name(
             &None,
             &self.data_stream,
@@ -210,6 +217,13 @@ impl NtfsFileEntry {
         &self,
         name: &Option<Ucs2String>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        if self.mft_entry.base_record_file_reference != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported MFT entry with base record file reference: {}-{}",
+                self.mft_entry.base_record_file_reference & 0x0000ffffffffffff,
+                self.mft_entry.base_record_file_reference >> 48,
+            )));
+        }
         self.mft_attributes.get_data_stream_by_name(
             name,
             &self.data_stream,
@@ -234,6 +248,7 @@ impl NtfsFileEntry {
             Some(data_attribute) => Ok(NtfsDataFork::new(
                 &self.data_stream,
                 self.mft.cluster_block_size,
+                self.mft_entry.base_record_file_reference,
                 &self.mft_attributes,
                 data_attribute,
             )),
