@@ -53,6 +53,8 @@ use super::mac_ukrainian::DecoderMacUkrainian;
 use super::utf8::DecoderUtf8;
 use super::windows874::DecoderWindows874;
 use super::windows932::DecoderWindows932;
+use super::windows936::DecoderWindows936;
+use super::windows949::DecoderWindows949;
 use super::windows1250::DecoderWindows1250;
 use super::windows1251::DecoderWindows1251;
 use super::windows1252::DecoderWindows1252;
@@ -110,6 +112,8 @@ pub fn new_character_decoder<'a>(
         CharacterEncoding::Utf8 => Box::new(DecoderUtf8::new(bytes)),
         CharacterEncoding::Windows874 => Box::new(DecoderWindows874::new(bytes)),
         CharacterEncoding::Windows932 => Box::new(DecoderWindows932::new(bytes)),
+        CharacterEncoding::Windows936 => Box::new(DecoderWindows936::new(bytes)),
+        CharacterEncoding::Windows949 => Box::new(DecoderWindows949::new(bytes)),
         CharacterEncoding::Windows1250 => Box::new(DecoderWindows1250::new(bytes)),
         CharacterEncoding::Windows1251 => Box::new(DecoderWindows1251::new(bytes)),
         CharacterEncoding::Windows1252 => Box::new(DecoderWindows1252::new(bytes)),
@@ -168,6 +172,8 @@ mod tests {
             CharacterEncoding::MacUkrainian,
             CharacterEncoding::Windows874,
             CharacterEncoding::Windows932,
+            CharacterEncoding::Windows936,
+            CharacterEncoding::Windows949,
             CharacterEncoding::Windows1250,
             CharacterEncoding::Windows1251,
             CharacterEncoding::Windows1252,

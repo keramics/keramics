@@ -52,6 +52,8 @@ use super::mac_turkish::EncoderMacTurkish;
 use super::mac_ukrainian::EncoderMacUkrainian;
 use super::windows874::EncoderWindows874;
 use super::windows932::EncoderWindows932;
+use super::windows936::EncoderWindows936;
+use super::windows949::EncoderWindows949;
 use super::windows1250::EncoderWindows1250;
 use super::windows1251::EncoderWindows1251;
 use super::windows1252::EncoderWindows1252;
@@ -110,6 +112,8 @@ pub fn new_character_encoder<'a>(
         CharacterEncoding::MacUkrainian => Box::new(EncoderMacUkrainian::new(code_points)),
         CharacterEncoding::Windows874 => Box::new(EncoderWindows874::new(code_points)),
         CharacterEncoding::Windows932 => Box::new(EncoderWindows932::new(code_points)),
+        CharacterEncoding::Windows936 => Box::new(EncoderWindows936::new(code_points)),
+        CharacterEncoding::Windows949 => Box::new(EncoderWindows949::new(code_points)),
         CharacterEncoding::Windows1250 => Box::new(EncoderWindows1250::new(code_points)),
         CharacterEncoding::Windows1251 => Box::new(EncoderWindows1251::new(code_points)),
         CharacterEncoding::Windows1252 => Box::new(EncoderWindows1252::new(code_points)),
@@ -168,6 +172,8 @@ mod tests {
             CharacterEncoding::MacUkrainian,
             CharacterEncoding::Windows874,
             CharacterEncoding::Windows932,
+            CharacterEncoding::Windows936,
+            CharacterEncoding::Windows949,
             CharacterEncoding::Windows1250,
             CharacterEncoding::Windows1251,
             CharacterEncoding::Windows1252,

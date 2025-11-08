@@ -64,6 +64,8 @@ mod windows1257;
 mod windows1258;
 mod windows874;
 mod windows932;
+mod windows936;
+mod windows949;
 
 pub use ascii::{DecoderAscii, EncoderAscii};
 pub use base64::{Base64Context, Base64Stream};
@@ -109,6 +111,8 @@ pub use mac_ukrainian::{DecoderMacUkrainian, EncoderMacUkrainian};
 pub use utf8::DecoderUtf8;
 pub use windows874::{DecoderWindows874, EncoderWindows874};
 pub use windows932::{DecoderWindows932, EncoderWindows932};
+pub use windows936::{DecoderWindows936, EncoderWindows936};
+pub use windows949::{DecoderWindows949, EncoderWindows949};
 pub use windows1250::{DecoderWindows1250, EncoderWindows1250};
 pub use windows1251::{DecoderWindows1251, EncoderWindows1251};
 pub use windows1252::{DecoderWindows1252, EncoderWindows1252};
