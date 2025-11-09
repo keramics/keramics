@@ -96,11 +96,8 @@ impl QcowFileHeader {
     ) -> Result<(), ErrorTrace> {
         let mut data: [u8; 112] = [0; 112];
 
-        let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
-            &mut data,
-            SeekFrom::Start(0)
-        );
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
                 "QcowFileHeader data of size: {} at offset: {} (0x{:08x})\n",

@@ -73,10 +73,10 @@ impl QcowFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> usize {
         match self {
-            QcowFileEntry::Layer { .. } => Ok(0),
-            QcowFileEntry::Root { image } => Ok(image.get_number_of_layers()),
+            QcowFileEntry::Layer { .. } => 0,
+            QcowFileEntry::Root { image } => image.get_number_of_layers(),
         }
     }
 
@@ -117,6 +117,14 @@ impl QcowFileEntry {
                     return Err(error);
                 }
             },
+        }
+    }
+
+    /// Determines if the file entry is the root file entry.
+    pub fn is_root_file_entry(&self) -> bool {
+        match self {
+            QcowFileEntry::Layer { .. } => false,
+            QcowFileEntry::Root { .. } => true,
         }
     }
 }
@@ -222,7 +230,7 @@ mod tests {
             image: test_image.clone(),
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
         let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
@@ -232,7 +240,7 @@ mod tests {
             size: 4194304,
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
         Ok(())
@@ -253,6 +261,30 @@ mod tests {
 
         let result: Result<QcowFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
+        let qcow_image: QcowImage = get_image()?;
+
+        let test_image: Arc<QcowImage> = Arc::new(qcow_image);
+
+        let file_entry = QcowFileEntry::Root {
+            image: test_image.clone(),
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), true);
+
+        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
+        let file_entry = QcowFileEntry::Layer {
+            index: 0,
+            layer: qcow_layer.clone(),
+            size: 4194304,
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())
     }

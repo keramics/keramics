@@ -186,7 +186,7 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the symbolic link target.
-    pub fn get_symbolic_link_target(&mut self) -> Result<Option<&Ucs2String>, ErrorTrace> {
+    pub fn get_symbolic_link_target(&self) -> Result<Option<&Ucs2String>, ErrorTrace> {
         let result: Option<&Ucs2String> = match &self.mft_attributes.reparse_point {
             Some(NtfsReparsePoint::SymbolicLink { reparse_data }) => {
                 Some(&reparse_data.substitute_name)
@@ -860,7 +860,7 @@ mod tests {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
         let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
+        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
             .get_file_entry_by_path(&ntfs_path)?
             .unwrap();
 

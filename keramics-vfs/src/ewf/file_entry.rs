@@ -70,10 +70,10 @@ impl EwfFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> usize {
         match self {
-            EwfFileEntry::Layer { .. } => Ok(0),
-            EwfFileEntry::Root { .. } => Ok(1),
+            EwfFileEntry::Layer { .. } => 0,
+            EwfFileEntry::Root { .. } => 1,
         }
     }
 
@@ -107,6 +107,14 @@ impl EwfFileEntry {
                     size: media_size,
                 })
             }
+        }
+    }
+
+    /// Determines if the file entry is the root file entry.
+    pub fn is_root_file_entry(&self) -> bool {
+        match self {
+            EwfFileEntry::Layer { .. } => false,
+            EwfFileEntry::Root { .. } => true,
         }
     }
 }
@@ -211,7 +219,7 @@ mod tests {
             image: test_image.clone(),
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
         let file_entry = EwfFileEntry::Layer {
@@ -219,7 +227,7 @@ mod tests {
             size: media_size,
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
         Ok(())
@@ -239,6 +247,29 @@ mod tests {
 
         let result: Result<EwfFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
+        let ewf_image: EwfImage = get_image()?;
+        let media_size: u64 = ewf_image.media_size;
+
+        let test_image: Arc<RwLock<EwfImage>> = Arc::new(RwLock::new(ewf_image));
+
+        let file_entry = EwfFileEntry::Root {
+            image: test_image.clone(),
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), true);
+
+        let file_entry = EwfFileEntry::Layer {
+            image: test_image.clone(),
+            size: media_size,
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())
     }

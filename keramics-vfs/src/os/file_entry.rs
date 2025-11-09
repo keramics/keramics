@@ -12,13 +12,12 @@
  */
 
 use std::ffi::OsStr;
-use std::fs::{File, Metadata, metadata};
+use std::fs::{File, Metadata, read_link, symlink_metadata};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 #[cfg(unix)]
 use std::os::unix::fs::MetadataExt;
-use std::time::UNIX_EPOCH;
 
 #[cfg(windows)]
 use std::os::windows::fs::MetadataExt;
@@ -32,6 +31,8 @@ use keramics_datetime::{DateTime, PosixTime32, PosixTime64Ns};
 use keramics_datetime::{DateTime, Filetime};
 
 use crate::enums::VfsFileType;
+
+use super::directory_entries::OsDirectoryEntries;
 
 /// Operating system file entry.
 pub struct OsFileEntry {
@@ -55,6 +56,9 @@ pub struct OsFileEntry {
 
     /// Size in bytes.
     size: u64,
+
+    /// Sub Sub directory entries.
+    sub_directory_entries: OsDirectoryEntries,
 }
 
 impl OsFileEntry {
@@ -68,6 +72,7 @@ impl OsFileEntry {
             creation_time: None,
             modification_time: None,
             size: 0,
+            sub_directory_entries: OsDirectoryEntries::new(),
         }
     }
 
@@ -135,10 +140,85 @@ impl OsFileEntry {
         self.size
     }
 
+    /// Retrieves the symbolic link target.
+    pub fn get_symbolic_link_target(&self) -> Option<PathBuf> {
+        match read_link(&self.path) {
+            Ok(link_target) => Some(link_target),
+            Err(_) => None,
+        }
+    }
+
+    /// Retrieves the number of sub file entries.
+    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.sub_directory_entries.read(&self.path) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read sub directory entries"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(self.sub_directory_entries.get_number_of_entries())
+    }
+
+    /// Retrieves a specific sub file entry.
+    pub fn get_sub_file_entry_by_index(
+        &mut self,
+        sub_file_entry_index: usize,
+    ) -> Result<OsFileEntry, ErrorTrace> {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.sub_directory_entries.read(&self.path) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read sub directory entries"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        match self
+            .sub_directory_entries
+            .get_entry_by_index(sub_file_entry_index)
+        {
+            Some(name) => {
+                let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+                let mut path_buf: PathBuf = self.path.clone();
+                path_buf.push(name);
+
+                match os_file_entry.open(&path_buf) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to open sub file entry",
+                            error
+                        ));
+                    }
+                }
+                Ok(os_file_entry)
+            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing directory entry: {}",
+                sub_file_entry_index
+            ))),
+        }
+    }
+
+    /// Determines if the file entry is a directory.
+    pub fn is_directory(&self) -> bool {
+        self.file_type == VfsFileType::Directory
+    }
+
     /// Opens the file entry.
     #[cfg(unix)]
     pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
-        let file_metadata: Metadata = match metadata(path) {
+        let file_metadata: Metadata = match symlink_metadata(path) {
             Ok(file_metadata) => file_metadata,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -174,18 +254,7 @@ impl OsFileEntry {
         ));
 
         self.creation_time = match file_metadata.created() {
-            Ok(system_time) => match system_time.duration_since(UNIX_EPOCH) {
-                Ok(duration) => Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                    duration.as_secs() as i64,
-                    duration.subsec_nanos(),
-                ))),
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to determine creation time",
-                        error
-                    ));
-                }
-            },
+            Ok(system_time) => Some(DateTime::FakeTime(system_time)),
             Err(_) => None,
         };
         self.size = file_metadata.len();
@@ -198,7 +267,7 @@ impl OsFileEntry {
     /// Opens the file entry.
     #[cfg(windows)]
     pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
-        let file_metadata: Metadata = match metadata(path) {
+        let file_metadata: Metadata = match symlink_metadata(path) {
             Ok(file_metadata) => file_metadata,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -244,12 +313,12 @@ mod tests {
 
     #[test]
     fn test_get_access_time() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let result: Option<&DateTime> = os_file_entry.get_access_time();
+        let result: Option<&DateTime> = file_entry.get_access_time();
         // Note that the actual date and time can vary.
         assert!(result.is_some());
 
@@ -259,12 +328,12 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_get_change_time() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let result: Option<&DateTime> = os_file_entry.get_change_time();
+        let result: Option<&DateTime> = file_entry.get_change_time();
         // Note that the actual date and time can vary.
         assert!(result.is_some());
 
@@ -274,12 +343,12 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let result: Option<&DateTime> = os_file_entry.get_creation_time();
+        let result: Option<&DateTime> = file_entry.get_creation_time();
         // Note that the actual date and time can vary.
         assert!(result.is_some());
 
@@ -288,12 +357,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let result: Option<DataStreamReference> = os_file_entry.get_data_stream()?;
+        let result: Option<DataStreamReference> = file_entry.get_data_stream()?;
 
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
@@ -327,12 +396,12 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let file_type: VfsFileType = os_file_entry.get_file_type();
+        let file_type: VfsFileType = file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
         Ok(())
@@ -341,12 +410,12 @@ mod tests {
     #[test]
     #[cfg(unix)]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let result: Option<&DateTime> = os_file_entry.get_modification_time();
+        let result: Option<&DateTime> = file_entry.get_modification_time();
         // Note that the actual date and time can vary.
         assert!(result.is_some());
 
@@ -355,12 +424,12 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let name: Option<&OsStr> = os_file_entry.get_name();
+        let name: Option<&OsStr> = file_entry.get_name();
         assert_eq!(name, Some(OsStr::new("file.txt")));
 
         Ok(())
@@ -370,25 +439,103 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        let size: u64 = os_file_entry.get_size();
+        let size: u64 = file_entry.get_size();
         assert_eq!(size, 202);
 
         Ok(())
     }
 
     #[test]
+    fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
+
+        let link_target: Option<PathBuf> = file_entry.get_symbolic_link_target();
+        assert_eq!(link_target, None);
+
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf =
+            PathBuf::from(get_test_data_path("directory/symbolic_link").as_str());
+        file_entry.open(&path_buf)?;
+
+        let link_target: Option<PathBuf> = file_entry.get_symbolic_link_target();
+        assert_eq!(link_target, Some(PathBuf::from("file.txt")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
+        file_entry.open(&path_buf)?;
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 2);
+
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
+
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
+        file_entry.open(&path_buf)?;
+
+        // Note that the order of the directory entries can vary.
+        let sub_file_entry: OsFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<&OsStr> = sub_file_entry.get_name();
+        assert!(name.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_directory() -> Result<(), ErrorTrace> {
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
+        file_entry.open(&path_buf)?;
+
+        assert_eq!(file_entry.is_directory(), true);
+
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
+
+        assert_eq!(file_entry.is_directory(), false);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+        let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("file.txt").as_str());
-        os_file_entry.open(&path_buf)?;
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        file_entry.open(&path_buf)?;
 
-        assert!(os_file_entry.file_type == VfsFileType::File);
+        assert!(file_entry.file_type == VfsFileType::File);
 
         Ok(())
     }

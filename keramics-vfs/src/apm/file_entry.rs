@@ -73,10 +73,10 @@ impl ApmFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> usize {
         match self {
-            ApmFileEntry::Partition { .. } => Ok(0),
-            ApmFileEntry::Root { volume_system } => Ok(volume_system.get_number_of_partitions()),
+            ApmFileEntry::Partition { .. } => 0,
+            ApmFileEntry::Root { volume_system } => volume_system.get_number_of_partitions(),
         }
     }
 
@@ -109,6 +109,14 @@ impl ApmFileEntry {
                     }
                 }
             }
+        }
+    }
+
+    /// Determines if the file entry is the root file entry.
+    pub fn is_root_file_entry(&self) -> bool {
+        match self {
+            ApmFileEntry::Partition { .. } => false,
+            ApmFileEntry::Root { .. } => true,
         }
     }
 }
@@ -207,7 +215,7 @@ mod tests {
             volume_system: apm_volume_system.clone(),
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 2);
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
@@ -218,7 +226,7 @@ mod tests {
             size: partition_size,
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
         Ok(())
@@ -237,6 +245,29 @@ mod tests {
 
         let result: Result<ApmFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
+        let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = ApmFileEntry::Root {
+            volume_system: apm_volume_system.clone(),
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), true);
+
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = apm_partition.size;
+        let file_entry = ApmFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())
     }

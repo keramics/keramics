@@ -617,7 +617,19 @@ impl VfsFileSystem {
                 };
                 Ok(Some(VfsFileEntry::Ewf(ewf_file_entry)))
             }
-            VfsFileSystem::Fake(_) => todo!(),
+            VfsFileSystem::Fake(fake_file_system) => match fake_file_system.get_root_file_entry() {
+                Ok(result) => match result {
+                    Some(fake_file_entry) => Ok(Some(VfsFileEntry::Fake(fake_file_entry))),
+                    None => Ok(None),
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve fake root directory"
+                    );
+                    return Err(error);
+                }
+            },
             VfsFileSystem::Fat(fat_file_system) => match fat_file_system.get_root_directory() {
                 Ok(fat_file_entry) => Ok(Some(VfsFileEntry::Fat(fat_file_entry))),
                 Err(mut error) => {
@@ -1210,20 +1222,20 @@ mod tests {
         Ok(())
     }
 
-    // Tests with FAKE.
+    // Tests with fake.
 
     fn get_fake_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Fake);
+
         if let VfsFileSystem::Fake(fake_file_system) = &mut vfs_file_system {
             let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_directory("fake");
+            fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
 
-            let data: [u8; 4] = [1, 2, 3, 4];
-            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("fake1", &data);
-            _ = fake_file_system.add_file_entry(&vfs_path, fake_file_entry);
-
-            let data: [u8; 4] = [5, 6, 7, 8];
-            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("fake2", &data);
-            _ = fake_file_system.add_file_entry(&vfs_path, fake_file_entry);
+            let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake");
+            let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
+            let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("file.txt", &test_data);
+            fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
         }
         Ok(vfs_file_system)
     }
@@ -1232,10 +1244,10 @@ mod tests {
     fn test_file_entry_exists_with_fake() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/bogus");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())
@@ -1245,7 +1257,7 @@ mod tests {
     fn test_get_file_entry_by_path_with_fake_file() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake2");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -1258,7 +1270,7 @@ mod tests {
     fn test_get_file_entry_by_path_with_fake_non_existing() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/bogus");
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
         let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&vfs_path)?;
 
         assert!(result.is_none());
@@ -1266,7 +1278,18 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_file_entry of fake root
+    #[test]
+    fn test_get_file_entry_by_path_with_fake_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_fake_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let vfs_file_entry: VfsFileEntry =
+            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+
+        Ok(())
+    }
 
     // Tests with FAT.
 
@@ -1534,12 +1557,16 @@ mod tests {
     fn test_file_entry_exists_with_os() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
-        let vfs_path: VfsPath =
-            VfsPath::from_path(&VfsType::Os, get_test_data_path("file.txt").as_str());
+        let vfs_path: VfsPath = VfsPath::from_path(
+            &VfsType::Os,
+            get_test_data_path("directory/file.txt").as_str(),
+        );
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, true);
 
-        let vfs_path: VfsPath =
-            VfsPath::from_path(&VfsType::Os, get_test_data_path("bogus.txt").as_str());
+        let vfs_path: VfsPath = VfsPath::from_path(
+            &VfsType::Os,
+            get_test_data_path("directory/bogus.txt").as_str(),
+        );
         assert_eq!(vfs_file_system.file_entry_exists(&vfs_path)?, false);
 
         Ok(())

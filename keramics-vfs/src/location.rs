@@ -144,15 +144,17 @@ mod tests {
     #[test]
     fn test_new_with_parent() {
         let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("file.txt").as_str());
-        let vfs_path: VfsPath =
-            VfsPath::from_path(&VfsType::Os, get_test_data_path("bogus.txt").as_str());
+            new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
+        let vfs_path: VfsPath = VfsPath::from_path(
+            &VfsType::Os,
+            get_test_data_path("directory/bogus.txt").as_str(),
+        );
         let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
 
         let vfs_path: &VfsPath = test_location.get_path();
         assert_eq!(
             vfs_path.to_string(),
-            get_test_data_path("bogus.txt").as_str()
+            get_test_data_path("directory/bogus.txt").as_str()
         );
 
         let vfs_type: &VfsType = test_location.get_type();
@@ -176,7 +178,7 @@ mod tests {
     #[test]
     fn test_get_parent() {
         let test_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("file.txt").as_str());
+            new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
 
         let parent: Option<&VfsLocation> = test_location.get_parent();
         assert!(parent.is_none());

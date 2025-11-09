@@ -11,12 +11,15 @@
  * under the License.
  */
 
+use std::time::SystemTime;
+
 use super::fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
 use super::filetime::Filetime;
 use super::posix::{PosixTime32, PosixTime64Ns};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DateTime {
+    FakeTime(SystemTime),
     FatDate(FatDate),
     FatTimeDate(FatTimeDate),
     FatTimeDate10Ms(FatTimeDate10Ms),

@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod directory_entries;
 mod file_entry;
 
 pub use file_entry::OsFileEntry;

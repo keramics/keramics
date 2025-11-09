@@ -70,10 +70,10 @@ impl UdifFileEntry {
     }
 
     /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&self) -> Result<usize, ErrorTrace> {
+    pub fn get_number_of_sub_file_entries(&self) -> usize {
         match self {
-            UdifFileEntry::Layer { .. } => Ok(0),
-            UdifFileEntry::Root { .. } => Ok(1),
+            UdifFileEntry::Layer { .. } => 0,
+            UdifFileEntry::Root { .. } => 1,
         }
     }
 
@@ -107,6 +107,14 @@ impl UdifFileEntry {
                     size: media_size,
                 })
             }
+        }
+    }
+
+    /// Determines if the file entry is the root file entry.
+    pub fn is_root_file_entry(&self) -> bool {
+        match self {
+            UdifFileEntry::Layer { .. } => false,
+            UdifFileEntry::Root { .. } => true,
         }
     }
 }
@@ -210,7 +218,7 @@ mod tests {
             file: test_file.clone(),
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
         let file_entry = UdifFileEntry::Layer {
@@ -218,7 +226,7 @@ mod tests {
             size: media_size,
         };
 
-        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
+        let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
         Ok(())
@@ -238,6 +246,29 @@ mod tests {
 
         let result: Result<UdifFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
+        let udif_file: UdifFile = get_file()?;
+        let media_size: u64 = udif_file.media_size;
+
+        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+
+        let file_entry = UdifFileEntry::Root {
+            file: test_file.clone(),
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), true);
+
+        let file_entry = UdifFileEntry::Layer {
+            file: test_file.clone(),
+            size: media_size,
+        };
+
+        assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())
     }

@@ -17,6 +17,7 @@ use std::sync::Arc;
 use keramics_core::ErrorTrace;
 use keramics_formats::PathComponent;
 
+use crate::enums::VfsType;
 use crate::path::VfsPath;
 
 use super::file_entry::FakeFileEntry;
@@ -31,7 +32,10 @@ impl FakeFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            paths: HashMap::new(),
+            paths: HashMap::from([(
+                VfsPath::from_path(&VfsType::Fake, "/"),
+                Arc::new(FakeFileEntry::new_root()),
+            )]),
         }
     }
 
@@ -43,6 +47,11 @@ impl FakeFileSystem {
     ) -> Result<(), ErrorTrace> {
         let file_entry_path: VfsPath = match file_entry.get_name() {
             Some(file_name) => {
+                if file_name.is_empty() {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to create file entry path - missing file name"
+                    ));
+                }
                 let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
 
                 match vfs_path.new_with_join(&path_components) {
@@ -56,11 +65,7 @@ impl FakeFileSystem {
                     }
                 }
             }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve file entry name"
-                ));
-            }
+            None => vfs_path.clone(),
         };
         match self.paths.insert(file_entry_path, Arc::new(file_entry)) {
             Some(_) => {
@@ -83,11 +88,20 @@ impl FakeFileSystem {
         &self,
         vfs_path: &VfsPath,
     ) -> Result<Option<Arc<FakeFileEntry>>, ErrorTrace> {
-        let result: Option<Arc<FakeFileEntry>> = match self.paths.get(vfs_path) {
-            Some(file_entry) => Some(file_entry.clone()),
-            None => None,
-        };
-        Ok(result)
+        match self.paths.get(vfs_path) {
+            Some(file_entry) => Ok(Some(file_entry.clone())),
+            None => Ok(None),
+        }
+    }
+
+    /// Retrieves the root file entry.
+    pub fn get_root_file_entry(&self) -> Result<Option<Arc<FakeFileEntry>>, ErrorTrace> {
+        let vfs_path: VfsPath = VfsPath::from_path(&crate::VfsType::Fake, "/");
+
+        match self.paths.get(&vfs_path) {
+            Some(file_entry) => Ok(Some(file_entry.clone())),
+            None => Ok(None),
+        }
     }
 }
 
@@ -95,10 +109,14 @@ impl FakeFileSystem {
 mod tests {
     use super::*;
 
-    use crate::VfsType;
+    use crate::enums::VfsFileType;
 
     fn get_file_system() -> Result<FakeFileSystem, ErrorTrace> {
         let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_directory("fake");
+        fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
 
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake");
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
@@ -108,7 +126,21 @@ mod tests {
         Ok(fake_file_system)
     }
 
-    // TODO: add tests for add_file_entry
+    #[test]
+    fn test_add_file_entry() -> Result<(), ErrorTrace> {
+        let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_directory("fake");
+        fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake");
+        let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
+        let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("file.txt", &test_data);
+        fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
+
+        Ok(())
+    }
 
     #[test]
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
@@ -125,5 +157,56 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_file_entry_by_path
+    #[test]
+    fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
+        let fake_file_system: FakeFileSystem = get_file_system()?;
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let result: Option<Arc<FakeFileEntry>> =
+            fake_file_system.get_file_entry_by_path(&vfs_path)?;
+        assert!(result.is_some());
+
+        let fake_file_entry: Arc<FakeFileEntry> = result.unwrap();
+
+        let name: Option<&String> = fake_file_entry.get_name();
+        assert!(name.is_none());
+
+        let file_type: VfsFileType = fake_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::Directory);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
+        let result: Option<Arc<FakeFileEntry>> =
+            fake_file_system.get_file_entry_by_path(&vfs_path)?;
+        assert!(result.is_some());
+
+        let fake_file_entry: Arc<FakeFileEntry> = result.unwrap();
+
+        let name: Option<&String> = fake_file_entry.get_name();
+        assert_eq!(name, Some(String::from("file.txt")).as_ref());
+
+        let file_type: VfsFileType = fake_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::File);
+
+        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
+        let result: Option<Arc<FakeFileEntry>> =
+            fake_file_system.get_file_entry_by_path(&vfs_path)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
+        let fake_file_system: FakeFileSystem = get_file_system()?;
+
+        let result: Option<Arc<FakeFileEntry>> = fake_file_system.get_root_file_entry()?;
+        assert!(result.is_some());
+
+        let fake_file_entry: Arc<FakeFileEntry> = result.unwrap();
+
+        let file_type: VfsFileType = fake_file_entry.get_file_type();
+        assert!(file_type == VfsFileType::Directory);
+
+        Ok(())
+    }
 }

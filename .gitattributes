@@ -1,4 +1,4 @@
 * text=auto
 
 LICENSE text eol=lf
-test_data/file.txt text eol=lf
+test_data/directory/file.txt text eol=lf

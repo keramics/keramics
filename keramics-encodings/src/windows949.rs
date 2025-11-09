@@ -52798,7 +52798,187 @@ mod tests {
         let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
-        // TODO: improve test coverage.
+        let byte_string: [u8; 2] = [0x81, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x81, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa2, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa2, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa3, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa3, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa6, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa6, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa7, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa7, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa8, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa8, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xaa, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xaa, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xac, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xac, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xad, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xad, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xb0, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xb0, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xc6, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xc6, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xc7, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xc7, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xca, 0x7f];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xca, 0x00];
+
+        let mut decoder: DecoderWindows949 = DecoderWindows949::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
 
         let byte_string: [u8; 1] = [0xff];
 

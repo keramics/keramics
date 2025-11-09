@@ -18,8 +18,7 @@ use super::string::VfsString;
 
 /// Virtual File System (VFS) data fork.
 pub enum VfsDataFork<'a> {
-    Ext(DataStreamReference),
-    Fat(DataStreamReference),
+    DataStream(DataStreamReference),
     Ntfs(NtfsDataFork<'a>),
 }
 
@@ -27,8 +26,7 @@ impl<'a> VfsDataFork<'a> {
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
         match self {
-            VfsDataFork::Ext(data_stream) => Ok(data_stream.clone()),
-            VfsDataFork::Fat(data_stream) => Ok(data_stream.clone()),
+            VfsDataFork::DataStream(data_stream) => Ok(data_stream.clone()),
             VfsDataFork::Ntfs(data_fork) => data_fork.get_data_stream(),
         }
     }
@@ -36,8 +34,7 @@ impl<'a> VfsDataFork<'a> {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<VfsString> {
         match self {
-            VfsDataFork::Ext(_) => None,
-            VfsDataFork::Fat(_) => None,
+            VfsDataFork::DataStream(_) => None,
             VfsDataFork::Ntfs(data_fork) => match data_fork.get_name() {
                 Some(name) => Some(VfsString::Ucs2(name.clone())),
                 None => None,
@@ -50,35 +47,31 @@ impl<'a> VfsDataFork<'a> {
 mod tests {
     use super::*;
 
-    use crate::enums::VfsType;
-    use crate::file_entry::VfsFileEntry;
-    use crate::file_system::VfsFileSystem;
-    use crate::location::{VfsLocation, new_os_vfs_location};
-    use crate::path::VfsPath;
-    use crate::types::VfsFileSystemReference;
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+    use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
+    use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem, NtfsPath};
 
     use crate::tests::get_test_data_path;
 
-    fn get_parent_file_system() -> VfsFileSystemReference {
-        VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os))
+    // Tests with ext.
+
+    fn get_ext_file_system() -> Result<ExtFileSystem, ErrorTrace> {
+        let mut file_system: ExtFileSystem = ExtFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
     }
 
-    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
+    fn get_ext_file_entry(path: &str) -> Result<ExtFileEntry, ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_ext_file_system()?;
 
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ext/ext2.raw").as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ext, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let ext_path: ExtPath = ExtPath::from(path);
+        match ext_file_system.get_file_entry_by_path(&ext_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -87,5 +80,82 @@ mod tests {
         }
     }
 
-    // TODO: add tests
+    #[test]
+    fn test_get_data_stream_with_ext() -> Result<(), ErrorTrace> {
+        let ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+
+        vfs_data_fork.get_data_stream()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_ext() -> Result<(), ErrorTrace> {
+        let ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+
+        let name: Option<VfsString> = vfs_data_fork.get_name();
+        assert_eq!(name, None);
+
+        Ok(())
+    }
+
+    // Tests with NTFS.
+
+    fn get_ntfs_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
+    fn get_ntfs_file_entry(path: &str) -> Result<NtfsFileEntry, ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_ntfs_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from(path);
+        match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
+        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
+        let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
+
+        vfs_data_fork.get_data_stream()?;
+
+        // TODO: add test with ADS
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
+        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
+        let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
+
+        let name: Option<VfsString> = vfs_data_fork.get_name();
+        assert_eq!(name, None);
+
+        // TODO: add test with ADS
+
+        Ok(())
+    }
 }

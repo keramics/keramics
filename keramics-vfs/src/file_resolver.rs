@@ -88,7 +88,10 @@ mod tests {
         let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "../test_data");
         let file_resolver: FileResolverReference = new_vfs_file_resolver(&file_system, vfs_path)?;
 
-        let path_components: [PathComponent; 1] = [PathComponent::from("file.txt")];
+        let path_components: [PathComponent; 2] = [
+            PathComponent::from("directory"),
+            PathComponent::from("file.txt"),
+        ];
         let result: Option<DataStreamReference> =
             file_resolver.get_data_stream(&path_components)?;
         assert!(result.is_some());

@@ -92,5 +92,24 @@ impl<'a> NtfsDataFork<'a> {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    use crate::ntfs::file_system::NtfsFileSystem;
+    use crate::ntfs::path::NtfsPath;
+
+    use crate::tests::get_test_data_path;
+
+    fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
+        let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
     // TODO: add tests.
 }

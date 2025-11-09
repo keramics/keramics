@@ -85,7 +85,10 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(get_test_data_path("").as_str());
         let file_resolver: OsFileResolver = OsFileResolver::new(path_buf);
 
-        let path_components: [PathComponent; 1] = [PathComponent::from("file.txt")];
+        let path_components: [PathComponent; 2] = [
+            PathComponent::from("directory"),
+            PathComponent::from("file.txt"),
+        ];
 
         let data_stream: Option<DataStreamReference> =
             file_resolver.get_data_stream(&path_components)?;

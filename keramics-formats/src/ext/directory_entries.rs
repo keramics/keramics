@@ -27,7 +27,7 @@ pub struct ExtDirectoryEntries {
     pub encoding: CharacterEncoding,
 
     /// Entries.
-    pub entries: BTreeMap<ByteString, ExtDirectoryEntry>,
+    entries: BTreeMap<ByteString, ExtDirectoryEntry>,
 
     /// Value to indicate the directory entries were read.
     is_read: bool,
@@ -89,6 +89,8 @@ impl ExtDirectoryEntries {
                 return Err(error);
             }
         }
+        self.is_read = true;
+
         Ok(())
     }
 
@@ -117,5 +119,134 @@ impl ExtDirectoryEntries {
 mod tests {
     use super::*;
 
-    // TODO: add tests
+    use keramics_core::open_fake_data_stream;
+
+    use crate::ext::block_range::ExtBlockRangeType;
+
+    fn get_test_data_inline() -> Vec<u8> {
+        vec![
+            0x02, 0x00, 0x00, 0x00, 0x1f, 0x00, 0x00, 0x00, 0x38, 0x00, 0x09, 0x01, 0x74, 0x65,
+            0x73, 0x74, 0x66, 0x69, 0x6c, 0x65, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ]
+    }
+
+    #[test]
+    fn test_get_entry_by_index() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_inline();
+
+        let mut directory_entries: ExtDirectoryEntries =
+            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        directory_entries.read_inline_data(&test_data, 256)?;
+
+        let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
+            directory_entries.get_entry_by_index(0);
+        assert!(entry.is_some());
+
+        let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
+            directory_entries.get_entry_by_index(99);
+        assert!(entry.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_entry_by_name() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_inline();
+
+        let mut directory_entries: ExtDirectoryEntries =
+            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        directory_entries.read_inline_data(&test_data, 256)?;
+
+        let name: ByteString = ByteString::from("testfile1");
+        let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
+            directory_entries.get_entry_by_name(&name);
+        assert!(entry.is_some());
+
+        let name: ByteString = ByteString::from("bogus");
+        let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
+            directory_entries.get_entry_by_name(&name);
+        assert!(entry.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_entries() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_inline();
+
+        let mut directory_entries: ExtDirectoryEntries =
+            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        directory_entries.read_inline_data(&test_data, 256)?;
+
+        assert_eq!(directory_entries.get_number_of_entries(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_block_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = vec![
+            0x02, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x01, 0x02, 0x2e, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0x00, 0x00, 0x0c, 0x00, 0x02, 0x02, 0x2e, 0x2e, 0x00, 0x00, 0x0b, 0x00, 0x00, 0x00,
+            0x14, 0x00, 0x0a, 0x02, 0x6c, 0x6f, 0x73, 0x74, 0x2b, 0x66, 0x6f, 0x75, 0x6e, 0x64,
+            0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x14, 0x00, 0x09, 0x01, 0x65, 0x6d, 0x70, 0x74,
+            0x79, 0x66, 0x69, 0x6c, 0x65, 0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00, 0x10, 0x00,
+            0x08, 0x02, 0x74, 0x65, 0x73, 0x74, 0x64, 0x69, 0x72, 0x31, 0x0e, 0x00, 0x00, 0x00,
+            0x18, 0x00, 0x0e, 0x01, 0x66, 0x69, 0x6c, 0x65, 0x5f, 0x68, 0x61, 0x72, 0x64, 0x6c,
+            0x69, 0x6e, 0x6b, 0x31, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x12, 0x07,
+            0x66, 0x69, 0x6c, 0x65, 0x5f, 0x73, 0x79, 0x6d, 0x62, 0x6f, 0x6c, 0x69, 0x63, 0x6c,
+            0x69, 0x6e, 0x6b, 0x31, 0x00, 0x00, 0x11, 0x00, 0x00, 0x00, 0x20, 0x00, 0x17, 0x07,
+            0x64, 0x69, 0x72, 0x65, 0x63, 0x74, 0x6f, 0x72, 0x79, 0x5f, 0x73, 0x79, 0x6d, 0x62,
+            0x6f, 0x6c, 0x69, 0x63, 0x6c, 0x69, 0x6e, 0x6b, 0x31, 0x00, 0x12, 0x00, 0x00, 0x00,
+            0x18, 0x00, 0x0e, 0x01, 0x6e, 0x66, 0x63, 0x5f, 0x74, 0xc3, 0xa9, 0x73, 0x74, 0x66,
+            0x69, 0x6c, 0xc3, 0xa8, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x18, 0x00, 0x10, 0x01,
+            0x6e, 0x66, 0x64, 0x5f, 0x74, 0x65, 0xcc, 0x81, 0x73, 0x74, 0x66, 0x69, 0x6c, 0x65,
+            0xcc, 0x80, 0x14, 0x00, 0x00, 0x00, 0x10, 0x00, 0x06, 0x01, 0x6e, 0x66, 0x64, 0x5f,
+            0xc2, 0xbe, 0x00, 0x00, 0x15, 0x00, 0x00, 0x00, 0x1c, 0x00, 0x0a, 0x01, 0x6e, 0x66,
+            0x6b, 0x64, 0x5f, 0x33, 0xe2, 0x81, 0x84, 0x34, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+
+        let mut directory_entries: ExtDirectoryEntries =
+            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+
+        assert_eq!(directory_entries.entries.len(), 0);
+        assert_eq!(directory_entries.is_read, false);
+
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let block_ranges: &Vec<ExtBlockRange> = &vec![ExtBlockRange {
+            logical_block_number: 0,
+            physical_block_number: 0,
+            number_of_blocks: 1,
+            range_type: ExtBlockRangeType::InFile,
+        }];
+        directory_entries.read_block_data(&data_stream, 256, &block_ranges)?;
+
+        assert_eq!(directory_entries.entries.len(), 10);
+        assert_eq!(directory_entries.is_read, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_inline_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data_inline();
+
+        let mut directory_entries: ExtDirectoryEntries =
+            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+
+        assert_eq!(directory_entries.entries.len(), 0);
+        assert_eq!(directory_entries.is_read, false);
+
+        directory_entries.read_inline_data(&test_data, 256)?;
+
+        assert_eq!(directory_entries.entries.len(), 1);
+        assert_eq!(directory_entries.is_read, true);
+
+        Ok(())
+    }
 }

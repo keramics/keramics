@@ -12,6 +12,7 @@
  */
 
 use std::sync::{Arc, RwLock};
+use std::time::SystemTime;
 
 use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
@@ -47,35 +48,72 @@ pub struct FakeFileEntry {
 
 impl FakeFileEntry {
     /// Creates a new file entry.
+    #[deprecated(
+        since = "0.0.1",
+        note = "please use `new_directory` or `new_file` instead"
+    )]
     pub fn new(name: &str) -> Self {
-        // TODO: use SystemTime to determine current time for timestamps
+        let current_time: SystemTime = SystemTime::now();
+
         Self {
             name: Some(name.to_string()),
             data_stream: None,
             file_type: VfsFileType::File,
-            access_time: None,
-            change_time: None,
-            creation_time: None,
-            modification_time: None,
+            access_time: Some(DateTime::FakeTime(current_time.clone())),
+            change_time: Some(DateTime::FakeTime(current_time.clone())),
+            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            modification_time: Some(DateTime::FakeTime(current_time)),
             size: 0,
         }
     }
 
-    /// Creates a new file entry.
+    /// Creates a new directory.
+    pub fn new_directory(name: &str) -> Self {
+        let current_time: SystemTime = SystemTime::now();
+
+        Self {
+            name: Some(name.to_string()),
+            data_stream: None,
+            file_type: VfsFileType::Directory,
+            access_time: Some(DateTime::FakeTime(current_time.clone())),
+            change_time: Some(DateTime::FakeTime(current_time.clone())),
+            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            modification_time: Some(DateTime::FakeTime(current_time)),
+            size: 0,
+        }
+    }
+
+    /// Creates a new file.
     pub fn new_file(name: &str, data: &[u8]) -> Self {
         let data_size: u64 = data.len() as u64;
         let data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
+        let current_time: SystemTime = SystemTime::now();
 
-        // TODO: use SystemTime to determine current time for timestamps
         Self {
             name: Some(name.to_string()),
             data_stream: Some(Arc::new(RwLock::new(data_stream))),
             file_type: VfsFileType::File,
-            access_time: None,
-            change_time: None,
-            creation_time: None,
-            modification_time: None,
+            access_time: Some(DateTime::FakeTime(current_time.clone())),
+            change_time: Some(DateTime::FakeTime(current_time.clone())),
+            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            modification_time: Some(DateTime::FakeTime(current_time)),
             size: data_size,
+        }
+    }
+
+    /// Creates a new root file entry.
+    pub fn new_root() -> Self {
+        let current_time: SystemTime = SystemTime::now();
+
+        Self {
+            name: None,
+            data_stream: None,
+            file_type: VfsFileType::Directory,
+            access_time: Some(DateTime::FakeTime(current_time.clone())),
+            change_time: Some(DateTime::FakeTime(current_time.clone())),
+            creation_time: Some(DateTime::FakeTime(current_time.clone())),
+            modification_time: Some(DateTime::FakeTime(current_time)),
+            size: 0,
         }
     }
 
@@ -126,6 +164,11 @@ impl FakeFileEntry {
     pub fn get_size(&self) -> u64 {
         self.size
     }
+
+    /// Determines if the file entry is the root file entry.
+    pub fn is_root_file_entry(&self) -> bool {
+        todo!()
+    }
 }
 
 #[cfg(test)]
@@ -163,8 +206,7 @@ mod tests {
         let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = fake_file_entry.get_access_time();
-        // TODO: use SystemTime to determine current time for timestamps
-        assert!(result.is_none());
+        assert!(result.is_some());
 
         Ok(())
     }
@@ -174,8 +216,7 @@ mod tests {
         let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = fake_file_entry.get_change_time();
-        // TODO: use SystemTime to determine current time for timestamps
-        assert!(result.is_none());
+        assert!(result.is_some());
 
         Ok(())
     }
@@ -185,8 +226,7 @@ mod tests {
         let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = fake_file_entry.get_creation_time();
-        // TODO: use SystemTime to determine current time for timestamps
-        assert!(result.is_none());
+        assert!(result.is_some());
 
         Ok(())
     }
@@ -237,8 +277,7 @@ mod tests {
         let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = fake_file_entry.get_modification_time();
-        // TODO: use SystemTime to determine current time for timestamps
-        assert!(result.is_none());
+        assert!(result.is_some());
 
         Ok(())
     }

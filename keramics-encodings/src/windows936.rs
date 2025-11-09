@@ -22824,7 +22824,7 @@ impl<'a> Iterator for DecoderWindows936<'a> {
                             Self::LOOKUP_TABLES_0XA1[(*byte_value - 0xa1) as usize];
 
                         match additional_byte_value {
-                            0x40..=0xff => {
+                            0xa0..=0xff => {
                                 match lookup_table[(additional_byte_value - 0xa0) as usize] {
                                     Some(code_point) => code_point,
                                     None => {
@@ -22850,7 +22850,7 @@ impl<'a> Iterator for DecoderWindows936<'a> {
                             Self::LOOKUP_TABLES_0XA4[(*byte_value - 0xa4) as usize];
 
                         match additional_byte_value {
-                            0x40..0xf8 => {
+                            0xa0..0xf8 => {
                                 match lookup_table[(additional_byte_value - 0xa0) as usize] {
                                     Some(code_point) => code_point,
                                     None => {
@@ -46033,7 +46033,110 @@ mod tests {
         let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
-        // TODO: improve test coverage.
+        let byte_string: [u8; 2] = [0x81, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0x81, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa1, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa1, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa4, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa4, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa8, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xa8, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xaa, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xaa, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xb0, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xb0, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xf8, 0x7f];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xf8, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
+
+        let byte_string: [u8; 2] = [0xfe, 0x00];
+
+        let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
+
+        let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
+        assert!(result.is_err());
 
         let byte_string: [u8; 1] = [0xff];
 
