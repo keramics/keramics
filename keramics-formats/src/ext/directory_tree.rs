@@ -252,8 +252,6 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00,
         ];
-        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
-
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
         let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();

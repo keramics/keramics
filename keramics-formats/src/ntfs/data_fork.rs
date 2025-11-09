@@ -96,6 +96,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::ntfs::file_entry::NtfsFileEntry;
     use crate::ntfs::file_system::NtfsFileSystem;
     use crate::ntfs::path::NtfsPath;
 
@@ -111,5 +112,43 @@ mod tests {
         Ok(file_system)
     }
 
-    // TODO: add tests.
+    fn get_file_entry(path: &str) -> Result<NtfsFileEntry, ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+
+        let ntfs_path: NtfsPath = NtfsPath::from(path);
+        match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
+        // TODO: change to not retrieve data fork from file entry.
+        let ntfs_file_entry: NtfsFileEntry = get_file_entry("\\testdir1\\testfile1")?;
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
+
+        data_fork.get_data_stream()?;
+
+        // TODO: add test with ADS
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
+        // TODO: change to not retrieve data fork from file entry.
+        let ntfs_file_entry: NtfsFileEntry = get_file_entry("\\testdir1\\testfile1")?;
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
+
+        let name: Option<&Ucs2String> = data_fork.get_name();
+        assert_eq!(name, None);
+
+        // TODO: add test with ADS
+
+        Ok(())
+    }
 }
