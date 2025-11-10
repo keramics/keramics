@@ -21,6 +21,7 @@ use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
 use super::location::{VfsLocation, new_os_vfs_location};
 use super::path::VfsPath;
+use super::string::VfsString;
 use super::types::VfsFileSystemReference;
 
 /// Virtual File System (VFS) context.
@@ -41,11 +42,11 @@ impl VfsContext {
         }
     }
 
-    /// Retrieves a data stream with the specified path and name.
-    pub fn get_data_stream_by_path_and_name(
+    /// Retrieves a data stream with the specified location and name.
+    pub fn get_data_stream_by_location_and_name(
         &mut self,
         vfs_location: &VfsLocation,
-        name: Option<&str>,
+        name: Option<&VfsString>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let file_system: VfsFileSystemReference = match self.open_file_system(vfs_location) {
             Ok(file_system) => file_system,
@@ -149,19 +150,19 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     #[test]
-    fn test_get_data_stream_by_path_and_name() -> Result<(), ErrorTrace> {
+    fn test_get_data_stream_by_location_and_name() -> Result<(), ErrorTrace> {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
         let result: Option<DataStreamReference> =
-            vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)?;
+            vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
         let vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("directory/bogus.txt").as_str());
         let result: Option<DataStreamReference> =
-            vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)?;
+            vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_none());
 
         Ok(())

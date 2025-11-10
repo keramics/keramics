@@ -20,6 +20,9 @@ pub type DataStreamReference = Arc<RwLock<dyn DataStream>>;
 
 /// Data stream trait.
 pub trait DataStream: Send + Sync {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace>;
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace>;
 

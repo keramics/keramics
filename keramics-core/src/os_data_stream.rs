@@ -20,6 +20,18 @@ use super::data_stream::{DataStream, DataStreamReference};
 use super::errors::ErrorTrace;
 
 impl DataStream for File {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        match Seek::stream_position(self) {
+            Ok(offset) => Ok(offset),
+            Err(error) => Err(ErrorTrace::new(format!(
+                "{}: Unable to retrieve current position with error: {}",
+                crate::error_trace_function!(),
+                error.to_string(),
+            ))),
+        }
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         let metadata: Metadata = match self.metadata() {
@@ -90,6 +102,19 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+
+        DataStream::seek(&mut file, SeekFrom::Start(101))?;
+
+        let offset: u64 = file.get_offset()?;
+        assert_eq!(offset, 101);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
         let mut file: File = open_file!(path_buf);
@@ -104,6 +129,88 @@ mod tests {
     fn test_open_os_data_stream() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
         let _ = open_os_data_stream(&path_buf)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+
+        let offset: u64 = DataStream::seek(&mut file, SeekFrom::Start(101))?;
+        assert_eq!(offset, 101);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+
+        let offset: u64 = DataStream::seek(&mut file, SeekFrom::End(-101))?;
+        assert_eq!(offset, 202 - 101);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+
+        let offset = DataStream::seek(&mut file, SeekFrom::Start(101))?;
+        assert_eq!(offset, 101);
+
+        let offset: u64 = DataStream::seek(&mut file, SeekFrom::Current(-50))?;
+        assert_eq!(offset, 51);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+
+        let offset: u64 = DataStream::seek(&mut file, SeekFrom::End(101))?;
+        assert_eq!(offset, 202 + 101);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+        DataStream::seek(&mut file, SeekFrom::Start(128))?;
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = DataStream::read(&mut file, &mut data)?;
+        assert_eq!(read_size, 64);
+
+        let expected_data: String = [
+            "A ceramic is any of the various hard, brittle, heat-resistant, and ",
+            "corrosion-resistant materials made by shaping and then firing an inorganic, ",
+            "nonmetallic material, such as clay, at a high temperature.\n",
+        ]
+        .join("");
+
+        assert_eq!(data, expected_data.as_bytes()[128..192]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let mut file: File = open_file!(path_buf);
+        DataStream::seek(&mut file, SeekFrom::End(512))?;
+
+        let mut data: Vec<u8> = vec![0; 64];
+        let read_size: usize = DataStream::read(&mut file, &mut data)?;
+        assert_eq!(read_size, 0);
 
         Ok(())
     }

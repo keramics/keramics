@@ -30,7 +30,7 @@ pub struct FakeDataStream {
     current_offset: u64,
 
     /// The size.
-    pub size: u64,
+    size: u64,
 }
 
 impl FakeDataStream {
@@ -46,6 +46,11 @@ impl FakeDataStream {
 }
 
 impl DataStream for FakeDataStream {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
@@ -150,6 +155,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        data_stream.seek(SeekFrom::Start(1024))?;
+
+        let offset: u64 = data_stream.get_offset()?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let size: u64 = data_stream.get_size()?;
+        assert_eq!(size, 32768);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let mut data_stream: FakeDataStream = get_test_data_stream();
 
@@ -218,12 +245,10 @@ mod tests {
         let mut data_stream: FakeDataStream = get_test_data_stream();
         data_stream.seek(SeekFrom::End(512))?;
 
-        let mut data: Vec<u8> = vec![0; 512];
+        let mut data: Vec<u8> = vec![0; 64];
         let read_size: usize = data_stream.read(&mut data)?;
         assert_eq!(read_size, 0);
 
         Ok(())
     }
-
-    // TODO: add tests for get_size.
 }

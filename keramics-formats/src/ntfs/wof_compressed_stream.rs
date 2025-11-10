@@ -356,6 +356,11 @@ impl NtfsWofCompressedStream {
 }
 
 impl DataStream for NtfsWofCompressedStream {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data stream.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
@@ -1184,6 +1189,26 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for get_offset.
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        data_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut block_stream: NtfsWofCompressedStream = NtfsWofCompressedStream::new(4096, 0);
+        block_stream.open(&data_stream, &data_attribute, 28672)?;
+
+        let size: u64 = block_stream.get_size()?;
+        assert_eq!(size, 28672);
+
+        Ok(())
+    }
+
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
@@ -1338,24 +1363,6 @@ mod tests {
         let mut data: Vec<u8> = vec![0; 512];
         let read_size: usize = block_stream.read(&mut data)?;
         assert_eq!(read_size, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_size() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
-
-        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
-        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-        data_attribute.read_data(&test_mft_attribute_data)?;
-
-        let mut block_stream: NtfsWofCompressedStream = NtfsWofCompressedStream::new(4096, 0);
-        block_stream.open(&data_stream, &data_attribute, 28672)?;
-
-        let size: u64 = block_stream.get_size()?;
-        assert_eq!(size, 28672);
 
         Ok(())
     }

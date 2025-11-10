@@ -803,7 +803,7 @@ mod tests {
         let mut vfs_context: VfsContext = VfsContext::new();
 
         let vfs_location: VfsLocation = new_os_vfs_location(path);
-        match vfs_context.get_data_stream_by_path_and_name(&vfs_location, None)? {
+        match vfs_context.get_data_stream_by_location_and_name(&vfs_location, None)? {
             Some(data_stream) => Ok(data_stream),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file: {}",

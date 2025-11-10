@@ -17,7 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtFileEntry, ExtPath};
-use keramics_formats::fat::{FatFileEntry, FatString};
+use keramics_formats::fat::FatFileEntry;
 use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry, NtfsPath};
 use keramics_types::{ByteString, Ucs2String};
 
@@ -190,64 +190,61 @@ impl VfsFileEntry {
     pub fn get_name(&self) -> Option<VfsString> {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
-                Some(name) => Some(VfsString::Byte(name.clone())),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Fake(fake_file_entry) => match fake_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name.clone())),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Fat(fat_file_entry) => match fat_file_entry.get_name() {
-                Some(name) => match name {
-                    FatString::ByteString(byte_string) => Some(VfsString::Byte(byte_string)),
-                    FatString::Ucs2String(ucs2_string) => Some(VfsString::Ucs2(ucs2_string)),
-                },
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_name() {
-                Some(name) => Some(VfsString::Ucs2(name.clone())),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_name() {
-                Some(name) => Some(VfsString::OsString(name.to_os_string())),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Qcow(qcow_file_entry) => match qcow_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 match sparseimage_file_entry.get_name() {
-                    Some(name) => Some(VfsString::String(name)),
+                    Some(name) => Some(VfsString::from(name)),
                     None => None,
                 }
             }
             VfsFileEntry::Udif(udif_file_entry) => match udif_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Vhd(vhd_file_entry) => match vhd_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
             VfsFileEntry::Vhdx(vhdx_file_entry) => match vhdx_file_entry.get_name() {
-                Some(name) => Some(VfsString::String(name)),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
         }
@@ -615,7 +612,7 @@ impl VfsFileEntry {
     /// Retrieves a data stream with the specified name.
     pub fn get_data_stream_by_name(
         &self,
-        name: Option<&str>,
+        name: Option<&VfsString>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Option<DataStreamReference> = match self {
             VfsFileEntry::Apm(_)
@@ -645,7 +642,7 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 let ntfs_name: Option<Ucs2String> = match name {
-                    Some(string) => Some(Ucs2String::from(string)),
+                    Some(vfs_string) => Some(vfs_string.to_ucs2string()),
                     None => None,
                 };
                 match ntfs_file_entry.get_data_stream_by_name(&ntfs_name) {
@@ -1238,7 +1235,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
-        assert_eq!(name, Some(VfsString::Byte(ByteString::from("testfile1"))));
+        assert_eq!(name, Some(VfsString::from(ByteString::from("testfile1"))));
         Ok(())
     }
 
@@ -1609,7 +1606,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
-        assert_eq!(name, Some(VfsString::Ucs2(Ucs2String::from("testfile1"))));
+        assert_eq!(name, Some(VfsString::from(Ucs2String::from("testfile1"))));
         Ok(())
     }
 
@@ -2032,7 +2029,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
-        assert_eq!(name, Some(VfsString::Ucs2(Ucs2String::from("testfile1"))));
+        assert_eq!(name, Some(VfsString::from(Ucs2String::from("testfile1"))));
         Ok(())
     }
 
@@ -2159,7 +2156,7 @@ mod tests {
             get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
-        assert_eq!(name, Some(VfsString::OsString(OsString::from("file.txt"))));
+        assert_eq!(name, Some(VfsString::from(OsString::from("file.txt"))));
 
         Ok(())
     }

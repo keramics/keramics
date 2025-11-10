@@ -210,8 +210,8 @@ impl HashTool {
             // }
             // TODO: create skip list
             let hash_string: String = if path_components.len() > 1
-                && path_components[1] == VfsString::Ucs2(Ucs2String::from("$BadClus"))
-                && name == Some(VfsString::Ucs2(Ucs2String::from("$Bad")))
+                && path_components[1] == VfsString::from(Ucs2String::from("$BadClus"))
+                && name == Some(VfsString::from(Ucs2String::from("$Bad")))
             {
                 String::from("N/A (skipped)")
             } else {

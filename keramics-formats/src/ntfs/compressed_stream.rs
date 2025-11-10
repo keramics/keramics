@@ -352,6 +352,11 @@ impl NtfsCompressedStream {
 }
 
 impl DataStream for NtfsCompressedStream {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data stream.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
@@ -1027,6 +1032,9 @@ mod tests {
 
     // TODO: add tests for read_data_from_blocks
 
+    // TODO: add tests for get_offset.
+    // TODO: add tests for get_size.
+
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
@@ -1154,6 +1162,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for get_size.
 }

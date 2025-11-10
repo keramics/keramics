@@ -11,41 +11,53 @@
  * under the License.
  */
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 
+use keramics_formats::fat::FatString;
 use keramics_types::{ByteString, Ucs2String};
 
 /// Virtual File System (VFS) string.
 #[derive(Clone, Debug, PartialEq)]
 pub enum VfsString {
-    Byte(ByteString),
+    ByteString(ByteString),
     Empty,
     OsString(OsString),
     String(String),
-    Ucs2(Ucs2String),
+    Ucs2String(Ucs2String),
 }
 
 impl VfsString {
     /// Determines if the VFS string is empty.
     pub fn is_empty(&self) -> bool {
         match self {
-            VfsString::Byte(byte_string) => byte_string.is_empty(),
-            VfsString::Empty => true,
-            VfsString::OsString(os_string) => os_string.is_empty(),
-            VfsString::String(string) => string.is_empty(),
-            VfsString::Ucs2(ucs2_string) => ucs2_string.is_empty(),
+            Self::ByteString(byte_string) => byte_string.is_empty(),
+            Self::Empty => true,
+            Self::OsString(os_string) => os_string.is_empty(),
+            Self::String(string) => string.is_empty(),
+            Self::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
         }
     }
 
     /// Converts the VFS string to a `String`.
     pub fn to_string(&self) -> String {
         match self {
-            VfsString::Byte(byte_string) => byte_string.to_string(),
-            VfsString::Empty => String::new(),
+            Self::ByteString(byte_string) => byte_string.to_string(),
+            Self::Empty => String::new(),
             // TODO: change to_string_lossy to a non-lossy conversion
-            VfsString::OsString(os_string) => os_string.to_string_lossy().to_string(),
-            VfsString::String(string) => string.clone(),
-            VfsString::Ucs2(ucs2_string) => ucs2_string.to_string(),
+            Self::OsString(os_string) => os_string.to_string_lossy().to_string(),
+            Self::String(string) => string.clone(),
+            Self::Ucs2String(ucs2_string) => ucs2_string.to_string(),
+        }
+    }
+
+    /// Converts the VFS string to an `Ucs2String`.
+    pub fn to_ucs2string(&self) -> Ucs2String {
+        match self {
+            Self::ByteString(_) => todo!(),
+            Self::Empty => Ucs2String::new(),
+            Self::OsString(_) => todo!(),
+            Self::String(string) => Ucs2String::from(string),
+            Self::Ucs2String(ucs2_string) => ucs2_string.clone(),
         }
     }
 }
@@ -58,11 +70,89 @@ impl From<&str> for VfsString {
     }
 }
 
+impl From<String> for VfsString {
+    /// Converts a [`String`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(string: String) -> Self {
+        Self::String(string)
+    }
+}
+
 impl From<&String> for VfsString {
     /// Converts a [`&String`] into a [`VfsString`]
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::String(string.clone())
+    }
+}
+
+impl From<ByteString> for VfsString {
+    /// Converts a [`ByteString`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(byte_string: ByteString) -> Self {
+        Self::ByteString(byte_string)
+    }
+}
+
+impl From<&ByteString> for VfsString {
+    /// Converts a [`&ByteString`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(byte_string: &ByteString) -> Self {
+        Self::ByteString(byte_string.clone())
+    }
+}
+
+impl From<FatString> for VfsString {
+    /// Converts a [`FatString`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(fat_string: FatString) -> Self {
+        match fat_string {
+            FatString::ByteString(byte_string) => Self::ByteString(byte_string),
+            FatString::Ucs2String(ucs2_string) => Self::Ucs2String(ucs2_string),
+        }
+    }
+}
+
+impl From<&FatString> for VfsString {
+    /// Converts a [`&FatString`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(fat_string: &FatString) -> Self {
+        match fat_string {
+            FatString::ByteString(byte_string) => Self::ByteString(byte_string.clone()),
+            FatString::Ucs2String(ucs2_string) => Self::Ucs2String(ucs2_string.clone()),
+        }
+    }
+}
+
+impl From<OsString> for VfsString {
+    /// Converts an [`OsString`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(os_string: OsString) -> Self {
+        Self::OsString(os_string)
+    }
+}
+
+impl From<&OsStr> for VfsString {
+    /// Converts an [`&OsStr`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(os_str: &OsStr) -> Self {
+        Self::OsString(os_str.to_os_string())
+    }
+}
+
+impl From<Ucs2String> for VfsString {
+    /// Converts an [`Ucs2String`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(ucs2_string: Ucs2String) -> Self {
+        Self::Ucs2String(ucs2_string)
+    }
+}
+
+impl From<&Ucs2String> for VfsString {
+    /// Converts an [`&Ucs2String`] into a [`VfsString`]
+    #[inline(always)]
+    fn from(ucs2_string: &Ucs2String) -> Self {
+        Self::Ucs2String(ucs2_string.clone())
     }
 }
 

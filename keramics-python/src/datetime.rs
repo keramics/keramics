@@ -14,7 +14,9 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyNone};
 
-use keramics_datetime::{DateTime, Filetime, PosixTime32, PosixTime64Ns};
+use keramics_datetime::{
+    DateTime, FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, PosixTime32, PosixTime64Ns,
+};
 
 pub struct PyDateTime {}
 
@@ -22,6 +24,24 @@ impl PyDateTime {
     pub fn new(date_time: &DateTime) -> PyResult<Py<PyAny>> {
         Python::attach(|py| -> PyResult<_> {
             match date_time {
+                DateTime::FatDate(fat_date) => {
+                    let py_fat_date: PyFatDate = PyFatDate {
+                        fat_date: fat_date.clone(),
+                    };
+                    Ok(Py::new(py, py_fat_date)?.into_any())
+                }
+                DateTime::FatTimeDate(fat_time_date) => {
+                    let py_fat_time_date: PyFatTimeDate = PyFatTimeDate {
+                        fat_time_date: fat_time_date.clone(),
+                    };
+                    Ok(Py::new(py, py_fat_time_date)?.into_any())
+                }
+                DateTime::FatTimeDate10Ms(fat_time_date) => {
+                    let py_fat_time_date: PyFatTimeDate10Ms = PyFatTimeDate10Ms {
+                        fat_time_date: fat_time_date.clone(),
+                    };
+                    Ok(Py::new(py, py_fat_time_date)?.into_any())
+                }
                 DateTime::Filetime(filetime) => {
                     let py_filetime: PyFiletime = PyFiletime {
                         filetime: filetime.clone(),
@@ -51,6 +71,36 @@ impl PyDateTime {
         })
     }
 }
+
+#[pyclass]
+#[pyo3(name = "FatDate")]
+#[derive(Clone)]
+struct PyFatDate {
+    fat_date: FatDate,
+}
+
+#[pymethods]
+impl PyFatDate {}
+
+#[pyclass]
+#[pyo3(name = "FatTimeDate")]
+#[derive(Clone)]
+struct PyFatTimeDate {
+    fat_time_date: FatTimeDate,
+}
+
+#[pymethods]
+impl PyFatTimeDate {}
+
+#[pyclass]
+#[pyo3(name = "FatTimeDate10Ms")]
+#[derive(Clone)]
+struct PyFatTimeDate10Ms {
+    fat_time_date: FatTimeDate10Ms,
+}
+
+#[pymethods]
+impl PyFatTimeDate10Ms {}
 
 #[pyclass]
 #[pyo3(name = "Filetime")]
@@ -104,6 +154,9 @@ impl PyPosixTime64Ns {
 
 #[pymodule]
 pub fn datetime(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<PyFatDate>()?;
+    module.add_class::<PyFatTimeDate>()?;
+    module.add_class::<PyFatTimeDate10Ms>()?;
     module.add_class::<PyFiletime>()?;
     module.add_class::<PyPosixTime32>()?;
     module.add_class::<PyPosixTime64Ns>()?;

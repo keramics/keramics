@@ -12,6 +12,7 @@ name = "pykeramics"
 crate-type = ["cdylib"]
 
 [dependencies]
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
 keramics-datetime = { version = "0.0.1", path = "../keramics-datetime" }
 keramics-vfs = { version = "0.0.1", path = "../keramics-vfs" }
 pyo3 = { version = "0.26.0", features = ["extension-module"] }

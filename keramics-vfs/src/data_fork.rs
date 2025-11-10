@@ -36,7 +36,7 @@ impl<'a> VfsDataFork<'a> {
         match self {
             VfsDataFork::DataStream(_) => None,
             VfsDataFork::Ntfs(data_fork) => match data_fork.get_name() {
-                Some(name) => Some(VfsString::Ucs2(name.clone())),
+                Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
         }

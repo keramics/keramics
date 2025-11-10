@@ -39,11 +39,11 @@ pub struct SparseImageFile {
     /// Block size.
     pub block_size: u32,
 
+    /// The current offset.
+    current_offset: u64,
+
     /// Media size.
     pub media_size: u64,
-
-    /// Media offset.
-    media_offset: u64,
 }
 
 impl SparseImageFile {
@@ -55,8 +55,8 @@ impl SparseImageFile {
             block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
             bytes_per_sector: 0,
             block_size: 0,
+            current_offset: 0,
             media_size: 0,
-            media_offset: 0,
         }
     }
 
@@ -197,7 +197,7 @@ impl SparseImageFile {
     fn read_data_from_bands(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut media_offset: u64 = self.media_offset;
+        let mut media_offset: u64 = self.current_offset;
         let block_number: u64 = media_offset / (self.block_size as u64);
         let block_offset: u64 = block_number * (self.block_size as u64);
         let mut range_relative_offset: u64 = media_offset - block_offset;
@@ -252,6 +252,11 @@ impl SparseImageFile {
 }
 
 impl DataStream for SparseImageFile {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.media_size)
@@ -259,10 +264,10 @@ impl DataStream for SparseImageFile {
 
     /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.media_offset >= self.media_size {
+        if self.current_offset >= self.media_size {
             return Ok(0);
         }
-        let remaining_media_size: u64 = self.media_size - self.media_offset;
+        let remaining_media_size: u64 = self.media_size - self.current_offset;
         let mut read_size: usize = buf.len();
 
         if (read_size as u64) > remaining_media_size {
@@ -275,16 +280,16 @@ impl DataStream for SparseImageFile {
                 return Err(error);
             }
         };
-        self.media_offset += read_count as u64;
+        self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.media_offset = match pos {
+        self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.media_offset as i64;
+                let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
@@ -295,7 +300,7 @@ impl DataStream for SparseImageFile {
             }
             SeekFrom::Start(offset) => offset,
         };
-        Ok(self.media_offset)
+        Ok(self.current_offset)
     }
 }
 
@@ -353,6 +358,9 @@ mod tests {
     }
 
     // TODO: add test for read_data_from_bands
+
+    // TODO: add tests for get_offset.
+    // TODO: add tests for get_size.
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
@@ -461,6 +469,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for get_size.
 }

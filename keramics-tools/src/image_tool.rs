@@ -363,6 +363,19 @@ impl StorageMediaImage {
 }
 
 impl DataStream for StorageMediaImage {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        match self {
+            StorageMediaImage::Ewf(image) => image.get_offset(),
+            // TODO: add Qcow layer support.
+            StorageMediaImage::SparseImage(file) => file.get_offset(),
+            StorageMediaImage::Udif(file) => file.get_offset(),
+            // TODO: add Vhd layer support.
+            // TODO: add Vhdx layer support.
+            _ => todo!(),
+        }
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         match self {

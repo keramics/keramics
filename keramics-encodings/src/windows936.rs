@@ -46047,7 +46047,7 @@ mod tests {
         let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
-        let byte_string: [u8; 2] = [0xa1, 0x7f];
+        let byte_string: [u8; 2] = [0xa1, 0xa0];
 
         let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
 
@@ -46061,7 +46061,7 @@ mod tests {
         let result: Result<Vec<u32>, ErrorTrace> = decoder.next().unwrap();
         assert!(result.is_err());
 
-        let byte_string: [u8; 2] = [0xa4, 0x7f];
+        let byte_string: [u8; 2] = [0xa4, 0xa0];
 
         let mut decoder: DecoderWindows936 = DecoderWindows936::new(&byte_string);
 
@@ -46167,7 +46167,147 @@ mod tests {
 
     #[test]
     fn test_encode_with_unsupported_code_point() {
+        let code_points: [u32; 1] = [0x00a0];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x01c8];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0250];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x02c0];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0390];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x0400];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2011];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2100];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x216c];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x2209];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x246a];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x254c];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x3004];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x322a];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x3388];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0x9fa6];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
         let code_points: [u32; 1] = [0xd800];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0xf9e0];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0xfe32];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0xff00];
+
+        let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
+
+        let result: Result<Vec<u8>, ErrorTrace> = encoder.next().unwrap();
+        assert!(result.is_err());
+
+        let code_points: [u32; 1] = [0xffe6];
 
         let mut encoder: EncoderWindows936 = EncoderWindows936::new(&code_points);
 

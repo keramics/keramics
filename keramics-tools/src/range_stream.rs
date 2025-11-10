@@ -77,6 +77,11 @@ impl FileRangeDataStream {
 }
 
 impl DataStream for FileRangeDataStream {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.range_size)
@@ -147,8 +152,9 @@ impl DataStream for FileRangeDataStream {
 mod tests {
     use super::*;
 
+    // TODO: add tests for get_offset.
+    // TODO: add tests for get_size.
     // TODO: add tests for open.
     // TODO: add tests for read.
     // TODO: add tests for seek.
-    // TODO: add tests for get_size.
 }

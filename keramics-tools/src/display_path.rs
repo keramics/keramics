@@ -57,7 +57,7 @@ impl DisplayPath {
     /// Escapes unprintable characters in a VFS string.
     pub fn escape_string(&self, vfs_string: &VfsString) -> String {
         match vfs_string {
-            VfsString::Byte(byte_string) => {
+            VfsString::ByteString(byte_string) => {
                 let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
 
                 let mut string_parts: Vec<String> = Vec::new();
@@ -89,7 +89,7 @@ impl DisplayPath {
             VfsString::Empty => String::new(),
             VfsString::OsString(_) => todo!(),
             VfsString::String(string) => self.internal_escape_string(string),
-            VfsString::Ucs2(ucs2_string) => ucs2_string
+            VfsString::Ucs2String(ucs2_string) => ucs2_string
                 .elements
                 .iter()
                 .map(|element| match char::from_u32(*element as u32) {
@@ -283,11 +283,11 @@ mod tests {
     fn test_escape_string() -> Result<(), ErrorTrace> {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
-        let test_string: VfsString = VfsString::String(String::from("test"));
+        let test_string: VfsString = VfsString::from("test");
         let escaped_string: String = display_path.escape_string(&test_string);
         assert_eq!(escaped_string, "test");
 
-        let test_string: VfsString = VfsString::Ucs2(Ucs2String {
+        let test_string: VfsString = VfsString::from(Ucs2String {
             elements: vec![0x0074, 0x0065, 0x0073, 0x0074, 0xd800],
         });
         let escaped_string: String = display_path.escape_string(&test_string);

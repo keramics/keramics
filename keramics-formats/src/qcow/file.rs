@@ -90,11 +90,11 @@ pub struct QcowFile {
     /// Backing file.
     backing_file: Option<Arc<RwLock<QcowFile>>>,
 
+    /// The current offset.
+    current_offset: u64,
+
     /// Media size.
     pub media_size: u64,
-
-    /// Media offset.
-    media_offset: u64,
 }
 
 impl QcowFile {
@@ -122,8 +122,8 @@ impl QcowFile {
             block_tree: BlockTree::<QcowBlockRange>::new(0, 0, 0),
             backing_file_name: None,
             backing_file: None,
+            current_offset: 0,
             media_size: 0,
-            media_offset: 0,
         }
     }
 
@@ -434,7 +434,7 @@ impl QcowFile {
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut media_offset: u64 = self.media_offset;
+        let mut media_offset: u64 = self.current_offset;
 
         while data_offset < read_size {
             if media_offset >= self.media_size {
@@ -534,6 +534,11 @@ impl QcowFile {
 }
 
 impl DataStream for QcowFile {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.media_size)
@@ -541,10 +546,10 @@ impl DataStream for QcowFile {
 
     /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.media_offset >= self.media_size {
+        if self.current_offset >= self.media_size {
             return Ok(0);
         }
-        let remaining_media_size: u64 = self.media_size - self.media_offset;
+        let remaining_media_size: u64 = self.media_size - self.current_offset;
         let mut read_size: usize = buf.len();
 
         if (read_size as u64) > remaining_media_size {
@@ -557,16 +562,16 @@ impl DataStream for QcowFile {
                 return Err(error);
             }
         };
-        self.media_offset += read_count as u64;
+        self.current_offset += read_count as u64;
 
         Ok(read_count)
     }
 
     /// Sets the current position of the data.
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.media_offset = match pos {
+        self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.media_offset as i64;
+                let mut current_offset: i64 = self.current_offset as i64;
                 current_offset += relative_offset;
                 current_offset as u64
             }
@@ -577,7 +582,7 @@ impl DataStream for QcowFile {
             }
             SeekFrom::Start(offset) => offset,
         };
-        Ok(self.media_offset)
+        Ok(self.current_offset)
     }
 }
 
@@ -633,6 +638,9 @@ mod tests {
     // TODO: add tests for read_cluster_block_entry
     // TODO: add tests for read_data_from_blocks
     // TODO: add tests for set_backing_file
+
+    // TODO: add tests for get_offset.
+    // TODO: add tests for get_size.
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
@@ -741,6 +749,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for get_size.
 }

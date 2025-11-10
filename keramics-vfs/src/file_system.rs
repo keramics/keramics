@@ -31,6 +31,7 @@ use super::os::OsFileEntry;
 use super::path::VfsPath;
 use super::qcow::{QcowFileEntry, QcowFileSystem};
 use super::sparseimage::{SparseImageFileEntry, SparseImageFileSystem};
+use super::string::VfsString;
 use super::types::VfsFileSystemReference;
 use super::udif::{UdifFileEntry, UdifFileSystem};
 use super::vhd::{VhdFileEntry, VhdFileSystem};
@@ -286,7 +287,7 @@ impl VfsFileSystem {
     pub fn get_data_stream_by_path_and_name(
         &self,
         vfs_path: &VfsPath,
-        name: Option<&str>,
+        name: Option<&VfsString>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.get_file_entry_by_path(vfs_path)? {
             // TODO: replace by get_data_fork_by_name

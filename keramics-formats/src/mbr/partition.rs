@@ -68,6 +68,11 @@ impl MbrPartition {
 }
 
 impl DataStream for MbrPartition {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data stream.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size)
@@ -149,6 +154,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_offset.
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {

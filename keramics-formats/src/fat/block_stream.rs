@@ -169,6 +169,11 @@ impl FatBlockStream {
 }
 
 impl DataStream for FatBlockStream {
+    /// Retrieves the current position.
+    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
+        Ok(self.current_offset)
+    }
+
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.size as u64)
@@ -261,6 +266,8 @@ mod tests {
     }
 
     // TODO: add tests for read_data_from_blocks
+
+    // TODO: add tests for get_offset.
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {

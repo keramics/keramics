@@ -20,7 +20,7 @@ use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_vfs::{
     VfsLocation, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode,
-    VfsScanner, VfsType, new_os_vfs_location,
+    VfsScanner, VfsString, VfsType, new_os_vfs_location,
 };
 
 mod writer;
@@ -81,7 +81,7 @@ impl ExportTool {
         data_stream_writer: &mut DataStreamWriter,
         vfs_scan_node: &VfsScanNode,
         path_components: &[&str],
-        name: Option<&str>,
+        name: Option<&VfsString>,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
@@ -90,7 +90,7 @@ impl ExportTool {
             let vfs_path: VfsPath = VfsPath::from_path_components(vfs_type, path_components);
             let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(vfs_path);
             let result: Option<DataStreamReference> = match vfs_resolver
-                .get_data_stream_by_path_and_name(&vfs_location, name)
+                .get_data_stream_by_location_and_name(&vfs_location, name)
             {
                 Ok(result) => result,
                 Err(mut error) => {
@@ -193,8 +193,8 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Commands::Path(command_arguments) => {
-            let name: Option<&str> = match command_arguments.name {
-                Some(ref name) => Some(name.as_str()),
+            let name: Option<VfsString> = match command_arguments.name {
+                Some(ref name) => Some(VfsString::from(name)),
                 None => None,
             };
             let path_components: Vec<&str> = command_arguments.path.split('/').collect();
@@ -203,7 +203,7 @@ fn main() -> ExitCode {
                 &mut data_stream_writer,
                 root_scan_node,
                 &path_components,
-                name,
+                name.as_ref(),
             ) {
                 Ok(_) => {}
                 Err(error) => {

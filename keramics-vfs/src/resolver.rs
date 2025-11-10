@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use super::context::VfsContext;
 use super::file_entry::VfsFileEntry;
 use super::location::VfsLocation;
+use super::string::VfsString;
 use super::types::{VfsFileSystemReference, VfsResolverReference};
 
 /// Virtual File System (VFS) resolver.
@@ -39,14 +40,14 @@ impl VfsResolver {
         CURRENT_RESOLVER.with(|resolver| resolver.clone())
     }
 
-    /// Retrieves a data stream with the specified path and name.
-    pub fn get_data_stream_by_path_and_name(
+    /// Retrieves a data stream with the specified location and name.
+    pub fn get_data_stream_by_location_and_name(
         &self,
         vfs_location: &VfsLocation,
-        name: Option<&str>,
+        name: Option<&VfsString>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.context.write() {
-            Ok(mut context) => context.get_data_stream_by_path_and_name(vfs_location, name),
+            Ok(mut context) => context.get_data_stream_by_location_and_name(vfs_location, name),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on context",
@@ -103,19 +104,19 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     #[test]
-    fn test_get_data_stream_by_path_and_name() -> Result<(), ErrorTrace> {
+    fn test_get_data_stream_by_location_and_name() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
         let vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
         let result: Option<DataStreamReference> =
-            vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, None)?;
+            vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
         let vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("directory/bogus.txt").as_str());
         let result: Option<DataStreamReference> =
-            vfs_resolver.get_data_stream_by_path_and_name(&vfs_location, None)?;
+            vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_none());
 
         Ok(())
