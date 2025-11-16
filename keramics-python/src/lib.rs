@@ -26,7 +26,7 @@ fn pykeramics(python: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> 
     module.add_wrapped(wrap_pymodule!(vfs::vfs))?;
 
     let sys = PyModule::import(python, "sys")?;
-    let sys_modules: Bound<'_, PyDict> = sys.getattr("modules")?.downcast_into()?;
+    let sys_modules: Bound<'_, PyDict> = Bound::cast_into(sys.getattr("modules")?)?;
     sys_modules.set_item("pykeramics.datetime", module.getattr("datetime")?)?;
     sys_modules.set_item("pykeramics.vfs", module.getattr("vfs")?)?;
 
