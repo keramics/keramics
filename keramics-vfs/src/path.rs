@@ -172,10 +172,10 @@ mod tests {
 
     #[test]
     fn test_from_string() {
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, "/apm1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, "apm1");
         assert!(matches!(vfs_path, VfsPath::Path(_)));
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/os1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "os1");
         assert!(matches!(vfs_path, VfsPath::Os(_)));
     }
 
@@ -200,19 +200,19 @@ mod tests {
 
     #[test]
     fn test_is_relative() {
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, "/apm1");
-        assert_eq!(vfs_path.is_relative(), false);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, "apm1");
+        assert_eq!(vfs_path.is_relative(), true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/os1");
-        assert_eq!(vfs_path.is_relative(), false);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "os1");
+        assert_eq!(vfs_path.is_relative(), true);
     }
 
     #[test]
     fn test_is_root() {
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, "/apm1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, "apm1");
         assert_eq!(vfs_path.is_root(), false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/os1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "os1");
         assert_eq!(vfs_path.is_root(), false);
     }
 
