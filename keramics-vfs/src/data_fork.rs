@@ -50,8 +50,9 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
-    use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
-    use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem, NtfsPath};
+    use keramics_formats::Path;
+    use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
+    use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
 
     use crate::tests::get_test_data_path;
 
@@ -67,15 +68,15 @@ mod tests {
         Ok(file_system)
     }
 
-    fn get_ext_file_entry(path: &str) -> Result<ExtFileEntry, ErrorTrace> {
+    fn get_ext_file_entry(path_string: &str) -> Result<ExtFileEntry, ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_ext_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from(path);
-        match ext_file_system.get_file_entry_by_path(&ext_path)? {
+        let path: Path = Path::from(path_string);
+        match ext_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
-                path
+                path_string
             ))),
         }
     }
@@ -117,22 +118,22 @@ mod tests {
         Ok(file_system)
     }
 
-    fn get_ntfs_file_entry(path: &str) -> Result<NtfsFileEntry, ErrorTrace> {
+    fn get_ntfs_file_entry(path_string: &str) -> Result<NtfsFileEntry, ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_ntfs_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from(path);
-        match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+        let path: Path = Path::from(path_string);
+        match ntfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
-                path
+                path_string
             ))),
         }
     }
 
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
-        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
         let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
@@ -146,7 +147,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
-        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
         let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);

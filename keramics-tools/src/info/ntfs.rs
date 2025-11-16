@@ -15,9 +15,10 @@ use std::collections::HashMap;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
+use keramics_formats::Path;
 use keramics_formats::ntfs::constants::*;
 use keramics_formats::ntfs::{
-    NtfsAttribute, NtfsAttributeListEntry, NtfsDataFork, NtfsFileEntry, NtfsFileSystem, NtfsPath,
+    NtfsAttribute, NtfsAttributeListEntry, NtfsDataFork, NtfsFileEntry, NtfsFileSystem,
 };
 
 use crate::formatters::format_as_bytesize;
@@ -564,7 +565,7 @@ impl NtfsInfo {
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
-        path_components: &[&str],
+        path: &Path,
     ) -> Result<(), ErrorTrace> {
         let mut ntfs_file_system = NtfsFileSystem::new();
 
@@ -578,9 +579,8 @@ impl NtfsInfo {
                 return Err(error);
             }
         };
-        let ntfs_path: NtfsPath = NtfsPath::from(path_components);
         let mut file_entry: Option<NtfsFileEntry> =
-            match ntfs_file_system.get_file_entry_by_path(&ntfs_path) {
+            match ntfs_file_system.get_file_entry_by_path(path) {
                 Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");

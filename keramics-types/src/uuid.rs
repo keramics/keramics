@@ -81,14 +81,14 @@ impl Uuid {
             string_length -= 2;
         }
         if string_length != 36 {
-            return Err(ParseError::new(format!("Unsupported string length")));
+            return Err(ParseError::new(String::from("Unsupported string length")));
         }
         if &string[8..9] != "-"
             || &string[13..14] != "-"
             || &string[18..19] != "-"
             || &string[23..24] != "-"
         {
-            return Err(ParseError::new(format!("Unsupported string")));
+            return Err(ParseError::new(String::from("Unsupported string")));
         }
         self.part1 = match u32::from_str_radix(&string[0..8], 16) {
             Ok(value) => value,
@@ -137,20 +137,16 @@ impl Uuid {
         };
         Ok(())
     }
-
-    /// Retrieves the string representation of an UUID.
-    pub fn to_string(&self) -> String {
-        format!(
-            "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
-            self.part1, self.part2, self.part3, self.part4, self.part5,
-        )
-    }
 }
 
 impl fmt::Display for Uuid {
     /// Formats the UUID for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "{}", self.to_string())
+        write!(
+            formatter,
+            "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
+            self.part1, self.part2, self.part3, self.part4, self.part5,
+        )
     }
 }
 

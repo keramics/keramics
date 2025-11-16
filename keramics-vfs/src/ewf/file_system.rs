@@ -47,19 +47,19 @@ impl EwfFileSystem {
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path) => {
-                let number_of_components: usize = string_path.components.len();
+            VfsPath::Path(path) => {
+                let number_of_components: usize = path.get_number_of_components();
                 if number_of_components == 0 || number_of_components > 2 {
                     return Ok(false);
                 }
-                if string_path.components[0] != "" {
+                if path.components[0] != "" {
                     return Ok(false);
                 }
                 // A single empty component represents "/".
                 if number_of_components == 1 {
                     return Ok(true);
                 }
-                if string_path.components[1] == "ewf1" {
+                if path.components[1] == "ewf1" {
                     Ok(true)
                 } else {
                     Ok(false)
@@ -75,12 +75,12 @@ impl EwfFileSystem {
         vfs_path: &VfsPath,
     ) -> Result<Option<EwfFileEntry>, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path) => {
-                let number_of_components: usize = string_path.components.len();
+            VfsPath::Path(path) => {
+                let number_of_components: usize = path.get_number_of_components();
                 if number_of_components == 0 || number_of_components > 2 {
                     return Ok(None);
                 }
-                if string_path.components[0] != "" {
+                if path.components[0] != "" {
                     return Ok(None);
                 }
                 // A single empty component represents "/".
@@ -89,7 +89,7 @@ impl EwfFileSystem {
 
                     return Ok(Some(ewf_file_entry));
                 }
-                if string_path.components[1] == "ewf1" {
+                if path.components[1] == "ewf1" {
                     let media_size: u64 = match self.image.read() {
                         Ok(ewf_image) => ewf_image.media_size,
                         Err(error) => {
@@ -219,27 +219,27 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let ewf_file_system: EwfFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/");
         let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/ewf1");
         let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/bougs1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/bougs1");
         let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/ewf1/bogus1");
         let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "bogus1");
         let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/");
         let result: Result<bool, ErrorTrace> = ewf_file_system.file_entry_exists(&vfs_path);
         assert!(result.is_err());
 
@@ -250,7 +250,7 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let ewf_file_system: EwfFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/");
         let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -262,7 +262,7 @@ mod tests {
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/ewf1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/ewf1");
         let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -274,7 +274,7 @@ mod tests {
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, "/bougs1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/bougs1");
         let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
 

@@ -341,7 +341,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let mut file_entry: OsFileEntry = OsFileEntry::new();
 
@@ -408,7 +407,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(unix)]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let mut file_entry: OsFileEntry = OsFileEntry::new();
 

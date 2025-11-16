@@ -18,6 +18,8 @@ use std::sync::Arc;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, bytes_to_u16_le};
 
+use crate::path::Path;
+
 use super::block_stream::NtfsBlockStream;
 use super::boot_record::NtfsBootRecord;
 use super::constants::*;
@@ -26,7 +28,6 @@ use super::master_file_table::NtfsMasterFileTable;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_attributes::NtfsMftAttributes;
 use super::mft_entry::NtfsMftEntry;
-use super::path::NtfsPath;
 use super::volume_information::NtfsVolumeInformation;
 
 /// New Technologies File System (NTFS).
@@ -150,11 +151,8 @@ impl NtfsFileSystem {
     }
 
     /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(
-        &self,
-        path: &NtfsPath,
-    ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
-        if path.is_empty() || path.components[0].len() != 0 {
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
+        if path.is_empty() || path.is_relative() {
             return Ok(None);
         }
         let mut file_entry: NtfsFileEntry = match self.get_root_directory() {
@@ -566,24 +564,24 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\");
-        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.mft_entry_number, 5);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\emptyfile");
-        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+        let path: Path = Path::from("/emptyfile");
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.mft_entry_number, 64);
 
         // TODO: add support for short names
-        // let ntfs_path: NtfsPath = NtfsPath::from("\\EMPTYF~1");
-        // let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+        // let path: Path = Path::from("/EMPTYF~1");
+        // let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         // assert_eq!(file_entry.mft_entry_number, 64);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&ntfs_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let file_entry: NtfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.mft_entry_number, 66);
 

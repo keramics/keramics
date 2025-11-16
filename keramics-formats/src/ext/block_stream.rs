@@ -184,15 +184,23 @@ impl DataStream for ExtBlockStream {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.current_offset as i64;
-                current_offset += relative_offset;
-                current_offset as u64
+                match self.current_offset.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
-            SeekFrom::End(relative_offset) => {
-                let mut end_offset: i64 = self.size as i64;
-                end_offset += relative_offset;
-                end_offset as u64
-            }
+            SeekFrom::End(relative_offset) => match self.size.checked_add_signed(relative_offset) {
+                Some(offset) => offset,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid offset value out of bounds"
+                    ));
+                }
+            },
             SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
@@ -303,6 +311,16 @@ mod tests {
 
         let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut block_stream: ExtBlockStream = get_block_stream()?;
+
+        let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
+        assert!(result.is_err());
 
         Ok(())
     }

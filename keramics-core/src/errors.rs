@@ -33,11 +33,6 @@ impl ErrorTrace {
     pub fn add_frame(&mut self, message_string: String) {
         self.messages.push(message_string);
     }
-
-    /// Retrieves a string representation of the error.
-    pub fn to_string(&self) -> String {
-        self.messages.join("\n")
-    }
 }
 
 impl Error for ErrorTrace {}

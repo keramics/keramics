@@ -13,6 +13,7 @@
 
 use std::ffi::{OsStr, OsString};
 
+use keramics_formats::PathComponent;
 use keramics_formats::fat::FatString;
 use keramics_types::{ByteString, Ucs2String};
 
@@ -27,7 +28,7 @@ pub enum VfsString {
 }
 
 impl VfsString {
-    /// Determines if the VFS string is empty.
+    /// Determines if the string is empty.
     pub fn is_empty(&self) -> bool {
         match self {
             Self::ByteString(byte_string) => byte_string.is_empty(),
@@ -38,7 +39,21 @@ impl VfsString {
         }
     }
 
-    /// Converts the VFS string to a `String`.
+    /// Converts the string to a `PathComponent`.
+    pub fn to_path_component(&self) -> PathComponent {
+        match self {
+            Self::ByteString(byte_string) => PathComponent::ByteString(byte_string.clone()),
+            Self::Empty => PathComponent::String(String::new()),
+            // TODO: change to_string_lossy to a non-lossy conversion
+            Self::OsString(os_string) => {
+                PathComponent::String(os_string.to_string_lossy().to_string())
+            }
+            Self::String(string) => PathComponent::String(string.clone()),
+            Self::Ucs2String(ucs2_string) => PathComponent::Ucs2String(ucs2_string.clone()),
+        }
+    }
+
+    /// Converts the string to a `String`.
     pub fn to_string(&self) -> String {
         match self {
             Self::ByteString(byte_string) => byte_string.to_string(),
@@ -50,7 +65,7 @@ impl VfsString {
         }
     }
 
-    /// Converts the VFS string to an `Ucs2String`.
+    /// Converts the string to an `Ucs2String`.
     pub fn to_ucs2string(&self) -> Ucs2String {
         match self {
             Self::ByteString(_) => todo!(),

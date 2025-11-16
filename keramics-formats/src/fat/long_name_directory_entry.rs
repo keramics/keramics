@@ -72,8 +72,6 @@ impl FatLongNameDirectoryEntry {
 mod tests {
     use super::*;
 
-    use keramics_core::open_fake_data_stream;
-
     fn get_test_data() -> Vec<u8> {
         return vec![
             0x41, 0x74, 0x00, 0x65, 0x00, 0x73, 0x00, 0x74, 0x00, 0x64, 0x00, 0x0f, 0x00, 0x81,

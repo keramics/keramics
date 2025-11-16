@@ -19,13 +19,14 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, Ucs2String};
 
+use crate::path_component::PathComponent;
+
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::constants::*;
 use super::directory_entry::FatDirectoryEntry;
 use super::directory_entry_type::FatDirectoryEntryType;
 use super::long_name_directory_entry::FatLongNameDirectoryEntry;
 use super::short_name_directory_entry::FatShortNameDirectoryEntry;
-use super::string::FatString;
 
 /// File Allocation Table (FAT) directory entries.
 pub struct FatDirectoryEntries {
@@ -68,15 +69,19 @@ impl FatDirectoryEntries {
     /// Retrieves a specific directory entry by name.
     pub fn get_entry_by_name(
         &self,
-        name: &FatString,
+        name: &PathComponent,
     ) -> Result<Option<&FatDirectoryEntry>, ErrorTrace> {
-        let lookup_name: Ucs2String = match name.get_lookup_name(&self.case_folding_mappings) {
-            Ok(string) => string,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to determine lookup name");
-                return Err(error);
-            }
-        };
+        let lookup_name: Ucs2String =
+            match name.to_ucs2_string_with_case_folding(&self.case_folding_mappings) {
+                Ok(ucs2_string) => ucs2_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to convert path component to UCS-2 string with case folding"
+                    );
+                    return Err(error);
+                }
+            };
         match self.entries.get_key_value(&lookup_name) {
             Some((_, entry)) => Ok(Some(entry)),
             None => Ok(None),
@@ -387,6 +392,65 @@ mod tests {
         ];
     }
 
+    fn get_directory_entries() -> Result<FatDirectoryEntries, ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let case_folding_mappings: Arc<HashMap<u16, u16>> = Arc::new(
+            UCS2_CASE_MAPPINGS
+                .into_iter()
+                .collect::<HashMap<u16, u16>>(),
+        );
+        let mut directory_entries: FatDirectoryEntries =
+            FatDirectoryEntries::new(&case_folding_mappings);
+        let mut last_vfat_sequence_number: u8 = 0;
+        let mut long_name_entries: Vec<FatLongNameDirectoryEntry> = Vec::new();
+
+        directory_entries.read_data(
+            &test_data,
+            0,
+            &mut last_vfat_sequence_number,
+            &mut long_name_entries,
+        )?;
+        Ok(directory_entries)
+    }
+
+    #[test]
+    fn test_get_entry_by_index() -> Result<(), ErrorTrace> {
+        let test_struct: FatDirectoryEntries = get_directory_entries()?;
+
+        let entry: Option<&FatDirectoryEntry> = test_struct.get_entry_by_index(0);
+        assert!(entry.is_some());
+
+        let entry: Option<&FatDirectoryEntry> = test_struct.get_entry_by_index(99);
+        assert!(entry.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_entry_by_name() -> Result<(), ErrorTrace> {
+        let test_struct: FatDirectoryEntries = get_directory_entries()?;
+
+        let name: PathComponent = PathComponent::Ucs2String(Ucs2String::from("emptyfile"));
+        let entry: Option<&FatDirectoryEntry> = test_struct.get_entry_by_name(&name)?;
+        assert!(entry.is_some());
+
+        let name: PathComponent = PathComponent::Ucs2String(Ucs2String::from("bogus"));
+        let entry: Option<&FatDirectoryEntry> = test_struct.get_entry_by_name(&name)?;
+        assert!(entry.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_entries() -> Result<(), ErrorTrace> {
+        let test_struct: FatDirectoryEntries = get_directory_entries()?;
+
+        assert_eq!(test_struct.get_number_of_entries(), 2);
+
+        Ok(())
+    }
+
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
@@ -396,7 +460,10 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<u16, u16>>(),
         );
-        let mut test_struct = FatDirectoryEntries::new(&case_folding_mappings);
+        let mut test_struct: FatDirectoryEntries = FatDirectoryEntries::new(&case_folding_mappings);
+
+        assert_eq!(test_struct.entries.len(), 0);
+
         let mut last_vfat_sequence_number: u8 = 0;
         let mut long_name_entries: Vec<FatLongNameDirectoryEntry> = Vec::new();
 
@@ -408,6 +475,7 @@ mod tests {
         )?;
 
         assert_eq!(test_struct.entries.len(), 2);
+
         assert_eq!(
             test_struct.volume_label,
             Some(ByteString {
@@ -415,18 +483,6 @@ mod tests {
                 elements: vec![b'F', b'A', b'T', b'1', b'2', b'_', b'T', b'E', b'S', b'T'],
             })
         );
-
-        let entry: &FatDirectoryEntry = test_struct.get_entry_by_index(0).unwrap();
-        assert_eq!(entry.long_name, Some(Ucs2String::from("emptyfile")));
-        assert_eq!(
-            entry.short_name.name,
-            ByteString {
-                encoding: CharacterEncoding::Ascii,
-                elements: vec![b'E', b'M', b'P', b'T', b'Y', b'F', b'~', b'1'],
-            }
-        );
-        assert_eq!(entry.short_name.file_attribute_flags, 0x20);
-
         Ok(())
     }
 
@@ -442,10 +498,16 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<u16, u16>>(),
         );
-        let mut test_struct = FatDirectoryEntries::new(&case_folding_mappings);
+        let mut test_struct: FatDirectoryEntries = FatDirectoryEntries::new(&case_folding_mappings);
+
+        assert_eq!(test_struct.entries.len(), 0);
+        assert_eq!(test_struct.is_read, false);
+
         test_struct.read_at_position(&data_stream, 512, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.entries.len(), 2);
+        assert_eq!(test_struct.is_read, true);
+
         assert_eq!(
             test_struct.volume_label,
             Some(ByteString {
@@ -453,18 +515,6 @@ mod tests {
                 elements: vec![b'F', b'A', b'T', b'1', b'2', b'_', b'T', b'E', b'S', b'T'],
             })
         );
-
-        let entry: &FatDirectoryEntry = test_struct.get_entry_by_index(0).unwrap();
-        assert_eq!(entry.long_name, Some(Ucs2String::from("emptyfile")));
-        assert_eq!(
-            entry.short_name.name,
-            ByteString {
-                encoding: CharacterEncoding::Ascii,
-                elements: vec![b'E', b'M', b'P', b'T', b'Y', b'F', b'~', b'1'],
-            }
-        );
-        assert_eq!(entry.short_name.file_attribute_flags, 0x20);
-
         Ok(())
     }
 }

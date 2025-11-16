@@ -40,7 +40,7 @@ impl FakeDataStream {
             data: data.to_vec(),
             data_size: data.len(),
             current_offset: 0,
-            size: size,
+            size,
         }
     }
 }
@@ -103,15 +103,25 @@ impl DataStream for FakeDataStream {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.current_offset as i64;
-                current_offset += relative_offset;
-                current_offset as u64
+                match self.current_offset.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(ErrorTrace::new(format!(
+                            "{}: Invalid offset value out of bounds",
+                            crate::error_trace_function!(),
+                        )));
+                    }
+                }
             }
-            SeekFrom::End(relative_offset) => {
-                let mut end_offset: i64 = self.size as i64;
-                end_offset += relative_offset;
-                end_offset as u64
-            }
+            SeekFrom::End(relative_offset) => match self.size.checked_add_signed(relative_offset) {
+                Some(offset) => offset,
+                None => {
+                    return Err(ErrorTrace::new(format!(
+                        "{}: Invalid offset value out of bounds",
+                        crate::error_trace_function!(),
+                    )));
+                }
+            },
             SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
@@ -205,6 +215,16 @@ mod tests {
 
         let offset: u64 = data_stream.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut data_stream: FakeDataStream = get_test_data_stream();
+
+        let result: Result<u64, ErrorTrace> = data_stream.seek(SeekFrom::Current(-512));
+        assert!(result.is_err());
 
         Ok(())
     }

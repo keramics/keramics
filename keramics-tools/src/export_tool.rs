@@ -18,6 +18,7 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::Path;
 use keramics_vfs::{
     VfsLocation, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode,
     VfsScanner, VfsString, VfsType, new_os_vfs_location,
@@ -80,14 +81,13 @@ impl ExportTool {
         &self,
         data_stream_writer: &mut DataStreamWriter,
         vfs_scan_node: &VfsScanNode,
-        path_components: &[&str],
+        path: &Path,
         name: Option<&VfsString>,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-            let vfs_type: &VfsType = vfs_scan_node.location.get_type();
-            let vfs_path: VfsPath = VfsPath::from_path_components(vfs_type, path_components);
+            let vfs_path: VfsPath = VfsPath::Path(path.clone());
             let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(vfs_path);
             let result: Option<DataStreamReference> = match vfs_resolver
                 .get_data_stream_by_location_and_name(&vfs_location, name)
@@ -117,7 +117,7 @@ impl ExportTool {
                 match self.export_data_stream_from_scan_node(
                     data_stream_writer,
                     sub_scan_node,
-                    path_components,
+                    path,
                     name,
                 ) {
                     Ok(number_of_file_entries) => number_of_file_entries,
@@ -197,12 +197,12 @@ fn main() -> ExitCode {
                 Some(ref name) => Some(VfsString::from(name)),
                 None => None,
             };
-            let path_components: Vec<&str> = command_arguments.path.split('/').collect();
+            let path: Path = Path::from(&command_arguments.path);
 
             match export_tool.export_data_stream_from_scan_node(
                 &mut data_stream_writer,
                 root_scan_node,
-                &path_components,
+                &path,
                 name.as_ref(),
             ) {
                 Ok(_) => {}

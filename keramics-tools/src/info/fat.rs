@@ -13,7 +13,8 @@
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat, FatPath};
+use keramics_formats::Path;
+use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat};
 
 /// Information about a File Allocation Table (FAT).
 pub struct FatInfo {}
@@ -174,7 +175,7 @@ impl FatInfo {
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
-        path_components: &[&str],
+        path: &Path,
     ) -> Result<(), ErrorTrace> {
         let mut fat_file_system = FatFileSystem::new();
 
@@ -185,10 +186,8 @@ impl FatInfo {
                 return Err(error);
             }
         }
-        let fat_path: FatPath = FatPath::from(path_components);
-
         let mut file_entry: Option<FatFileEntry> =
-            match fat_file_system.get_file_entry_by_path(&fat_path) {
+            match fat_file_system.get_file_entry_by_path(path) {
                 Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");

@@ -39,8 +39,6 @@ impl FileResolver for FakeFileResolver {
 mod tests {
     use super::*;
 
-    use std::path::PathBuf;
-
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let file_resolver: FakeFileResolver = FakeFileResolver::new();

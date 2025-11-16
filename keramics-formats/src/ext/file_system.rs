@@ -20,6 +20,8 @@ use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
+use crate::path::Path;
+
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
 use super::features::ExtFeatures;
@@ -28,7 +30,6 @@ use super::group_descriptor::ExtGroupDescriptor;
 use super::group_descriptor_table::ExtGroupDescriptorTable;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
-use super::path::ExtPath;
 use super::superblock::ExtSuperblock;
 
 /// Extended File System (ext).
@@ -151,11 +152,8 @@ impl ExtFileSystem {
     }
 
     /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(
-        &self,
-        path: &ExtPath,
-    ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
-        if path.is_empty() || path.components[0].len() != 0 {
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<ExtFileEntry>, ErrorTrace> {
+        if path.is_empty() || path.is_relative() {
             return Ok(None);
         }
         let result: Option<ExtFileEntry> = match self.get_root_directory() {
@@ -318,7 +316,6 @@ impl ExtFileSystem {
                     if !superblock.volume_label.is_empty() {
                         self.volume_label = Some(superblock.volume_label);
                     }
-                    // TODO: change to ExtPath
                     self.last_mount_path = superblock.last_mount_path;
 
                     if superblock.last_mount_time.timestamp != 0 {
@@ -600,18 +597,18 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/");
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.inode_number, 2);
 
-        let ext_path: ExtPath = ExtPath::from("/emptyfile");
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/emptyfile");
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.inode_number, 12);
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.inode_number, 14);
 

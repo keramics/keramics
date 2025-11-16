@@ -12,7 +12,7 @@
  */
 
 /// Formats an array for debugging purposes.
-pub fn debug_format_array(array: &Vec<String>) -> String {
+pub fn debug_format_array(array: &[String]) -> String {
     // TODO: pass string for indentation?
     let number_of_values: usize = array.len();
     let string_value: &String = &array[0];
@@ -37,7 +37,7 @@ pub fn debug_format_array(array: &Vec<String>) -> String {
 
         return format!("[\n        {}\n    ]", string_parts.join(",\n        "));
     }
-    return format!("[{}]", array.join(", "));
+    format!("[{}]", array.join(", "))
 }
 
 /// Formats a bytes as a hexdump.
@@ -52,14 +52,14 @@ pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
 
     while data_offset < groups_data_size {
         if character_index == 0 {
-            if group == true
+            if group
                 && group_data_offset != data_offset
                 && data[group_data_offset..group_data_offset + 16]
                     == data[data_offset..data_offset + 16]
                 && data_offset + 16 < groups_data_size
             {
                 if group_data_offset + 16 == data_offset {
-                    string_parts.push(format!("...\n"))
+                    string_parts.push(String::from("...\n"))
                 }
                 data_offset += 16;
                 continue;
@@ -70,25 +70,24 @@ pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
         }
         let byte_value: u8 = data[data_offset];
 
-        if byte_value < 32 || byte_value >= 127 {
-            ascii_values[character_index] = '.';
-        } else {
-            ascii_values[character_index] = byte_value as char;
-        }
+        ascii_values[character_index] = match byte_value {
+            0x20..0x7f => byte_value as char,
+            _ => '.',
+        };
         string_parts.push(format!("{:02x} ", byte_value));
 
         if character_index == 7 {
-            string_parts.push(format!(" "));
+            string_parts.push(String::from(" "));
         }
         if character_index == 15 {
             character_index += 1;
 
-            string_parts.push(format!(" "));
+            string_parts.push(String::from(" "));
 
-            for index in 0..character_index {
-                string_parts.push(format!("{}", ascii_values[index]));
+            for ascii_value in ascii_values.iter().take(character_index) {
+                string_parts.push(format!("{}", ascii_value));
             }
-            string_parts.push(format!("\n"));
+            string_parts.push(String::from("\n"));
 
             character_index = 0;
         } else {
@@ -103,15 +102,14 @@ pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
         }
         let byte_value: u8 = data[data_offset];
 
-        if byte_value < 32 || byte_value >= 127 {
-            ascii_values[character_index] = '.';
-        } else {
-            ascii_values[character_index] = byte_value as char;
-        }
+        ascii_values[character_index] = match byte_value {
+            0x20..0x7f => byte_value as char,
+            _ => '.',
+        };
         string_parts.push(format!("{:02x} ", data[data_offset]));
 
         if character_index == 7 {
-            string_parts.push(format!(" "));
+            string_parts.push(String::from(" "));
         }
         data_offset += 1;
     }
@@ -120,20 +118,20 @@ pub fn format_as_hexdump(data: &[u8], group: bool) -> String {
 
         for index in character_index..16 {
             if index == 7 {
-                string_parts.push(format!(" "));
+                string_parts.push(String::from(" "));
             }
-            string_parts.push(format!("   "));
+            string_parts.push(String::from("   "));
         }
-        string_parts.push(format!(" "));
+        string_parts.push(String::from(" "));
 
-        for index in 0..character_index {
-            string_parts.push(format!("{}", ascii_values[index]));
+        for ascii_value in ascii_values.iter().take(character_index) {
+            string_parts.push(format!("{}", ascii_value));
         }
-        string_parts.push(format!("\n"));
+        string_parts.push(String::from("\n"));
     }
-    string_parts.push(format!("\n"));
+    string_parts.push(String::from("\n"));
 
-    return string_parts.join("");
+    string_parts.join("")
 }
 
 /// Formats a bytes as a string.

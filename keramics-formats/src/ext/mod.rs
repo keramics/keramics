@@ -40,9 +40,7 @@ mod inode_ext3;
 mod inode_ext4;
 mod inode_extension_ext4;
 mod inode_table;
-mod path;
 mod superblock;
 
 pub use file_entry::ExtFileEntry;
 pub use file_system::ExtFileSystem;
-pub use path::ExtPath;

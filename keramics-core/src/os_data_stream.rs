@@ -27,7 +27,7 @@ impl DataStream for File {
             Err(error) => Err(ErrorTrace::new(format!(
                 "{}: Unable to retrieve current position with error: {}",
                 crate::error_trace_function!(),
-                error.to_string(),
+                error,
             ))),
         }
     }
@@ -40,7 +40,7 @@ impl DataStream for File {
                 return Err(ErrorTrace::new(format!(
                     "{}: Unable to retrieve file metadata with error: {}",
                     crate::error_trace_function!(),
-                    error.to_string(),
+                    error,
                 )));
             }
         };
@@ -54,7 +54,7 @@ impl DataStream for File {
             Err(error) => Err(ErrorTrace::new(format!(
                 "{}: Unable to read data with error: {}",
                 crate::error_trace_function!(),
-                error.to_string(),
+                error,
             ))),
         }
     }
@@ -66,32 +66,24 @@ impl DataStream for File {
             Err(error) => Err(ErrorTrace::new(format!(
                 "{}: Unable to seek position with error: {}",
                 crate::error_trace_function!(),
-                error.to_string(),
+                error,
             ))),
         }
     }
 }
 
-/// Opens a file.
-macro_rules! open_file {
-    ( $path:expr ) => {
-        match File::open($path) {
-            Ok(file) => file,
-            Err(error) => {
-                return Err(ErrorTrace::new(format!(
-                    "{}: Unable to open file with error: {}",
-                    crate::error_trace_function!(),
-                    error.to_string(),
-                )));
-            }
-        }
-    };
-}
-
 /// Opens a new operating system data stream.
 pub fn open_os_data_stream(path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
-    let file: File = open_file!(path);
-
+    let file: File = match File::open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            return Err(ErrorTrace::new(format!(
+                "{}: Unable to open file with error: {}",
+                crate::error_trace_function!(),
+                error,
+            )));
+        }
+    };
     Ok(Arc::new(RwLock::new(file)))
 }
 
@@ -101,10 +93,24 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
+    fn get_data_stream() -> Result<File, ErrorTrace> {
+        let path: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let file: File = match File::open(path) {
+            Ok(file) => file,
+            Err(error) => {
+                return Err(ErrorTrace::new(format!(
+                    "{}: Unable to open file with error: {}",
+                    crate::error_trace_function!(),
+                    error,
+                )));
+            }
+        };
+        Ok(file)
+    }
+
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
 
         DataStream::seek(&mut file, SeekFrom::Start(101))?;
 
@@ -116,8 +122,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
 
         let size: u64 = file.get_size()?;
         assert_eq!(size, 202);
@@ -135,8 +140,7 @@ mod tests {
 
     #[test]
     fn test_seek() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
 
         let offset: u64 = DataStream::seek(&mut file, SeekFrom::Start(101))?;
         assert_eq!(offset, 101);
@@ -146,8 +150,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
 
         let offset: u64 = DataStream::seek(&mut file, SeekFrom::End(-101))?;
         assert_eq!(offset, 202 - 101);
@@ -157,8 +160,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
 
         let offset = DataStream::seek(&mut file, SeekFrom::Start(101))?;
         assert_eq!(offset, 101);
@@ -170,9 +172,18 @@ mod tests {
     }
 
     #[test]
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut file: File = get_data_stream()?;
+
+        let result: Result<u64, ErrorTrace> = DataStream::seek(&mut file, SeekFrom::Current(-512));
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
 
         let offset: u64 = DataStream::seek(&mut file, SeekFrom::End(101))?;
         assert_eq!(offset, 202 + 101);
@@ -182,8 +193,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
         DataStream::seek(&mut file, SeekFrom::Start(128))?;
 
         let mut data: Vec<u8> = vec![0; 64];
@@ -204,8 +214,8 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let mut file: File = open_file!(path_buf);
+        let mut file: File = get_data_stream()?;
+
         DataStream::seek(&mut file, SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 64];

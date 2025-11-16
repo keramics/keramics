@@ -15,7 +15,8 @@ use std::path::PathBuf;
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
+use keramics_formats::Path;
+use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), ErrorTrace> {
@@ -46,12 +47,27 @@ fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), 
     Ok((offset, hash_string))
 }
 
-fn read_path(file_system: &ExtFileSystem, path: &str) -> Result<(u64, String), ErrorTrace> {
-    let path: ExtPath = ExtPath::from(path);
-    let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
+fn read_path(file_system: &ExtFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
+    let path: Path = Path::from(path_string);
 
-    let data_stream: DataStreamReference = file_entry.get_data_stream()?.unwrap();
-
+    let file_entry: ExtFileEntry = match file_system.get_file_entry_by_path(&path)? {
+        Some(ext_file_entry) => ext_file_entry,
+        None => {
+            return Err(keramics_core::error_trace_new!(format!(
+                "No such file entry: {}",
+                path_string
+            )));
+        }
+    };
+    let data_stream: DataStreamReference = match file_entry.get_data_stream()? {
+        Some(ext_data_stream) => ext_data_stream,
+        None => {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Missing data stream for file entry: {}",
+                path_string
+            )));
+        }
+    };
     read_data_stream(&data_stream)
 }
 
@@ -76,7 +92,7 @@ fn open_file_system(path: &PathBuf) -> Result<ExtFileSystem, ErrorTrace> {
             );
             return Err(error);
         }
-    };
+    }
     Ok(file_system)
 }
 

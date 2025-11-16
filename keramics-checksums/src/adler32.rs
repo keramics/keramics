@@ -28,7 +28,7 @@ impl Adler32Context {
     /// Creates a new context.
     pub fn new(initial_value: u32) -> Self {
         Self {
-            initial_value: initial_value,
+            initial_value,
             checksum: initial_value,
         }
     }

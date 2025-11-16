@@ -19,6 +19,7 @@ mod fake_file_resolver;
 mod file_resolver;
 mod lru_cache;
 mod os_file_resolver;
+mod path;
 mod path_component;
 mod scanner;
 
@@ -47,6 +48,7 @@ pub mod ntfs;
 pub use enums::FormatIdentifier;
 pub use file_resolver::{FileResolver, FileResolverReference};
 pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
+pub use path::Path;
 pub use path_component::PathComponent;
 pub use scanner::FormatScanner;
 

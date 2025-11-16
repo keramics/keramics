@@ -21,7 +21,6 @@ mod iterators;
 mod location;
 mod path;
 mod string;
-mod string_path;
 mod types;
 
 // Format specific back-ends.

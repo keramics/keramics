@@ -18,6 +18,8 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::Ucs2String;
 
+use crate::path_component::PathComponent;
+
 use super::attribute::NtfsAttribute;
 use super::attribute_list::NtfsAttributeList;
 use super::constants::*;
@@ -548,7 +550,7 @@ impl NtfsFileEntry {
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(
         &mut self,
-        sub_file_entry_name: &Ucs2String,
+        sub_file_entry_name: &PathComponent,
     ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
         if !self.has_sub_directory_entries {
             return Ok(None);
@@ -565,18 +567,11 @@ impl NtfsFileEntry {
                 }
             }
         }
-        let result: Option<NtfsDirectoryEntry> = match self
+        match self
             .directory_index
             .get_directory_entry_by_name(&self.data_stream, sub_file_entry_name)
         {
-            Ok(directory_entry) => directory_entry,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
-                return Err(error);
-            }
-        };
-        match result {
-            Some(directory_entry) => {
+            Ok(Some(directory_entry)) => {
                 let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
                 let mft_entry: NtfsMftEntry =
                     match self.mft.get_entry(&self.data_stream, mft_entry_number) {
@@ -609,7 +604,11 @@ impl NtfsFileEntry {
                 }
                 Ok(Some(file_entry))
             }
-            None => Ok(None),
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
+                return Err(error);
+            }
         }
     }
 
@@ -708,7 +707,7 @@ mod tests {
     use keramics_datetime::Filetime;
 
     use crate::ntfs::file_system::NtfsFileSystem;
-    use crate::ntfs::path::NtfsPath;
+    use crate::path::Path;
 
     use crate::tests::get_test_data_path;
 
@@ -726,10 +725,9 @@ mod tests {
     fn test_get_access_time() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ntfs_file_entry.get_access_time(),
@@ -746,10 +744,9 @@ mod tests {
     fn test_get_change_time() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ntfs_file_entry.get_change_time(),
@@ -764,10 +761,9 @@ mod tests {
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ntfs_file_entry.get_creation_time(),
@@ -782,10 +778,9 @@ mod tests {
     fn test_get_file_attribute_flags() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let file_attribute_flags: u32 = ntfs_file_entry.get_file_attribute_flags();
         assert_eq!(file_attribute_flags, 0x00000020);
@@ -797,10 +792,9 @@ mod tests {
     fn test_get_journal_sequence_number() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let journal_sequence_number: u64 = ntfs_file_entry.get_journal_sequence_number();
         assert_eq!(journal_sequence_number, 0);
@@ -812,10 +806,9 @@ mod tests {
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ntfs_file_entry.get_modification_time(),
@@ -830,10 +823,9 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let name: Option<&Ucs2String> = ntfs_file_entry.get_name();
         assert_eq!(name, Some(Ucs2String::from("testfile1")).as_ref());
@@ -845,10 +837,9 @@ mod tests {
     fn test_get_size() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.get_size(), 9);
 
@@ -859,10 +850,9 @@ mod tests {
     fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let symbolic_link_target: Option<&Ucs2String> =
             ntfs_file_entry.get_symbolic_link_target()?;
@@ -877,18 +867,16 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ntfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ntfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -900,26 +888,19 @@ mod tests {
     fn test_test_get_data_stream_by_name() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ntfs_file_entry.get_data_stream_by_name(&None)?;
         assert!(result.is_none());
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ntfs_file_entry.get_data_stream_by_name(&None)?;
         assert!(result.is_some());
-
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
 
         let name: Ucs2String = Ucs2String::from("bogus");
         let result: Option<DataStreamReference> =
@@ -933,18 +914,16 @@ mod tests {
     fn test_get_number_of_data_forks() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_data_forks: usize = ntfs_file_entry.get_number_of_data_forks()?;
         assert_eq!(number_of_data_forks, 0);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_data_forks: usize = ntfs_file_entry.get_number_of_data_forks()?;
         assert_eq!(number_of_data_forks, 1);
@@ -958,10 +937,9 @@ mod tests {
     fn test_get_number_of_attributes() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_attributes: usize = ntfs_file_entry.get_number_of_attributes();
         assert_eq!(number_of_attributes, 4);
@@ -975,18 +953,16 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let mut ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = ntfs_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 3);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = ntfs_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 0);
@@ -998,10 +974,9 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let mut ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let sub_file_entry: NtfsFileEntry = ntfs_file_entry.get_sub_file_entry_by_index(2)?;
         assert_eq!(
@@ -1015,16 +990,15 @@ mod tests {
     fn test_get_sub_file_entry_by_name() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let mut ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let mut ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let name: Ucs2String = Ucs2String::from("TestFile2");
+        let name: PathComponent = PathComponent::Ucs2String(Ucs2String::from("TestFile2"));
         let result: Option<NtfsFileEntry> = ntfs_file_entry.get_sub_file_entry_by_name(&name)?;
         assert!(result.is_some());
 
-        let name: Ucs2String = Ucs2String::from("bogus");
+        let name: PathComponent = PathComponent::Ucs2String(Ucs2String::from("bogus"));
         let result: Option<NtfsFileEntry> = ntfs_file_entry.get_sub_file_entry_by_name(&name)?;
         assert!(result.is_none());
 
@@ -1035,10 +1009,9 @@ mod tests {
     fn test_is_allocated() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_allocated(), true);
 
@@ -1049,10 +1022,9 @@ mod tests {
     fn test_is_bad() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_bad(), false);
 
@@ -1065,24 +1037,21 @@ mod tests {
     fn test_is_directory() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_directory(), true);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_directory(), true);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_directory(), false);
 
@@ -1093,10 +1062,9 @@ mod tests {
     fn test_is_empty() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_empty(), false);
 
@@ -1109,10 +1077,9 @@ mod tests {
     fn test_is_junction() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_junction(), false);
 
@@ -1125,24 +1092,21 @@ mod tests {
     fn test_is_root_directory() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_root_directory(), true);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_root_directory(), false);
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_root_directory(), false);
 
@@ -1153,10 +1117,9 @@ mod tests {
     fn test_is_symbolic_link() -> Result<(), ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from("\\testdir1\\testfile1");
-        let ntfs_file_entry: NtfsFileEntry = ntfs_file_system
-            .get_file_entry_by_path(&ntfs_path)?
-            .unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ntfs_file_entry.is_symbolic_link(), false);
 

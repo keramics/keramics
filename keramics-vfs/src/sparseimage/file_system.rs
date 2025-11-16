@@ -45,22 +45,28 @@ impl SparseImageFileSystem {
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path) => {
-                let number_of_components: usize = string_path.components.len();
-                if number_of_components == 0 || number_of_components > 2 {
+            VfsPath::Path(path) => {
+                if path.is_relative() {
                     return Ok(false);
                 }
-                if string_path.components[0] != "" {
-                    return Ok(false);
-                }
-                // A single empty component represents "/".
-                if number_of_components == 1 {
-                    return Ok(true);
-                }
-                if string_path.components[1] == "sparseimage1" {
-                    Ok(true)
-                } else {
-                    Ok(false)
+                match path.get_component_by_index(1) {
+                    Some(path_component) => {
+                        if path.get_number_of_components() > 2 {
+                            return Ok(false);
+                        }
+                        if path_component != "sparseimage1" {
+                            Ok(false)
+                        } else {
+                            Ok(true)
+                        }
+                    }
+                    None => {
+                        if path.is_empty() {
+                            Ok(false)
+                        } else {
+                            Ok(true)
+                        }
+                    }
                 }
             }
             _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
@@ -73,39 +79,40 @@ impl SparseImageFileSystem {
         vfs_path: &VfsPath,
     ) -> Result<Option<SparseImageFileEntry>, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path) => {
-                let number_of_components: usize = string_path.components.len();
-                if number_of_components == 0 || number_of_components > 2 {
+            VfsPath::Path(path) => {
+                if path.is_relative() {
                     return Ok(None);
                 }
-                if string_path.components[0] != "" {
-                    return Ok(None);
-                }
-                // A single empty component represents "/".
-                if number_of_components == 1 {
-                    let sparseimage_file_entry: SparseImageFileEntry =
-                        self.get_root_file_entry()?;
-
-                    return Ok(Some(sparseimage_file_entry));
-                }
-                if string_path.components[1] == "sparseimage1" {
-                    let media_size: u64 = match self.file.read() {
-                        Ok(sparseimage_file) => sparseimage_file.media_size,
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to obtain read lock on sparseimage file",
-                                error
-                            ));
+                match path.get_component_by_index(1) {
+                    Some(path_component) => {
+                        if path.get_number_of_components() > 2 {
+                            return Ok(None);
                         }
-                    };
-                    let sparseimage_file_entry: SparseImageFileEntry =
-                        SparseImageFileEntry::Layer {
+                        if path_component != "sparseimage1" {
+                            return Ok(None);
+                        }
+                        let media_size: u64 = match self.file.read() {
+                            Ok(sparseimage_file) => sparseimage_file.media_size,
+                            Err(error) => {
+                                return Err(keramics_core::error_trace_new_with_error!(
+                                    "Unable to obtain read lock on sparseimage file",
+                                    error
+                                ));
+                            }
+                        };
+                        Ok(Some(SparseImageFileEntry::Layer {
                             file: self.file.clone(),
                             size: media_size,
-                        };
-                    Ok(Some(sparseimage_file_entry))
-                } else {
-                    Ok(None)
+                        }))
+                    }
+                    None => {
+                        if path.is_empty() {
+                            return Ok(None);
+                        }
+                        Ok(Some(SparseImageFileEntry::Root {
+                            file: self.file.clone(),
+                        }))
+                    }
                 }
             }
             _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
@@ -219,27 +226,27 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let sparseimage_file_system: SparseImageFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/sparseimage1");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/bogus1");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/sparseimage1/bogus1");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "bogus1");
         let result: bool = sparseimage_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/");
         let result: Result<bool, ErrorTrace> = sparseimage_file_system.file_entry_exists(&vfs_path);
         assert!(result.is_err());
 
@@ -250,7 +257,7 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let sparseimage_file_system: SparseImageFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/");
         let result: Option<SparseImageFileEntry> =
             sparseimage_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -263,7 +270,7 @@ mod tests {
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/sparseimage1");
         let result: Option<SparseImageFileEntry> =
             sparseimage_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -276,7 +283,7 @@ mod tests {
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/bogus1");
         let result: Option<SparseImageFileEntry> =
             sparseimage_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());

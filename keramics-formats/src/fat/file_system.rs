@@ -20,6 +20,8 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 use keramics_types::constants::UCS2_CASE_MAPPINGS;
 
+use crate::path::Path;
+
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::boot_record::FatBootRecord;
 use super::directory_entries::FatDirectoryEntries;
@@ -28,7 +30,6 @@ use super::directory_entry_type::FatDirectoryEntryType;
 use super::enums::FatFormat;
 use super::file_entry::FatFileEntry;
 use super::long_name_directory_entry::FatLongNameDirectoryEntry;
-use super::path::FatPath;
 use super::short_name_directory_entry::FatShortNameDirectoryEntry;
 
 /// File Allocation Table (FAT) file system.
@@ -150,11 +151,8 @@ impl FatFileSystem {
     }
 
     /// Retrieves the file entry for a specific path.
-    pub fn get_file_entry_by_path(
-        &self,
-        path: &FatPath,
-    ) -> Result<Option<FatFileEntry>, ErrorTrace> {
-        if path.is_empty() || path.components[0].len() != 0 {
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<FatFileEntry>, ErrorTrace> {
+        if path.is_empty() || path.is_relative() {
             return Ok(None);
         }
         let mut file_entry: FatFileEntry = match self.get_root_directory() {
@@ -549,24 +547,24 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/");
-        let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.identifier, 0x00001a00);
 
-        let fat_path: FatPath = FatPath::from("/emptyfile");
-        let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/emptyfile");
+        let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.identifier, 0x00001a40);
 
         // TODO: add support for short names
-        // let fat_path: FatPath = FatPath::from("/EMPTYF~1");
-        // let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        // let path: Path = Path::from("/EMPTYF~1");
+        // let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         // assert_eq!(file_entry.identifier, 0x00001a40);
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(file_entry.identifier, 0x00006260);
 

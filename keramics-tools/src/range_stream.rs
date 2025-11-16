@@ -133,14 +133,24 @@ impl DataStream for FileRangeDataStream {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.current_offset as i64;
-                current_offset += relative_offset;
-                current_offset as u64
+                match self.current_offset.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
             SeekFrom::End(relative_offset) => {
-                let mut end_offset: i64 = self.range_size as i64;
-                end_offset += relative_offset;
-                end_offset as u64
+                match self.range_size.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
             SeekFrom::Start(offset) => offset,
         };

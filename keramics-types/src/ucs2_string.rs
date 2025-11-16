@@ -13,6 +13,7 @@
 
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
@@ -24,14 +25,14 @@ pub struct Ucs2String {
 }
 
 impl Ucs2String {
-    /// Creates a new string.
+    /// Creates a new UCS-2 string.
     pub fn new() -> Self {
         Self {
             elements: Vec::new(),
         }
     }
 
-    /// Creates a new string with case folding applied.
+    /// Creates a new UCS-2 string with case folding applied.
     pub fn new_with_case_folding(source: &Ucs2String, mappings: &HashMap<u16, u16>) -> Self {
         let elements: Vec<u16> = source
             .elements
@@ -45,7 +46,7 @@ impl Ucs2String {
         Self { elements: elements }
     }
 
-    /// Reads a string from a byte sequence in big-endian.
+    /// Creates a new UCS-2 string from a byte sequence in big-endian.
     pub fn from_be_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
@@ -60,7 +61,7 @@ impl Ucs2String {
         Self { elements: elements }
     }
 
-    /// Reads a string from a byte sequence in little-endian.
+    /// Creates a new UCS-2 string from a byte sequence in little-endian.
     pub fn from_le_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len();
         let mut elements: Vec<u16> = Vec::new();
@@ -75,19 +76,19 @@ impl Ucs2String {
         Self { elements: elements }
     }
 
-    /// Determines if the string is empty.
+    /// Determines if the UCS-2 string is empty.
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
-    /// Retrieves the length (or size) of the string.
+    /// Retrieves the length (or size) of the UCS-2 string.
     pub fn len(&self) -> usize {
         self.elements.len()
     }
 
     // TODO: add read_data_be
 
-    /// Reads a string from a buffer in little-endian.
+    /// Reads a UCS-2 string from a buffer in little-endian.
     pub fn read_data_le(&mut self, data: &[u8]) {
         let data_size: usize = data.len();
 
@@ -126,24 +127,6 @@ impl Ucs2String {
         }
         Ordering::Equal
     }
-
-    /// Converts a [`Ucs2String`] to a [`String`].
-    pub fn to_string(&self) -> String {
-        self.elements
-            .iter()
-            .map(|element| match char::from_u32(*element as u32) {
-                Some(unicode_character) => {
-                    if unicode_character == '\\' {
-                        String::from("\\\\")
-                    } else {
-                        unicode_character.to_string()
-                    }
-                }
-                None => format!("\\{{{:04x}}}", element),
-            })
-            .collect::<Vec<String>>()
-            .join("")
-    }
 }
 
 impl From<&[u16]> for Ucs2String {
@@ -162,10 +145,8 @@ impl From<&[u16]> for Ucs2String {
 impl From<&str> for Ucs2String {
     /// Converts a [`&str`] into a [`Ucs2String`]
     fn from(string: &str) -> Self {
-        // TODO: add support for escaped non UTF-16 characters.
-        Self {
-            elements: string.encode_utf16().collect(),
-        }
+        let elements: Vec<u16> = string.encode_utf16().collect::<Vec<u16>>();
+        Self { elements: elements }
     }
 }
 
@@ -182,6 +163,52 @@ impl From<&Vec<u16>> for Ucs2String {
     #[inline(always)]
     fn from(vector: &Vec<u16>) -> Self {
         Self::from(vector.as_slice())
+    }
+}
+
+impl PartialEq<&[u16]> for Ucs2String {
+    /// Detemines if a [`Ucs2String`] is equal to a [`&[u16]`]
+    #[inline(always)]
+    fn eq(&self, slice: &&[u16]) -> bool {
+        self.elements == *slice
+    }
+}
+
+impl PartialEq<str> for Ucs2String {
+    /// Detemines if a [`Ucs2String`] is equal to a [`str`]
+    #[inline(always)]
+    fn eq(&self, string: &str) -> bool {
+        self.elements == string.encode_utf16().collect::<Vec<u16>>()
+    }
+}
+
+impl PartialEq<&str> for Ucs2String {
+    /// Detemines if a [`Ucs2String`] is equal to a [`&str`]
+    #[inline(always)]
+    fn eq(&self, string: &&str) -> bool {
+        Self::eq(self, *string)
+    }
+}
+
+impl fmt::Display for Ucs2String {
+    /// Formats the UCS-2 string for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let string_parts: Vec<String> = self
+            .elements
+            .iter()
+            .map(|element| match char::from_u32(*element as u32) {
+                Some(unicode_character) => {
+                    if unicode_character == '\\' {
+                        String::from("\\\\")
+                    } else {
+                        unicode_character.to_string()
+                    }
+                }
+                None => format!("\\{{{:04x}}}", element),
+            })
+            .collect::<Vec<String>>();
+
+        write!(formatter, "{}", string_parts.join(""))
     }
 }
 
@@ -274,24 +301,6 @@ mod tests {
     }
 
     #[test]
-    fn test_to_string() {
-        let test_data: [u8; 24] = [
-            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73, 0x00,
-            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
-        ];
-        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
-
-        assert_eq!(ucs2_string.to_string(), String::from("UCS-2 string"));
-        let test_data: [u8; 24] = [
-            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x00, 0xd8, 0x20, 0x00, 0x73, 0x00,
-            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
-        ];
-
-        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), String::from("UCS-\\{d800} string"));
-    }
-
-    #[test]
     fn test_from_slice() {
         let test_data: [u16; 14] = [
             0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
@@ -342,5 +351,23 @@ mod tests {
             0x0067,
         ];
         assert_eq!(ucs2_string.elements, expected_elements);
+    }
+
+    #[test]
+    fn test_to_string() {
+        let test_data: [u8; 24] = [
+            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73, 0x00,
+            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
+        ];
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+
+        assert_eq!(ucs2_string.to_string(), String::from("UCS-2 string"));
+        let test_data: [u8; 24] = [
+            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x00, 0xd8, 0x20, 0x00, 0x73, 0x00,
+            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
+        ];
+
+        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        assert_eq!(ucs2_string.to_string(), String::from("UCS-\\{d800} string"));
     }
 }

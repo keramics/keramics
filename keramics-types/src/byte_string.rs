@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::fmt;
+
 use keramics_core::ErrorTrace;
 use keramics_encodings::{
     CharacterDecoder, CharacterEncoder, CharacterEncoding, new_character_decoder,
@@ -28,7 +30,7 @@ pub struct ByteString {
 }
 
 impl ByteString {
-    /// Creates a new string.
+    /// Creates a new byte string.
     pub fn new() -> Self {
         Self {
             encoding: CharacterEncoding::Utf8,
@@ -36,7 +38,7 @@ impl ByteString {
         }
     }
 
-    /// Creates a new string with a specified character encoding.
+    /// Creates a new byte string with a specified character encoding.
     pub fn new_with_encoding(encoding: &CharacterEncoding) -> Self {
         Self {
             encoding: encoding.clone(),
@@ -44,25 +46,59 @@ impl ByteString {
         }
     }
 
-    /// Extends the string from another [`ByteString`].
+    /// Decodes the byte string.
+    pub fn decode(&self) -> Result<Vec<u32>, ErrorTrace> {
+        let mut character_decoder: CharacterDecoder =
+            new_character_decoder(&self.encoding, &self.elements);
+
+        let mut code_points: Vec<u32> = Vec::new();
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(mut decoded_code_points) => code_points.append(&mut decoded_code_points),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode character");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(code_points)
+    }
+
+    /// Encodes the byte string with a specified character encoding.
+    pub fn encode(&self, encoding: &CharacterEncoding) -> Result<Self, ErrorTrace> {
+        let byte_string: ByteString = if self.encoding == *encoding {
+            self.clone()
+        } else {
+            let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
+
+            match byte_string.extend(self) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to extend byte string");
+                    return Err(error);
+                }
+            }
+            byte_string
+        };
+        Ok(byte_string)
+    }
+
+    /// Extends the byte string from another byte string.
     pub fn extend(&mut self, byte_string: &ByteString) -> Result<(), ErrorTrace> {
         if self.encoding == byte_string.encoding {
             self.elements.extend_from_slice(&byte_string.elements);
         } else {
-            let mut character_decoder: CharacterDecoder =
+            let character_decoder: CharacterDecoder =
                 new_character_decoder(&byte_string.encoding, &byte_string.elements);
 
-            let mut code_points: Vec<u32> = Vec::new();
-
-            while let Some(result) = character_decoder.next() {
-                match result {
-                    Ok(mut decoded_code_points) => code_points.append(&mut decoded_code_points),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decode character");
-                        return Err(error);
-                    }
+            let code_points: Vec<u32> = match byte_string.decode() {
+                Ok(code_points) => code_points,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode byte string");
+                    return Err(error);
                 }
-            }
+            };
             match self.extend_from_codepoints(&code_points) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -77,8 +113,8 @@ impl ByteString {
         Ok(())
     }
 
-    /// Extends the string from code points.
-    pub fn extend_from_codepoints(&mut self, code_points: &Vec<u32>) -> Result<(), ErrorTrace> {
+    /// Extends the byte string from code points.
+    fn extend_from_codepoints(&mut self, code_points: &Vec<u32>) -> Result<(), ErrorTrace> {
         let mut character_encoder: CharacterEncoder =
             new_character_encoder(&self.encoding, code_points);
 
@@ -94,57 +130,28 @@ impl ByteString {
         Ok(())
     }
 
-    /// Retrieves a character decoder for the string.
+    /// Retrieves a character decoder for the byte string.
     pub fn get_character_decoder(&self) -> CharacterDecoder<'_> {
         new_character_decoder(&self.encoding, &self.elements)
     }
 
-    /// Determines if the string is empty.
+    /// Determines if the byte string is empty.
     pub fn is_empty(&self) -> bool {
         self.elements.is_empty()
     }
 
-    /// Retrieves the length (or size) of the string.
+    /// Retrieves the length (or size) of the byte string.
     pub fn len(&self) -> usize {
         self.elements.len()
     }
 
-    /// Reads the string from a buffer.
+    /// Reads the byte string from a buffer.
     pub fn read_data(&mut self, data: &[u8]) {
         let slice: &[u8] = match data.iter().position(|value| *value == 0) {
             Some(data_index) => &data[0..data_index],
             None => &data,
         };
         self.elements.extend_from_slice(&slice);
-    }
-
-    /// Converts a [`ByteString`] to a [`String`].
-    pub fn to_string(&self) -> String {
-        let mut character_decoder: CharacterDecoder = self.get_character_decoder();
-
-        let mut string_parts: Vec<String> = Vec::new();
-
-        while let Some(result) = character_decoder.next() {
-            match result {
-                Ok(code_points) => {
-                    for code_point in code_points {
-                        let string: String = match char::from_u32(code_point as u32) {
-                            Some(unicode_character) => {
-                                if unicode_character == '\\' {
-                                    String::from("\\\\")
-                                } else {
-                                    unicode_character.to_string()
-                                }
-                            }
-                            None => format!("\\{{{:04x}}}", code_point),
-                        };
-                        string_parts.push(string);
-                    }
-                }
-                Err(error) => return String::from(format!("{}", error)),
-            }
-        }
-        string_parts.join("")
     }
 }
 
@@ -194,11 +201,51 @@ impl PartialEq<&[u8]> for ByteString {
     }
 }
 
+impl PartialEq<str> for ByteString {
+    /// Detemines if a [`ByteString`] is equal to a [`str`]
+    #[inline(always)]
+    fn eq(&self, string: &str) -> bool {
+        // TODO: handle encoding
+        self.elements == string.as_bytes()
+    }
+}
+
 impl PartialEq<&str> for ByteString {
     /// Detemines if a [`ByteString`] is equal to a [`&str`]
     #[inline(always)]
     fn eq(&self, string: &&str) -> bool {
-        self.elements == *string.as_bytes()
+        Self::eq(self, *string)
+    }
+}
+
+impl fmt::Display for ByteString {
+    /// Formats the byte string for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let mut string_parts: Vec<String> = Vec::new();
+
+        let mut character_decoder: CharacterDecoder = self.get_character_decoder();
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(code_points) => {
+                    for code_point in code_points {
+                        let string: String = match char::from_u32(code_point as u32) {
+                            Some(unicode_character) => {
+                                if unicode_character == '\\' {
+                                    String::from("\\\\")
+                                } else {
+                                    unicode_character.to_string()
+                                }
+                            }
+                            None => format!("\\{{{:04x}}}", code_point),
+                        };
+                        string_parts.push(string);
+                    }
+                }
+                Err(error) => return write!(formatter, "{}", error),
+            }
+        }
+        write!(formatter, "{}", string_parts.join(""))
     }
 }
 
@@ -248,8 +295,6 @@ mod tests {
         assert_eq!(byte_string.len(), 12);
     }
 
-    // TODO: add test for to_string
-
     #[test]
     fn test_from_u8_slice() {
         let test_data: [u8; 14] = [
@@ -296,4 +341,32 @@ mod tests {
         ];
         assert_eq!(byte_string.elements, expected_elements);
     }
+
+    #[test]
+    fn test_eq_u8_slice() {
+        let test_vector: Vec<u8> = vec![
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from(&test_vector);
+
+        let expected_elements: Vec<u8> = vec![
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+        ];
+        assert!(byte_string.eq(&expected_elements.as_slice()));
+    }
+
+    #[test]
+    fn test_eq_str() {
+        let test_vector: Vec<u8> = vec![
+            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
+        ];
+        let byte_string: ByteString = ByteString::from(&test_vector);
+
+        let expected_str: &str = "ASCII string";
+
+        assert!(byte_string.eq(expected_str));
+        assert!(byte_string.eq(&expected_str));
+    }
+
+    // TODO: add test for to_string
 }

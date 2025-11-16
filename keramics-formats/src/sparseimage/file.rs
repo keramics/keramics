@@ -289,14 +289,24 @@ impl DataStream for SparseImageFile {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.current_offset as i64;
-                current_offset += relative_offset;
-                current_offset as u64
+                match self.current_offset.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
             SeekFrom::End(relative_offset) => {
-                let mut end_offset: i64 = self.media_size as i64;
-                end_offset += relative_offset;
-                end_offset as u64
+                match self.media_size.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
             SeekFrom::Start(offset) => offset,
         };
@@ -396,7 +406,17 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_media_size() -> Result<(), ErrorTrace> {
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut file: SparseImageFile = get_file()?;
+
+        let result: Result<u64, ErrorTrace> = file.seek(SeekFrom::Current(-512));
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
 
         let offset: u64 = file.seek(SeekFrom::End(512))?;

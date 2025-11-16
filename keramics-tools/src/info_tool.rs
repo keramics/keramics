@@ -22,7 +22,7 @@ use clap_num::maybe_hex;
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_encodings::CharacterEncoding;
-use keramics_formats::{FormatIdentifier, FormatScanner};
+use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 
 mod enums;
 mod formatters;
@@ -266,25 +266,16 @@ fn main() -> ExitCode {
         Some(Commands::Path(command_arguments)) => {
             // TODO: detect leading partion path component and suggest/check path exists without
             // it.
-            let path_components: Vec<&str> = if command_arguments.path.is_empty() {
-                vec![]
-            } else if command_arguments.path == "/" {
-                vec![""]
-            } else {
-                command_arguments.path.split('/').collect()
-            };
+            let path: Path = Path::from(&command_arguments.path);
+
             match &format_identifier {
                 FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
                     &data_stream,
-                    &path_components,
+                    &path,
                     character_encoding.as_ref(),
                 ),
-                FormatIdentifier::Fat => {
-                    FatInfo::print_file_entry_by_path(&data_stream, &path_components)
-                }
-                FormatIdentifier::Ntfs => {
-                    NtfsInfo::print_file_entry_by_path(&data_stream, &path_components)
-                }
+                FormatIdentifier::Fat => FatInfo::print_file_entry_by_path(&data_stream, &path),
+                FormatIdentifier::Ntfs => NtfsInfo::print_file_entry_by_path(&data_stream, &path),
                 _ => Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
                     format_identifier.to_string()

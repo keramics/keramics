@@ -33,7 +33,7 @@ impl FakeFileSystem {
     pub fn new() -> Self {
         Self {
             paths: HashMap::from([(
-                VfsPath::from_path(&VfsType::Fake, "/"),
+                VfsPath::from_string(&VfsType::Fake, "/"),
                 Arc::new(FakeFileEntry::new_root()),
             )]),
         }
@@ -54,7 +54,7 @@ impl FakeFileSystem {
                 }
                 let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
 
-                match vfs_path.new_with_join(&path_components) {
+                match vfs_path.new_with_join_path_components(&path_components) {
                     Ok(path) => path,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -96,7 +96,7 @@ impl FakeFileSystem {
 
     /// Retrieves the root file entry.
     pub fn get_root_file_entry(&self) -> Result<Option<Arc<FakeFileEntry>>, ErrorTrace> {
-        let vfs_path: VfsPath = VfsPath::from_path(&crate::VfsType::Fake, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&crate::VfsType::Fake, "/");
 
         match self.paths.get(&vfs_path) {
             Some(file_entry) => Ok(Some(file_entry.clone())),
@@ -114,11 +114,11 @@ mod tests {
     fn get_file_system() -> Result<FakeFileSystem, ErrorTrace> {
         let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/");
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_directory("fake");
         fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/fake");
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("file.txt", &test_data);
         fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
@@ -130,11 +130,11 @@ mod tests {
     fn test_add_file_entry() -> Result<(), ErrorTrace> {
         let mut fake_file_system: FakeFileSystem = FakeFileSystem::new();
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/");
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_directory("fake");
         fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/fake");
         let test_data: [u8; 4] = [0x74, 0x65, 0x73, 0x74];
         let fake_file_entry: FakeFileEntry = FakeFileEntry::new_file("file.txt", &test_data);
         fake_file_system.add_file_entry(&vfs_path, fake_file_entry)?;
@@ -146,11 +146,11 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let fake_file_system: FakeFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/fake/file.txt");
         let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/fake/bogus.txt");
         let result: bool = fake_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
@@ -161,7 +161,7 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let fake_file_system: FakeFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/");
         let result: Option<Arc<FakeFileEntry>> =
             fake_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -174,7 +174,7 @@ mod tests {
         let file_type: VfsFileType = fake_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/file.txt");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/fake/file.txt");
         let result: Option<Arc<FakeFileEntry>> =
             fake_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
@@ -187,7 +187,7 @@ mod tests {
         let file_type: VfsFileType = fake_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Fake, "/fake/bogus.txt");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Fake, "/fake/bogus.txt");
         let result: Option<Arc<FakeFileEntry>> =
             fake_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());

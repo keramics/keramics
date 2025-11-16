@@ -11,12 +11,9 @@
  * under the License.
  */
 
-use std::collections::HashMap;
-use std::sync::Arc;
-
-use keramics_core::ErrorTrace;
-use keramics_encodings::CharacterDecoder;
 use keramics_types::{ByteString, Ucs2String};
+
+use crate::path_component::PathComponent;
 
 /// File Allocation Table (FAT) string.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -32,47 +29,6 @@ impl FatString {
     /// Creates a new string.
     pub fn new() -> Self {
         Self::Ucs2String(Ucs2String::new())
-    }
-
-    /// Retrieves the lookup name.
-    pub(super) fn get_lookup_name(
-        &self,
-        case_folding_mappings: &Arc<HashMap<u16, u16>>,
-    ) -> Result<Ucs2String, ErrorTrace> {
-        let lookup_name: Ucs2String = match &self {
-            FatString::ByteString(byte_string) => {
-                let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
-
-                let mut lookup_name: Ucs2String = Ucs2String::new();
-
-                while let Some(result) = character_decoder.next() {
-                    match result {
-                        Ok(code_points) => {
-                            for code_point in code_points {
-                                if code_point > 0xffff {
-                                    return Err(keramics_core::error_trace_new!(
-                                        "Unable to encode string - code point outside of UCS-2 range"
-                                    ));
-                                }
-                                lookup_name.elements.push(code_point as u16);
-                            }
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to decode byte string"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-                lookup_name
-            }
-            FatString::Ucs2String(ucs2_string) => {
-                Ucs2String::new_with_case_folding(ucs2_string, case_folding_mappings)
-            }
-        };
-        Ok(lookup_name)
     }
 
     /// Determines if the string is empty.
@@ -113,6 +69,18 @@ impl From<&String> for FatString {
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::Ucs2String(Ucs2String::from(string))
+    }
+}
+
+impl From<&PathComponent> for FatString {
+    /// Converts a [`&PathComponent`] into a [`FatString`]
+    #[inline(always)]
+    fn from(path_component: &PathComponent) -> Self {
+        match path_component {
+            PathComponent::ByteString(byte_string) => Self::ByteString(byte_string.clone()),
+            PathComponent::Ucs2String(ucs2_string) => Self::Ucs2String(ucs2_string.clone()),
+            PathComponent::String(string) => Self::Ucs2String(Ucs2String::from(string)),
+        }
     }
 }
 

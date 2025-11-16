@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::Path;
-use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
+use keramics_formats::fat::{FatFileEntry, FatFileSystem};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), ErrorTrace> {
@@ -47,9 +47,9 @@ fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), 
     Ok((offset, hash_string))
 }
 
-fn read_path(file_system: &NtfsFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
+fn read_path(file_system: &FatFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
     let path: Path = Path::from(path_string);
-    let result: Option<NtfsFileEntry> = match file_system.get_file_entry_by_path(&path) {
+    let result: Option<FatFileEntry> = match file_system.get_file_entry_by_path(&path) {
         Ok(result) => result,
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(
@@ -59,7 +59,7 @@ fn read_path(file_system: &NtfsFileSystem, path_string: &str) -> Result<(u64, St
             return Err(error);
         }
     };
-    let file_entry: NtfsFileEntry = match result {
+    let file_entry: FatFileEntry = match result {
         Some(file_entry) => file_entry,
         None => {
             return Err(keramics_core::error_trace_new!(format!(
@@ -73,7 +73,7 @@ fn read_path(file_system: &NtfsFileSystem, path_string: &str) -> Result<(u64, St
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(path: &PathBuf) -> Result<NtfsFileSystem, ErrorTrace> {
+fn open_file_system(path: &PathBuf) -> Result<FatFileSystem, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
         Ok(data_stream) => data_stream,
         Err(error) => {
@@ -83,14 +83,14 @@ fn open_file_system(path: &PathBuf) -> Result<NtfsFileSystem, ErrorTrace> {
             ));
         }
     };
-    let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
+    let mut file_system: FatFileSystem = FatFileSystem::new();
 
     match file_system.read_data_stream(&data_stream) {
         Ok(_) => {}
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(
                 error,
-                "Unable to read NTFS file system from data stream"
+                "Unable to read FAT file system from data stream"
             );
             return Err(error);
         }
@@ -99,9 +99,9 @@ fn open_file_system(path: &PathBuf) -> Result<NtfsFileSystem, ErrorTrace> {
 }
 
 #[test]
-fn read_ntfs_empty_file() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/ntfs/ntfs.raw");
-    let file_system: NtfsFileSystem = open_file_system(&path_buf)?;
+fn read_fat_empty_file() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
+    let file_system: FatFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
     assert_eq!(offset, 0);

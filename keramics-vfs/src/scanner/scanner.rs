@@ -303,7 +303,7 @@ impl VfsScanner {
 
         // TODO: use layer identifier in path?
         let image_layer_path: String = format!("{}{}", path_prefix, number_of_layers);
-        let node_vfs_path: VfsPath = VfsPath::from_path(vfs_type, image_layer_path.as_str());
+        let node_vfs_path: VfsPath = VfsPath::from_string(vfs_type, image_layer_path.as_str());
         let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_vfs_path);
         let node_file_system: VfsFileSystemReference =
             match self.resolver.open_file_system(&node_vfs_location) {
@@ -319,7 +319,8 @@ impl VfsScanner {
                     VfsType::Ntfs { .. } => "\\",
                     _ => "/",
                 };
-                let sub_node_vfs_path: VfsPath = VfsPath::from_path(&sub_node_vfs_type, root_path);
+                let sub_node_vfs_path: VfsPath =
+                    VfsPath::from_string(&sub_node_vfs_type, root_path);
                 let sub_node_vfs_location: VfsLocation =
                     node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
                 let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
@@ -481,7 +482,7 @@ impl VfsScanner {
                         _ => "/",
                     };
                     let sub_node_vfs_path: VfsPath =
-                        VfsPath::from_path(&sub_node_vfs_type, root_path);
+                        VfsPath::from_string(&sub_node_vfs_type, root_path);
                     let sub_node_vfs_location: VfsLocation =
                         vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
@@ -740,7 +741,7 @@ impl VfsScanner {
             VfsType::Ntfs { .. } => "\\",
             _ => "/",
         };
-        let vfs_path: VfsPath = VfsPath::from_path(vfs_type, root_path);
+        let vfs_path: VfsPath = VfsPath::from_string(vfs_type, root_path);
         let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, vfs_path);
         let node_file_system: VfsFileSystemReference =
             match self.resolver.open_file_system(&file_system_vfs_location) {
@@ -757,7 +758,7 @@ impl VfsScanner {
             // TODO: use volume identifier in location?
             let volume_path: String = format!("{}{}", path_prefix, volume_index + 1);
 
-            let node_vfs_path: VfsPath = VfsPath::from_path(vfs_type, volume_path.as_str());
+            let node_vfs_path: VfsPath = VfsPath::from_string(vfs_type, volume_path.as_str());
             let node_vfs_location: VfsLocation =
                 vfs_location.new_with_layer(vfs_type, node_vfs_path);
             let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
@@ -769,7 +770,7 @@ impl VfsScanner {
                         _ => "/",
                     };
                     let sub_node_vfs_path: VfsPath =
-                        VfsPath::from_path(&sub_node_vfs_type, root_path);
+                        VfsPath::from_string(&sub_node_vfs_type, root_path);
                     let sub_node_vfs_location: VfsLocation = volume_scan_node
                         .location
                         .new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
@@ -901,13 +902,13 @@ mod tests {
 
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
         let vfs_file_system_path: VfsLocation =
             os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, "/qcow1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/qcow1");
         let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
@@ -934,13 +935,13 @@ mod tests {
 
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/");
         let vfs_file_system_path: VfsLocation =
             os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, "/gpt1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/gpt1");
         let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?

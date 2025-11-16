@@ -37,7 +37,7 @@ pub struct FatBlockStream {
     current_offset: u64,
 
     /// The size.
-    size: u32,
+    size: u64,
 }
 
 impl FatBlockStream {
@@ -48,7 +48,7 @@ impl FatBlockStream {
             block_size: block_size,
             block_tree: BlockTree::<FatBlockRange>::new(0, 0, 0),
             current_offset: 0,
-            size: size,
+            size: size as u64,
         }
     }
 
@@ -63,7 +63,7 @@ impl FatBlockStream {
             block_allocation_table.get_largest_cluster_block_number();
 
         let block_tree_data_size: u64 =
-            (self.size.div_ceil(self.block_size) as u64) * (self.block_size as u64);
+            self.size.div_ceil(self.block_size as u64) * (self.block_size as u64);
         self.block_tree =
             BlockTree::<FatBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
 
@@ -125,7 +125,7 @@ impl FatBlockStream {
         let mut current_offset: u64 = self.current_offset;
 
         while data_offset < read_size {
-            if current_offset >= self.size as u64 {
+            if current_offset >= self.size {
                 break;
             }
             let block_range: &FatBlockRange = match self.block_tree.get_value(current_offset) {
@@ -176,15 +176,15 @@ impl DataStream for FatBlockStream {
 
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.size as u64)
+        Ok(self.size)
     }
 
     /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.size as u64 {
+        if self.current_offset >= self.size {
             return Ok(0);
         }
-        let remaining_size: u64 = (self.size as u64) - self.current_offset;
+        let remaining_size: u64 = self.size - self.current_offset;
         let mut read_size: usize = buf.len();
 
         if (read_size as u64) > remaining_size {
@@ -206,15 +206,23 @@ impl DataStream for FatBlockStream {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.current_offset as i64;
-                current_offset += relative_offset;
-                current_offset as u64
+                match self.current_offset.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
-            SeekFrom::End(relative_offset) => {
-                let mut end_offset: i64 = self.size as i64;
-                end_offset += relative_offset;
-                end_offset as u64
-            }
+            SeekFrom::End(relative_offset) => match self.size.checked_add_signed(relative_offset) {
+                Some(offset) => offset,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid offset value out of bounds"
+                    ));
+                }
+            },
             SeekFrom::Start(offset) => offset,
         };
         Ok(self.current_offset)
@@ -308,6 +316,16 @@ mod tests {
 
         let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
         assert_eq!(offset, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut block_stream: FatBlockStream = get_block_stream()?;
+
+        let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
+        assert!(result.is_err());
 
         Ok(())
     }

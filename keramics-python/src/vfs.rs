@@ -495,7 +495,7 @@ impl PyVfsPath {
             PyVfsType::Vhdx => VfsType::Vhdx,
         };
         Ok(Self {
-            path: Arc::new(VfsPath::from_path(&vfs_type, path)),
+            path: Arc::new(VfsPath::from_string(&vfs_type, path)),
         })
     }
 }

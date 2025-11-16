@@ -15,11 +15,12 @@ use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
+use keramics_formats::ext::ExtFileEntry;
 use keramics_formats::ext::constants::*;
-use keramics_formats::ext::{ExtFileEntry, ExtPath};
 use keramics_formats::fat::FatFileEntry;
-use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry, NtfsPath};
-use keramics_types::{ByteString, Ucs2String};
+use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry};
+use keramics_formats::{Path, PathComponent};
+use keramics_types::Ucs2String;
 
 use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
@@ -286,15 +287,8 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_symbolic_link_target() {
                 Ok(result) => match result {
-                    Some(name) => {
-                        let path_components: Vec<ByteString> = name
-                            .elements
-                            .split(|value| *value == 0x2f)
-                            .map(|component| ByteString::from(component))
-                            .collect::<Vec<ByteString>>();
-                        Ok(Some(VfsPath::Ext(ExtPath {
-                            components: path_components,
-                        })))
+                    Some(symbolic_link_target) => {
+                        Ok(Some(VfsPath::from(Path::from(symbolic_link_target))))
                     }
                     None => Ok(None),
                 },
@@ -310,15 +304,14 @@ impl VfsFileEntry {
             {
                 Ok(result) => match result {
                     Some(name) => {
-                        let path_components: Vec<Ucs2String> = name
+                        let path_components: Vec<PathComponent> = name
                             .elements
                             .split(|value| *value == 0x005c)
                             .skip(2) // Strip leading "\\??\\".
-                            .map(|component| Ucs2String::from(component))
-                            .collect::<Vec<Ucs2String>>();
-                        Ok(Some(VfsPath::Ntfs(NtfsPath {
-                            components: path_components,
-                        })))
+                            .map(|component| PathComponent::Ucs2String(Ucs2String::from(component)))
+                            .collect::<Vec<PathComponent>>();
+
+                        Ok(Some(VfsPath::from(Path::from(path_components))))
                     }
                     None => Ok(None),
                 },
@@ -331,7 +324,7 @@ impl VfsFileEntry {
                 }
             },
             VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_symbolic_link_target() {
-                Some(link_target) => Ok(Some(VfsPath::Os(link_target))),
+                Some(link_target) => Ok(Some(VfsPath::from(link_target))),
                 None => Ok(None),
             },
         }
@@ -984,8 +977,9 @@ mod tests {
     use keramics_core::open_os_data_stream;
     use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, PosixTime32};
     use keramics_formats::ext::ExtFileSystem;
-    use keramics_formats::fat::{FatFileSystem, FatPath};
+    use keramics_formats::fat::FatFileSystem;
     use keramics_formats::ntfs::NtfsFileSystem;
+    use keramics_types::ByteString;
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
@@ -1015,7 +1009,7 @@ mod tests {
     fn get_apm_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Apm, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1152,15 +1146,15 @@ mod tests {
         Ok(file_system)
     }
 
-    fn get_ext_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+    fn get_ext_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_ext_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from(path);
-        match ext_file_system.get_file_entry_by_path(&ext_path)? {
+        let path: Path = Path::from(path_string);
+        match ext_file_system.get_file_entry_by_path(&path)? {
             Some(ext_file_entry) => Ok(VfsFileEntry::Ext(ext_file_entry)),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
-                path
+                path_string
             ))),
         }
     }
@@ -1259,12 +1253,18 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/file_symboliclink1")?;
 
         let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+
         assert_eq!(
             link_target,
-            Some(VfsPath::from_path(
-                &VfsType::Ext,
-                "/mnt/keramics/testdir1/testfile1",
-            ))
+            Some(VfsPath::Path(Path {
+                components: vec![
+                    PathComponent::ByteString(ByteString::from("")),
+                    PathComponent::ByteString(ByteString::from("mnt")),
+                    PathComponent::ByteString(ByteString::from("keramics")),
+                    PathComponent::ByteString(ByteString::from("testdir1")),
+                    PathComponent::ByteString(ByteString::from("testfile1")),
+                ],
+            }))
         );
         Ok(())
     }
@@ -1303,7 +1303,7 @@ mod tests {
     fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Ewf, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1525,15 +1525,15 @@ mod tests {
         Ok(file_system)
     }
 
-    fn get_fat_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+    fn get_fat_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let fat_file_system: FatFileSystem = get_fat_file_system()?;
 
-        let fat_path: FatPath = FatPath::from(path);
-        match fat_file_system.get_file_entry_by_path(&fat_path)? {
+        let path: Path = Path::from(path_string);
+        match fat_file_system.get_file_entry_by_path(&path)? {
             Some(fat_file_entry) => Ok(VfsFileEntry::Fat(fat_file_entry)),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
-                path
+                path_string
             ))),
         }
     }
@@ -1664,7 +1664,7 @@ mod tests {
     fn get_gpt_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Gpt, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1805,7 +1805,7 @@ mod tests {
     fn get_mbr_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Mbr, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Mbr, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -1942,22 +1942,22 @@ mod tests {
         Ok(file_system)
     }
 
-    fn get_ntfs_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+    fn get_ntfs_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let ntfs_file_system: NtfsFileSystem = get_ntfs_file_system()?;
 
-        let ntfs_path: NtfsPath = NtfsPath::from(path);
-        match ntfs_file_system.get_file_entry_by_path(&ntfs_path)? {
+        let path: Path = Path::from(path_string);
+        match ntfs_file_system.get_file_entry_by_path(&path)? {
             Some(ntfs_file_entry) => Ok(VfsFileEntry::Ntfs(ntfs_file_entry)),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
-                path
+                path_string
             ))),
         }
     }
 
     #[test]
     fn test_get_access_time_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
         assert_eq!(
@@ -1971,7 +1971,7 @@ mod tests {
 
     #[test]
     fn test_get_change_time_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
         assert_eq!(
@@ -1985,7 +1985,7 @@ mod tests {
 
     #[test]
     fn test_get_creation_time_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
         assert_eq!(
@@ -1999,11 +1999,11 @@ mod tests {
 
     #[test]
     fn test_get_file_type_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
@@ -2012,7 +2012,7 @@ mod tests {
 
     #[test]
     fn test_get_modification_time_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
         assert_eq!(
@@ -2026,7 +2026,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from(Ucs2String::from("testfile1"))));
@@ -2035,7 +2035,7 @@ mod tests {
 
     #[test]
     fn test_get_size_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let size: u64 = vfs_file_entry.get_size();
         assert_eq!(size, 9);
@@ -2045,7 +2045,7 @@ mod tests {
 
     #[test]
     fn test_get_symbolic_link_target_with_ntfs() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
@@ -2057,12 +2057,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("\\testdir1\\testfile1")?;
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -2078,7 +2078,7 @@ mod tests {
     fn get_os_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -2195,7 +2195,7 @@ mod tests {
     fn get_qcow_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Qcow, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -2336,7 +2336,7 @@ mod tests {
     fn get_sparseimage_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -2380,13 +2380,13 @@ mod tests {
     fn test_get_file_type_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::SparseImage, "/sparseimage1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/sparseimage1");
         let vfs_file_entry: VfsFileEntry =
             vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
 
@@ -2482,7 +2482,7 @@ mod tests {
     fn get_udif_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Udif, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Udif, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -2623,7 +2623,7 @@ mod tests {
     fn get_vhd_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhd, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhd, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -2764,7 +2764,7 @@ mod tests {
     fn get_vhdx_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, path);
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, path);
         match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(

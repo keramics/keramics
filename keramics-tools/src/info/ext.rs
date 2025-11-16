@@ -14,8 +14,9 @@
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
+use keramics_formats::Path;
 use keramics_formats::ext::constants::*;
-use keramics_formats::ext::{ExtFileEntry, ExtFileSystem, ExtPath};
+use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
 use keramics_types::ByteString;
 
 /// Information about an Extended File System (ext).
@@ -424,7 +425,7 @@ impl ExtInfo {
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
-        path_components: &[&str],
+        path: &Path,
         character_encoding: Option<&CharacterEncoding>,
     ) -> Result<(), ErrorTrace> {
         let mut ext_file_system = ExtFileSystem::new();
@@ -449,10 +450,8 @@ impl ExtInfo {
                 return Err(error);
             }
         }
-        let ext_path: ExtPath = ExtPath::from(path_components);
-
         let mut file_entry: Option<ExtFileEntry> =
-            match ext_file_system.get_file_entry_by_path(&ext_path) {
+            match ext_file_system.get_file_entry_by_path(path) {
                 Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");

@@ -59,6 +59,7 @@ impl Utf16String {
     }
 
     /// Converts the UTF-16 string to a `String`.
+    // TODO: change to use fmt::Display
     pub fn to_string(&self) -> String {
         String::from_utf16(&self.elements).unwrap()
     }

@@ -17,6 +17,8 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
+use crate::path_component::PathComponent;
+
 use super::block_range::ExtBlockRange;
 use super::directory_entry::ExtDirectoryEntry;
 use super::directory_tree::ExtDirectoryTree;
@@ -54,9 +56,19 @@ impl ExtDirectoryEntries {
     /// Retrieves a specific directory entry by name.
     pub fn get_entry_by_name(
         &self,
-        name: &ByteString,
-    ) -> Option<(&ByteString, &ExtDirectoryEntry)> {
-        self.entries.get_key_value(name)
+        name: &PathComponent,
+    ) -> Result<Option<(&ByteString, &ExtDirectoryEntry)>, ErrorTrace> {
+        let lookup_name: ByteString = match name.to_byte_string(&self.encoding) {
+            Ok(byte_string) => byte_string,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to convert path component to byte string"
+                );
+                return Err(error);
+            }
+        };
+        Ok(self.entries.get_key_value(&lookup_name))
     }
 
     /// Retrieves the number of entries.
@@ -133,20 +145,24 @@ mod tests {
         ]
     }
 
-    #[test]
-    fn test_get_entry_by_index() -> Result<(), ErrorTrace> {
+    fn get_directory_entries() -> Result<ExtDirectoryEntries, ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_inline();
 
         let mut directory_entries: ExtDirectoryEntries =
             ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
         directory_entries.read_inline_data(&test_data, 256)?;
 
-        let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
-            directory_entries.get_entry_by_index(0);
+        Ok(directory_entries)
+    }
+
+    #[test]
+    fn test_get_entry_by_index() -> Result<(), ErrorTrace> {
+        let test_struct: ExtDirectoryEntries = get_directory_entries()?;
+
+        let entry: Option<(&ByteString, &ExtDirectoryEntry)> = test_struct.get_entry_by_index(0);
         assert!(entry.is_some());
 
-        let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
-            directory_entries.get_entry_by_index(99);
+        let entry: Option<(&ByteString, &ExtDirectoryEntry)> = test_struct.get_entry_by_index(99);
         assert!(entry.is_none());
 
         Ok(())
@@ -154,20 +170,16 @@ mod tests {
 
     #[test]
     fn test_get_entry_by_name() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data_inline();
+        let test_struct: ExtDirectoryEntries = get_directory_entries()?;
 
-        let mut directory_entries: ExtDirectoryEntries =
-            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
-        directory_entries.read_inline_data(&test_data, 256)?;
-
-        let name: ByteString = ByteString::from("testfile1");
+        let name: PathComponent = PathComponent::ByteString(ByteString::from("testfile1"));
         let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
-            directory_entries.get_entry_by_name(&name);
+            test_struct.get_entry_by_name(&name)?;
         assert!(entry.is_some());
 
-        let name: ByteString = ByteString::from("bogus");
+        let name: PathComponent = PathComponent::ByteString(ByteString::from("bogus"));
         let entry: Option<(&ByteString, &ExtDirectoryEntry)> =
-            directory_entries.get_entry_by_name(&name);
+            test_struct.get_entry_by_name(&name)?;
         assert!(entry.is_none());
 
         Ok(())
@@ -175,13 +187,9 @@ mod tests {
 
     #[test]
     fn test_get_number_of_entries() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data_inline();
+        let test_struct: ExtDirectoryEntries = get_directory_entries()?;
 
-        let mut directory_entries: ExtDirectoryEntries =
-            ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
-        directory_entries.read_inline_data(&test_data, 256)?;
-
-        assert_eq!(directory_entries.get_number_of_entries(), 1);
+        assert_eq!(test_struct.get_number_of_entries(), 1);
 
         Ok(())
     }
@@ -210,11 +218,11 @@ mod tests {
             0x00, 0x00, 0x00, 0x00,
         ];
 
-        let mut directory_entries: ExtDirectoryEntries =
+        let mut test_struct: ExtDirectoryEntries =
             ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
 
-        assert_eq!(directory_entries.entries.len(), 0);
-        assert_eq!(directory_entries.is_read, false);
+        assert_eq!(test_struct.entries.len(), 0);
+        assert_eq!(test_struct.is_read, false);
 
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
@@ -224,10 +232,10 @@ mod tests {
             number_of_blocks: 1,
             range_type: ExtBlockRangeType::InFile,
         }];
-        directory_entries.read_block_data(&data_stream, 256, &block_ranges)?;
+        test_struct.read_block_data(&data_stream, 256, &block_ranges)?;
 
-        assert_eq!(directory_entries.entries.len(), 10);
-        assert_eq!(directory_entries.is_read, true);
+        assert_eq!(test_struct.entries.len(), 10);
+        assert_eq!(test_struct.is_read, true);
 
         Ok(())
     }
@@ -236,16 +244,16 @@ mod tests {
     fn test_read_inline_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data_inline();
 
-        let mut directory_entries: ExtDirectoryEntries =
+        let mut test_struct: ExtDirectoryEntries =
             ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
 
-        assert_eq!(directory_entries.entries.len(), 0);
-        assert_eq!(directory_entries.is_read, false);
+        assert_eq!(test_struct.entries.len(), 0);
+        assert_eq!(test_struct.is_read, false);
 
-        directory_entries.read_inline_data(&test_data, 256)?;
+        test_struct.read_inline_data(&test_data, 256)?;
 
-        assert_eq!(directory_entries.entries.len(), 1);
-        assert_eq!(directory_entries.is_read, true);
+        assert_eq!(test_struct.entries.len(), 1);
+        assert_eq!(test_struct.is_read, true);
 
         Ok(())
     }

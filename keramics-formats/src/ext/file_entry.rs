@@ -18,6 +18,8 @@ use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream}
 use keramics_datetime::DateTime;
 use keramics_types::{ByteString, bytes_to_u16_le};
 
+use crate::path_component::PathComponent;
+
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
@@ -313,7 +315,7 @@ impl ExtFileEntry {
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(
         &mut self,
-        sub_file_entry_name: &ByteString,
+        sub_file_entry_name: &PathComponent,
     ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries.is_read() {
             match self.read_sub_directory_entries() {
@@ -327,24 +329,11 @@ impl ExtFileEntry {
                 }
             }
         }
-        let mut encoded_name: ByteString =
-            ByteString::new_with_encoding(&self.sub_directory_entries.encoding);
-        let lookup_name: &ByteString = if sub_file_entry_name.encoding
-            == self.sub_directory_entries.encoding
+        match self
+            .sub_directory_entries
+            .get_entry_by_name(sub_file_entry_name)
         {
-            sub_file_entry_name
-        } else {
-            match encoded_name.extend(sub_file_entry_name) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to extend encoded name");
-                    return Err(error);
-                }
-            }
-            &encoded_name
-        };
-        match self.sub_directory_entries.get_entry_by_name(lookup_name) {
-            Some((name, directory_entry)) => {
+            Ok(Some((name, directory_entry))) => {
                 let inode: ExtInode = match self
                     .inode_table
                     .get_inode(&self.data_stream, directory_entry.inode_number)
@@ -367,7 +356,11 @@ impl ExtFileEntry {
                     ExtDirectoryEntries::new(&self.sub_directory_entries.encoding),
                 )))
             }
-            None => Ok(None),
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve sub file entry");
+                Err(error)
+            }
         }
     }
 
@@ -427,7 +420,7 @@ mod tests {
     use keramics_datetime::PosixTime32;
 
     use crate::ext::file_system::ExtFileSystem;
-    use crate::ext::path::ExtPath;
+    use crate::path::Path;
 
     use crate::tests::get_test_data_path;
 
@@ -445,9 +438,8 @@ mod tests {
     fn test_get_access_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ext_file_entry.get_access_time(),
@@ -462,9 +454,8 @@ mod tests {
     fn test_get_change_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ext_file_entry.get_change_time(),
@@ -479,9 +470,8 @@ mod tests {
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_creation_time(), None);
 
@@ -492,9 +482,9 @@ mod tests {
     fn test_get_device_identifier() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
         assert_eq!(device_identifier, None);
@@ -508,9 +498,8 @@ mod tests {
     fn test_get_file_mode() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_file_mode(), 0o100644);
 
@@ -521,9 +510,8 @@ mod tests {
     fn test_get_group_identifier() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_group_identifier(), 1000);
 
@@ -534,9 +522,8 @@ mod tests {
     fn test_get_deletion_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_deletion_time(), &DateTime::NotSet);
 
@@ -547,9 +534,8 @@ mod tests {
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             ext_file_entry.get_modification_time(),
@@ -564,9 +550,8 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let name: Option<&ByteString> = ext_file_entry.get_name();
         assert_eq!(name, Some(ByteString::from("testfile1")).as_ref());
@@ -578,9 +563,8 @@ mod tests {
     fn test_get_number_of_links() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_number_of_links(), 2);
 
@@ -591,9 +575,8 @@ mod tests {
     fn test_get_owner_identifier() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_owner_identifier(), 1000);
 
@@ -604,9 +587,8 @@ mod tests {
     fn test_get_size() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_size(), 9);
 
@@ -617,17 +599,17 @@ mod tests {
     fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let symbolic_link_target: Option<&ByteString> =
             ext_file_entry.get_symbolic_link_target()?;
         assert_eq!(symbolic_link_target, None);
 
-        let ext_path: ExtPath = ExtPath::from("/file_symboliclink1");
+        let path: Path = Path::from("/file_symboliclink1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let symbolic_link_target: Option<&ByteString> =
             ext_file_entry.get_symbolic_link_target()?;
@@ -643,16 +625,14 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ext_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ext_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -664,9 +644,9 @@ mod tests {
     fn test_get_number_of_attributes() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_attributes: usize = ext_file_entry.get_number_of_attributes()?;
         assert_eq!(number_of_attributes, 0);
@@ -680,16 +660,16 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let path: Path = Path::from("/testdir1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = ext_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 10);
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
+        let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = ext_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 0);
@@ -701,9 +681,9 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let path: Path = Path::from("/testdir1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let sub_file_entry: ExtFileEntry = ext_file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -717,15 +697,15 @@ mod tests {
     fn test_get_sub_file_entry_by_name() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1");
+        let path: Path = Path::from("/testdir1");
         let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let name: ByteString = ByteString::from("TestFile2");
+        let name: PathComponent = PathComponent::ByteString(ByteString::from("TestFile2"));
         let result: Option<ExtFileEntry> = ext_file_entry.get_sub_file_entry_by_name(&name)?;
         assert!(result.is_some());
 
-        let name: ByteString = ByteString::from("bogus");
+        let name: PathComponent = PathComponent::ByteString(ByteString::from("bogus"));
         let result: Option<ExtFileEntry> = ext_file_entry.get_sub_file_entry_by_name(&name)?;
         assert!(result.is_none());
 
@@ -736,21 +716,18 @@ mod tests {
     fn test_is_directory() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.is_directory(), true);
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.is_directory(), true);
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.is_directory(), false);
 
@@ -761,21 +738,18 @@ mod tests {
     fn test_is_root_directory() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
-        let ext_path: ExtPath = ExtPath::from("/");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.is_root_directory(), true);
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.is_root_directory(), false);
 
-        let ext_path: ExtPath = ExtPath::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&ext_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.is_root_directory(), false);
 

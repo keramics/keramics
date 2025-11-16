@@ -26,9 +26,7 @@ pub struct Mediator {
 impl Mediator {
     /// Creates a new mediator.
     pub fn new(debug_output: bool) -> Self {
-        Self {
-            debug_output: debug_output,
-        }
+        Self { debug_output }
     }
 
     /// Retrieves the current mediator.

@@ -25,12 +25,10 @@ mod enums;
 mod file_entry;
 mod file_system;
 mod long_name_directory_entry;
-mod path;
 mod short_name_directory_entry;
 mod string;
 
 pub use enums::FatFormat;
 pub use file_entry::FatFileEntry;
 pub use file_system::FatFileSystem;
-pub use path::FatPath;
 pub use string::FatString;

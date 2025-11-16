@@ -16,6 +16,8 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 
+use crate::path_component::PathComponent;
+
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::block_stream::FatBlockStream;
 use super::constants::*;
@@ -198,7 +200,7 @@ impl FatFileEntry {
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(
         &mut self,
-        sub_file_entry_name: &FatString,
+        sub_file_entry_name: &PathComponent,
     ) -> Result<Option<FatFileEntry>, ErrorTrace> {
         if self.is_directory() && !self.sub_directory_entries.is_read() {
             match self.read_sub_directory_entries() {
@@ -212,25 +214,22 @@ impl FatFileEntry {
                 }
             }
         }
-        let result = match self
+        match self
             .sub_directory_entries
             .get_entry_by_name(sub_file_entry_name)
         {
-            Ok(result) => result,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve sub file entry");
-                return Err(error);
-            }
-        };
-        match result {
-            Some(directory_entry) => Ok(Some(FatFileEntry::new(
+            Ok(Some(directory_entry)) => Ok(Some(FatFileEntry::new(
                 &self.data_stream,
                 &self.block_allocation_table,
                 directory_entry.identifier,
                 Some(directory_entry.clone()),
                 FatDirectoryEntries::new(&self.sub_directory_entries.case_folding_mappings),
             ))),
-            None => Ok(None),
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve sub file entry");
+                Err(error)
+            }
         }
     }
 
@@ -289,7 +288,7 @@ mod tests {
     use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms};
 
     use crate::fat::file_system::FatFileSystem;
-    use crate::fat::path::FatPath;
+    use crate::path::Path;
 
     use crate::tests::get_test_data_path;
 
@@ -307,9 +306,8 @@ mod tests {
     fn test_get_access_time() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             fat_file_entry.get_access_time(),
@@ -322,9 +320,8 @@ mod tests {
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             fat_file_entry.get_creation_time(),
@@ -341,9 +338,8 @@ mod tests {
     fn test_get_file_attribute_flags() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
         assert_eq!(file_attribute_flags, 0x20);
@@ -355,9 +351,8 @@ mod tests {
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
             fat_file_entry.get_modification_time(),
@@ -373,9 +368,8 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let name: Option<FatString> = fat_file_entry.get_name();
         assert_eq!(name, Some(FatString::from("testfile1")));
@@ -387,9 +381,8 @@ mod tests {
     fn test_get_size() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.get_size(), 9);
 
@@ -400,16 +393,14 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = fat_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = fat_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -421,16 +412,16 @@ mod tests {
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1");
+        let path: Path = Path::from("/testdir1");
         let mut fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = fat_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 3);
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
+        let path: Path = Path::from("/testdir1/testfile1");
         let mut fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = fat_file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 0);
@@ -442,9 +433,9 @@ mod tests {
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/testdir1");
+        let path: Path = Path::from("/testdir1");
         let mut fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let sub_file_entry: FatFileEntry = fat_file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -465,21 +456,18 @@ mod tests {
     fn test_is_directory() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.is_directory(), true);
 
-        let fat_path: FatPath = FatPath::from("/testdir1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.is_directory(), true);
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.is_directory(), false);
 
@@ -490,21 +478,18 @@ mod tests {
     fn test_is_root_directory() -> Result<(), ErrorTrace> {
         let fat_file_system: FatFileSystem = get_file_system()?;
 
-        let fat_path: FatPath = FatPath::from("/");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.is_root_directory(), true);
 
-        let fat_path: FatPath = FatPath::from("/testdir1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.is_root_directory(), false);
 
-        let fat_path: FatPath = FatPath::from("/testdir1/testfile1");
-        let fat_file_entry: FatFileEntry =
-            fat_file_system.get_file_entry_by_path(&fat_path)?.unwrap();
+        let path: Path = Path::from("/testdir1/testfile1");
+        let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(fat_file_entry.is_root_directory(), false);
 

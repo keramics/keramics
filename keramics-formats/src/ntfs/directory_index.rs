@@ -19,6 +19,8 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2String, bytes_to_u64_le};
 
+use crate::path_component::PathComponent;
+
 use super::constants::*;
 use super::directory_entries::NtfsDirectoryEntries;
 use super::directory_entry::NtfsDirectoryEntry;
@@ -178,26 +180,42 @@ impl NtfsDirectoryIndex {
     pub fn get_directory_entry_by_name(
         &self,
         data_stream: &DataStreamReference,
-        name: &Ucs2String,
+        name: &PathComponent,
     ) -> Result<Option<NtfsDirectoryEntry>, ErrorTrace> {
         if !self.is_initialized {
             return Err(keramics_core::error_trace_new!(
                 "Directory index was not initialized"
             ));
         }
-        if self.use_case_folding {
-            let case_folded_name: Ucs2String =
-                Ucs2String::new_with_case_folding(name, &self.case_folding_mappings);
-
-            self.get_directory_entry_by_name_from_node(
-                &self.root_node_data,
-                16,
-                data_stream,
-                &case_folded_name,
-            )
+        let lookup_name: Ucs2String = if self.use_case_folding {
+            match name.to_ucs2_string_with_case_folding(&self.case_folding_mappings) {
+                Ok(ucs2_string) => ucs2_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to convert path component to UCS-2 string with case folding"
+                    );
+                    return Err(error);
+                }
+            }
         } else {
-            self.get_directory_entry_by_name_from_node(&self.root_node_data, 16, data_stream, name)
-        }
+            match name.to_ucs2_string() {
+                Ok(ucs2_string) => ucs2_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to convert path component to UCS-2 string"
+                    );
+                    return Err(error);
+                }
+            }
+        };
+        self.get_directory_entry_by_name_from_node(
+            &self.root_node_data,
+            16,
+            data_stream,
+            &lookup_name,
+        )
     }
 
     /// Retrieves a directory entry by name from an index node.

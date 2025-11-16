@@ -175,10 +175,18 @@ impl EwfImage {
                 segment_number,
             )));
         }
-        let segment_extension: String = extension
-            .iter()
-            .map(|value| std::char::from_u32(*value).unwrap())
-            .collect::<String>();
+        let mut segment_extension: String = String::new();
+
+        for code_point in extension.iter() {
+            match char::from_u32(*code_point) {
+                Some(character) => segment_extension.push(character),
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to encode string - code point outside of supported range"
+                    ));
+                }
+            }
+        }
         Ok(segment_extension)
     }
 
@@ -569,21 +577,41 @@ impl EwfImage {
     ) -> Result<(), ErrorTrace> {
         // TODO: add function that retrieves both file stem and extension
         let name: String = match file_name.file_stem() {
-            Some(file_stem) => file_stem.to_string(),
-            None => {
+            Ok(Some(file_stem)) => file_stem.to_string(),
+            Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Extension missing in segment file: {}",
                     file_name.to_string(),
                 )));
             }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve file stem of segment file: {}",
+                        file_name.to_string()
+                    )
+                );
+                return Err(error);
+            }
         };
         let extension: String = match file_name.extension() {
-            Some(extension) => extension.to_string(),
-            None => {
+            Ok(Some(extension)) => extension.to_string(),
+            Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Extension missing in segment file: {}",
                     file_name.to_string(),
                 )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve extension of segment file: {}",
+                        file_name.to_string()
+                    )
+                );
+                return Err(error);
             }
         };
         let naming_schema: EwfNamingSchema = match extension.as_str() {
@@ -970,14 +998,24 @@ impl DataStream for EwfImage {
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
-                let mut current_offset: i64 = self.current_offset as i64;
-                current_offset += relative_offset;
-                current_offset as u64
+                match self.current_offset.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
             SeekFrom::End(relative_offset) => {
-                let mut end_offset: i64 = self.media_size as i64;
-                end_offset += relative_offset;
-                end_offset as u64
+                match self.media_size.checked_add_signed(relative_offset) {
+                    Some(offset) => offset,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid offset value out of bounds"
+                        ));
+                    }
+                }
             }
             SeekFrom::Start(offset) => offset,
         };
@@ -1115,7 +1153,17 @@ mod tests {
     }
 
     #[test]
-    fn test_seek_beyond_media_size() -> Result<(), ErrorTrace> {
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut image: EwfImage = get_image()?;
+
+        let result: Result<u64, ErrorTrace> = image.seek(SeekFrom::Current(-512));
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
         let mut image: EwfImage = get_image()?;
 
         let offset: u64 = image.seek(SeekFrom::End(512))?;

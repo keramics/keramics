@@ -154,7 +154,7 @@ impl ZlibContext {
         data_header.read_data(compressed_data)?;
 
         let mut bitstream: DeflateBitstream =
-            DeflateBitstream::new(&compressed_data, data_header.header_size);
+            DeflateBitstream::new(compressed_data, data_header.header_size);
         let mut deflate_context: DeflateContext = DeflateContext::new();
         deflate_context.decompress_bitstream(&mut bitstream, uncompressed_data)?;
 

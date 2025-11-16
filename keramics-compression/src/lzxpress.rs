@@ -477,7 +477,7 @@ impl LzxpressHuffmanContext {
                 } else {
                     bitstream.get_value(symbol as usize)
                 };
-                distance = (1 << symbol) | distance;
+                distance |= 1 << symbol;
 
                 // Check for a first level extended match size (0x000f).
                 if match_size == 15 {

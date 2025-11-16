@@ -14,7 +14,7 @@
 use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::vhdx::VhdxImage;
+use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::{FileResolverReference, PathComponent};
 
 use crate::file_resolver::new_vfs_file_resolver;
@@ -47,21 +47,33 @@ impl VhdxFileSystem {
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path) => {
-                let number_of_components: usize = string_path.components.len();
-                if number_of_components == 0 || number_of_components > 2 {
+            VfsPath::Path(path) => {
+                if path.is_relative() {
                     return Ok(false);
                 }
-                if string_path.components[0] != "" {
-                    return Ok(false);
-                }
-                // A single empty component represents "/".
-                if number_of_components == 1 {
-                    return Ok(true);
-                }
-                match self.get_layer_index(&string_path.components[1]) {
-                    Some(_) => Ok(true),
-                    None => Ok(false),
+                match path.get_component_by_index(1) {
+                    Some(path_component) => {
+                        if path.get_number_of_components() > 2 {
+                            return Ok(false);
+                        }
+                        let layer_index: usize =
+                            match VfsPath::get_numeric_suffix(path_component, "vhdx") {
+                                Some(layer_index) => layer_index,
+                                None => return Ok(false),
+                            };
+                        if layer_index == 0 || layer_index > self.number_of_layers {
+                            Ok(false)
+                        } else {
+                            Ok(true)
+                        }
+                    }
+                    None => {
+                        if path.is_empty() {
+                            Ok(false)
+                        } else {
+                            Ok(true)
+                        }
+                    }
                 }
             }
             _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
@@ -74,28 +86,38 @@ impl VhdxFileSystem {
         vfs_path: &VfsPath,
     ) -> Result<Option<VhdxFileEntry>, ErrorTrace> {
         match vfs_path {
-            VfsPath::String(string_path) => {
-                let number_of_components: usize = string_path.components.len();
-                if number_of_components == 0 || number_of_components > 2 {
+            VfsPath::Path(path) => {
+                if path.is_relative() {
                     return Ok(None);
                 }
-                if string_path.components[0] != "" {
-                    return Ok(None);
-                }
-                // A single empty component represents "/".
-                if number_of_components == 1 {
-                    let vhdx_file_entry: VhdxFileEntry = self.get_root_file_entry()?;
+                match path.get_component_by_index(1) {
+                    Some(path_component) => {
+                        if path.get_number_of_components() > 2 {
+                            return Ok(None);
+                        }
+                        let mut layer_index: usize =
+                            match VfsPath::get_numeric_suffix(path_component, "vhdx") {
+                                Some(layer_index) => layer_index,
+                                None => return Ok(None),
+                            };
+                        if layer_index == 0 || layer_index > self.number_of_layers {
+                            return Ok(None);
+                        }
+                        layer_index -= 1;
 
-                    return Ok(Some(vhdx_file_entry));
-                }
-                let layer_index: usize = match self.get_layer_index(&string_path.components[1]) {
-                    Some(layer_index) => layer_index,
-                    None => return Ok(None),
-                };
-                match self.image.get_layer_by_index(layer_index) {
-                    Ok(vhdx_layer) => {
+                        let vhdx_layer: VhdxImageLayer =
+                            match self.image.get_layer_by_index(layer_index) {
+                                Ok(vhdx_layer) => vhdx_layer,
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!("Unable to retrieve VHDX layer: {}", layer_index)
+                                    );
+                                    return Err(error);
+                                }
+                            };
                         let media_size: u64 = match vhdx_layer.read() {
-                            Ok(vhd_file) => vhd_file.media_size,
+                            Ok(vhdx_file) => vhdx_file.media_size,
                             Err(error) => {
                                 return Err(keramics_core::error_trace_new_with_error!(
                                     "Unable to obtain read lock on VHDX layer",
@@ -109,33 +131,17 @@ impl VhdxFileSystem {
                             size: media_size,
                         }))
                     }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to retrieve VHDX layer: {}", layer_index)
-                        );
-                        return Err(error);
+                    None => {
+                        if path.is_empty() {
+                            return Ok(None);
+                        }
+                        Ok(Some(VhdxFileEntry::Root {
+                            image: self.image.clone(),
+                        }))
                     }
                 }
             }
             _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
-        }
-    }
-
-    /// Retrieves the layer index.
-    fn get_layer_index(&self, file_name: &String) -> Option<usize> {
-        if !file_name.starts_with("vhdx") {
-            return None;
-        }
-        match file_name[4..].parse::<usize>() {
-            Ok(layer_index) => {
-                if layer_index > 0 && layer_index <= self.number_of_layers {
-                    Some(layer_index - 1)
-                } else {
-                    None
-                }
-            }
-            Err(_) => None,
         }
     }
 
@@ -245,27 +251,27 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let vhdx_file_system: VhdxFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/vhdx1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/bogus1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx1/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/vhdx1/bogus1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "bogus1");
         let result: bool = vhdx_file_system.file_entry_exists(&vfs_path)?;
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Os, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/");
         let result: Result<bool, ErrorTrace> = vhdx_file_system.file_entry_exists(&vfs_path);
         assert!(result.is_err());
 
@@ -276,7 +282,7 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let vhdx_file_system: VhdxFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -288,7 +294,7 @@ mod tests {
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/vhdx1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/vhdx1");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_some());
 
@@ -300,28 +306,9 @@ mod tests {
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_path(&VfsType::Vhdx, "/bogus1");
+        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, "/bogus1");
         let result: Option<VhdxFileEntry> = vhdx_file_system.get_file_entry_by_path(&vfs_path)?;
         assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_layer_index() -> Result<(), ErrorTrace> {
-        let vhdx_file_system: VhdxFileSystem = get_file_system()?;
-
-        let file_name: String = String::from("vhdx1");
-        let layer_index: Option<usize> = vhdx_file_system.get_layer_index(&file_name);
-        assert_eq!(layer_index, Some(0));
-
-        let file_name: String = String::from("vhdx99");
-        let layer_index: Option<usize> = vhdx_file_system.get_layer_index(&file_name);
-        assert!(layer_index.is_none());
-
-        let file_name: String = String::from("bogus1");
-        let layer_index: Option<usize> = vhdx_file_system.get_layer_index(&file_name);
-        assert!(layer_index.is_none());
 
         Ok(())
     }

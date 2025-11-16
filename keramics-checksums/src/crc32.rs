@@ -37,8 +37,8 @@ impl Crc32Context {
     /// Creates a new context.
     pub fn new(polynomial: u32, initial_value: u32) -> Self {
         Self {
-            polynomial: polynomial,
-            initial_value: initial_value,
+            polynomial,
+            initial_value,
             checksum: initial_value ^ 0xffffffff,
             table: [0; 256],
             table_initilized: false,
@@ -79,8 +79,8 @@ impl Crc32Context {
         let data_size: usize = data.len();
         let mut checksum: u32 = self.checksum;
 
-        for data_offset in 0..data_size {
-            let table_index: u32 = ((checksum >> 24) ^ data[data_offset] as u32) & 0x000000ff;
+        for byte_value in data.iter().take(data_size) {
+            let table_index: u32 = ((checksum >> 24) ^ (*byte_value as u32)) & 0x000000ff;
 
             checksum = self.table[table_index as usize] ^ (checksum << 8);
         }
@@ -110,8 +110,8 @@ impl ReversedCrc32Context {
     /// Creates a new context.
     pub fn new(polynomial: u32, initial_value: u32) -> Self {
         Self {
-            polynomial: polynomial,
-            initial_value: initial_value,
+            polynomial,
+            initial_value,
             checksum: initial_value ^ 0xffffffff,
             table: [0; 256],
             table_initilized: false,
@@ -152,8 +152,8 @@ impl ReversedCrc32Context {
         let data_size: usize = data.len();
         let mut checksum: u32 = self.checksum;
 
-        for data_offset in 0..data_size {
-            let table_index: u32 = (checksum ^ data[data_offset] as u32) & 0x000000ff;
+        for byte_value in data.iter().take(data_size) {
+            let table_index: u32 = (checksum ^ (*byte_value as u32)) & 0x000000ff;
 
             checksum = self.table[table_index as usize] ^ (checksum >> 8);
         }
