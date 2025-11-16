@@ -63,11 +63,11 @@ impl PathComponent {
                 // Note that value_index is relative to end of the code points.
                 let extention_index: usize = code_points.len() - value_index;
 
-                let mut string: String = String::new();
+                let mut extension_string: String = String::new();
 
                 for code_point in code_points[extention_index..].iter() {
                     match char::from_u32(*code_point) {
-                        Some(character) => string.push(character),
+                        Some(character) => extension_string.push(character),
                         None => {
                             return Err(keramics_core::error_trace_new!(
                                 "Unable to encode string - code point outside of supported range"
@@ -75,7 +75,7 @@ impl PathComponent {
                         }
                     }
                 }
-                Some(PathComponent::String(string))
+                Some(PathComponent::String(extension_string))
             }
             None => None,
         };
@@ -93,7 +93,9 @@ impl PathComponent {
                 // Note that value_index is relative to end of the string.
                 let extention_index: usize = string.len() - value_index;
 
-                Some(PathComponent::String(string[extention_index..].to_string()))
+                let extension_string: String = string[extention_index..].to_string();
+
+                Some(PathComponent::String(extension_string))
             }
             None => None,
         }
@@ -114,9 +116,10 @@ impl PathComponent {
                 // Note that value_index is relative to end of the string.
                 let extention_index: usize = ucs2_string.len() - value_index;
 
-                Some(PathComponent::Ucs2String(Ucs2String::from(
-                    &ucs2_string.elements[extention_index..],
-                )))
+                let extension_string: Ucs2String =
+                    Ucs2String::from(&ucs2_string.elements[extention_index..]);
+
+                Some(PathComponent::Ucs2String(extension_string))
             }
             None => None,
         }
@@ -261,13 +264,18 @@ impl PathComponent {
                 while let Some(result) = character_decoder.next() {
                     match result {
                         Ok(code_points) => {
-                            for code_point in code_points {
+                            for mut code_point in code_points {
                                 if code_point > 0xffff {
-                                    return Err(keramics_core::error_trace_new!(
-                                        "Unable to encode UCS-2 string - code point outside of supported range"
-                                    ));
+                                    code_point -= 0x10000;
+                                    ucs2_string
+                                        .elements
+                                        .push(0xd800 + (code_point >> 10) as u16);
+                                    ucs2_string
+                                        .elements
+                                        .push(0xdc00 + (code_point & 0x03ff) as u16);
+                                } else {
+                                    ucs2_string.elements.push(code_point as u16);
                                 }
-                                ucs2_string.elements.push(code_point as u16);
                             }
                         }
                         Err(mut error) => {
@@ -281,19 +289,7 @@ impl PathComponent {
                 }
                 ucs2_string
             }
-            PathComponent::String(string) => {
-                let mut ucs2_string: Ucs2String = Ucs2String::new();
-
-                for character in string.chars() {
-                    if character as u32 > 0xffff {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unable to encode UCS-2 string - code point outside of supported range"
-                        ));
-                    }
-                    ucs2_string.elements.push(character as u16);
-                }
-                ucs2_string
-            }
+            PathComponent::String(string) => Ucs2String::from(string),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.clone(),
         };
         Ok(ucs2_string)
@@ -342,19 +338,24 @@ impl PathComponent {
                 let mut ucs2_string: Ucs2String = Ucs2String::new();
 
                 for character in string.chars() {
-                    let code_point: u32 = character as u32;
+                    let mut code_point: u32 = character as u32;
 
                     if code_point > 0xffff {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unable to encode UCS-2 string - code point outside of supported range"
-                        ));
+                        code_point -= 0x10000;
+                        ucs2_string
+                            .elements
+                            .push(0xd800 + (code_point >> 10) as u16);
+                        ucs2_string
+                            .elements
+                            .push(0xdc00 + (code_point & 0x03ff) as u16);
+                    } else {
+                        let folded_code_point: u16 =
+                            match case_folding_mappings.get(&(code_point as u16)) {
+                                Some(folded_code_point) => *folded_code_point,
+                                None => code_point as u16,
+                            };
+                        ucs2_string.elements.push(folded_code_point);
                     }
-                    let folded_code_point: u16 =
-                        match case_folding_mappings.get(&(code_point as u16)) {
-                            Some(folded_code_point) => *folded_code_point,
-                            None => code_point as u16,
-                        };
-                    ucs2_string.elements.push(folded_code_point);
                 }
                 ucs2_string
             }
