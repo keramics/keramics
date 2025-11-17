@@ -18,9 +18,9 @@ use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
 
 use keramics_core::DataStreamReference;
-use keramics_formats::PathComponent;
+use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{
-    VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsLocation, VfsPath, VfsResolver,
+    VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsLocation, VfsResolver,
     VfsResolverReference, VfsString, VfsType,
 };
 
@@ -43,14 +43,14 @@ impl PyVfsDataStream {
                 Err(error) => {
                     return Err(PyErr::new::<PyRuntimeError, String>(format!(
                         "Unable to determine offset of data stream with error: {}",
-                        error.to_string()
+                        error
                     )));
                 }
             },
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to obtain write lock on data stream with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -63,14 +63,14 @@ impl PyVfsDataStream {
                 Err(error) => {
                     return Err(PyErr::new::<PyRuntimeError, String>(format!(
                         "Unable to determine size of data stream with error: {}",
-                        error.to_string()
+                        error
                     )));
                 }
             },
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to obtain write lock on data stream with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -86,14 +86,14 @@ impl PyVfsDataStream {
                 Err(error) => {
                     return Err(PyErr::new::<PyRuntimeError, String>(format!(
                         "Unable to read from data stream with error: {}",
-                        error.to_string()
+                        error
                     )));
                 }
             },
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to obtain write lock on data stream with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         };
@@ -128,14 +128,14 @@ impl PyVfsDataStream {
                 Err(error) => {
                     return Err(PyErr::new::<PyRuntimeError, String>(format!(
                         "Unable to read from data stream with error: {}",
-                        error.to_string()
+                        error
                     )));
                 }
             },
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to obtain write lock on data stream with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -235,7 +235,7 @@ impl PyVfsFileEntry {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve symbolic link target with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -252,7 +252,7 @@ impl PyVfsFileEntry {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve data stream with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -272,7 +272,7 @@ impl PyVfsFileEntry {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve number of sub file entries with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -297,8 +297,7 @@ impl PyVfsFileEntry {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve sub file entry: {} with error: {}",
-                    sub_file_entry_index,
-                    error.to_string()
+                    sub_file_entry_index, error
                 )));
             }
         }
@@ -315,13 +314,13 @@ struct PyVfsFileSystem {
 
 #[pymethods]
 impl PyVfsFileSystem {
-    pub fn file_entry_exists(&self, py_path: PyVfsPath) -> PyResult<bool> {
-        match self.file_system.file_entry_exists(&py_path.path) {
+    pub fn file_entry_exists(&self, path: PyVfsPath) -> PyResult<bool> {
+        match self.file_system.file_entry_exists(&path.path) {
             Ok(result) => Ok(result),
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to determine if file entry exists with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -329,8 +328,8 @@ impl PyVfsFileSystem {
 
     // TODO: add get_data_stream_by_path_and_name
 
-    pub fn get_file_entry_by_path(&self, py_path: PyVfsPath) -> PyResult<Option<PyVfsFileEntry>> {
-        match self.file_system.get_file_entry_by_path(&py_path.path) {
+    pub fn get_file_entry_by_path(&self, path: PyVfsPath) -> PyResult<Option<PyVfsFileEntry>> {
+        match self.file_system.get_file_entry_by_path(&path.path) {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
             })),
@@ -340,7 +339,7 @@ impl PyVfsFileSystem {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve file entry with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -357,7 +356,7 @@ impl PyVfsFileSystem {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve root file entry with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -399,30 +398,32 @@ struct PyVfsLocation {
 #[pymethods]
 impl PyVfsLocation {
     #[staticmethod]
-    pub fn new_base_from_string(py_path_type: &PyVfsType, path: &str) -> PyResult<Self> {
-        let vfs_type: VfsType = VfsType::from(py_path_type);
-        let vfs_path: VfsPath = VfsPath::from_string(&vfs_type, path);
+    pub fn new_base_from_string(path_type: &PyVfsType, path_string: &str) -> PyResult<Self> {
+        let vfs_type: VfsType = VfsType::from(path_type);
+        let vfs_path: Path = Path::from(path_string);
+        let vfs_location: VfsLocation = VfsLocation::new_base(&vfs_type, vfs_path);
 
         Ok(Self {
-            location: Arc::new(VfsLocation::new_base(&vfs_type, vfs_path)),
+            location: Arc::new(vfs_location),
         })
     }
 
     pub fn new_with_layer_from_string(
         &self,
-        py_path_type: &PyVfsType,
-        path: &str,
+        path_type: &PyVfsType,
+        path_string: &str,
     ) -> PyResult<Self> {
-        let vfs_type: VfsType = VfsType::from(py_path_type);
-        let vfs_path: VfsPath = VfsPath::from_string(&vfs_type, path);
+        let vfs_type: VfsType = VfsType::from(path_type);
+        let vfs_path: Path = Path::from(path_string);
+        let vfs_location: VfsLocation = self.location.new_with_layer(&vfs_type, vfs_path);
 
         Ok(Self {
-            location: Arc::new(self.location.new_with_layer(&vfs_type, vfs_path)),
+            location: Arc::new(vfs_location),
         })
     }
 
-    pub fn new_with_parent(&self, py_path: &PyVfsPath) -> PyResult<Self> {
-        let vfs_path: VfsPath = py_path.path.as_ref().clone();
+    pub fn new_with_parent(&self, path: &PyVfsPath) -> PyResult<Self> {
+        let vfs_path: Path = path.path.as_ref().clone();
         let vfs_location: VfsLocation = self.location.new_with_parent(vfs_path);
 
         Ok(Self {
@@ -442,7 +443,7 @@ impl PyVfsLocation {
 
     #[getter]
     pub fn get_path(&self) -> PyResult<PyVfsPath> {
-        let vfs_path: &VfsPath = self.location.get_path();
+        let vfs_path: &Path = self.location.get_path();
 
         Ok(PyVfsPath {
             path: Arc::new(vfs_path.clone()),
@@ -461,15 +462,22 @@ impl PyVfsLocation {
 #[derive(Clone)]
 struct PyVfsPath {
     /// Path.
-    path: Arc<VfsPath>,
+    path: Arc<Path>,
 }
 
 #[pymethods]
 impl PyVfsPath {
     #[staticmethod]
-    pub fn from_string(py_path_type: &PyVfsType, path: &str) -> PyResult<Self> {
-        let vfs_type: VfsType = VfsType::from(py_path_type);
-        let vfs_path: VfsPath = VfsPath::from_string(&vfs_type, path);
+    pub fn from_string(path_string: &str) -> PyResult<Self> {
+        let vfs_path: Path = Path::from(path_string);
+
+        Ok(Self {
+            path: Arc::new(vfs_path),
+        })
+    }
+
+    pub fn new_with_join(&self, path: &PyVfsPath) -> PyResult<Self> {
+        let vfs_path: Path = self.path.new_with_join(&path.path);
 
         Ok(Self {
             path: Arc::new(vfs_path),
@@ -485,25 +493,17 @@ impl PyVfsPath {
             .map(|path_component| path_component.path_component.as_ref().clone())
             .collect::<Vec<PathComponent>>();
 
-        let vfs_path: VfsPath = match self
+        let vfs_path: Path = self
             .path
-            .new_with_join_path_components(&vfs_path_components)
-        {
-            Ok(path) => path,
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to join path and components with error: {}",
-                    error.to_string()
-                )));
-            }
-        };
+            .new_with_join_path_components(&vfs_path_components);
+
         Ok(Self {
             path: Arc::new(vfs_path),
         })
     }
 
     pub fn new_with_parent_directory(&self) -> PyResult<Self> {
-        let vfs_path: VfsPath = self.path.new_with_parent_directory();
+        let vfs_path: Path = self.path.new_with_parent_directory();
 
         Ok(Self {
             path: Arc::new(vfs_path),
@@ -511,9 +511,9 @@ impl PyVfsPath {
     }
 
     pub fn get_file_name(&self) -> PyResult<Option<PyVfsPathComponent>> {
-        match self.path.get_file_name() {
+        match self.path.file_name() {
             Some(path_component) => Ok(Some(PyVfsPathComponent {
-                path_component: Arc::new(path_component),
+                path_component: Arc::new(path_component.clone()),
             })),
             None => Ok(None),
         }
@@ -543,9 +543,9 @@ struct PyVfsPathComponent {
 #[pymethods]
 impl PyVfsPathComponent {
     #[new]
-    pub fn new(py_string: &PyVfsString) -> PyResult<Self> {
+    pub fn new(string: &PyVfsString) -> PyResult<Self> {
         Ok(Self {
-            path_component: Arc::new(py_string.string.to_path_component()),
+            path_component: Arc::new(string.string.to_path_component()),
         })
     }
 
@@ -576,7 +576,7 @@ impl PyVfsResolver {
 
     pub fn get_data_stream_by_location_and_name(
         &self,
-        py_location: &PyVfsLocation,
+        location: &PyVfsLocation,
         name: Option<&PyVfsString>,
     ) -> PyResult<Option<PyVfsDataStream>> {
         let vfs_name: Option<&VfsString> = match name {
@@ -585,7 +585,7 @@ impl PyVfsResolver {
         };
         match self
             .resolver
-            .get_data_stream_by_location_and_name(py_location.location.as_ref(), vfs_name)
+            .get_data_stream_by_location_and_name(location.location.as_ref(), vfs_name)
         {
             Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream {
                 data_stream: data_stream,
@@ -596,7 +596,7 @@ impl PyVfsResolver {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve data stream with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
@@ -604,11 +604,11 @@ impl PyVfsResolver {
 
     pub fn get_file_entry_by_location(
         &self,
-        py_location: &PyVfsLocation,
+        location: &PyVfsLocation,
     ) -> PyResult<Option<PyVfsFileEntry>> {
         match self
             .resolver
-            .get_file_entry_by_location(py_location.location.as_ref())
+            .get_file_entry_by_location(location.location.as_ref())
         {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
@@ -619,24 +619,21 @@ impl PyVfsResolver {
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to retrieve file entry with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }
     }
 
-    pub fn open_file_system(&self, py_location: &PyVfsLocation) -> PyResult<PyVfsFileSystem> {
-        match self
-            .resolver
-            .open_file_system(py_location.location.as_ref())
-        {
+    pub fn open_file_system(&self, location: &PyVfsLocation) -> PyResult<PyVfsFileSystem> {
+        match self.resolver.open_file_system(location.location.as_ref()) {
             Ok(file_system) => Ok(PyVfsFileSystem {
                 file_system: file_system,
             }),
             Err(error) => {
                 return Err(PyErr::new::<PyRuntimeError, String>(format!(
                     "Unable to open file system with error: {}",
-                    error.to_string()
+                    error
                 )));
             }
         }

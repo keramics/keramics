@@ -31,7 +31,6 @@ use super::gpt::GptFileEntry;
 use super::iterators::VfsFileEntriesIterator;
 use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
-use super::path::VfsPath;
 use super::qcow::QcowFileEntry;
 use super::sparseimage::SparseImageFileEntry;
 use super::string::VfsString;
@@ -272,7 +271,7 @@ impl VfsFileEntry {
     }
 
     /// Retrieves the symbolic link target.
-    pub fn get_symbolic_link_target(&mut self) -> Result<Option<VfsPath>, ErrorTrace> {
+    pub fn get_symbolic_link_target(&mut self) -> Result<Option<Path>, ErrorTrace> {
         match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
@@ -287,9 +286,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_symbolic_link_target() {
                 Ok(result) => match result {
-                    Some(symbolic_link_target) => {
-                        Ok(Some(VfsPath::from(Path::from(symbolic_link_target))))
-                    }
+                    Some(symbolic_link_target) => Ok(Some(Path::from(symbolic_link_target))),
                     None => Ok(None),
                 },
                 Err(mut error) => {
@@ -311,7 +308,7 @@ impl VfsFileEntry {
                             .map(|component| PathComponent::Ucs2String(Ucs2String::from(component)))
                             .collect::<Vec<PathComponent>>();
 
-                        Ok(Some(VfsPath::from(Path::from(path_components))))
+                        Ok(Some(Path::from(path_components)))
                     }
                     None => Ok(None),
                 },
@@ -324,7 +321,7 @@ impl VfsFileEntry {
                 }
             },
             VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_symbolic_link_target() {
-                Some(link_target) => Ok(Some(VfsPath::from(link_target))),
+                Some(link_target) => Ok(Some(Path::from(&link_target))),
                 None => Ok(None),
             },
         }
@@ -984,7 +981,6 @@ mod tests {
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
     use crate::location::{VfsLocation, new_os_vfs_location};
-    use crate::path::VfsPath;
     use crate::types::VfsFileSystemReference;
 
     use crate::tests::get_test_data_path;
@@ -1009,8 +1005,8 @@ mod tests {
     fn get_apm_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_apm_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Apm, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -1096,7 +1092,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_apm() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -1247,16 +1243,16 @@ mod tests {
     fn test_get_symbolic_link_target_with_ext() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/file_symboliclink1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
 
         assert_eq!(
             link_target,
-            Some(VfsPath::Path(Path {
+            Some(Path {
                 components: vec![
                     PathComponent::ByteString(ByteString::from("")),
                     PathComponent::ByteString(ByteString::from("mnt")),
@@ -1264,7 +1260,7 @@ mod tests {
                     PathComponent::ByteString(ByteString::from("testdir1")),
                     PathComponent::ByteString(ByteString::from("testfile1")),
                 ],
-            }))
+            })
         );
         Ok(())
     }
@@ -1303,8 +1299,8 @@ mod tests {
     fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -1390,7 +1386,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_ewf() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -1502,7 +1498,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_fake() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_fake_file_entry();
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -1624,7 +1620,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_fat() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -1664,8 +1660,8 @@ mod tests {
     fn get_gpt_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_gpt_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -1751,7 +1747,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_gpt() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -1805,8 +1801,8 @@ mod tests {
     fn get_mbr_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_mbr_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Mbr, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -1892,7 +1888,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_mbr() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -2047,7 +2043,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_ntfs() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         // TODO: add test with link target
@@ -2078,8 +2074,8 @@ mod tests {
     fn get_os_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -2195,8 +2191,8 @@ mod tests {
     fn get_qcow_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -2282,7 +2278,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_qcow() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -2336,8 +2332,8 @@ mod tests {
     fn get_sparseimage_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -2380,15 +2376,13 @@ mod tests {
     fn test_get_file_type_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::SparseImage, "/sparseimage1");
-        let vfs_file_entry: VfsFileEntry =
-            vfs_file_system.get_file_entry_by_path(&vfs_path)?.unwrap();
+        let path: Path = Path::from("/sparseimage1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
@@ -2428,7 +2422,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_sparseiamge() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -2482,8 +2476,8 @@ mod tests {
     fn get_udif_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_udif_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Udif, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -2569,7 +2563,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_udif() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -2623,8 +2617,8 @@ mod tests {
     fn get_vhd_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhd_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhd, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -2710,7 +2704,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_vhd() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())
@@ -2764,8 +2758,8 @@ mod tests {
     fn get_vhdx_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Vhdx, path);
-        match vfs_file_system.get_file_entry_by_path(&vfs_path)? {
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No such file entry: {}",
@@ -2851,7 +2845,7 @@ mod tests {
     fn test_get_symbolic_link_target_with_vhdx() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
-        let link_target: Option<VfsPath> = vfs_file_entry.get_symbolic_link_target()?;
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
         assert_eq!(link_target, None);
 
         Ok(())

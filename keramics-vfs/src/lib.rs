@@ -49,7 +49,6 @@ pub use file_resolver::{VfsFileResolver, new_vfs_file_resolver};
 pub use file_system::VfsFileSystem;
 pub use finder::VfsFinder;
 pub use location::{VfsLocation, new_os_vfs_location};
-pub use path::VfsPath;
 pub use resolver::VfsResolver;
 pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
 pub use string::VfsString;

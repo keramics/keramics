@@ -12,6 +12,8 @@
  */
 
 use std::collections::HashMap;
+use std::ffi::OsString;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
@@ -22,6 +24,7 @@ use keramics_types::{ByteString, Ucs2String};
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum PathComponent {
     ByteString(ByteString),
+    OsString(OsString),
     String(String),
     Ucs2String(Ucs2String),
     // TODO: add Utf16String support.
@@ -32,6 +35,13 @@ impl PathComponent {
     pub fn extension(&self) -> Result<Option<PathComponent>, ErrorTrace> {
         match self {
             PathComponent::ByteString(byte_string) => Self::extension_from_byte_string(byte_string),
+            PathComponent::OsString(os_string) => {
+                let path_buf: PathBuf = PathBuf::from(os_string);
+                match path_buf.extension() {
+                    Some(os_str) => Ok(Some(PathComponent::OsString(os_str.to_os_string()))),
+                    None => return Ok(None),
+                }
+            }
             PathComponent::String(string) => Ok(Self::extension_from_string(string)),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::extension_from_ucs2_string(ucs2_string))
@@ -129,6 +139,13 @@ impl PathComponent {
     pub fn file_stem(&self) -> Result<Option<PathComponent>, ErrorTrace> {
         match self {
             PathComponent::ByteString(byte_string) => Self::file_stem_from_byte_string(byte_string),
+            PathComponent::OsString(os_string) => {
+                let path_buf: PathBuf = PathBuf::from(os_string);
+                match path_buf.file_stem() {
+                    Some(os_str) => Ok(Some(PathComponent::OsString(os_str.to_os_string()))),
+                    None => return Ok(None),
+                }
+            }
             PathComponent::String(string) => Ok(Self::file_stem_from_string(string)),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::file_stem_from_ucs2_string(ucs2_string))
@@ -219,16 +236,17 @@ impl PathComponent {
         }
     }
 
-    /// Determines if the `PathComponent` is empty.
+    /// Determines if the path component is empty.
     pub fn is_empty(&self) -> bool {
         match self {
             PathComponent::ByteString(byte_string) => byte_string.is_empty(),
+            PathComponent::OsString(os_string) => os_string.is_empty(),
             PathComponent::String(string) => string.is_empty(),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
         }
     }
 
-    /// Converts the `PathComponent` to a `ByteString` with a specific encoding.
+    /// Converts the path component to a `ByteString` with a specific encoding.
     pub fn to_byte_string(&self, encoding: &CharacterEncoding) -> Result<ByteString, ErrorTrace> {
         let byte_string: ByteString = match self {
             PathComponent::ByteString(byte_string) => match byte_string.encode(encoding) {
@@ -238,22 +256,24 @@ impl PathComponent {
                     return Err(error);
                 }
             },
+            PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => ByteString::from(string),
             PathComponent::Ucs2String(ucs2_string) => todo!(),
         };
         Ok(byte_string)
     }
 
-    /// Converts the `PathComponent` to a `String`.
+    /// Converts the path component to a `String`.
     pub fn to_string(&self) -> String {
         match self {
             PathComponent::ByteString(byte_string) => byte_string.to_string(),
+            PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => string.clone(),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.to_string(),
         }
     }
 
-    /// Converts the `PathComponent` to a `Ucs2String`.
+    /// Converts the path component to a `Ucs2String`.
     pub fn to_ucs2_string(&self) -> Result<Ucs2String, ErrorTrace> {
         let ucs2_string: Ucs2String = match &self {
             PathComponent::ByteString(byte_string) => {
@@ -289,13 +309,14 @@ impl PathComponent {
                 }
                 ucs2_string
             }
+            PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => Ucs2String::from(string),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.clone(),
         };
         Ok(ucs2_string)
     }
 
-    /// Converts the `PathComponent` to a `Ucs2String` with case folding applied.
+    /// Converts the path component to a `Ucs2String` with case folding applied.
     pub fn to_ucs2_string_with_case_folding(
         &self,
         case_folding_mappings: &Arc<HashMap<u16, u16>>,
@@ -334,6 +355,7 @@ impl PathComponent {
                 }
                 ucs2_string
             }
+            PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => {
                 let mut ucs2_string: Ucs2String = Ucs2String::new();
 
@@ -395,6 +417,7 @@ impl PartialEq<&str> for PathComponent {
     fn eq(&self, other: &&str) -> bool {
         match self {
             PathComponent::ByteString(byte_string) => ByteString::eq(byte_string, other),
+            PathComponent::OsString(os_string) => OsString::eq(os_string, other),
             PathComponent::String(string) => String::eq(string, other),
             PathComponent::Ucs2String(ucs2_string) => Ucs2String::eq(ucs2_string, other),
         }

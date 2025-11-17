@@ -15,12 +15,12 @@ use std::collections::HashMap;
 use std::sync::Weak;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::Path;
 
 use super::enums::VfsType;
 use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
 use super::location::{VfsLocation, new_os_vfs_location};
-use super::path::VfsPath;
 use super::string::VfsString;
 use super::types::VfsFileSystemReference;
 
@@ -55,8 +55,8 @@ impl VfsContext {
                 return Err(error);
             }
         };
-        let vfs_path: &VfsPath = vfs_location.get_path();
-        file_system.get_data_stream_by_path_and_name(vfs_path, name)
+        let path: &Path = vfs_location.get_path();
+        file_system.get_data_stream_by_path_and_name(path, name)
     }
 
     /// Retrieves a file entry with the specified location.
@@ -71,8 +71,8 @@ impl VfsContext {
                 return Err(error);
             }
         };
-        let vfs_path: &VfsPath = vfs_location.get_path();
-        file_system.get_file_entry_by_path(vfs_path)
+        let path: &Path = vfs_location.get_path();
+        file_system.get_file_entry_by_path(path)
     }
 
     /// Opens a file system.

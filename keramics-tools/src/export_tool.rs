@@ -20,8 +20,8 @@ use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_vfs::{
-    VfsLocation, VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode,
-    VfsScanner, VfsString, VfsType, new_os_vfs_location,
+    VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
+    VfsString, VfsType, new_os_vfs_location,
 };
 
 mod writer;
@@ -87,8 +87,7 @@ impl ExportTool {
         if vfs_scan_node.is_empty() {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-            let vfs_path: VfsPath = VfsPath::Path(path.clone());
-            let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(vfs_path);
+            let vfs_location: VfsLocation = vfs_scan_node.location.new_with_parent(path.clone());
             let result: Option<DataStreamReference> = match vfs_resolver
                 .get_data_stream_by_location_and_name(&vfs_location, name)
             {

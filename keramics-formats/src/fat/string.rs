@@ -13,8 +13,6 @@
 
 use keramics_types::{ByteString, Ucs2String};
 
-use crate::path_component::PathComponent;
-
 /// File Allocation Table (FAT) string.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum FatString {
@@ -69,18 +67,6 @@ impl From<&String> for FatString {
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::Ucs2String(Ucs2String::from(string))
-    }
-}
-
-impl From<&PathComponent> for FatString {
-    /// Converts a [`&PathComponent`] into a [`FatString`]
-    #[inline(always)]
-    fn from(path_component: &PathComponent) -> Self {
-        match path_component {
-            PathComponent::ByteString(byte_string) => Self::ByteString(byte_string.clone()),
-            PathComponent::Ucs2String(ucs2_string) => Self::Ucs2String(ucs2_string.clone()),
-            PathComponent::String(string) => Self::Ucs2String(Ucs2String::from(string)),
-        }
     }
 }
 

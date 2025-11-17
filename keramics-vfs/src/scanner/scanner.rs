@@ -25,7 +25,7 @@ use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::VhdImage;
 use keramics_formats::vhdx::VhdxImage;
-use keramics_formats::{FormatIdentifier, FormatScanner};
+use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 
 use crate::apm::ApmFileSystem;
 use crate::enums::{VfsFileType, VfsType};
@@ -35,7 +35,6 @@ use crate::file_system::VfsFileSystem;
 use crate::gpt::GptFileSystem;
 use crate::location::VfsLocation;
 use crate::mbr::MbrFileSystem;
-use crate::path::VfsPath;
 use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
 use crate::sparseimage::SparseImageFileSystem;
@@ -132,8 +131,8 @@ impl VfsScanner {
 
         let file_system: VfsFileSystemReference = self.resolver.open_file_system(vfs_location)?;
 
-        let vfs_path: &VfsPath = vfs_location.get_path();
-        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(vfs_path)? {
+        let path: &Path = vfs_location.get_path();
+        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(path)? {
             Some(file_entry) => file_entry,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -165,9 +164,9 @@ impl VfsScanner {
         file_system: &VfsFileSystem,
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsType>, ErrorTrace> {
-        let vfs_path: &VfsPath = vfs_location.get_path();
+        let path: &Path = vfs_location.get_path();
         let result: Option<DataStreamReference> =
-            file_system.get_data_stream_by_path_and_name(vfs_path, None)?;
+            file_system.get_data_stream_by_path_and_name(path, None)?;
 
         let data_stream: DataStreamReference = match result {
             Some(data_stream) => data_stream,
@@ -303,8 +302,8 @@ impl VfsScanner {
 
         // TODO: use layer identifier in path?
         let image_layer_path: String = format!("{}{}", path_prefix, number_of_layers);
-        let node_vfs_path: VfsPath = VfsPath::from_string(vfs_type, image_layer_path.as_str());
-        let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_vfs_path);
+        let node_path: Path = Path::from(image_layer_path.as_str());
+        let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
         let node_file_system: VfsFileSystemReference =
             match self.resolver.open_file_system(&node_vfs_location) {
                 Ok(file_system) => file_system,
@@ -319,10 +318,9 @@ impl VfsScanner {
                     VfsType::Ntfs { .. } => "\\",
                     _ => "/",
                 };
-                let sub_node_vfs_path: VfsPath =
-                    VfsPath::from_string(&sub_node_vfs_type, root_path);
+                let sub_node_path: Path = Path::from(root_path);
                 let sub_node_vfs_location: VfsLocation =
-                    node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
+                    node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
                 let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
                 self.scan_for_sub_nodes(&node_file_system, &node_vfs_location, &mut sub_scan_node)?;
 
@@ -340,18 +338,14 @@ impl VfsScanner {
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
     ) -> Result<(), ErrorTrace> {
-        let vfs_path: &VfsPath = vfs_location.get_path();
+        let path: &Path = vfs_location.get_path();
 
         // TODO: handle image with both GPT and MBR volume systems.
         match scan_node.get_type() {
             VfsType::Apm { .. } => {
                 let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
-                match ApmFileSystem::open_volume_system(
-                    &mut apm_volume_system,
-                    file_system,
-                    vfs_path,
-                ) {
+                match ApmFileSystem::open_volume_system(&mut apm_volume_system, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -383,7 +377,7 @@ impl VfsScanner {
             VfsType::Ewf { .. } => {
                 let mut ewf_image: EwfImage = EwfImage::new();
 
-                match EwfFileSystem::open_image(&mut ewf_image, file_system, vfs_path) {
+                match EwfFileSystem::open_image(&mut ewf_image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
@@ -407,11 +401,7 @@ impl VfsScanner {
             VfsType::Gpt { .. } => {
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
 
-                match GptFileSystem::open_volume_system(
-                    &mut gpt_volume_system,
-                    file_system,
-                    vfs_path,
-                ) {
+                match GptFileSystem::open_volume_system(&mut gpt_volume_system, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -442,11 +432,7 @@ impl VfsScanner {
             VfsType::Mbr { .. } => {
                 let mut mbr_volume_system: MbrVolumeSystem = MbrVolumeSystem::new();
 
-                match MbrFileSystem::open_volume_system(
-                    &mut mbr_volume_system,
-                    file_system,
-                    vfs_path,
-                ) {
+                match MbrFileSystem::open_volume_system(&mut mbr_volume_system, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -481,10 +467,9 @@ impl VfsScanner {
                         VfsType::Ntfs { .. } => "\\",
                         _ => "/",
                     };
-                    let sub_node_vfs_path: VfsPath =
-                        VfsPath::from_string(&sub_node_vfs_type, root_path);
+                    let sub_node_path: Path = Path::from(root_path);
                     let sub_node_vfs_location: VfsLocation =
-                        vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
+                        vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
                     match self.scan_for_sub_nodes(file_system, vfs_location, &mut sub_scan_node) {
@@ -501,7 +486,7 @@ impl VfsScanner {
             VfsType::Qcow { .. } => {
                 let mut qcow_image: QcowImage = QcowImage::new();
 
-                match QcowFileSystem::open_image(&mut qcow_image, file_system, vfs_path) {
+                match QcowFileSystem::open_image(&mut qcow_image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -526,8 +511,7 @@ impl VfsScanner {
             VfsType::SparseImage { .. } => {
                 let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
-                match SparseImageFileSystem::open_file(&mut sparseimage_file, file_system, vfs_path)
-                {
+                match SparseImageFileSystem::open_file(&mut sparseimage_file, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -556,7 +540,7 @@ impl VfsScanner {
             VfsType::Udif { .. } => {
                 let mut udif_file: UdifFile = UdifFile::new();
 
-                match UdifFileSystem::open_file(&mut udif_file, file_system, vfs_path) {
+                match UdifFileSystem::open_file(&mut udif_file, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
@@ -579,7 +563,7 @@ impl VfsScanner {
             VfsType::Vhd { .. } => {
                 let mut vhd_image: VhdImage = VhdImage::new();
 
-                match VhdFileSystem::open_image(&mut vhd_image, file_system, vfs_path) {
+                match VhdFileSystem::open_image(&mut vhd_image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
@@ -604,7 +588,7 @@ impl VfsScanner {
             VfsType::Vhdx { .. } => {
                 let mut vhdx_image: VhdxImage = VhdxImage::new();
 
-                match VhdxFileSystem::open_image(&mut vhdx_image, file_system, vfs_path) {
+                match VhdxFileSystem::open_image(&mut vhdx_image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
@@ -741,8 +725,8 @@ impl VfsScanner {
             VfsType::Ntfs { .. } => "\\",
             _ => "/",
         };
-        let vfs_path: VfsPath = VfsPath::from_string(vfs_type, root_path);
-        let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, vfs_path);
+        let path: Path = Path::from(root_path);
+        let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, path);
         let node_file_system: VfsFileSystemReference =
             match self.resolver.open_file_system(&file_system_vfs_location) {
                 Ok(file_system) => file_system,
@@ -758,9 +742,8 @@ impl VfsScanner {
             // TODO: use volume identifier in location?
             let volume_path: String = format!("{}{}", path_prefix, volume_index + 1);
 
-            let node_vfs_path: VfsPath = VfsPath::from_string(vfs_type, volume_path.as_str());
-            let node_vfs_location: VfsLocation =
-                vfs_location.new_with_layer(vfs_type, node_vfs_path);
+            let node_path: Path = Path::from(volume_path.as_str());
+            let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
             let mut volume_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
 
             match self.scan_for_format(&node_file_system, &volume_scan_node.location)? {
@@ -769,11 +752,10 @@ impl VfsScanner {
                         VfsType::Ntfs { .. } => "\\",
                         _ => "/",
                     };
-                    let sub_node_vfs_path: VfsPath =
-                        VfsPath::from_string(&sub_node_vfs_type, root_path);
+                    let sub_node_path: Path = Path::from(root_path);
                     let sub_node_vfs_location: VfsLocation = volume_scan_node
                         .location
-                        .new_with_layer(&sub_node_vfs_type, sub_node_vfs_path);
+                        .new_with_layer(&sub_node_vfs_type, sub_node_path);
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
                     self.scan_for_sub_nodes(
                         &node_file_system,
@@ -902,14 +884,14 @@ mod tests {
 
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
+        let path: Path = Path::from("/");
         let vfs_file_system_path: VfsLocation =
-            os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
+            os_vfs_location.new_with_layer(&VfsType::Qcow, path);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/qcow1");
-        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
+        let path: Path = Path::from("/qcow1");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();
@@ -935,14 +917,13 @@ mod tests {
 
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/");
-        let vfs_file_system_path: VfsLocation =
-            os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
+        let path: Path = Path::from("/");
+        let vfs_file_system_path: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
         let vfs_file_system: VfsFileSystemReference =
             vfs_context.open_file_system(&vfs_file_system_path)?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/gpt1");
-        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, vfs_path);
+        let path: Path = Path::from("/gpt1");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
         let vfs_type: VfsType = format_scanner
             .scan_for_format(&vfs_file_system, &vfs_location)?
             .unwrap();

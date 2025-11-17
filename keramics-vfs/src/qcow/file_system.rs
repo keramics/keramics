@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
-use keramics_formats::{FileResolverReference, PathComponent};
+use keramics_formats::{FileResolverReference, Path, PathComponent};
 
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
@@ -45,111 +45,94 @@ impl QcowFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
-        match vfs_path {
-            VfsPath::Path(path) => {
-                if path.is_relative() {
-                    return Ok(false);
+    pub fn file_entry_exists(&self, path: &Path) -> bool {
+        if path.is_relative() {
+            return false;
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
+                    return false;
                 }
-                match path.get_component_by_index(1) {
-                    Some(path_component) => {
-                        if path.get_number_of_components() > 2 {
-                            return Ok(false);
-                        }
-                        let layer_index: usize =
-                            match VfsPath::get_numeric_suffix(path_component, "qcow") {
-                                Some(layer_index) => layer_index,
-                                None => return Ok(false),
-                            };
-                        if layer_index == 0 || layer_index > self.number_of_layers {
-                            Ok(false)
-                        } else {
-                            Ok(true)
-                        }
-                    }
-                    None => {
-                        if path.is_empty() {
-                            Ok(false)
-                        } else {
-                            Ok(true)
-                        }
-                    }
+                let layer_index: usize = match VfsPath::get_numeric_suffix(path_component, "qcow") {
+                    Some(layer_index) => layer_index,
+                    None => return false,
+                };
+                if layer_index == 0 || layer_index > self.number_of_layers {
+                    false
+                } else {
+                    true
                 }
             }
-            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
+            None => {
+                if path.is_empty() {
+                    false
+                } else {
+                    true
+                }
+            }
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(
-        &self,
-        vfs_path: &VfsPath,
-    ) -> Result<Option<QcowFileEntry>, ErrorTrace> {
-        match vfs_path {
-            VfsPath::Path(path) => {
-                if path.is_relative() {
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<QcowFileEntry>, ErrorTrace> {
+        if path.is_relative() {
+            return Ok(None);
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
                     return Ok(None);
                 }
-                match path.get_component_by_index(1) {
-                    Some(path_component) => {
-                        if path.get_number_of_components() > 2 {
-                            return Ok(None);
-                        }
-                        let mut layer_index: usize =
-                            match VfsPath::get_numeric_suffix(path_component, "qcow") {
-                                Some(layer_index) => layer_index,
-                                None => return Ok(None),
-                            };
-                        if layer_index == 0 || layer_index > self.number_of_layers {
-                            return Ok(None);
-                        }
-                        layer_index -= 1;
-
-                        let qcow_layer: QcowImageLayer =
-                            match self.image.get_layer_by_index(layer_index) {
-                                Ok(qcow_layer) => qcow_layer,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!("Unable to retrieve QCOW layer: {}", layer_index)
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        let media_size: u64 = match qcow_layer.read() {
-                            Ok(qcow_file) => qcow_file.media_size,
-                            Err(error) => {
-                                return Err(keramics_core::error_trace_new_with_error!(
-                                    "Unable to obtain read lock on QCOW layer",
-                                    error
-                                ));
-                            }
-                        };
-                        Ok(Some(QcowFileEntry::Layer {
-                            index: layer_index,
-                            layer: qcow_layer.clone(),
-                            size: media_size,
-                        }))
-                    }
-                    None => {
-                        if path.is_empty() {
-                            return Ok(None);
-                        }
-                        Ok(Some(QcowFileEntry::Root {
-                            image: self.image.clone(),
-                        }))
-                    }
+                let mut layer_index: usize =
+                    match VfsPath::get_numeric_suffix(path_component, "qcow") {
+                        Some(layer_index) => layer_index,
+                        None => return Ok(None),
+                    };
+                if layer_index == 0 || layer_index > self.number_of_layers {
+                    return Ok(None);
                 }
+                layer_index -= 1;
+
+                let qcow_layer: QcowImageLayer = match self.image.get_layer_by_index(layer_index) {
+                    Ok(qcow_layer) => qcow_layer,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve QCOW layer: {}", layer_index)
+                        );
+                        return Err(error);
+                    }
+                };
+                let media_size: u64 = match qcow_layer.read() {
+                    Ok(qcow_file) => qcow_file.media_size,
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to obtain read lock on QCOW layer",
+                            error
+                        ));
+                    }
+                };
+                Ok(Some(QcowFileEntry::Layer {
+                    index: layer_index,
+                    layer: qcow_layer.clone(),
+                    size: media_size,
+                }))
             }
-            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
+            None => {
+                if path.is_empty() {
+                    return Ok(None);
+                }
+                Ok(Some(self.get_root_file_entry()))
+            }
         }
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> Result<QcowFileEntry, ErrorTrace> {
-        Ok(QcowFileEntry::Root {
+    pub fn get_root_file_entry(&self) -> QcowFileEntry {
+        QcowFileEntry::Root {
             image: self.image.clone(),
-        })
+        }
     }
 
     /// Opens the file system.
@@ -166,11 +149,11 @@ impl QcowFileSystem {
                 ));
             }
         };
-        let vfs_path: &VfsPath = vfs_location.get_path();
+        let path: &Path = vfs_location.get_path();
 
         match Arc::get_mut(&mut self.image) {
             Some(image) => {
-                match Self::open_image(image, file_system, vfs_path) {
+                match Self::open_image(image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -192,11 +175,11 @@ impl QcowFileSystem {
     pub(crate) fn open_image(
         image: &mut QcowImage,
         file_system: &VfsFileSystemReference,
-        vfs_path: &VfsPath,
+        path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
+        let parent_path: Path = path.new_with_parent_directory();
         let file_resolver: FileResolverReference =
-            match new_vfs_file_resolver(file_system, parent_vfs_path) {
+            match new_vfs_file_resolver(file_system, parent_path) {
                 Ok(file_resolver) => file_resolver,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -206,7 +189,7 @@ impl QcowFileSystem {
                     return Err(error);
                 }
             };
-        let file_name: PathComponent = match vfs_path.get_file_name() {
+        let file_name: &PathComponent = match path.file_name() {
             Some(file_name) => file_name,
             None => {
                 return Err(keramics_core::error_trace_new!(
@@ -214,7 +197,7 @@ impl QcowFileSystem {
                 ));
             }
         };
-        match image.open(&file_resolver, &file_name) {
+        match image.open(&file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
@@ -251,29 +234,29 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let qcow_file_system: QcowFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
-        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/");
+        let result: bool = qcow_file_system.file_entry_exists(&path);
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/qcow1");
-        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/qcow1");
+        let result: bool = qcow_file_system.file_entry_exists(&path);
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/bogus1");
-        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/qcow99");
+        let result: bool = qcow_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/qcow1/bogus1");
-        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("qcow1");
+        let result: bool = qcow_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "bogus1");
-        let result: bool = qcow_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/bogus1");
+        let result: bool = qcow_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/");
-        let result: Result<bool, ErrorTrace> = qcow_file_system.file_entry_exists(&vfs_path);
-        assert!(result.is_err());
+        let path: Path = Path::from("/qcow1/bogus1");
+        let result: bool = qcow_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
 
         Ok(())
     }
@@ -282,8 +265,8 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let qcow_file_system: QcowFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
-        let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/");
+        let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_some());
 
         let qcow_file_entry: QcowFileEntry = result.unwrap();
@@ -294,8 +277,8 @@ mod tests {
         let file_type: VfsFileType = qcow_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/qcow1");
-        let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/qcow1");
+        let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_some());
 
         let qcow_file_entry: QcowFileEntry = result.unwrap();
@@ -306,8 +289,8 @@ mod tests {
         let file_type: VfsFileType = qcow_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/bogus1");
-        let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/bogus1");
+        let result: Option<QcowFileEntry> = qcow_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
         Ok(())
@@ -317,10 +300,8 @@ mod tests {
     fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
         let qcow_file_system: QcowFileSystem = get_file_system()?;
 
-        let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry()?;
-
-        let file_type: VfsFileType = qcow_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry();
+        assert!(matches!(qcow_file_entry, QcowFileEntry::Root { .. }));
 
         Ok(())
     }

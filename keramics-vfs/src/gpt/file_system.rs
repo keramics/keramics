@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::Path;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
 
 use crate::location::VfsLocation;
@@ -43,107 +44,89 @@ impl GptFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
-        match vfs_path {
-            VfsPath::Path(path) => {
-                if path.is_relative() {
-                    return Ok(false);
+    pub fn file_entry_exists(&self, path: &Path) -> bool {
+        if path.is_relative() {
+            return false;
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
+                    return false;
                 }
-                match path.get_component_by_index(1) {
-                    Some(path_component) => {
-                        if path.get_number_of_components() > 2 {
-                            return Ok(false);
-                        }
-                        let partition_index: usize =
-                            match VfsPath::get_numeric_suffix(path_component, "gpt") {
-                                Some(partition_index) => partition_index,
-                                None => return Ok(false),
-                            };
-                        if partition_index == 0 || partition_index > self.number_of_partitions {
-                            Ok(false)
-                        } else {
-                            Ok(true)
-                        }
-                    }
-                    None => {
-                        if path.is_empty() {
-                            Ok(false)
-                        } else {
-                            Ok(true)
-                        }
-                    }
+                let partition_index: usize =
+                    match VfsPath::get_numeric_suffix(path_component, "gpt") {
+                        Some(partition_index) => partition_index,
+                        None => return false,
+                    };
+                if partition_index == 0 || partition_index > self.number_of_partitions {
+                    false
+                } else {
+                    true
                 }
             }
-            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
+            None => {
+                if path.is_empty() {
+                    false
+                } else {
+                    true
+                }
+            }
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(
-        &self,
-        vfs_path: &VfsPath,
-    ) -> Result<Option<GptFileEntry>, ErrorTrace> {
-        match vfs_path {
-            VfsPath::Path(path) => {
-                if path.is_relative() {
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<GptFileEntry>, ErrorTrace> {
+        if path.is_relative() {
+            return Ok(None);
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
                     return Ok(None);
                 }
-                match path.get_component_by_index(1) {
-                    Some(path_component) => {
-                        if path.get_number_of_components() > 2 {
-                            return Ok(None);
-                        }
-                        let mut partition_index: usize =
-                            match VfsPath::get_numeric_suffix(path_component, "gpt") {
-                                Some(partition_index) => partition_index,
-                                None => return Ok(None),
-                            };
-                        if partition_index == 0 || partition_index > self.number_of_partitions {
-                            return Ok(None);
-                        }
-                        partition_index -= 1;
-
-                        let gpt_partition: GptPartition =
-                            match self.volume_system.get_partition_by_index(partition_index) {
-                                Ok(gpt_partition) => gpt_partition,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to retrieve GPT partition: {}",
-                                            partition_index
-                                        )
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        let partition_size: u64 = gpt_partition.size;
-
-                        Ok(Some(GptFileEntry::Partition {
-                            index: partition_index,
-                            partition: Arc::new(RwLock::new(gpt_partition)),
-                            size: partition_size,
-                        }))
-                    }
-                    None => {
-                        if path.is_empty() {
-                            return Ok(None);
-                        }
-                        Ok(Some(GptFileEntry::Root {
-                            volume_system: self.volume_system.clone(),
-                        }))
-                    }
+                let mut partition_index: usize =
+                    match VfsPath::get_numeric_suffix(path_component, "gpt") {
+                        Some(partition_index) => partition_index,
+                        None => return Ok(None),
+                    };
+                if partition_index == 0 || partition_index > self.number_of_partitions {
+                    return Ok(None);
                 }
+                partition_index -= 1;
+
+                let gpt_partition: GptPartition =
+                    match self.volume_system.get_partition_by_index(partition_index) {
+                        Ok(gpt_partition) => gpt_partition,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to retrieve GPT partition: {}", partition_index)
+                            );
+                            return Err(error);
+                        }
+                    };
+                let partition_size: u64 = gpt_partition.size;
+
+                Ok(Some(GptFileEntry::Partition {
+                    index: partition_index,
+                    partition: Arc::new(RwLock::new(gpt_partition)),
+                    size: partition_size,
+                }))
             }
-            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
+            None => {
+                if path.is_empty() {
+                    return Ok(None);
+                }
+                Ok(Some(self.get_root_file_entry()))
+            }
         }
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> Result<GptFileEntry, ErrorTrace> {
-        Ok(GptFileEntry::Root {
+    pub fn get_root_file_entry(&self) -> GptFileEntry {
+        GptFileEntry::Root {
             volume_system: self.volume_system.clone(),
-        })
+        }
     }
 
     /// Opens the file system.
@@ -160,11 +143,11 @@ impl GptFileSystem {
                 ));
             }
         };
-        let vfs_path: &VfsPath = vfs_location.get_path();
+        let path: &Path = vfs_location.get_path();
 
         match Arc::get_mut(&mut self.volume_system) {
             Some(volume_system) => {
-                match Self::open_volume_system(volume_system, file_system, vfs_path) {
+                match Self::open_volume_system(volume_system, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -189,10 +172,10 @@ impl GptFileSystem {
     pub(crate) fn open_volume_system(
         volume_system: &mut GptVolumeSystem,
         file_system: &VfsFileSystemReference,
-        vfs_path: &VfsPath,
+        path: &Path,
     ) -> Result<(), ErrorTrace> {
         let result: Option<DataStreamReference> =
-            match file_system.get_data_stream_by_path_and_name(vfs_path, None) {
+            match file_system.get_data_stream_by_path_and_name(path, None) {
                 Ok(result) => result,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
@@ -245,29 +228,29 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/");
-        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/");
+        let result: bool = gpt_file_system.file_entry_exists(&path);
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/gpt1");
-        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/gpt1");
+        let result: bool = gpt_file_system.file_entry_exists(&path);
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/bogus1");
-        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/gpt99");
+        let result: bool = gpt_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/gpt1/bogus1");
-        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("gpt1");
+        let result: bool = gpt_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "bogus1");
-        let result: bool = gpt_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/bogus1");
+        let result: bool = gpt_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/");
-        let result: Result<bool, ErrorTrace> = gpt_file_system.file_entry_exists(&vfs_path);
-        assert!(result.is_err());
+        let path: Path = Path::from("/gpt1/bogus1");
+        let result: bool = gpt_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
 
         Ok(())
     }
@@ -276,8 +259,8 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/");
-        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/");
+        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_some());
 
         let gpt_file_entry: GptFileEntry = result.unwrap();
@@ -288,8 +271,8 @@ mod tests {
         let file_type: VfsFileType = gpt_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/gpt1");
-        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/gpt1");
+        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_some());
 
         let gpt_file_entry: GptFileEntry = result.unwrap();
@@ -300,8 +283,8 @@ mod tests {
         let file_type: VfsFileType = gpt_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Gpt, "/bogus1");
-        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/bogus1");
+        let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
         Ok(())
@@ -311,10 +294,8 @@ mod tests {
     fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
         let gpt_file_system: GptFileSystem = get_file_system()?;
 
-        let gpt_file_entry: GptFileEntry = gpt_file_system.get_root_file_entry()?;
-
-        let file_type: VfsFileType = gpt_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        let gpt_file_entry: GptFileEntry = gpt_file_system.get_root_file_entry();
+        assert!(matches!(gpt_file_entry, GptFileEntry::Root { .. }));
 
         Ok(())
     }

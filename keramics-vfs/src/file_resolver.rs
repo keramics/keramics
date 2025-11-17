@@ -12,10 +12,9 @@
  */
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::{FileResolver, FileResolverReference, PathComponent};
+use keramics_formats::{FileResolver, FileResolverReference, Path, PathComponent};
 
 use crate::file_entry::VfsFileEntry;
-use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
 
 pub struct VfsFileResolver {
@@ -23,12 +22,12 @@ pub struct VfsFileResolver {
     file_system: VfsFileSystemReference,
 
     /// Base path.
-    base_path: VfsPath,
+    base_path: Path,
 }
 
 impl VfsFileResolver {
     /// Creates a new file resolver.
-    pub fn new(file_system: &VfsFileSystemReference, base_path: VfsPath) -> Self {
+    pub fn new(file_system: &VfsFileSystemReference, base_path: Path) -> Self {
         Self {
             file_system: file_system.clone(),
             base_path: base_path,
@@ -42,18 +41,11 @@ impl FileResolver for VfsFileResolver {
         &self,
         path_components: &[PathComponent],
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        let vfs_path: VfsPath = match self
+        let path: Path = self
             .base_path
-            .new_with_join_path_components(path_components)
-        {
-            Ok(path) => path,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to create VFS path");
-                return Err(error);
-            }
-        };
-        let result: Option<VfsFileEntry> = match self.file_system.get_file_entry_by_path(&vfs_path)
-        {
+            .new_with_join_path_components(path_components);
+
+        let result: Option<VfsFileEntry> = match self.file_system.get_file_entry_by_path(&path) {
             Ok(result) => result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
@@ -71,7 +63,7 @@ impl FileResolver for VfsFileResolver {
 /// Creates a new  Virtual File System (VFS) file resolver.
 pub fn new_vfs_file_resolver(
     file_system: &VfsFileSystemReference,
-    base_path: VfsPath,
+    base_path: Path,
 ) -> Result<FileResolverReference, ErrorTrace> {
     let file_resolver: VfsFileResolver = VfsFileResolver::new(file_system, base_path);
     Ok(FileResolverReference::new(Box::new(file_resolver)))
@@ -88,8 +80,8 @@ mod tests {
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
         let file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "../test_data");
-        let file_resolver: FileResolverReference = new_vfs_file_resolver(&file_system, vfs_path)?;
+        let path: Path = Path::from("../test_data");
+        let file_resolver: FileResolverReference = new_vfs_file_resolver(&file_system, path)?;
 
         let path_components: [PathComponent; 2] = [
             PathComponent::from("directory"),
@@ -106,8 +98,8 @@ mod tests {
     fn test_new_vfs_file_resolver() -> Result<(), ErrorTrace> {
         let file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "../test_data");
-        let _ = new_vfs_file_resolver(&file_system, vfs_path)?;
+        let path: Path = Path::from("../test_data");
+        let _ = new_vfs_file_resolver(&file_system, path)?;
 
         Ok(())
     }

@@ -15,11 +15,10 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::ErrorTrace;
 use keramics_formats::ewf::EwfImage;
-use keramics_formats::{FileResolverReference, PathComponent};
+use keramics_formats::{FileResolverReference, Path, PathComponent};
 
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
-use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
 
 use super::file_entry::EwfFileEntry;
@@ -45,78 +44,72 @@ impl EwfFileSystem {
     }
 
     /// Determines if the file entry with the specified path exists.
-    pub fn file_entry_exists(&self, vfs_path: &VfsPath) -> Result<bool, ErrorTrace> {
-        match vfs_path {
-            VfsPath::Path(path) => {
-                let number_of_components: usize = path.get_number_of_components();
-                if number_of_components == 0 || number_of_components > 2 {
-                    return Ok(false);
+    pub fn file_entry_exists(&self, path: &Path) -> bool {
+        if path.is_relative() {
+            return false;
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
+                    return false;
                 }
-                if path.components[0] != "" {
-                    return Ok(false);
-                }
-                // A single empty component represents "/".
-                if number_of_components == 1 {
-                    return Ok(true);
-                }
-                if path.components[1] == "ewf1" {
-                    Ok(true)
+                if path_component != "ewf1" {
+                    false
                 } else {
-                    Ok(false)
+                    true
                 }
             }
-            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
+            None => {
+                if path.is_empty() {
+                    false
+                } else {
+                    true
+                }
+            }
         }
     }
 
     /// Retrieves the file entry with the specific location.
-    pub fn get_file_entry_by_path(
-        &self,
-        vfs_path: &VfsPath,
-    ) -> Result<Option<EwfFileEntry>, ErrorTrace> {
-        match vfs_path {
-            VfsPath::Path(path) => {
-                let number_of_components: usize = path.get_number_of_components();
-                if number_of_components == 0 || number_of_components > 2 {
+    pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<EwfFileEntry>, ErrorTrace> {
+        if path.is_relative() {
+            return Ok(None);
+        }
+        match path.get_component_by_index(1) {
+            Some(path_component) => {
+                if path.get_number_of_components() > 2 {
                     return Ok(None);
                 }
-                if path.components[0] != "" {
+                if path_component != "ewf1" {
                     return Ok(None);
                 }
-                // A single empty component represents "/".
-                if number_of_components == 1 {
-                    let ewf_file_entry: EwfFileEntry = self.get_root_file_entry()?;
-
-                    return Ok(Some(ewf_file_entry));
-                }
-                if path.components[1] == "ewf1" {
-                    let media_size: u64 = match self.image.read() {
-                        Ok(ewf_image) => ewf_image.media_size,
-                        Err(error) => {
-                            return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to obtain read lock on EWF image",
-                                error
-                            ));
-                        }
-                    };
-                    let ewf_file_entry: EwfFileEntry = EwfFileEntry::Layer {
-                        image: self.image.clone(),
-                        size: media_size,
-                    };
-                    Ok(Some(ewf_file_entry))
-                } else {
-                    Ok(None)
-                }
+                let media_size: u64 = match self.image.read() {
+                    Ok(ewf_image) => ewf_image.media_size,
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to obtain read lock on EWF image",
+                            error
+                        ));
+                    }
+                };
+                Ok(Some(EwfFileEntry::Layer {
+                    image: self.image.clone(),
+                    size: media_size,
+                }))
             }
-            _ => Err(keramics_core::error_trace_new!("Unsupported VFS path type")),
+            None => {
+                if path.is_empty() {
+                    return Ok(None);
+                }
+                Ok(Some(self.get_root_file_entry()))
+            }
         }
     }
 
     /// Retrieves the root file entry.
-    pub fn get_root_file_entry(&self) -> Result<EwfFileEntry, ErrorTrace> {
-        Ok(EwfFileEntry::Root {
+    pub fn get_root_file_entry(&self) -> EwfFileEntry {
+        EwfFileEntry::Root {
             image: self.image.clone(),
-        })
+        }
     }
 
     /// Opens the file system.
@@ -133,11 +126,11 @@ impl EwfFileSystem {
                 ));
             }
         };
-        let vfs_path: &VfsPath = vfs_location.get_path();
+        let path: &Path = vfs_location.get_path();
 
         match self.image.write() {
             Ok(mut image) => {
-                match Self::open_image(&mut image, file_system, vfs_path) {
+                match Self::open_image(&mut image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
@@ -160,11 +153,11 @@ impl EwfFileSystem {
     pub(crate) fn open_image(
         image: &mut EwfImage,
         file_system: &VfsFileSystemReference,
-        vfs_path: &VfsPath,
+        path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let parent_vfs_path: VfsPath = vfs_path.new_with_parent_directory();
+        let parent_path: Path = path.new_with_parent_directory();
         let file_resolver: FileResolverReference =
-            match new_vfs_file_resolver(file_system, parent_vfs_path) {
+            match new_vfs_file_resolver(file_system, parent_path) {
                 Ok(file_resolver) => file_resolver,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -174,7 +167,7 @@ impl EwfFileSystem {
                     return Err(error);
                 }
             };
-        let file_name: PathComponent = match vfs_path.get_file_name() {
+        let file_name: &PathComponent = match path.file_name() {
             Some(file_name) => file_name,
             None => {
                 return Err(keramics_core::error_trace_new!(
@@ -182,7 +175,7 @@ impl EwfFileSystem {
                 ));
             }
         };
-        match image.open(&file_resolver, &file_name) {
+        match image.open(&file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
@@ -219,29 +212,29 @@ mod tests {
     fn test_file_entry_exists() -> Result<(), ErrorTrace> {
         let ewf_file_system: EwfFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/");
-        let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/");
+        let result: bool = ewf_file_system.file_entry_exists(&path);
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/ewf1");
-        let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/ewf1");
+        let result: bool = ewf_file_system.file_entry_exists(&path);
         assert_eq!(result, true);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/bougs1");
-        let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/ewf99");
+        let result: bool = ewf_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/ewf1/bogus1");
-        let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("ewf1");
+        let result: bool = ewf_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "bogus1");
-        let result: bool = ewf_file_system.file_entry_exists(&vfs_path)?;
+        let path: Path = Path::from("/bogus");
+        let result: bool = ewf_file_system.file_entry_exists(&path);
         assert_eq!(result, false);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Os, "/");
-        let result: Result<bool, ErrorTrace> = ewf_file_system.file_entry_exists(&vfs_path);
-        assert!(result.is_err());
+        let path: Path = Path::from("/ewf1/bogus1");
+        let result: bool = ewf_file_system.file_entry_exists(&path);
+        assert_eq!(result, false);
 
         Ok(())
     }
@@ -250,8 +243,8 @@ mod tests {
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {
         let ewf_file_system: EwfFileSystem = get_file_system()?;
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/");
-        let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/");
+        let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_some());
 
         let ewf_file_entry: EwfFileEntry = result.unwrap();
@@ -262,8 +255,8 @@ mod tests {
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
         assert!(file_type == VfsFileType::Directory);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/ewf1");
-        let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/ewf1");
+        let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_some());
 
         let ewf_file_entry: EwfFileEntry = result.unwrap();
@@ -274,8 +267,8 @@ mod tests {
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Ewf, "/bougs1");
-        let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&vfs_path)?;
+        let path: Path = Path::from("/bogus");
+        let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
         Ok(())
@@ -285,10 +278,8 @@ mod tests {
     fn test_get_root_file_entry() -> Result<(), ErrorTrace> {
         let ewf_file_system: EwfFileSystem = get_file_system()?;
 
-        let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry()?;
-
-        let file_type: VfsFileType = ewf_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry();
+        assert!(matches!(ewf_file_entry, EwfFileEntry::Root { .. }));
 
         Ok(())
     }

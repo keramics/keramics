@@ -13,5 +13,7 @@
 
 mod directory_entries;
 mod file_entry;
+mod file_system;
 
 pub use file_entry::OsFileEntry;
+pub use file_system::OsFileSystem;

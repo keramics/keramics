@@ -30,14 +30,16 @@ use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
-use keramics_formats::{FormatIdentifier, FormatScanner};
+use keramics_formats::{
+    FileResolverReference, FormatIdentifier, FormatScanner, Path, PathComponent,
+    open_os_file_resolver,
+};
 use keramics_hashes::{DigestHashContext, Md5Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsLocation,
-    VfsPath, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString,
-    VfsType, new_os_vfs_location,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
+    new_os_vfs_location,
 };
 
 mod bodyfile;
@@ -591,7 +593,7 @@ impl ImageTool {
         };
         let display_path: String = self.display_path.join_path_components(path_components);
 
-        let result: Option<VfsPath> = match file_entry.get_symbolic_link_target() {
+        let result: Option<Path> = match file_entry.get_symbolic_link_target() {
             Ok(result) => result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -932,7 +934,7 @@ impl ImageTool {
                 }
             };
         let indentation: String = vec![" "; depth * 4].join("");
-        let vfs_path: &VfsPath = vfs_scan_node.location.get_path();
+        let path: &Path = vfs_scan_node.location.get_path();
 
         let vfs_type: &VfsType = vfs_scan_node.get_type();
 
@@ -950,7 +952,7 @@ impl ImageTool {
             "{}{}: path: {}{}",
             indentation,
             vfs_type.as_str(),
-            vfs_path.to_string(),
+            path.to_string(),
             suffix,
         );
         for sub_scan_node in vfs_scan_node.sub_nodes.iter() {

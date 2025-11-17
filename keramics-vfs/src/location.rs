@@ -13,18 +13,19 @@
 
 use std::sync::Arc;
 
+use keramics_formats::Path;
+
 use super::enums::VfsType;
-use super::path::VfsPath;
 
 /// Virtual File System (VFS) location.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VfsLocation {
     Base {
-        path: VfsPath,
+        path: Path,
         vfs_type: VfsType,
     },
     Layer {
-        path: VfsPath,
+        path: Path,
         parent: Arc<VfsLocation>,
         vfs_type: VfsType,
     },
@@ -32,7 +33,7 @@ pub enum VfsLocation {
 
 impl VfsLocation {
     /// Creates a new location base.
-    pub fn new_base(vfs_type: &VfsType, path: VfsPath) -> Self {
+    pub fn new_base(vfs_type: &VfsType, path: Path) -> Self {
         VfsLocation::Base {
             path: path,
             vfs_type: vfs_type.clone(),
@@ -40,7 +41,7 @@ impl VfsLocation {
     }
 
     /// Creates a new location with an additional layer.
-    pub fn new_with_layer(&self, vfs_type: &VfsType, path: VfsPath) -> Self {
+    pub fn new_with_layer(&self, vfs_type: &VfsType, path: Path) -> Self {
         VfsLocation::Layer {
             path: path,
             parent: Arc::new(self.clone()),
@@ -49,7 +50,7 @@ impl VfsLocation {
     }
 
     /// Creates a new location from the path with the same parent.
-    pub fn new_with_parent(&self, path: VfsPath) -> Self {
+    pub fn new_with_parent(&self, path: Path) -> Self {
         match self {
             VfsLocation::Base { vfs_type, .. } => VfsLocation::Base {
                 path: path,
@@ -74,7 +75,7 @@ impl VfsLocation {
     }
 
     /// Retrieves the path.
-    pub fn get_path(&self) -> &VfsPath {
+    pub fn get_path(&self) -> &Path {
         match self {
             VfsLocation::Base { path, .. } => &path,
             VfsLocation::Layer { path, .. } => &path,
@@ -114,7 +115,7 @@ impl VfsLocation {
 /// Creates a new OS VFS location.
 pub fn new_os_vfs_location(path: &str) -> VfsLocation {
     VfsLocation::Base {
-        path: VfsPath::from_string(&VfsType::Os, path),
+        path: Path::from(path),
         vfs_type: VfsType::Os,
     }
 }
@@ -131,45 +132,42 @@ mod tests {
     fn test_new_with_layer() {
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
-        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
+        let path: Path = Path::from("/");
+        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
 
         let vfs_type: &VfsType = test_location.get_type();
         assert!(vfs_type == &VfsType::Qcow);
 
-        let vfs_path: &VfsPath = test_location.get_path();
-        assert_eq!(vfs_path.to_string(), "/");
+        let path: &Path = test_location.get_path();
+        let expected_path: Path = Path::from("/");
+        assert_eq!(path, &expected_path);
     }
 
     #[test]
     fn test_new_with_parent() {
         let vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
-        let vfs_path: VfsPath = VfsPath::from_string(
-            &VfsType::Os,
-            get_test_data_path("directory/bogus.txt").as_str(),
-        );
-        let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
+        let path: Path = Path::from(get_test_data_path("directory/bogus.txt").as_str());
+        let test_location: VfsLocation = vfs_location.new_with_parent(path);
 
-        let vfs_path: &VfsPath = test_location.get_path();
-        assert_eq!(
-            vfs_path.to_string(),
-            get_test_data_path("directory/bogus.txt").as_str()
-        );
+        let path: &Path = test_location.get_path();
+        let expected_path: Path = Path::from(get_test_data_path("directory/bogus.txt").as_str());
+        assert_eq!(path, &expected_path);
 
         let vfs_type: &VfsType = test_location.get_type();
         assert!(vfs_type == &VfsType::Os);
 
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
-        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
+        let path: Path = Path::from("/");
+        let vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
 
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/qcow1");
-        let test_location: VfsLocation = vfs_location.new_with_parent(vfs_path);
+        let path: Path = Path::from("/qcow1");
+        let test_location: VfsLocation = vfs_location.new_with_parent(path);
 
-        let vfs_path: &VfsPath = test_location.get_path();
-        assert_eq!(vfs_path.to_string(), "/qcow1");
+        let path: &Path = test_location.get_path();
+        let expected_path: Path = Path::from("/qcow1");
+        assert_eq!(path, &expected_path);
 
         let vfs_type: &VfsType = test_location.get_type();
         assert!(vfs_type == &VfsType::Qcow);
@@ -185,8 +183,8 @@ mod tests {
 
         let os_vfs_location: VfsLocation =
             new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
-        let vfs_path: VfsPath = VfsPath::from_string(&VfsType::Qcow, "/");
-        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, vfs_path);
+        let path: Path = Path::from("/");
+        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
 
         let parent: Option<&VfsLocation> = test_location.get_parent();
         assert!(parent.is_some());

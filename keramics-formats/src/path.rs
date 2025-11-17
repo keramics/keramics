@@ -12,6 +12,7 @@
  */
 
 use std::fmt;
+use std::path::PathBuf;
 
 use keramics_types::ByteString;
 
@@ -133,6 +134,21 @@ impl From<&ByteString> for Path {
             }
             components
         };
+        Self {
+            components: components,
+        }
+    }
+}
+
+impl From<&PathBuf> for Path {
+    /// Converts a [`&PathBuf`] into a [`Path`]
+    #[inline(always)]
+    fn from(path_buf: &PathBuf) -> Self {
+        let components: Vec<PathComponent> = path_buf
+            .iter()
+            .map(|component| PathComponent::OsString(component.to_os_string()))
+            .collect();
+
         Self {
             components: components,
         }
@@ -374,8 +390,26 @@ mod tests {
         assert_eq!(result, Some(&PathComponent::from("")));
     }
 
-    // TODO: add tests for get_number_of_components
-    // TODO: add tests for get_component_by_index
+    #[test]
+    fn test_get_number_of_components() {
+        let test_struct: Path = Path::from("/directory/filename.txt");
+        assert_eq!(test_struct.get_number_of_components(), 3);
+
+        let test_struct: Path = Path::from("");
+        assert_eq!(test_struct.get_number_of_components(), 0);
+    }
+
+    #[test]
+    fn test_get_component_by_index() {
+        let test_struct: Path = Path::from("/directory/filename.txt");
+        assert_eq!(
+            test_struct.get_component_by_index(1),
+            Some(&PathComponent::from("directory"))
+        );
+
+        let test_struct: Path = Path::from("");
+        assert_eq!(test_struct.get_component_by_index(1), None);
+    }
 
     #[test]
     fn test_is_empty() {
