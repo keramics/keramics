@@ -14,15 +14,11 @@
 use keramics_formats::PathComponent;
 
 /// Virtual File System (VFS) path.
-pub struct VfsPath {
-}
+pub struct VfsPath {}
 
 impl VfsPath {
     /// Retrieves a numeric path component suffix.
-    pub fn get_numeric_suffix(
-        path_component: &PathComponent,
-        prefix: &str,
-    ) -> Option<usize> {
+    pub fn get_numeric_suffix(path_component: &PathComponent, prefix: &str) -> Option<usize> {
         let string: String = path_component.to_string();
 
         if !string.starts_with(prefix) {
