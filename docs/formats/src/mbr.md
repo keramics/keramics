@@ -89,19 +89,19 @@ The modern MBR is 512 bytes in size and consists of:
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
 | 0 | 218 | | The first part of the boot (loader) code
-| <td colspan="4"> *Disk timestamp* used by Microsoft Windows 95, 98 and ME
+| <td colspan="4">*Disk timestamp* used by Microsoft Windows 95, 98 and ME</td>
 | **218** | **2** | **0x0000** | Unknown (Reserved)
 | **220** | **1** | | Unknown (Original physical drive), which contains a value that ranges from 0x80 to 0xff, where 0x80 is the first drive, 0x81 the second, etc.
 | **221**| **1** | | **Seconds**, which contains a value that ranges from 0 to 59
 | **222**| **1** | | **Minutes**, which contains a value that ranges from 0 to 59
 | **223**| **1** | | **Hours**, which contains a value that ranges from 0 to 23
-| <td colspan="4"> *Without disk identity*
+| <td colspan="4">*Without disk identity*</td>
 | 224 | 222 | | The second part of the boot (loader) code
-| <td colspan="4"> *With disk identity*, used by UEFI, Microsoft Windows NT or later
+| <td colspan="4">*With disk identity*, used by UEFI, Microsoft Windows NT or later</td>
 | 224 | 216 | | The second part of the boot (loader) code
 | **440** | **4** | | **Disk identity (signature)**
 | **444** | **2** | **0x0000** or **0x5a5a** | **copy-protection marker**
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | 446 | 16 | | Partition table entry 1
 | 462 | 16 | | Partition table entry 2
 | 478 | 16 | | Partition table entry 3

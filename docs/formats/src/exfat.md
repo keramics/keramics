@@ -124,22 +124,22 @@ A directory entry is 32 bytes in size and consists of:
 
 | Value | Description
 | --- | ---
-| <td colspan="4"> *Critical and primary*
+| <td colspan="4">*Critical and primary*</td>
 | 0x81 | Allocation bitmap
 | 0x82 | Case folding mappings
 | 0x83 | Volume label
 | |
 | 0x85 | File entry
 | |
-| <td colspan="4"> *Non-critical and primary*
+| <td colspan="4">*Non-critical and primary*</td>
 | 0xa0 | Volume identifier
 | 0xa1 | TexFAT padding
 | |
-| <td colspan="4"> *Critical and secondary*
+| <td colspan="4">*Critical and secondary*</td>
 | 0xc0 | Data stream
 | 0xc1 | File entry name
 | |
-| <td colspan="4"> *Non-critical and secondary*
+| <td colspan="4">*Non-critical and secondary*</td>
 | 0xe0 | Vendor extension
 | 0xe1 | Vendor allocation
 

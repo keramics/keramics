@@ -16,10 +16,9 @@ use std::io;
 use std::iter;
 use std::process::ExitCode;
 
-use mdbook::BookItem;
-use mdbook::book::{Book, Chapter};
-use mdbook::errors::Error;
-use mdbook::preprocess::{CmdPreprocessor, Preprocessor, PreprocessorContext};
+use mdbook_preprocessor::book::{Book, Chapter};
+use mdbook_preprocessor::errors::Error;
+use mdbook_preprocessor::{Preprocessor, PreprocessorContext};
 use pulldown_cmark::{CowStr, Event, Options, Parser, Tag, TagEnd, html};
 use pulldown_cmark_to_cmark::cmark;
 
@@ -146,13 +145,7 @@ impl Preprocessor for TablesPreprocessor {
     }
 
     fn run(&self, _context: &PreprocessorContext, mut book: Book) -> Result<Book, Error> {
-        book.for_each_mut(|item| {
-            let BookItem::Chapter(chapter) = item else {
-                return;
-            };
-            if chapter.is_draft_chapter() {
-                return;
-            }
+        book.for_each_chapter_mut(|chapter| {
             match self.preprocess_tables(chapter) {
                 Ok(string) => chapter.content = string,
                 // Note eprintln!() needs to be used instead of println!() otherwise the mdbook
@@ -167,7 +160,7 @@ impl Preprocessor for TablesPreprocessor {
 pub fn handle_preprocessing() -> Result<(), Error> {
     let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
 
-    let (context, book) = CmdPreprocessor::parse_input(io::stdin())?;
+    let (context, book) = mdbook_preprocessor::parse_input(io::stdin())?;
 
     let processed_book = preprocessor.run(&context, book)?;
     serde_json::to_writer(io::stdout(), &processed_book)?;

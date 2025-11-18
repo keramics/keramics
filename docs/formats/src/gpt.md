@@ -105,7 +105,7 @@ The GPT partition entry is 128 bytes in size and consists of:
 | d3bfe2de-3daf-11df-ba40-e3a556d89593 | | Intel Fast Flash (iFFS) partition (for Intel Rapid Start technology)
 | f4019732-066e-4e12-8273-346c5641494f | | Sony boot partition
 | bfbfafe7-a34f-448a-9a5b-6213eb736c22 | | Lenovo boot partition
-| <td colspan="3"> *Windows*
+| <td colspan="3">*Windows*</td>
 | e3c9e316-0b5c-4db8-817d-f92df00215ae | | Microsoft Reserved Partition (MSR)
 | ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 | | Basic data partition
 | 5808c8aa-7e8f-42e0-85d2-e1e90434cfb3 | | Logical Disk Manager (LDM) metadata partition
@@ -113,10 +113,10 @@ The GPT partition entry is 128 bytes in size and consists of:
 | de94bba4-06d1-4d40-a16a-bfd50179d6ac | | Windows Recovery Environment
 | 37affc90-ef7d-4e96-91c3-2d7ae055b174 | | IBM General Parallel File System (GPFS) partition
 | e75caf8f-f680-4cee-afa3-b001e56efc2d | | Storage Spaces partition
-| <td colspan="3"> *HP-UX*
+| <td colspan="3">*HP-UX*</td>
 | 75894c1e-3aeb-11d3-b7c1-7b03a0000000 | | Data partition
 | e2a1e728-32e3-11d6-a682-7b03a0000000 | | Service Partition
-| <td colspan="3"> *Linux*
+| <td colspan="3">*Linux*</td>
 | 0fc63daf-8483-4772-8e79-3d69d8477de4 | | Linux filesystem data
 | a19d880f-05fc-4d3b-a006-743f0f84911e | | RAID partition
 | 44479540-f297-41b2-9af7-d131d5f0458a | | Root partition (x86)
@@ -130,14 +130,14 @@ The GPT partition entry is 128 bytes in size and consists of:
 | 7ffec5c9-2d00-49b7-8941-3ea10a5586b7 | | Plain dm-crypt partition
 | ca7d7ccb-63ed-4c53-861c-1742536059cc | | LUKS partition
 | 8da63339-0007-60c0-c436-083ac8230908 | | Reserved
-| <td colspan="3"> *FreeBSD*
+| <td colspan="3">*FreeBSD*</td>
 | 83bd6b9d-7f41-11dc-be0b-001560b84f0f | | Boot partition
 | 516e7cb4-6ecf-11d6-8ff8-00022d09712b | | Data partition
 | 516e7cb5-6ecf-11d6-8ff8-00022d09712b | | Swap partition
 | 516e7cb6-6ecf-11d6-8ff8-00022d09712b | | Unix File System (UFS) partition
 | 516e7cb8-6ecf-11d6-8ff8-00022d09712b | | Vinum volume manager partition
 | 516e7cba-6ecf-11d6-8ff8-00022d09712b | | ZFS partition
-| <td colspan="3"> *Darwin / Mac OS*
+| <td colspan="3">*Darwin / Mac OS*</td>
 | 48465300-0000-11aa-aa11-00306543ecac | | Hierarchical File System Plus (HFS+) partition
 | 7c3457ef-0000-11aa-aa11-00306543ecac | | Apple APFS
 | 55465300-0000-11aa-aa11-00306543ecac | | Apple UFS container
@@ -152,7 +152,7 @@ The GPT partition entry is 128 bytes in size and consists of:
 | 2e313465-19b9-463f-8126-8a7993773801 | | SoftRAID_Scratch
 | fa709c7e-65b1-4593-bfd5-e71d61de9b02 | | SoftRAID_Volume
 | bbba6df5-f46f-4a89-8f59-8765b2727503 | | SoftRAID_Cache
-| <td colspan="3"> *Solaris / illumos*
+| <td colspan="3">*Solaris / illumos*</td>
 | 6a82cb45-1dd2-11b2-99a6-080020736631 | | Boot partition
 | 6a85cf4d-1dd2-11b2-99a6-080020736631 | | Root partition
 | 6a87c46f-1dd2-11b2-99a6-080020736631 | | Swap partition
@@ -166,32 +166,32 @@ The GPT partition entry is 128 bytes in size and consists of:
 | 6a96237f-1dd2-11b2-99a6-080020736631 | | Reserved partition
 | 6a9630d1-1dd2-11b2-99a6-080020736631 | | Reserved partition
 | 6a980767-1dd2-11b2-99a6-080020736631 | | Reserved partition
-| <td colspan="3"> *NetBSD*
+| <td colspan="3">*NetBSD*</td>
 | 49f48d32-b10e-11dc-b99b-0019d1879648 | | Swap partition
 | 49f48d5a-b10e-11dc-b99b-0019d1879648 | | FFS partition
 | 49f48d82-b10e-11dc-b99b-0019d1879648 | | LFS partition
 | 49f48daa-b10e-11dc-b99b-0019d1879648 | | RAID partition
 | 2db519c4-b10f-11dc-b99b-0019d1879648 | | Concatenated partition
 | 2db519ec-b10f-11dc-b99b-0019d1879648 | | Encrypted partition
-| <td colspan="3"> *Chrome OS*
+| <td colspan="3">*Chrome OS*</td>
 | fe3a2a5d-4f32-41a7-b725-accc3285a309 | | Chrome OS kernel
 | 3cb8e202-3b7e-47dd-8a3c-7ff2a13cfcec | | Chrome OS rootfs
 | 2e0a753d-9e48-43b0-8337-b15192cb1b5e | | Chrome OS future use
-| <td colspan="3"> *Container Linux by CoreOS*
+| <td colspan="3">*Container Linux by CoreOS*</td>
 | 5dfbf5f4-2848-4bac-aa5e-0d9a20b745a6 | | /usr partition (coreos-usr)
 | 3884dd41-8582-4404-b9a8-e9b84f2df50e | | Resizable rootfs (coreos-resize)
 | c95dc21a-df0e-4340-8d7b-26cbfa9a03e0 | | OEM customizations (coreos-reserved)
 | be9067b9-ea49-4f15-b4f6-f36f8c9e1818 | | Root filesystem on RAID (coreos-root-raid)
-| <td colspan="3"> *Haiku*
+| <td colspan="3">*Haiku*</td>
 | 42465331-3ba3-10f1-802a-4861696b7521 | | Haiku BFS
-| <td colspan="3"> *MidnightBSD*
+| <td colspan="3">*MidnightBSD*</td>
 | 85d5e45e-237c-11e1-b4b3-e89a8f7fc3a7 | | Boot partition
 | 85d5e45a-237c-11e1-b4b3-e89a8f7fc3a7 | | Data partition
 | 85d5e45b-237c-11e1-b4b3-e89a8f7fc3a7 | | Swap partition
 | 0394ef8b-237e-11e1-b4b3-e89a8f7fc3a7 | | Unix File System (UFS) partition
 | 85d5e45c-237c-11e1-b4b3-e89a8f7fc3a7 | | Vinum volume manager partition
 | 85d5e45d-237c-11e1-b4b3-e89a8f7fc3a7 | | ZFS partition
-| <td colspan="3"> *Ceph*
+| <td colspan="3">*Ceph*</td>
 | 45b0969e-9b03-4f30-b4c6-b4b80ceff106 | | Journal
 | 45b0969e-9b03-4f30-b4c6-5ec00ceff106 | | dm-crypt journal
 | 4fbd7e29-9d25-41b8-afd0-062c0ceff05d | | OSD
@@ -216,17 +216,17 @@ The GPT partition entry is 128 bytes in size and consists of:
 | 166418da-c469-4022-adf4-b30afd37f176 | | dm-crypt LUKS block DB
 | 86a32090-3647-40b9-bbbd-38d8c573aa86 | | dm-crypt LUKS block write-ahead log
 | 4fbd7e29-9d25-41b8-afd0-35865ceff05d | | dm-crypt LUKS OSD
-| <td colspan="3"> *OpenBSD*
+| <td colspan="3">*OpenBSD*</td>
 | 824cc7a0-36a8-11e3-890a-952519ad3f61 | | Data partition
-| <td colspan="3"> *QNX*
+| <td colspan="3">*QNX*</td>
 | cef5a9ad-73bc-4601-89f3-cdeeeee321a1 | | Power-safe (QNX6) file system
-| <td colspan="3"> *Plan 9*
+| <td colspan="3">*Plan 9*</td>
 | c91818f9-8025-47af-89d2-f030d7000c2c | | Plan 9 partition
-| <td colspan="3"> *VMware ESX*
+| <td colspan="3">*VMware ESX*</td>
 | 9d275380-40ad-11db-bf97-000c2911d1b8 | | vmkcore (coredump partition)
 | aa31e02a-400f-11db-9590-000c2911d1b8 | | VMFS filesystem partition
 | 9198effc-31c0-11db-8f78-000c2911d1b8 | | VMware Reserved
-| <td colspan="3"> *Android-IA*
+| <td colspan="3">*Android-IA*</td>
 | 2568845d-2332-4675-bc39-8fa5a4748d15 | | Bootloader
 | 114eaffe-1552-4022-b26e-9b053604cf84 | | Bootloader2
 | 49a4d17f-93a3-45c1-a0de-f50b2ebe2599 | | Boot
@@ -243,17 +243,17 @@ The GPT partition entry is 128 bytes in size and consists of:
 | 9fdaa6ef-4b3f-40d2-ba8d-bff16bfb887b | | Factory (alt)
 | 767941d0-2085-11e3-ad3b-6cfdb94711e9 | | Fastboot / Tertiary
 | ac6d7924-eb71-4df8-b48d-e267b27148ff | | OEM
-| <td colspan="3"> *Android 6.0+ ARM*
+| <td colspan="3">*Android 6.0+ ARM*</td>
 | 19a710a2-b3ca-11e4-b026-10604b889dcf | | Android Meta
 | 193d1ea4-b3ca-11e4-b075-10604b889dcf | | Android EXT
-| <td colspan="3"> *Open Network Install Environment (ONIE)*
+| <td colspan="3">*Open Network Install Environment (ONIE)*</td>
 | 7412f7d5-a156-4b13-81dc-867174929325 | | Boot
 | d4e6e2cd-4469-46f3-b5cb-1bff57afc149 | | Config
-| <td colspan="3"> *PowerPC*
+| <td colspan="3">*PowerPC*</td>
 | 9e1a2d38-c612-4316-aa26-8b49521e5a8b | | PReP boot
-| <td colspan="3"> *freedesktop.org OSes (Linux, etc.)*
+| <td colspan="3">*freedesktop.org OSes (Linux, etc.)*</td>
 | bc13c2ff-59e6-4262-a352-b275fd6f7172 | | Shared boot loader configuration
-| <td colspan="3"> *Atari TOS*
+| <td colspan="3">*Atari TOS*</td>
 | 734e5afe-f61a-11e6-bc64-92361f002671 | | Basic data partition (GEM, BGM, F32)
 
 ### <a name="partition_attribute_flags"></a>Partition attribute flags

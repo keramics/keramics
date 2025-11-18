@@ -1536,9 +1536,9 @@ The 1st line of the permission entry consists of the following 2 values:
 | (empty) | | Owner or category root
 | 1 | | Group
 | 2 | | Allow
-| <td colspan="3"> &nbsp;
+| <td colspan="3">&nbsp;</td>
 | 6 | | Other
-| <td colspan="3"> &nbsp;
+| <td colspan="3">&nbsp;</td>
 | 10 | | Unknown (permissions group?)
 
 ##### Access mask
@@ -1550,7 +1550,7 @@ Access mask seen in combination with property types 0, 1 and 6
 | (empty) | | Owner or category root
 | 0x00000001 | `[Lst Fldr/Rd Data]` | List folder / Read data
 | 0x00000002 | `[Crt Fl/W Data]` | Create file / Write data
-| <td colspan="3"> &nbsp;
+| <td colspan="3">&nbsp;</td>
 | 0x00000020 | `[Trav Fldr/X Fl]` | Traverse folder / Execute file
 
 Access mask seen in combination with property type 2
@@ -1573,7 +1573,7 @@ Access mask seen in combination with property type 2
 | 0x00000040 | |
 | 0x00000080 | |
 | 0x00000100 | |
-| <td colspan="3"> &nbsp;
+| <td colspan="3">&nbsp;</td>
 | 0x00010000 | |
 | 0x00020000 | |
 | 0x00040000 | |

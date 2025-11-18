@@ -83,13 +83,13 @@ The FAT-12 and FAT-16 boot record is at least 512 bytes in size and consists of:
 | 36 | 1 | | Drive number
 | 37 | 1 | 0 | Unknown (reserved for Windows NT)
 | 38 | 1 | | Extended boot signature
-| <td colspan="4"> *If extended boot signature == 0x29*
+| <td colspan="4">*If extended boot signature == 0x29*</td>
 | 39 | 4 | | Volume serial number
 | 43 | 11 | | Volume label, which contains a narrow character string or "NO\x20NAME\x20\x20\x20\x20" if not set
 | 54 | 8 | "FAT12\x20\x20\x20" or "FAT16\x20\x20\x20" | File system hint
-| <td colspan="4"> *If extended boot signature != 0x29*
+| <td colspan="4">*If extended boot signature != 0x29*</td>
 | 39 | 23 | | Unknown
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | 62 | 448 | | Used for boot code
 | 510 | 2 | "\x55\xaa" | Sector signature
 
@@ -133,13 +133,13 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 | 64 | 1 | | Drive number
 | 65 | 1 | 0 | Unknown (reserved for Windows NT)
 | 66 | 1 | | Extended boot signature
-| <td colspan="4"> *If extended boot signature == 0x29*
+| <td colspan="4">*If extended boot signature == 0x29*</td>
 | 67 | 4 | | Volume serial number
 | 71 | 11 | | Volume label, which contains a narrow character string or "NO\x20NAME\x20\x20\x20\x20" if not set
 | 82 | 8 | "FAT32\x20\x20\x20" | File system hint
-| <td colspan="4"> *If extended boot signature != 0x29*
+| <td colspan="4">*If extended boot signature != 0x29*</td>
 | 67 | 23 | | Unknown
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | 90 | 420 | | Used for boot code
 | 510 | 2 | "\x55\xaa" | Sector signature
 
@@ -359,7 +359,7 @@ Valid FAT short file name characters are:
 | --- | ---
 | 0x01 | Data is EFS encrypted
 | 0x02 | Data contains large EFS header
-| <td colspan="3"> &nbsp;
+| <td colspan="3">&nbsp;</td>
 | 0x08 | Name should be represented in lower case
 | 0x10 | Extension should be represented in lower case
 

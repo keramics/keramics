@@ -83,29 +83,29 @@ The following metadata files are predefined and use a fixed MFT entry number.
 | 6 | "$Bitmap" | Cluster block allocation bitmap
 | 7 | "$Boot" | Boot record (or boot code)
 | 8 | "$BadClus" | Bad clusters
-| <td colspan="3"> *Used in NTFS version 1.2 and earlier*
+| <td colspan="3">*Used in NTFS version 1.2 and earlier*</td>
 | 9 | "$Quota" | Quota information
-| <td colspan="3"> *Used in NTFS version 3.0 and later*
+| <td colspan="3">*Used in NTFS version 3.0 and later*</td>
 | 9 | "$Secure" | Security and access control information
-| <td colspan="3"> *Common*
+| <td colspan="3">*Common*</td>
 | 10 | "$UpCase" | Case folding mappings
 | 11 | "$Extend" | A directory containing extended metadata files
 | 12-15 | | Unknown (Reserved), which are marked as in-use but are empty
 | 16-23 | | Unused, which are marked as unused
-| <td colspan="3"> *Used in NTFS version 3.0 and later*
+| <td colspan="3">*Used in NTFS version 3.0 and later*</td>
 | 24 | "$Extend\$Quota" | Quota information
 | 25 | "$Extend\$ObjId" | Unique file identifiers for distributed link tracking
 | 26 | "$Extend\$Reparse" | Backreferences to reparse points
-| <td colspan="3"> *[Transactional NTFS metadata files](#transactional_ntfs), which have been observed in Windows Vista and later*
+| <td colspan="3">*[Transactional NTFS metadata files](#transactional_ntfs), which have been observed in Windows Vista and later*</td>
 | 27 | "$Extend\$RmMetadata" | Resource manager metadata directory
 | 28 | "$Extend\$RmMetadata\$Repair" | Repair information
 | 29 or 30 | "$Extend\$RmMetadata\$TxfLog" | Transactional NTFS (TxF) log metadata directory
 | 30 or 31 | "$Extend\$RmMetadata\$Txf" | Transactional NTFS (TxF) metadata directory
 | 31 or 32 | "$Extend\$RmMetadata\$TxfLog\$Tops" | TxF Old Page Stream (TOPS) file, which is used to store data that has been overwritten inside a currently active transaction
 | 32 or 33 | "$Extend\$RmMetadata\$TxfLog\$TxfLog.blf" | Transactional NTFS (TxF) base log metadata file
-| <td colspan="3"> *Observed in Windows 10 and later*
+| <td colspan="3">*Observed in Windows 10 and later*</td>
 | 29 | "$Extend\$Deleted" | Temporary location for files that have an open handle but a request has been made to delete them
-| <td colspan="3"> *Common*
+| <td colspan="3">*Common*</td>
 | | ... | A file or directory
 
 The following metadata files are predefined, however the MFT entry number is
@@ -128,7 +128,7 @@ file) and contains:
 | --- | --- | --- | ---
 | 0 | 3 | | Boot entry point
 | 3 | 8 | "NTFS\x20\x20\x20\x20" | File system signature (Also known as OEM identifier or dummy identifier)
-| <td colspan="4"> *DOS version 2.0 BIOS parameter block (BPB)*
+| <td colspan="4">*DOS version 2.0 BIOS parameter block (BPB)*</td>
 | 11 | 2 | | Bytes per sector. Note that the following values are supported by mkntfs: 256, 512, 1024, 2048 and 4096
 | 13 | 1 | | Number of sectors per cluster block
 | 14 | 2 | 0 | Unknown (Reserved Sectors), which is not used by NTFS and must be 0
@@ -137,12 +137,12 @@ file) and contains:
 | 19 | 2 | 0 | Number of sectors (16-bit), which is not used by NTFS must be 0
 | 21 | 1 | | [Media descriptor](#media_descriptor)
 | 22 | 2 | 0 | Cluster block allocation table size (16-bit) in number of sectors, which is not used by NTFS and must be 0
-| <td colspan="4"> *DOS version 3.4 BIOS parameter block (BPB)*
+| <td colspan="4">*DOS version 3.4 BIOS parameter block (BPB)*</td>
 | 24 | 2 | 0x3f | Sectors per track, which is not used by NTFS
 | 26 | 2 | 0xff | Number of heads, which is not used by NTFS
 | 28 | 4 | 0x3f | Number of hidden sectors, which is not used by NTFS
 | 32 | 4 | 0x00 | Number of sectors (32-bit), which is not used by NTFS must be 0
-| <td colspan="4"> *NTFS version 8.0 BIOS parameter block (BPB) or extended BPB, which was introduced in Windows NT 3.1*
+| <td colspan="4">*NTFS version 8.0 BIOS parameter block (BPB) or extended BPB, which was introduced in Windows NT 3.1*</td>
 | 36 | 1 | 0x80 | Unknown (Disc unit number), which is not used by NTFS
 | 37 | 1 | 0x00 | Unknown (Flags), which is not used by NTFS
 | 38 | 1 | 0x80 | Unknown (BPB version signature byte), which is not used by NTFS
@@ -154,7 +154,7 @@ file) and contains:
 | 68 | 4 | | Index entry size
 | 72 | 8 | | Volume serial number
 | 80 | 4 | 0 | Checksum, which is not used by NTFS
-| <td colspan="4"> &nbsp;
+| <td colspan="4">&nbsp;</td>
 | 84 | 426 | | Boot code
 | 510 | 2 | "\x55\xaa" | The (boot) signature
 
@@ -327,11 +327,11 @@ and consists of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *MULTI_SECTOR_HEADER*
+| <td colspan="4">*MULTI_SECTOR_HEADER*</td>
 | 0 | 4 | "BAAD", "FILE" | Signature
 | 4 | 2 | | The fix-up values (or update sequence array) offset, which contain an offset relative from the start of the MFT entry.
 | 6 | 2 | | The number of fix-up values (or update sequence array size)
-| <td colspan="4"> &nbsp;
+| <td colspan="4">&nbsp;</td>
 | 8 | 8 | | Metadata transaction journal sequence number, which contains a $LogFile Sequence Number (LSN)
 | 16 | 2 | | Sequence (number)
 | 18 | 2 | | Reference (link) count
@@ -341,10 +341,10 @@ and consists of:
 | 28 | 4 | | MFT entry size in bytes
 | 32 | 8 | | [Base record file reference](#file_reference)
 | 40 | 2 | | First available attribute identifier
-| <td colspan="4"> *If NTFS version is 3.0*
+| <td colspan="4">*If NTFS version is 3.0*</td>
 | 42 | 2 | | Unknown (wfixupPattern)
 | 44 | 4 | | Unknown
-| <td colspan="4"> *If NTFS version is 3.1*
+| <td colspan="4">*If NTFS version is 3.1*</td>
 | 42 | 2 | | Unknown (wfixupPattern)
 | 44 | 4 | | MFT entry number
 
@@ -487,7 +487,7 @@ set (1). The non-resident data is 48 or 56 bytes in size and consists of:
 | 24 | 8 | | Allocated data size (or allocated length), which contains the allocated data size in number of bytes. This value is not valid if the first VCN is nonzero.
 | 32 | 8 | | Data size (or file size), which contains the data size in number of bytes. This value is not valid if the first VCN is nonzero.
 | 40 | 8 | | Valid data size (or valid data length), which contains the valid data size in number of bytes. This value is not valid if the first VCN is nonzero.
-| <td colspan="4"> *If compression unit size > 0*
+| <td colspan="4">*If compression unit size > 0*</td>
 | 48 | 8 | | Compressed data size.
 
 > Note that the total size of the data runs should be larger or equal to the
@@ -591,11 +591,11 @@ The attribute types are stored in the [$AttrDef metadata file](#attribute_defini
 | 0x00000010 | $STANDARD_INFORMATION | Standard information
 | 0x00000020 | $ATTRIBUTE_LIST | Attributes list
 | 0x00000030 | $FILE_NAME | The file or directory name
-| <td colspan="3"> *Used in NTFS version 1.2 and earlier*
+| <td colspan="3">*Used in NTFS version 1.2 and earlier*</td>
 | 0x00000040 | $VOLUME_VERSION | Volume version
-| <td colspan="3"> *Used in NTFS version 3.0 and later*
+| <td colspan="3">*Used in NTFS version 3.0 and later*</td>
 | 0x00000040 | $OBJECT_ID | Object identifier
-| <td colspan="3"> *Common*
+| <td colspan="3">*Common*</td>
 | 0x00000050 | $SECURITY_DESCRIPTOR | Security descriptor
 | 0x00000060 | $VOLUME_NAME | Volume label
 | 0x00000070 | $VOLUME_INFORMATION | Volume information
@@ -603,18 +603,18 @@ The attribute types are stored in the [$AttrDef metadata file](#attribute_defini
 | 0x00000090 | $INDEX_ROOT | Index root
 | 0x000000a0 | $INDEX_ALLOCATION | Index allocation
 | 0x000000b0 | $BITMAP | Bitmap
-| <td colspan="3"> *Used in NTFS version 1.2 and earlier*
+| <td colspan="3">*Used in NTFS version 1.2 and earlier*</td>
 | 0x000000c0 | $SYMBOLIC_LINK | Symbolic link
-| <td colspan="3"> *Used in NTFS version 3.0 and later*
+| <td colspan="3">*Used in NTFS version 3.0 and later*</td>
 | 0x000000c0 | $REPARSE_POINT | Reparse point
-| <td colspan="3"> *Common*
+| <td colspan="3">*Common*</td>
 | 0x000000d0 | $EA_INFORMATION | (HPFS) extended attribute information
 | 0x000000e0 | $EA | (HPFS) extended attribute
-| <td colspan="3"> *Used in NTFS version 1.2 and earlier*
+| <td colspan="3">*Used in NTFS version 1.2 and earlier*</td>
 | 0x000000f0 | $PROPERTY_SET | Property set
-| <td colspan="3"> *Used in NTFS version 3.0 and later*
+| <td colspan="3">*Used in NTFS version 3.0 and later*</td>
 | 0x00000100 | $LOGGED_UTILITY_STREAM | Logged utility stream
-| <td colspan="3"> *Common*
+| <td colspan="3">*Common*</td>
 | | |
 | 0x00001000 | | First user defined attribute
 | | |
@@ -652,7 +652,7 @@ in size and consists of:
 | 36 | 4 | | Unknown (Maximum number of versions)
 | 40 | 4 | | Unknown (Version number)
 | 44 | 4 | | Unknown (Class identifier)
-| <td colspan="4"> *If NTFS version 3.0 or later*
+| <td colspan="4">*If NTFS version 3.0 or later*</td>
 | 48 | 4 | | Owner identifier
 | 52 | 4 | | Security descriptor identifier, which contains the entry number in the security ID index ($Secure:$SII). Also see [Access Control](#access_control)
 | 56 | 8 | | Quota charged
@@ -715,11 +715,11 @@ The file name data (FILE_NAME) is of variable size and consists of:
 | 40 | 8 | | Allocated (or reserved) file size
 | 48 | 8 | | Data size
 | 56 | 4 | | [File attribute flags](#file_attribute_flags)
-| <td colspan="4"> *If FILE_ATTRIBUTE_REPARSE_POINT is set*
+| <td colspan="4">*If FILE_ATTRIBUTE_REPARSE_POINT is set*</td>
 | 60 | 4 | | [Reparse point tag](#reparse_point_tag)
-| <td colspan="4"> *If FILE_ATTRIBUTE_REPARSE_POINT is not set*
+| <td colspan="4">*If FILE_ATTRIBUTE_REPARSE_POINT is not set*</td>
 | 60 | 4 | | Unknown (extended attribute data size)
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | 64 | 1 | | Name string size, which contains the number of characters without the end-of-string character
 | 65 | 1 | | Namespace of the name string
 | 66 | ... | | Name, which contains an UCS-2 little-endian string without end-of-string character
@@ -1128,10 +1128,10 @@ The index value is of variable size and consists of:
 | 8 | 2 | | Size, which includes the 10 bytes of the file reference and size
 | 10 | 2 | | Key data size
 | 12 | 4 | | Index value flags
-| <td colspan="4"> *If index key data size > 0*
+| <td colspan="4">*If index key data size > 0*</td>
 | 16 | ... | | Key data
 | ... | ... | | Data
-| <td colspan="4"> *If index value flag 0x00000001 (is branch node) is set*
+| <td colspan="4">*If index value flag 0x00000001 (is branch node) is set*</td>
 | ... | 8 | | Sub node Virtual Cluster Number (VCN)
 
 The index values are stored 8 byte aligned.
@@ -1266,9 +1266,9 @@ following attributes:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *Chunk offset table*
+| <td colspan="4">*Chunk offset table*</td>
 | 0 | ... | | Array of 32-bit of 64-bit compressed data chunk offsets, where the offset is relative from the start of the data chunks
-| <td colspan="4"> *Data chunks*
+| <td colspan="4">*Data chunks*</td>
 | ... | ... | | One or more compressed or uncompressed data chunks
 
 > Note that if the chunk size equals the size of the uncompressed data the chunk
@@ -1425,7 +1425,7 @@ is of variable size and consists of:
 | 2 | 2 | | Substitute name size in bytes, where the size of the end-of-string character is not included
 | 4 | 2 | | Display name offset, where the offset is relative from the start of the reparse name data
 | 6 | 2 | | Display name size in bytes, where the size of the end-of-string character is not included
-| <td colspan="4"> *Reparse name data*
+| <td colspan="4">*Reparse name data*</td>
 | 8 | ... | | Substitute name, which contains an UCS-2 little-endian string without end-of-string character
 | ... | ... | | Display name, which contains an UCS-2 little-endian string without end-of-string character
 
@@ -1454,7 +1454,7 @@ consists of:
 | 4 | 2 | | Display name offset, where the offset is relative from the start of the reparse name data
 | 6 | 2 | | Display name size, in bytes
 | 8 | 4 | | Symbolic link flags
-| <td colspan="4"> *Reparse name data*
+| <td colspan="4"> *Reparse name data*</td>
 | 12 | ... | | Substitute name, which contains an UCS-2 little-endian string without end-of-string character
 | ... | ... | | Display name, which contains an UCS-2 little-endian string without end-of-string character
 
@@ -1472,10 +1472,10 @@ data is 16 bytes in size and consists of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *External provider information*
+| <td colspan="4">*External provider information*</td>
 | 0 | 4 | 1 | Unknown (WOF version)
 | 4 | 4 | 2 | Unknown (WOF provider)
-| <td colspan="4"> *Internal provider information*
+| <td colspan="4">*Internal provider information*</td>
 | 8 | 4 | 1 | Unknown (file information version)
 | 12 | 4 | | [Compression method](#wof_compression_method)
 
@@ -1490,7 +1490,7 @@ data is 16 bytes in size and consists of:
 
 TODO: link to LZXPRESS Huffman and LZX documentation
 
-### <a name="wci_reparse_data">Windows Container Isolation (WCI) reparse data
+### <a name="wci_reparse_data"></a>Windows Container Isolation (WCI) reparse data
 
 A reparse point with tag IO_REPARSE_TAG_WCI (0x80000018) contains Windows
 Container Isolation (WCI) reparse data. The Windows Container Isolation (WCI)
@@ -1529,10 +1529,10 @@ The $Secure metadata file contains the security descriptors used for access cont
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *Key data*
+| <td colspan="4">*Key data*</td>
 | 0 | 4 | | Security descriptor hash
 | 4 | 4 | | Security descriptor identifier
-| <td colspan="4"> *Value data*
+| <td colspan="4">*Value data*</td>
 | 8 | 4 | | Security descriptor hash
 | 12 | 4 | | Security descriptor identifier
 | 16 | 8 | | Security descriptor data offset (in $SDS)
@@ -1545,9 +1545,9 @@ The $Secure metadata file contains the security descriptors used for access cont
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *Key data*
+| <td colspan="4">*Key data*</td>
 | 0 | 4 | | Security descriptor identifier
-| <td colspan="4"> *Value data*
+| <td colspan="4">*Value data*</td>
 | 4 | 4 | | Security descriptor hash
 | 8 | 4 | | Security descriptor identifier
 | 12 | 8 | | Security descriptor data offset (in $SDS)
@@ -1574,9 +1574,9 @@ TODO: link to security descriptor format documentation
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *Key data*
+| <td colspan="4">*Key data*</td>
 | 0 | 16 | | File (or object) identifier, which contains a GUID
-| <td colspan="4"> *Value data*
+| <td colspan="4">*Value data*</td>
 | 4 | 8 | | [File reference](#file_reference)
 | 12 | 16 | | Birth droid volume identifier, which contains a GUID
 | 28 | 16 | | Birth droid file (or object) identifier, which contains a GUID
@@ -1599,11 +1599,11 @@ in size and consists of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *MULTI_SECTOR_HEADER*
+| <td colspan="4">*MULTI_SECTOR_HEADER*</td>
 | 0 | 4 | "CHKD", "RCRD", "RSTR" | Signature
 | 4 | 2 | | The fix-up values (or update sequence array) offset, which contain an offset relative from the start of the restart page header.
 | 6 | 2 | | The number of fix-up values (or update sequence array size)
-| <td colspan="4"> &nbsp;
+| <td colspan="4">&nbsp;</td>
 | 8 | 8 | | Checkdisk last LSN
 | 16 | 4 | | System page size
 | 20 | 4 | | Log page size

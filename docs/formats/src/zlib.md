@@ -24,16 +24,16 @@ The data header is 2 or 6 bytes in size and consist of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| <td colspan="4"> *The bit values are stored a 8-bit values*
+| <td colspan="4">*The bit values are stored a 8-bit values*</td>
 | 0.0 | 4 bits | | [Compression method](#compression_method)
 | 0.4 | 4 bits | | [Compression information](#compression_information)
-| <td colspan="4"> *Flags*
+| <td colspan="4">*Flags*</td>
 | 1.0 | 5 bits | | Check bits
 | 1.5 | 1 bit | | Preset dictionary flag
 | 1.6 | 2 bits | | [Compression level](#compression_level). The compression level is used mainly for re-compression
-| <td colspan="4"> *If the dictionary identifier flag is set*
+| <td colspan="4">*If the dictionary identifier flag is set*</td>
 | 2 | 4 | | Preset dictionary identifier, which contains an Adler-32 used to identifier the preset dictionary
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | ... | ... | | Compressed data
 | ... | 4 | | Checksum, which contains an Adler-32 of the compressed data
 
@@ -214,7 +214,7 @@ The literal codes consist of:
 | --- | --- | ---
 | 0x00 – 0xff | | literal byte values
 | 0x100 | | end-of-block marker
-| <td colspan="3"> *0 additional bits*
+| <td colspan="3">*0 additional bits*</td>
 | 0x101 | | Size of 3
 | 0x102 | | Size of 4
 | 0x103 | | Size of 5
@@ -223,32 +223,32 @@ The literal codes consist of:
 | 0x106 | | Size of 8
 | 0x107 | | Size of 9
 | 0x108 | | Size of 10
-| <td colspan="3"> *1 additional bit*
+| <td colspan="3">*1 additional bit*</td>
 | 0x109 | | Size of 11 to 12
 | 0x10a | | Size of 13 to 14
 | 0x10b | | Size of 15 to 16
 | 0x10c | | Size of 17 to 18
-| <td colspan="3"> *2 additional bits*
+| <td colspan="3">*2 additional bits*</td>
 | 0x10d | | Size of 19 to 22
 | 0x10e | | Size of 23 to 26
 | 0x10f | | Size of 27 to 30
 | 0x110 | | Size of 31 to 34
-| <td colspan="3"> *3 additional bits*
+| <td colspan="3">*3 additional bits*</td>
 | 0x111 | | Size of 35 to 42
 | 0x112 | | Size of 43 to 50
 | 0x113 | | Size of 51 to 58
 | 0x114 | | Size of 59 to 66
-| <td colspan="3"> *4 additional bits*
+| <td colspan="3">*4 additional bits*</td>
 | 0x115 | | Size of 67 to 82
 | 0x116 | | Size of 83 to 98
 | 0x117 | | Size of 99 to 114
 | 0x118 | | Size of 115 to 130
-| <td colspan="3"> *5 additional bits*
+| <td colspan="3">*5 additional bits*</td>
 | 0x119 | | Size of 131 to 162
 | 0x11a | | Size of 163 to 194
 | 0x11b | | Size of 195 to 226
 | 0x11c | | Size of 227 to 257
-| <td colspan="3"> *0 additional bits*
+| <td colspan="3">*0 additional bits*</td>
 | 0x11d | | Size of 258
 
 ##### <a name="deflate_distance_codes"></a>Distance codes
@@ -261,46 +261,46 @@ The distance codes consist of:
 | 1 | distance of 2
 | 2 | distance of 3
 | 3 | distance of 4
-| <td colspan="3"> *1 additional bit*
+| <td colspan="3">*1 additional bit*</td>
 | 4 | distance of 5 - 6
 | 5 | distance of 7 - 8
-| <td colspan="3"> *2 additional bits*
+| <td colspan="3">*2 additional bits*</td>
 | 6 | distance of 9 - 12
 | 7 | distance of 13 - 16
-| <td colspan="3"> *3 additional bits*
+| <td colspan="3">*3 additional bits*</td>
 | 8 | distance of 17 - 24
 | 9 | distance of 25 - 32
-| <td colspan="3"> *4 additional bits*
+| <td colspan="3">*4 additional bits*</td>
 | 10 | distance of 33 - 48
 | 11 | distance of 49 - 64
-| <td colspan="3"> *5 additional bits*
+| <td colspan="3">*5 additional bits*</td>
 | 12 | distance of 65 - 96
 | 13 | distance of 97 - 128
-| <td colspan="3"> *6 additional bits*
+| <td colspan="3">*6 additional bits*</td>
 | 14 | distance of 129 - 192
 | 15 | distance of 193 - 256
-| <td colspan="3"> *7 additional bits*
+| <td colspan="3">*7 additional bits*</td>
 | 16 | distance of 257 - 384
 | 17 | distance of 385 - 512
-| <td colspan="3"> *8 additional bits*
+| <td colspan="3">*8 additional bits*</td>
 | 18 | distance of 513 - 768
 | 19 | distance of 769 - 1024
-| <td colspan="3"> *9 additional bits*
+| <td colspan="3">*9 additional bits*</td>
 | 20 | distance of 1025 - 1536
 | 21 | distance of 1537 - 2048
-| <td colspan="3"> *10 additional bits*
+| <td colspan="3">*10 additional bits*</td>
 | 22 | distance of 2049 - 3072
 | 23 | distance of 3073 - 4096
-| <td colspan="3"> *11 additional bits*
+| <td colspan="3">*11 additional bits*</td>
 | 24 | distance of 4097 - 6144
 | 25 | distance of 6145 - 8192
-| <td colspan="3"> *12 additional bits*
+| <td colspan="3">*12 additional bits*</td>
 | 26 | distance 8193 - 12288
 | 27 | distance 12289 - 16384
-| <td colspan="3"> *13 additional bits*
+| <td colspan="3">*13 additional bits*</td>
 | 28 | distance 16385 - 24576
 | 29 | distance 24577 - 32768
-| <td colspan="3"> *other*
+| <td colspan="3">*other*</td>
 | 30-31 | not used, reserved and illegal but still part of the tree.
 
 TODO: complete this section
@@ -312,12 +312,12 @@ into the corresponding array of size values (or base size + additional size).
 
 | Value | Identifier | Description
 | --- | --- | ---
-| <td colspan="3"> *0 additional bits*
+| <td colspan="3">*0 additional bits*</td>
 | 0 | | Offset of 1
 | 1 | | Offset of 2
 | 2 | | Offset of 3
 | 3 | | Offset of 4
-| <td colspan="3"> *1 additional bit*
+| <td colspan="3">*1 additional bit*</td>
 | | |
 
 TODO: complete this section

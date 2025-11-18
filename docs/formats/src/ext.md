@@ -122,7 +122,7 @@ The ext2 superblock is 208 bytes in size and consists of:
 | 76 | 4 | | [Format revision](#format_revisision)
 | 80 | 2 | | Reserved block owner (or user) identifier (UID)
 | 82 | 2 | | Reserved block group identifier (GID)
-| <td colspan="4"> *Dynamic inode information, if major version is EXT2_DYNAMIC_REV*
+| <td colspan="4">*Dynamic inode information, if major version is EXT2_DYNAMIC_REV*</td>
 | 84 | 4 | | First non-reserved inode
 | 88 | 2 | | Inode size. Note that the inode size must be a power of 2 larger or equal to 128, the maximum supported by mke2fs is 1024
 | 90 | 2 | | Block group, which contains a block group number
@@ -133,7 +133,7 @@ The ext2 superblock is 208 bytes in size and consists of:
 | 120 | 16 | | Volume label, which contains a narrow character string without end-of-string character
 | 136 | 64 | | Last mount path, which contains a narrow character string without end-of-string character
 | 200 | 4 | | Algorithm usage bitmap
-| <td colspan="4"> *Performance hints, if EXT2_COMPAT_PREALLOC is set*
+| <td colspan="4">*Performance hints, if EXT2_COMPAT_PREALLOC is set*</td>
 | 204 | 1 | | Number of pre-allocated blocks per file
 | 205 | 1 | | Number of pre-allocated blocks per directory
 | 206 | 2 | | Unknown (padding)
@@ -169,7 +169,7 @@ The ext3 superblock is 336 bytes in size and consists of:
 | 76 | 4 | | [Format revision](#format_revisision)
 | 80 | 2 | | Reserved block owner (or user) identifier (UID)
 | 82 | 2 | | Reserved block group identifier (GID)
-| <td colspan="4"> *Dynamic inode information, if major version is EXT2_DYNAMIC_REV*
+| <td colspan="4">*Dynamic inode information, if major version is EXT2_DYNAMIC_REV*</td>
 | 84 | 4 | | First non-reserved inode
 | 88 | 2 | | Inode size. Note that the inode size must be a power of 2 larger or equal to 128, the maximum supported by mke2fs is 1024
 | 90 | 2 | | Block group, which contains a block group number
@@ -180,11 +180,11 @@ The ext3 superblock is 336 bytes in size and consists of:
 | 120 | 16 | | Volume label, which contains a narrow character string without end-of-string character
 | 136 | 64 | | Last mount path, which contains a narrow character string without end-of-string character
 | 200 | 4 | | Algorithm usage bitmap
-| <td colspan="4"> *Performance hints, if EXT2_COMPAT_PREALLOC is set*
+| <td colspan="4">*Performance hints, if EXT2_COMPAT_PREALLOC is set*</td>
 | 204 | 1 | | Number of pre-allocated blocks per file
 | 205 | 1 | | Number of pre-allocated blocks per directory
 | 206 | 2 | | Unknown (padding)
-| <td colspan="4"> *Journalling support, if EXT3_FEATURE_COMPAT_HAS_JOURNAL is set*
+| <td colspan="4">*Journalling support, if EXT3_FEATURE_COMPAT_HAS_JOURNAL is set*</td>
 | 208 | 16 | | Journal identifier, which contains a big-endian UUID
 | 224 | 4 | | Journal inode
 | 228 | 4 | | Unknown (Journal device)
@@ -229,7 +229,7 @@ The superblock is 1024 bytes in size and consists of:
 | 76 | 4 | | [Format revision](#format_revisision)
 | 80 | 2 | | Reserved block owner (or user) identifier (UID)
 | 82 | 2 | | Reserved block group identifier (GID)
-| <td colspan="4"> *Dynamic inode information, if major version is EXT2_DYNAMIC_REV*
+| <td colspan="4">*Dynamic inode information, if major version is EXT2_DYNAMIC_REV*</td>
 | 84 | 4 | | First non-reserved inode
 | 88 | 2 | | Inode size. Note that the inode size must be a power of 2 larger or equal to 128, the maximum supported by mke2fs is 1024
 | 90 | 2 | | Block group
@@ -240,11 +240,11 @@ The superblock is 1024 bytes in size and consists of:
 | 120 | 16 | | Volume label, which contains a narrow character string without end-of-string character
 | 136 | 64 | | Last mount path, which contains a narrow character string without end-of-string character
 | 200 | 4 | | Algorithm usage bitmap
-| <td colspan="4"> *Performance hints, if EXT2_COMPAT_PREALLOC is set*
+| <td colspan="4">*Performance hints, if EXT2_COMPAT_PREALLOC is set*</td>
 | 204 | 1 | | Number of pre-allocated blocks per file
 | 205 | 1 | | Number of pre-allocated blocks per directory
 | 206 | 2 | | Unknown (padding)
-| <td colspan="4"> *Journalling support, if EXT3_FEATURE_COMPAT_HAS_JOURNAL is set*
+| <td colspan="4">*Journalling support, if EXT3_FEATURE_COMPAT_HAS_JOURNAL is set*</td>
 | 208 | 16 | | Journal identifier, which contains a big-endian UUID
 | 224 | 4 | | Journal inode
 | 228 | 4 | | Unknown (Journal device)
@@ -257,7 +257,7 @@ The superblock is 1024 bytes in size and consists of:
 | 260 | 4 | | First meta block group (or metablock)
 | 264 | 4 | | File system creation time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 268 | 17 x 4 | | Backup journal inodes
-| <td colspan="4"> *If 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT) is enabled*
+| <td colspan="4">*If 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT) is enabled*</td>
 | 336 | 4 | | Number of blocks, which contains the upper 32-bit of the value
 | 340 | 4 | | Number of reserved blocks, which contains the upper 32-bit of the value
 | 344 | 4 | | Number of unallocated blocks, which contains the upper 32-bit of the value
@@ -504,7 +504,7 @@ The ext4 group descriptor is 68 bytes in size and consists of:
 | 26 | 2 | | Inode bitmap checksum, which contains the lower 16-bit of the value
 | 28 | 2 | | Number of unused inodes, which contains the lower 16-bit of the value
 | 30 | 2 | | Checksum
-| <td colspan="4"> *If 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT) is enabled and group descriptor size > 32*
+| <td colspan="4">*If 64-bit support (EXT4_FEATURE_INCOMPAT_64BIT) is enabled and group descriptor size > 32*</td>
 | 32 | 4 | | Block bitmap block number, which contains the upper 32-bit of the value. The block number is relative from the start of the volume
 | 36 | 4 | | Inode bitmap block number, which contains the upper 32-bit of the value. The block number is relative from the start of the volume
 | 40 | 4 | | Inode table block number, which contains the upper 32-bit of the value. The block number is relative from the start of the volume
@@ -717,7 +717,7 @@ The ext3 inode is 132 bytes in size and consists of:
 | 120 | 2 | | Upper 16-bits of owner (or user) identifier (UID)
 | 122 | 2 | | Upper 16-bits of group identifier (GID)
 | 124 | 4 | | Unknown (reserved)
-| <td colspan="4"> *Extension (if inode size > 128)*
+| <td colspan="4">*Extension (if inode size > 128)*</td>
 | 128 | 2 | | Extended inode size
 | 130 | 2 | | Unknown (padding)
 
@@ -736,35 +736,35 @@ The ext4 inode is 160 bytes in size and consists of:
 | 0 | 2 | | [File mode](#file_mode), which contains file type and permissions
 | 2 | 2 | | Lower 16-bits of owner (or user) identifier (UID)
 | 4 | 4 | | Lower 32-bits of data size
-| <td colspan="4"> *If EXT4_EA_INODE_FL is not set*
+| <td colspan="4">*If EXT4_EA_INODE_FL is not set*</td>
 | 8 | 4 | | (last) access time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 12 | 4 | | (last) inode change time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 16 | 4 | | (last) modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
-| <td colspan="4"> *If EXT4_EA_INODE_FL is set*
+| <td colspan="4">*If EXT4_EA_INODE_FL is set*</td>
 | 8 | 4 | | Unknown (extended attribute value data checksum)
 | 12 | 4 | | Unknown (lower 32-bits of extended attribute reference count)
 | 16 | 4 | | Unknown (inode number that owns the extended attribute)
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | 20 | 4 | | Deletion time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch)
 | 24 | 2 | | Lower 16-bits of group identifier (GID)
 | 26 | 2 | | Number of (hard) links
 | 28 | 4 | | Lower 32-bits of number of blocks
 | 32 | 4 | | [Flags](#inode_flags)
-| <td colspan="4"> *If EXT4_EA_INODE_FL is not set*
+| <td colspan="4">*If EXT4_EA_INODE_FL is not set*</td>
 | 36 | 4 | | Lower 32-bits of version
-| <td colspan="4"> *If EXT4_EA_INODE_FL is set*
+| <td colspan="4">*If EXT4_EA_INODE_FL is set*</td>
 | 36 | 4 | | Unknown (upper 32-bits of extended attribute reference count)
-| <td colspan="4"> *If EXT4_EXTENTS_FL and EXT4_INLINE_DATA_FL are not set*
+| <td colspan="4">*If EXT4_EXTENTS_FL and EXT4_INLINE_DATA_FL are not set*</td>
 | 40 | 12 x 4 | | Array of direct block numbers. A block number is relative from the start of the volume
 | 88 | 4 | | Indirect block number. A block number is relative from the start of the volume
 | 92 | 4 | | Double indirect block number. A block number is relative from the start of the volume
 | 96 | 4 | | Triple indirect block number. A block number is relative from the start of the volume
-| <td colspan="4"> *If EXT4_EXTENTS_FL is set*
+| <td colspan="4">*If EXT4_EXTENTS_FL is set*</td>
 | 40 | 12 | | [Extents header](#xt4_extents_header)
 | 52 | 4 x 12 | | [extent descriptors](#ext4_extent_descriptor) or [extents indexes](#ext4_extent_index)
-| <td colspan="4"> *If EXT4_INLINE_DATA_FL is set*
+| <td colspan="4">*If EXT4_INLINE_DATA_FL is set*</td>
 | 40 | 60 | | File content data
-| <td colspan="4"> *Common*
+| <td colspan="4">*Common*</td>
 | 100 | 4 | | NFS generation number
 | 104 | 4 | | Lower 32-bits of file ACL (or extended attributes) block number
 | 108 | 4 | | Upper 32-bits of data size
@@ -775,7 +775,7 @@ The ext4 inode is 160 bytes in size and consists of:
 | 122 | 2 | | Upper 16-bits of group identifier (GID)
 | 124 | 2 | | Lower 16-bits of checksum
 | 126 | 2 | | Unknown (reserved)
-| <td colspan="4"> *Extension (if inode size > 128)*
+| <td colspan="4">*Extension (if inode size > 128)*</td>
 | 128 | 2 | | Extended inode size
 | 130 | 2 | | Upper 16-bits of checksum
 | 132 | 4 | | (last) inode change time extra precision
@@ -839,23 +839,23 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 
 | Value | Identifier | Description
 | --- | --- | ---
-| <td colspan="3"> *Access other, Bitmask: 0x0007 (S_IRWXO)*
+| <td colspan="3">*Access other, Bitmask: 0x0007 (S_IRWXO)*</td>
 | 0x0001 | S_IXOTH | X-access for other
 | 0x0002 | S_IWOTH | W-access for other
 | 0x0004 | S_IROTH | R-access for other
-| <td colspan="3"> *Access group, Bitmask: 0x0038 (S_IRWXG)*
+| <td colspan="3">*Access group, Bitmask: 0x0038 (S_IRWXG)*</td>
 | 0x0008 | S_IXGRP | X-access for group
 | 0x0010 | S_IWGRP | W-access for group
 | 0x0020 | S_IRGRP | R-access for group
-| <td colspan="3"> *Access owner (or user), Bitmask: 0x01c0 (S_IRWXU)*
+| <td colspan="3">*Access owner (or user), Bitmask: 0x01c0 (S_IRWXU)*</td>
 | 0x0040 | S_IXUSR | X-access for owner (or user)
 | 0x0080 | S_IWUSR | W-access for owner (or user)
 | 0x0100 | S_IRUSR | R-access for owner (or user)
-| <td colspan="3"> *Other*
+| <td colspan="3">*Other*</td>
 | 0x0200 | S_ISTXT | Sticky bit
 | 0x0400 | S_ISGID | Set group identifer (GID) on execution
 | 0x0800 | S_ISUID | Set owner (or user) identifer (UID) on execution
-| <td colspan="3"> *Type of file, Bitmask: 0xf000 (S_IFMT)*
+| <td colspan="3">*Type of file, Bitmask: 0xf000 (S_IFMT)*</td>
 | 0x1000 | S_IFIFO | Named pipe (FIFO)
 | 0x2000 | S_IFCHR | Character device
 | 0x4000 | S_IFDIR | Directory
@@ -879,18 +879,18 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 | 0x00000100 | EXT2_DIRTY_FL, EXT3_DIRTY_FL, EXT4_DIRTY_FL, EXT4_INODE_DIRTY | Dirty compressed file, which is not yet implemented
 | 0x00000200 | EXT2_COMPRBLK_FL, EXT3_COMPRBLK_FL, EXT4_COMPRBLK_FL, EXT4_INODE_COMPRBLK | One or more compressed clusters, which is not yet implemented
 | 0x00000400 | EXT2_NOCOMP_FL, EXT3_NOCOMP_FL, EXT4_NOCOMPR_FL, EXT4_INODE_NOCOMPR | Do not compress, which is not yet implemented
-| <td colspan="3"> *ext2 and ext3*
+| <td colspan="3">*ext2 and ext3*</td>
 | 0x00000800 | EXT2_ECOMPR_FL, EXT3_ECOMPR_FL | Encrypted Compression error
-| <td colspan="3"> *ext4*
+| <td colspan="3">*ext4*</td>
 | 0x00000800 | EXT4_ENCRYPT_FL, EXT4_INODE_ENCRYPT | Encrypted file
-| <td colspan="3"> *Common*
+| <td colspan="3">*Common*</td>
 | 0x00001000 | EXT2_BTREE_FL, EXT2_INDEX_FL, EXT3_INDEX_FL, EXT4_INDEX_FL, EXT4_INODE_INDEX | Hash-indexed directory (previously referred to as B-tree format).
 | 0x00002000 | EXT2_IMAGIC_FL, EXT3_IMAGIC_FL, EXT4_IMAGIC_FL, EXT4_INODE_IMAGIC | AFS directory
 | 0x00004000 | EXT2_JOURNAL_DATA_FL, EXT3_JOURNAL_DATA_FL, EXT4_JOURNAL_DATA_FL, EXT4_INODE_JOURNAL_DATA | File data must be written using the journal.
 | 0x00008000 | EXT2_NOTAIL_FL, EXT3_NOTAIL_FL, EXT4_NOTAIL_FL, EXT4_INODE_NOTAIL | File tail should not be merged, which is not used by ext4
 | 0x00010000 | EXT2_DIRSYNC_FL, EXT3_DIRSYNC_FL, EXT4_DIRSYNC_FL, EXT4_INODE_DIRSYNC | Directory entries should be written synchronously (dirsync)
 | 0x00020000 | EXT2_TOPDIR_FL, EXT3_TOPDIR_FL, EXT4_TOPDIR_FL, EXT4_INODE_TOPDIR | Top of directory hierarchy
-| <td colspan="3"> *ext4*
+| <td colspan="3">*ext4*</td>
 | 0x00040000 | EXT4_HUGE_FILE_FL, EXT4_INODE_HUGE_FILE | Is a [huge file](#huge_files)
 | 0x00080000 | EXT4_EXTENTS_FL, EXT4_INODE_EXTENTS | Inode uses extents
 | 0x00100000 | EXT4_INODE_VERITY | Verity protected inode

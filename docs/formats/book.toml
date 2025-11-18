@@ -2,11 +2,10 @@
 title = "Keramics data format specifications"
 authors = ["Joachim Metz"]
 language = "en"
-multilingual = false
 src = "src"
 
 [output.html]
 additional-css = ["custom.css"]
 
 [preprocessor.tables]
-command = "cargo run --manifest-path=docs/mdbook-tables/Cargo.toml --locked"
+command = "cargo run --manifest-path=../mdbook-tables/Cargo.toml --locked"

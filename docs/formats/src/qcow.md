@@ -197,7 +197,7 @@ The file header - version 3 is 104 or 112 bytes in size and consist of:
 | 88 | 8 | | Auto-clear feature flags
 | 96 | 4 | | Reference count order
 | 100 | 4 | 104 or 112 | File header size, which contains the size of the file header, this value does not include the size of the file header extensions
-| <td colspan="4"> *If file header size equals 112*
+| <td colspan="4">*If file header size equals 112*</td>
 | 104 | 1 | | Compression method
 | 105 | 7 | | Unknown (padding)
 
