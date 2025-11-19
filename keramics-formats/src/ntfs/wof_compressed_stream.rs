@@ -64,8 +64,8 @@ impl NtfsWofCompressedStream {
         Self {
             mediator: Mediator::current(),
             data_stream: None,
-            cluster_block_size: cluster_block_size,
-            compression_method: compression_method,
+            cluster_block_size,
+            compression_method,
             compression_unit_size: 0,
             compressed_size: 0,
             current_offset: 0,

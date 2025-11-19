@@ -28,9 +28,9 @@ impl FatBlockRange {
     /// Creates a new block range.
     pub fn new(logical_offset: u64, physical_offset: u64, size: u32) -> Self {
         Self {
-            logical_offset: logical_offset,
-            physical_offset: physical_offset,
-            size: size,
+            logical_offset,
+            physical_offset,
+            size,
         }
     }
 }

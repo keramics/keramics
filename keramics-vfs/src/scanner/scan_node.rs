@@ -28,7 +28,7 @@ impl VfsScanNode {
     /// Creates a new scan node.
     pub(super) fn new(location: VfsLocation) -> Self {
         Self {
-            location: location,
+            location,
             sub_nodes: Vec::new(),
         }
     }

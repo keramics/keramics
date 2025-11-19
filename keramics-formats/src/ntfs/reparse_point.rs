@@ -50,7 +50,7 @@ impl NtfsReparsePoint {
             0xa000000c => NtfsReparsePoint::SymbolicLink {
                 reparse_data: NtfsSymbolicLinkReparseData::new(),
             },
-            _ => NtfsReparsePoint::Undefined { tag: tag },
+            _ => NtfsReparsePoint::Undefined { tag },
         }
     }
 

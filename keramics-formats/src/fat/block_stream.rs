@@ -45,7 +45,7 @@ impl FatBlockStream {
     pub(super) fn new(block_size: u32, size: u32) -> Self {
         Self {
             data_stream: None,
-            block_size: block_size,
+            block_size,
             block_tree: BlockTree::<FatBlockRange>::new(0, 0, 0),
             current_offset: 0,
             size: size as u64,

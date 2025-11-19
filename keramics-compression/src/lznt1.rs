@@ -145,13 +145,14 @@ impl Lznt1Context {
 
                 if self.mediator.debug_output {
                     self.mediator
-                        .debug_print(format!("Lznt1Context::decompress {{\n",));
-                    self.mediator.debug_print(format!("    literal data:\n"));
+                        .debug_print(String::from("Lznt1Context::decompress {\n"));
+                    self.mediator
+                        .debug_print(String::from("    literal data:\n"));
                     self.mediator.debug_print_data(
                         &compressed_data[compressed_data_offset..compressed_data_end_offset],
                         true,
                     );
-                    self.mediator.debug_print(format!("}}\n\n"));
+                    self.mediator.debug_print(String::from("}\n\n"));
                 }
                 if compressed_data_end_offset > compressed_data_size {
                     return Err(keramics_core::error_trace_new!(
@@ -192,7 +193,7 @@ impl Lznt1Context {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(format!("Lznt1Context::decompress_block {{\n",));
+                .debug_print(String::from("Lznt1Context::decompress_block {\n"));
         }
         let compressed_data_end_offset: usize = safe_compressed_data_offset + block_size;
         let mut compression_tuple_threshold: usize = 16;
@@ -275,7 +276,7 @@ impl Lznt1Context {
                     if self.mediator.debug_output {
                         self.mediator
                             .debug_print(format!("    match offset: {}\n", match_offset));
-                        self.mediator.debug_print(format!("    match data:\n"));
+                        self.mediator.debug_print(String::from("    match data:\n"));
                         self.mediator.debug_print_data(
                             &uncompressed_data[match_offset..match_end_offset],
                             true,
@@ -317,7 +318,7 @@ impl Lznt1Context {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         *compressed_data_offset = compressed_data_end_offset;
 

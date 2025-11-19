@@ -46,10 +46,10 @@ impl<'a> NtfsDataFork<'a> {
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
-            cluster_block_size: cluster_block_size,
-            base_record_file_reference: base_record_file_reference,
-            mft_attributes: mft_attributes,
-            data_attribute: data_attribute,
+            cluster_block_size,
+            base_record_file_reference,
+            mft_attributes,
+            data_attribute,
         }
     }
 

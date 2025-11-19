@@ -162,7 +162,7 @@ impl LzxpressContext {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(format!("LzxpressContext::decompress {{\n",));
+                .debug_print(String::from("LzxpressContext::decompress {\n"));
         }
         let mut shared_compression_byte_offset: usize = 0;
 
@@ -301,7 +301,7 @@ impl LzxpressContext {
                     if self.mediator.debug_output {
                         self.mediator
                             .debug_print(format!("    match_offset: {}\n", match_offset));
-                        self.mediator.debug_print(format!("    match_data:\n"));
+                        self.mediator.debug_print(String::from("    match_data:\n"));
                         self.mediator.debug_print_data(
                             &uncompressed_data[match_offset..match_end_offset],
                             true,
@@ -328,7 +328,7 @@ impl LzxpressContext {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         self.uncompressed_data_size = uncompressed_data_offset;
 
@@ -414,7 +414,7 @@ impl LzxpressHuffmanContext {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(format!("LzxpressHuffmanContext::decompress_block {{\n",));
+                .debug_print(String::from("LzxpressHuffmanContext::decompress_block {\n"));
         }
         let end_of_block_uncompressed_data_offset: usize = min(
             safe_uncompressed_data_offset + 65536,
@@ -549,7 +549,7 @@ impl LzxpressHuffmanContext {
                 if self.mediator.debug_output {
                     self.mediator
                         .debug_print(format!("    match_offset: {}\n", match_offset));
-                    self.mediator.debug_print(format!("    match_data:\n"));
+                    self.mediator.debug_print(String::from("    match_data:\n"));
                     self.mediator
                         .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
                 }
@@ -558,7 +558,7 @@ impl LzxpressHuffmanContext {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         *uncompressed_data_offset = safe_uncompressed_data_offset;
 

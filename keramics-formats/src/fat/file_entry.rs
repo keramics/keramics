@@ -55,9 +55,9 @@ impl FatFileEntry {
         Self {
             data_stream: data_stream.clone(),
             block_allocation_table: block_allocation_table.clone(),
-            identifier: identifier,
-            directory_entry: directory_entry,
-            sub_directory_entries: sub_directory_entries,
+            identifier,
+            directory_entry,
+            sub_directory_entries,
         }
     }
 

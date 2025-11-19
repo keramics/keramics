@@ -89,7 +89,7 @@ impl SparseImageFile {
         let mut file_header: SparseImageFileHeader = SparseImageFileHeader::new();
 
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
+            self.mediator.debug_print(String::from(
                 "SparseImageFileHeader data of size: 64 at offset: 0 (0x00000000)\n",
             ));
             self.mediator.debug_print_data(&data[0..64], true);
@@ -145,8 +145,9 @@ impl SparseImageFile {
 
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(format!("SparseImageBandNumbersArray {{\n"));
-            self.mediator.debug_print(format!("    band_numbers: [\n"));
+                .debug_print(String::from("SparseImageBandNumbersArray {\n"));
+            self.mediator
+                .debug_print(String::from("    band_numbers: [\n"));
         }
         for array_index in 0..number_of_bands {
             let band_number: u32 = bytes_to_u32_be!(data, data_offset);
@@ -185,10 +186,10 @@ impl SparseImageFile {
         }
         if self.mediator.debug_output {
             if number_of_bands % 16 != 0 {
-                self.mediator.debug_print(format!("\n"));
+                self.mediator.debug_print(String::from("\n"));
             }
-            self.mediator.debug_print(format!("    ],\n"));
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("    ],\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         Ok(())
     }

@@ -30,7 +30,7 @@ impl VhdSectorBitmapRange {
     pub fn new(start_offset: u64, end_offset: u64, is_set: bool) -> Self {
         Self {
             size: end_offset - start_offset,
-            is_set: is_set,
+            is_set,
         }
     }
 }
@@ -55,8 +55,8 @@ impl VhdSectorBitmap {
     pub fn new(size: usize, bytes_per_bit: u16) -> Self {
         Self {
             mediator: Mediator::current(),
-            size: size,
-            bytes_per_bit: bytes_per_bit,
+            size,
+            bytes_per_bit,
             ranges: Vec::new(),
         }
     }

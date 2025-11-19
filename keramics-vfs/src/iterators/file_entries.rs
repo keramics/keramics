@@ -31,8 +31,8 @@ impl<'a> VfsFileEntriesIterator<'a> {
     /// Creates a new iterator.
     pub fn new(file_entry: &'a mut VfsFileEntry, number_of_sub_file_entries: usize) -> Self {
         Self {
-            file_entry: file_entry,
-            number_of_sub_file_entries: number_of_sub_file_entries,
+            file_entry,
+            number_of_sub_file_entries,
             sub_file_entry_index: 0,
         }
     }

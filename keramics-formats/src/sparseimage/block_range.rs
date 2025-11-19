@@ -21,8 +21,6 @@ pub struct SparseImageBlockRange {
 impl SparseImageBlockRange {
     /// Creates a new block range.
     pub fn new(data_offset: u64) -> Self {
-        Self {
-            data_offset: data_offset,
-        }
+        Self { data_offset }
     }
 }

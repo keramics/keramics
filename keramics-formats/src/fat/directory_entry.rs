@@ -36,8 +36,8 @@ impl FatDirectoryEntry {
     /// Creates a new directory entry.
     pub fn new(identifier: u32, short_name: FatShortNameDirectoryEntry) -> Self {
         Self {
-            identifier: identifier,
-            short_name: short_name,
+            identifier,
+            short_name,
             long_name: None,
         }
     }

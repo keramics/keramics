@@ -32,7 +32,7 @@ impl<'a> DataStreamWriter<'a> {
     /// Creates a new data stream writer.
     pub fn new(target: &'a PathBuf) -> Self {
         Self {
-            target: target,
+            target,
             number_of_streams_written: 0,
         }
     }

@@ -43,7 +43,7 @@ impl GptPartitionEntry {
     /// Creates a new partition entry.
     pub fn new(index: usize) -> Self {
         Self {
-            index: index,
+            index,
             type_identifier: Uuid::new(),
             identifier: Uuid::new(),
             start_block_number: 0,

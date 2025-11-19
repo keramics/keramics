@@ -63,10 +63,10 @@ impl ExtFileEntry {
         Self {
             data_stream: data_stream.clone(),
             inode_table: inode_table.clone(),
-            inode_number: inode_number,
-            inode: inode,
-            name: name,
-            sub_directory_entries: sub_directory_entries,
+            inode_number,
+            inode,
+            name,
+            sub_directory_entries,
             symbolic_link_target: None,
         }
     }

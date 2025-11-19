@@ -37,7 +37,7 @@ impl ZlibDataHeader {
     /// Reads the data header for debugging.
     pub fn debug_read_data(data: &[u8]) -> String {
         let mut string_parts: Vec<String> = Vec::new();
-        string_parts.push(format!("ZlibDataHeader {{\n"));
+        string_parts.push(String::from("ZlibDataHeader {\n"));
 
         let compression_data: u8 = data[0];
 
@@ -66,7 +66,7 @@ impl ZlibDataHeader {
                 preset_dictionary_identifier
             ));
         }
-        string_parts.push(format!("}}\n\n"));
+        string_parts.push(String::from("}\n\n"));
 
         string_parts.join("")
     }

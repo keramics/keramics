@@ -434,9 +434,7 @@ impl ImageTool {
             .translation_table
             .insert('|' as u32, String::from("\\|"));
 
-        Self {
-            display_path: display_path,
-        }
+        Self { display_path }
     }
 
     /// Output file entries in bodyfile format.

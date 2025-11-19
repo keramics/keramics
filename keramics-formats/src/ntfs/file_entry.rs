@@ -92,12 +92,12 @@ impl NtfsFileEntry {
         Self {
             data_stream: data_stream.clone(),
             mft: mft.clone(),
-            mft_entry_number: mft_entry_number,
-            mft_entry: mft_entry,
-            sequence_number: sequence_number,
-            name: name,
+            mft_entry_number,
+            mft_entry,
+            sequence_number,
+            name,
             mft_attributes: NtfsMftAttributes::new(),
-            directory_entry: directory_entry,
+            directory_entry,
             directory_index: NtfsDirectoryIndex::new(cluster_block_size, case_folding_mappings),
             sub_directory_entries: NtfsDirectoryEntries::new(),
             has_sub_directory_entries: false,
@@ -296,7 +296,7 @@ impl NtfsFileEntry {
                         }
                     };
                 NtfsAttribute::StandardInformation {
-                    standard_information: standard_information,
+                    standard_information,
                 }
             }
             NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST => {
@@ -316,9 +316,7 @@ impl NtfsFileEntry {
                         return Err(error);
                     }
                 }
-                NtfsAttribute::AttributeList {
-                    attribute_list: attribute_list,
-                }
+                NtfsAttribute::AttributeList { attribute_list }
             }
             NTFS_ATTRIBUTE_TYPE_FILE_NAME => {
                 let file_name: NtfsFileName = match NtfsFileName::from_attribute(mft_attribute) {
@@ -331,9 +329,7 @@ impl NtfsFileEntry {
                         return Err(error);
                     }
                 };
-                NtfsAttribute::FileName {
-                    file_name: file_name,
-                }
+                NtfsAttribute::FileName { file_name }
             }
             NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION => {
                 let volume_information: NtfsVolumeInformation =
@@ -347,9 +343,7 @@ impl NtfsFileEntry {
                             return Err(error);
                         }
                     };
-                NtfsAttribute::VolumeInformation {
-                    volume_information: volume_information,
-                }
+                NtfsAttribute::VolumeInformation { volume_information }
             }
             NTFS_ATTRIBUTE_TYPE_VOLUME_NAME => {
                 if !mft_attribute.is_resident() {
@@ -359,9 +353,7 @@ impl NtfsFileEntry {
                 }
                 let volume_name: Ucs2String =
                     Ucs2String::from_le_bytes(&mft_attribute.resident_data);
-                NtfsAttribute::VolumeName {
-                    volume_name: volume_name,
-                }
+                NtfsAttribute::VolumeName { volume_name }
             }
             NTFS_ATTRIBUTE_TYPE_REPARSE_POINT => {
                 let reparse_point: NtfsReparsePoint =
@@ -375,13 +367,9 @@ impl NtfsFileEntry {
                             return Err(error);
                         }
                     };
-                NtfsAttribute::ReparsePoint {
-                    reparse_point: reparse_point,
-                }
+                NtfsAttribute::ReparsePoint { reparse_point }
             }
-            _ => NtfsAttribute::Generic {
-                mft_attribute: mft_attribute,
-            },
+            _ => NtfsAttribute::Generic { mft_attribute },
         };
         Ok(attribute)
     }

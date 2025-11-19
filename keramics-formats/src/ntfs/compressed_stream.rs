@@ -63,7 +63,7 @@ impl NtfsCompressedStream {
         Self {
             mediator: Mediator::current(),
             data_stream: None,
-            cluster_block_size: cluster_block_size,
+            cluster_block_size,
             block_tree: BlockTree::<NtfsCompressionRange>::new(0, 0, 0),
             compression_unit_size: 0,
             block_cache: LruCache::new(8),

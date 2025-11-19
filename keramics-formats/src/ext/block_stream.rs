@@ -42,10 +42,10 @@ impl ExtBlockStream {
     pub(super) fn new(block_size: u32, size: u64) -> Self {
         Self {
             data_stream: None,
-            block_size: block_size,
+            block_size,
             block_tree: BlockTree::<ExtBlockRange>::new(0, 0, 0),
             current_offset: 0,
-            size: size,
+            size,
         }
     }
 

@@ -225,7 +225,8 @@ impl LzxContext {
                 32768
             };
             if self.mediator.debug_output {
-                self.mediator.debug_print(format!("LzxBlockHeader {{\n",));
+                self.mediator
+                    .debug_print(String::from("LzxBlockHeader {\n"));
 
                 let block_type_string: &str = match block_type {
                     1 => "verbatim",
@@ -239,7 +240,7 @@ impl LzxContext {
                 ));
                 self.mediator
                     .debug_print(format!("    block_size: {}\n", block_size));
-                self.mediator.debug_print(format!("}}\n\n"));
+                self.mediator.debug_print(String::from("}\n\n"));
             }
             match block_type {
                 1 | 2 => {
@@ -250,7 +251,7 @@ impl LzxContext {
                         }
                         if self.mediator.debug_output {
                             self.mediator
-                                .debug_print(format!("LzxAlignedOffsets {{\n",));
+                                .debug_print(String::from("LzxAlignedOffsets {\n"));
 
                             // TODO: create optimized debug_format_array_decimals
                             let array_parts: Vec<String> = aligned_offsets_code_sizes
@@ -261,7 +262,7 @@ impl LzxContext {
                                 "    code_sizes: {},",
                                 debug_format_array(&array_parts),
                             ));
-                            self.mediator.debug_print(format!("}}\n\n"));
+                            self.mediator.debug_print(String::from("}\n\n"));
                         }
                         let mut huffman_tree: HuffmanTree = HuffmanTree::new(256, 16);
                         huffman_tree.build(&aligned_offsets_code_sizes)?;
@@ -506,7 +507,7 @@ impl LzxContext {
                 if self.mediator.debug_output {
                     self.mediator
                         .debug_print(format!("    match_offset: {}\n", match_offset));
-                    self.mediator.debug_print(format!("    match_data:\n"));
+                    self.mediator.debug_print(String::from("    match_data:\n"));
                     self.mediator
                         .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
                 }
@@ -531,7 +532,8 @@ impl LzxContext {
             pre_code_sizes[code_size_index] = code_size as u8;
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("LzxPreCodeSizes {{\n",));
+            self.mediator
+                .debug_print(String::from("LzxPreCodeSizes {\n"));
 
             // TODO: create optimized debug_format_array_decimals
             let array_parts: Vec<String> = pre_code_sizes
@@ -542,7 +544,7 @@ impl LzxContext {
                 "    code_sizes: {},",
                 debug_format_array(&array_parts),
             ));
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         let mut codes_huffman_tree: HuffmanTree = HuffmanTree::new(20, 15);
         codes_huffman_tree.build(&pre_code_sizes)?;
@@ -550,7 +552,7 @@ impl LzxContext {
         let mut code_size_index: usize = 0;
 
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("LzxCodeSizes {{\n",));
+            self.mediator.debug_print(String::from("LzxCodeSizes {\n"));
         }
         while code_size_index < number_of_code_sizes {
             let symbol: u16 = codes_huffman_tree.decode_symbol(bitstream)?;
@@ -612,7 +614,7 @@ impl LzxContext {
                 if (times_to_repeat as usize) > number_of_code_sizes - code_size_index {
                     if self.mediator.debug_output {
                         self.mediator
-                            .debug_print(format!("times to repeat value out of bounds.\n"));
+                            .debug_print(String::from("times to repeat value out of bounds.\n"));
                     }
                     times_to_repeat = (number_of_code_sizes - code_size_index) as u32;
                 }
@@ -629,7 +631,7 @@ impl LzxContext {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         Ok(())
     }

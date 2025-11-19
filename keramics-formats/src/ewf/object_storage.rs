@@ -88,7 +88,7 @@ impl<'a> EwfUtf16ObjectStorage<'a> {
             data,
             data_size: data.len(),
             data_offset: 0,
-            byte_order: byte_order,
+            byte_order,
         }
     }
 

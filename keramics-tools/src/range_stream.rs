@@ -37,7 +37,7 @@ impl FileRangeDataStream {
         Self {
             file: None,
             current_offset: 0,
-            range_offset: range_offset,
+            range_offset,
             range_size: 0,
         }
     }

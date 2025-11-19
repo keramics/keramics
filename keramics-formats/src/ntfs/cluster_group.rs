@@ -32,8 +32,8 @@ impl NtfsClusterGroup {
     /// Creates a new cluster group.
     pub fn new(first_vcn: u64, last_vcn: u64) -> Self {
         Self {
-            first_vcn: first_vcn,
-            last_vcn: last_vcn,
+            first_vcn,
+            last_vcn,
             data_runs: Vec::new(),
         }
     }

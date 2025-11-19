@@ -40,7 +40,7 @@ impl ExtDirectoryTree {
         Self {
             mediator: Mediator::current(),
             encoding: encoding.clone(),
-            block_size: block_size,
+            block_size,
         }
     }
 

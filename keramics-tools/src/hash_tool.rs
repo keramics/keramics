@@ -90,7 +90,7 @@ impl HashTool {
             digest_hasher: DigestHasher::new(digest_hash_type),
             display_path: DisplayPath::new(display_path_type),
             digest_hash_type: digest_hash_type.clone(),
-            stop_on_error: stop_on_error,
+            stop_on_error,
         }
     }
 

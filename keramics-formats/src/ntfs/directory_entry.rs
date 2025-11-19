@@ -32,8 +32,8 @@ impl NtfsDirectoryEntry {
     /// Creates a new directory entry.
     pub fn new(file_reference: u64, file_name: NtfsFileName) -> Self {
         Self {
-            file_reference: file_reference,
-            file_name: file_name,
+            file_reference,
+            file_name,
             short_file_name: None,
         }
     }

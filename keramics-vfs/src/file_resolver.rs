@@ -30,7 +30,7 @@ impl VfsFileResolver {
     pub fn new(file_system: &VfsFileSystemReference, base_path: Path) -> Self {
         Self {
             file_system: file_system.clone(),
-            base_path: base_path,
+            base_path,
         }
     }
 }

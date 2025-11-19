@@ -38,7 +38,7 @@ impl NtfsIndex {
     /// Creates a new index.
     pub fn new(cluster_block_size: u32) -> Self {
         Self {
-            cluster_block_size: cluster_block_size,
+            cluster_block_size,
             index_entry_size: 0,
             block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
         }

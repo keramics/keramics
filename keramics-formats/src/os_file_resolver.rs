@@ -26,9 +26,7 @@ pub struct OsFileResolver {
 impl OsFileResolver {
     /// Creates a new file resolver.
     pub fn new(base_path: PathBuf) -> Self {
-        Self {
-            base_path: base_path,
-        }
+        Self { base_path }
     }
 }
 

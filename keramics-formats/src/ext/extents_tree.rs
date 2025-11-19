@@ -39,8 +39,8 @@ impl ExtExtentsTree {
     pub fn new(block_size: u32, number_of_blocks: u64) -> Self {
         Self {
             mediator: Mediator::current(),
-            block_size: block_size,
-            number_of_blocks: number_of_blocks,
+            block_size,
+            number_of_blocks,
         }
     }
 

@@ -46,7 +46,7 @@ impl NtfsBlockStream {
     pub(super) fn new(cluster_block_size: u32) -> Self {
         Self {
             data_stream: None,
-            cluster_block_size: cluster_block_size,
+            cluster_block_size,
             block_ranges: Vec::new(),
             current_offset: 0,
             size: 0,

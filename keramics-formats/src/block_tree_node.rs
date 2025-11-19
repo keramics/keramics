@@ -114,7 +114,7 @@ impl<T> BlockTreeNode<T> {
 
             for value_index in first_value_index..last_value_index {
                 if self.values[value_index as usize].is_some() {
-                    return Err(InsertError::new(format!("Leaf value already set")));
+                    return Err(InsertError::new(String::from("Leaf value already set")));
                 }
                 self.values[value_index as usize] = Some(value.clone());
             }

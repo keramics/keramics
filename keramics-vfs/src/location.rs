@@ -35,7 +35,7 @@ impl VfsLocation {
     /// Creates a new location base.
     pub fn new_base(vfs_type: &VfsType, path: Path) -> Self {
         VfsLocation::Base {
-            path: path,
+            path,
             vfs_type: vfs_type.clone(),
         }
     }
@@ -43,7 +43,7 @@ impl VfsLocation {
     /// Creates a new location with an additional layer.
     pub fn new_with_layer(&self, vfs_type: &VfsType, path: Path) -> Self {
         VfsLocation::Layer {
-            path: path,
+            path,
             parent: Arc::new(self.clone()),
             vfs_type: vfs_type.clone(),
         }
@@ -53,13 +53,13 @@ impl VfsLocation {
     pub fn new_with_parent(&self, path: Path) -> Self {
         match self {
             VfsLocation::Base { vfs_type, .. } => VfsLocation::Base {
-                path: path,
+                path,
                 vfs_type: vfs_type.clone(),
             },
             VfsLocation::Layer {
                 parent, vfs_type, ..
             } => VfsLocation::Layer {
-                path: path,
+                path,
                 parent: parent.clone(),
                 vfs_type: vfs_type.clone(),
             },
