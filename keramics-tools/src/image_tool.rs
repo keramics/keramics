@@ -613,7 +613,7 @@ impl ImageTool {
         };
         let file_identifier: String = match file_entry {
             VfsFileEntry::Ext(ext_file_entry) => {
-                format!("{}", ext_file_entry.inode_number)
+                format!("{}", ext_file_entry.get_inode_number())
             }
             VfsFileEntry::Fat(fat_file_entry) => {
                 format!("0x{:08x}", fat_file_entry.identifier)
@@ -622,6 +622,7 @@ impl ImageTool {
                 // Note that the directory entry file reference can be differrent
                 // from the values in the MFT entry.
                 let file_reference: u64 = ntfs_file_entry.get_file_reference();
+
                 format!(
                     "{}-{}",
                     file_reference & 0x0000ffffffffffff,

@@ -21,7 +21,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_vfs::{
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
-    VfsString, VfsType, new_os_vfs_location,
+    VfsString, new_os_vfs_location,
 };
 
 mod writer;

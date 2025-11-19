@@ -20,12 +20,22 @@ from pykeramics import datetime
 from pykeramics import vfs
 
 
-class TestDataStream:
+class TestClass:
+    def get_test_data_path(self, path):
+        return os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "test_data",
+            path,
+        )
+
+
+class TestDataStream(TestClass):
     def get_data_stream(self, path):
         resolver = vfs.VfsResolver()
 
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -79,12 +89,13 @@ class TestDataStream:
             _ = data_stream.seek(0, whence=99)
 
 
-class TestFileEntry:
+class TestFileEntry(TestClass):
     def get_file_entry(self, path):
         resolver = vfs.VfsResolver()
 
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -99,10 +110,16 @@ class TestFileEntry:
         assert file_entry.access_time.timestamp == 1735977482
         assert file_entry.change_time.timestamp == 1735977481
         assert file_entry.creation_time is None
+        assert file_entry.device_identifier is None
+        assert file_entry.file_mode == 0o100644
         assert file_entry.file_type == vfs.VfsFileType.FILE
         # TODO: add deletion_time
+        assert file_entry.group_identifier == 1000
+        assert file_entry.inode_number == 14
         assert file_entry.modification_time.timestamp == 1735977481
         assert file_entry.name.to_string() == "testfile1"
+        assert file_entry.number_of_links == 2
+        assert file_entry.owner_identifier == 1000
         assert file_entry.size == 9
         assert file_entry.symbolic_link_target is None
 
@@ -143,12 +160,13 @@ class TestFileEntry:
             _ = file_entry.get_sub_file_entry_by_index(0)
 
 
-class TestFileSystem:
+class TestFileSystem(TestClass):
     def get_file_system(self):
         resolver = vfs.VfsResolver()
 
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -191,22 +209,24 @@ class TestFileSystem:
         assert root_file_entry is not None
 
 
-class TestFileType:
+class TestFileType(TestClass):
     def test_hash(self):
         hash(vfs.VfsFileType.FILE)
 
 
-class TestLocation:
+class TestLocation(TestClass):
     def test_new_base_from_string(self):
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
 
         assert os_location is not None
 
     def test_new_with_layer_from_string(self):
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -215,8 +235,9 @@ class TestLocation:
         assert qcow_location is not None
 
     def test_new_with_parent(self):
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -229,8 +250,9 @@ class TestLocation:
         assert test_location is not None
 
     def test_getters(self):
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -240,26 +262,29 @@ class TestLocation:
         assert qcow_location.parent is not None
 
     def test_to_string(self):
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
         )
 
-        assert qcow_location.to_string() == (
-            "OS: ../test_data/qcow/ext2.qcow2\n" "QCOW: /qcow1\n"
-        )
+        location_string = qcow_location.to_string()
+        assert location_string.startswith("OS: ")
+        assert location_string.endswith("/test_data/qcow/ext2.qcow2\nQCOW: /qcow1\n")
 
 
-class TestPath:
+class TestPath(TestClass):
     def test_from_string(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow/ext2.qcow2")
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
         assert os_path is not None
 
     def test_new_with_join(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow")
+        os_path_string = self.get_test_data_path("qcow")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
         assert os_path is not None
 
@@ -268,7 +293,8 @@ class TestPath:
         assert test_path is not None
 
     def test_new_with_join_path_components(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow")
+        os_path_string = self.get_test_data_path("qcow")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
         assert os_path is not None
 
@@ -277,34 +303,40 @@ class TestPath:
         assert test_path is not None
 
     def test_new_with_parent_directory(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow/ext2.qcow2")
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
         test_path = os_path.new_with_parent_directory()
         assert test_path is not None
 
     def test_get_file_name(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow/ext2.qcow2")
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
         file_name = os_path.get_file_name()
         assert file_name is not None
 
     def test_is_relative(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow/ext2.qcow2")
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
-        assert os_path.is_relative() is True
+        assert os_path.is_relative() is False
 
     def test_is_root(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow/ext2.qcow2")
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
         assert os_path.is_root() is False
 
     def test_to_string(self):
-        os_path = vfs.VfsPath.from_string("../test_data/qcow/ext2.qcow2")
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_path = vfs.VfsPath.from_string(os_path_string)
 
-        assert os_path.to_string() == "../test_data/qcow/ext2.qcow2"
+        path_string = os_path.to_string()
+        assert path_string.endswith("/test_data/qcow/ext2.qcow2")
 
 
-class TestPathComponent:
+class TestPathComponent(TestClass):
     def test_new(self):
         string = vfs.VfsString.from_string("ext2.qcow2")
         path_component = vfs.VfsPathComponent.new(string)
@@ -317,12 +349,13 @@ class TestPathComponent:
         assert path_component is not None
 
 
-class TestResolver:
+class TestResolver(TestClass):
     def test_get_data_stream_by_location_and_name(self):
         resolver = vfs.VfsResolver()
 
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -344,8 +377,9 @@ class TestResolver:
     def test_get_file_entry_by_location(self):
         resolver = vfs.VfsResolver()
 
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -367,8 +401,9 @@ class TestResolver:
     def test_open_file_system(self):
         resolver = vfs.VfsResolver()
 
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
         os_location = vfs.VfsLocation.new_base_from_string(
-            vfs.VfsType.OS, "../test_data/qcow/ext2.qcow2"
+            vfs.VfsType.OS, os_path_string
         )
         qcow_location = os_location.new_with_layer_from_string(
             vfs.VfsType.QCOW, "/qcow1"
@@ -381,13 +416,13 @@ class TestResolver:
         assert file_system is not None
 
 
-class TestPathComponent:
+class TestPathComponent(TestClass):
     def test_from_string(self):
         string = vfs.VfsString.from_string("ext2.qcow2")
 
         assert string is not None
 
 
-class TestType:
+class TestType(TestClass):
     def test_hash(self):
         hash(vfs.VfsType.APM)

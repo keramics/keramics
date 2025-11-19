@@ -564,9 +564,15 @@ impl VfsFileSystem {
                 };
                 let path: &Path = vfs_location.get_path();
 
-                let result: Option<DataStreamReference> =
+                let data_stream: DataStreamReference =
                     match file_system.get_data_stream_by_path_and_name(path, None) {
-                        Ok(result) => result,
+                        Ok(Some(data_stream)) => data_stream,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing data stream: {}",
+                                path.to_string()
+                            )));
+                        }
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
@@ -575,15 +581,6 @@ impl VfsFileSystem {
                             return Err(error);
                         }
                     };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "No such file: {}",
-                            vfs_location.to_string()
-                        )));
-                    }
-                };
                 match ext_file_system.read_data_stream(&data_stream) {
                     Ok(result) => result,
                     Err(mut error) => {
@@ -625,9 +622,15 @@ impl VfsFileSystem {
                 };
                 let path: &Path = vfs_location.get_path();
 
-                let result: Option<DataStreamReference> =
+                let data_stream: DataStreamReference =
                     match file_system.get_data_stream_by_path_and_name(path, None) {
-                        Ok(result) => result,
+                        Ok(Some(data_stream)) => data_stream,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing data stream: {}",
+                                path.to_string()
+                            )));
+                        }
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
@@ -636,15 +639,6 @@ impl VfsFileSystem {
                             return Err(error);
                         }
                     };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "No such file: {}",
-                            vfs_location.to_string()
-                        )));
-                    }
-                };
                 match fat_file_system.read_data_stream(&data_stream) {
                     Ok(result) => result,
                     Err(mut error) => {
@@ -691,9 +685,15 @@ impl VfsFileSystem {
                 };
                 let path: &Path = vfs_location.get_path();
 
-                let result: Option<DataStreamReference> =
+                let data_stream: DataStreamReference =
                     match file_system.get_data_stream_by_path_and_name(path, None) {
-                        Ok(result) => result,
+                        Ok(Some(data_stream)) => data_stream,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing data stream: {}",
+                                path.to_string()
+                            )));
+                        }
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
@@ -702,15 +702,6 @@ impl VfsFileSystem {
                             return Err(error);
                         }
                     };
-                let data_stream: DataStreamReference = match result {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "No such file: {}",
-                            vfs_location.to_string()
-                        )));
-                    }
-                };
                 match ntfs_file_system.read_data_stream(&data_stream) {
                     Ok(result) => result,
                     Err(mut error) => {

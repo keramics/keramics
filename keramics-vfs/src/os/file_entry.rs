@@ -51,8 +51,26 @@ pub struct OsFileEntry {
     /// Creation time.
     creation_time: Option<DateTime>,
 
+    /// Device identifier.
+    device_identifier: Option<u64>,
+
+    /// File mode.
+    file_mode: Option<u32>,
+
+    /// Group identifier.
+    group_identifier: Option<u32>,
+
+    /// Inode number.
+    inode_number: Option<u64>,
+
     /// Modification time.
     modification_time: Option<DateTime>,
+
+    /// Number of links.
+    number_of_links: Option<u64>,
+
+    /// Owner identifier.
+    owner_identifier: Option<u32>,
 
     /// Size in bytes.
     size: u64,
@@ -70,7 +88,13 @@ impl OsFileEntry {
             access_time: None,
             change_time: None,
             creation_time: None,
+            device_identifier: None,
+            file_mode: None,
+            group_identifier: None,
+            inode_number: None,
             modification_time: None,
+            number_of_links: None,
+            owner_identifier: None,
             size: 0,
             sub_directory_entries: OsDirectoryEntries::new(),
         }
@@ -96,7 +120,7 @@ impl OsFileEntry {
         if self.file_type != VfsFileType::File {
             return Ok(None);
         }
-        let file: File = match File::open(self.path.as_os_str()) {
+        let file: File = match File::open(&self.path) {
             Ok(file) => file,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -113,14 +137,44 @@ impl OsFileEntry {
         self.file_type.clone()
     }
 
-    /// Retrieves the name.
-    pub fn get_name(&self) -> Option<&OsStr> {
-        self.path.file_name()
+    /// Retrieves the device identifier.
+    pub fn get_device_identifier(&self) -> Option<u64> {
+        self.device_identifier
+    }
+
+    /// Retrieves the file mode.
+    pub fn get_file_mode(&self) -> Option<u32> {
+        self.file_mode
+    }
+
+    /// Retrieves the group identifier.
+    pub fn get_group_identifier(&self) -> Option<u32> {
+        self.group_identifier
+    }
+
+    /// Retrieves the inode number.
+    pub fn get_inode_number(&self) -> Option<u64> {
+        self.inode_number
     }
 
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         self.modification_time.as_ref()
+    }
+
+    /// Retrieves the name.
+    pub fn get_name(&self) -> Option<&OsStr> {
+        self.path.file_name()
+    }
+
+    /// Retrieves the number of links.
+    pub fn get_number_of_links(&self) -> Option<u64> {
+        self.number_of_links
+    }
+
+    /// Retrieves the owner identifier.
+    pub fn get_owner_identifier(&self) -> Option<u32> {
+        self.owner_identifier
     }
 
     /// Determines the POSIX date and time value.
@@ -227,6 +281,18 @@ impl OsFileEntry {
                 ));
             }
         };
+        self.access_time = Some(Self::get_posix_datetime_value(
+            file_metadata.atime(),
+            file_metadata.atime_nsec(),
+        ));
+        self.change_time = Some(Self::get_posix_datetime_value(
+            file_metadata.ctime(),
+            file_metadata.ctime_nsec(),
+        ));
+        self.creation_time = match file_metadata.created() {
+            Ok(system_time) => Some(DateTime::FakeTime(system_time)),
+            Err(_) => None,
+        };
         let mode: u32 = file_metadata.mode();
 
         self.file_type = match mode & 0xf000 {
@@ -240,23 +306,20 @@ impl OsFileEntry {
                 return Err(keramics_core::error_trace_new!("Unsupported file mode"));
             }
         };
+        // Note that rdev() will return 0 if the file entry is not a device.
+        self.device_identifier = match mode & 0xf000 {
+            0x2000 | 0x6000 => Some(file_metadata.rdev()),
+            _ => None,
+        };
+        self.file_mode = Some(mode);
+        self.group_identifier = Some(file_metadata.gid());
+        self.inode_number = Some(file_metadata.ino());
         self.modification_time = Some(Self::get_posix_datetime_value(
             file_metadata.mtime(),
             file_metadata.mtime_nsec(),
         ));
-        self.access_time = Some(Self::get_posix_datetime_value(
-            file_metadata.atime(),
-            file_metadata.atime_nsec(),
-        ));
-        self.change_time = Some(Self::get_posix_datetime_value(
-            file_metadata.ctime(),
-            file_metadata.ctime_nsec(),
-        ));
-
-        self.creation_time = match file_metadata.created() {
-            Ok(system_time) => Some(DateTime::FakeTime(system_time)),
-            Err(_) => None,
-        };
+        self.number_of_links = Some(file_metadata.nlink());
+        self.owner_identifier = Some(file_metadata.uid());
         self.size = file_metadata.len();
 
         self.path = path.clone();
@@ -276,6 +339,15 @@ impl OsFileEntry {
                 ));
             }
         };
+        self.access_time = Some(DateTime::Filetime(Filetime::new(
+            file_metadata.last_access_time(),
+        )));
+
+        // TODO: add support for change_time
+
+        self.creation_time = Some(DateTime::Filetime(Filetime::new(
+            file_metadata.creation_time(),
+        )));
         let file_attributes: u32 = file_metadata.file_attributes();
 
         self.file_type = match file_attributes & 0x000000f0 {
@@ -286,17 +358,6 @@ impl OsFileEntry {
         self.modification_time = Some(DateTime::Filetime(Filetime::new(
             file_metadata.last_write_time(),
         )));
-
-        self.access_time = Some(DateTime::Filetime(Filetime::new(
-            file_metadata.last_access_time(),
-        )));
-
-        // TODO: add support for change_time
-
-        self.creation_time = Some(DateTime::Filetime(Filetime::new(
-            file_metadata.creation_time(),
-        )));
-
         self.size = file_metadata.len();
 
         self.path = path.clone();
@@ -311,44 +372,47 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    #[test]
-    fn test_get_access_time() -> Result<(), ErrorTrace> {
+    fn get_os_file_entry(path_string: &str) -> Result<OsFileEntry, ErrorTrace> {
         let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
         file_entry.open(&path_buf)?;
 
+        Ok(file_entry)
+    }
+
+    #[test]
+    fn test_get_access_time() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
+
         let result: Option<&DateTime> = file_entry.get_access_time();
-        // Note that the actual date and time can vary.
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
     }
 
     #[test]
-    #[cfg(unix)]
     fn test_get_change_time() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = file_entry.get_change_time();
-        // Note that the actual date and time can vary.
-        assert!(result.is_some());
-
+        if cfg!(windows) {
+            assert_eq!(result, None);
+        } else {
+            // Note that the value can vary.
+            assert!(result.is_some());
+        }
         Ok(())
     }
 
     #[test]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = file_entry.get_creation_time();
-        // Note that the actual date and time can vary.
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -356,10 +420,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let data_stream: DataStreamReference = match file_entry.get_data_stream()? {
             Some(data_stream) => data_stream,
@@ -393,10 +454,7 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert!(file_type == VfsFileType::File);
@@ -405,14 +463,63 @@ mod tests {
     }
 
     #[test]
-    fn test_get_modification_time() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
+    fn test_get_device_identifier() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let device_identifier: Option<u64> = file_entry.get_device_identifier();
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let file_mode: Option<u32> = file_entry.get_file_mode();
+        if cfg!(windows) {
+            assert_eq!(file_mode, None);
+        } else {
+            // Note that the value can vary.
+            assert!(file_mode.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let group_identifier: Option<u32> = file_entry.get_group_identifier();
+        if cfg!(windows) {
+            assert_eq!(group_identifier, None);
+        } else {
+            // Note that the value can vary.
+            assert!(group_identifier.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let inode_number: Option<u64> = file_entry.get_inode_number();
+        if cfg!(windows) {
+            assert_eq!(inode_number, None);
+        } else {
+            // Note that the value can vary.
+            assert!(inode_number.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = file_entry.get_modification_time();
-        // Note that the actual date and time can vary.
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -420,10 +527,7 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let name: Option<&OsStr> = file_entry.get_name();
         assert_eq!(name, Some(OsStr::new("file.txt")));
@@ -431,14 +535,38 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_get_number_of_links() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let number_of_links: Option<u64> = file_entry.get_number_of_links();
+        if cfg!(windows) {
+            assert_eq!(number_of_links, None);
+        } else {
+            assert_eq!(number_of_links, Some(1));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let owner_identifier: Option<u32> = file_entry.get_owner_identifier();
+        if cfg!(windows) {
+            assert_eq!(owner_identifier, None);
+        } else {
+            // Note that the value can vary.
+            assert!(owner_identifier.is_some());
+        }
+        Ok(())
+    }
+
     // TODO: add tests for get_posix_datetime_value
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 202);
@@ -448,19 +576,12 @@ mod tests {
 
     #[test]
     fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let link_target: Option<PathBuf> = file_entry.get_symbolic_link_target();
         assert_eq!(link_target, None);
 
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf =
-            PathBuf::from(get_test_data_path("directory/symbolic_link").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/symbolic_link")?;
 
         let link_target: Option<PathBuf> = file_entry.get_symbolic_link_target();
         assert_eq!(link_target, Some(PathBuf::from("file.txt")));
@@ -470,18 +591,12 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
-        file_entry.open(&path_buf)?;
+        let mut file_entry: OsFileEntry = get_os_file_entry("directory")?;
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 2);
 
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let mut file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries()?;
         assert_eq!(number_of_sub_file_entries, 0);
@@ -491,10 +606,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
-        file_entry.open(&path_buf)?;
+        let mut file_entry: OsFileEntry = get_os_file_entry("directory")?;
 
         // Note that the order of the directory entries can vary.
         let sub_file_entry: OsFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
@@ -507,17 +619,11 @@ mod tests {
 
     #[test]
     fn test_is_directory() -> Result<(), ErrorTrace> {
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory")?;
 
         assert_eq!(file_entry.is_directory(), true);
 
-        let mut file_entry: OsFileEntry = OsFileEntry::new();
-
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        file_entry.open(&path_buf)?;
+        let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         assert_eq!(file_entry.is_directory(), false);
 
@@ -528,7 +634,8 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut file_entry: OsFileEntry = OsFileEntry::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         file_entry.open(&path_buf)?;
 
         assert!(file_entry.file_type == VfsFileType::File);

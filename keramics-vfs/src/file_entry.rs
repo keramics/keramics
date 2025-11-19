@@ -117,6 +117,56 @@ impl VfsFileEntry {
         }
     }
 
+    /// Retrieves the device identifier.
+    pub fn get_device_identifier(&self) -> Result<Option<u64>, ErrorTrace> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => Ok(None),
+            VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_device_identifier() {
+                Ok(Some(device_identifier)) => Ok(Some(device_identifier as u64)),
+                Ok(None) => Ok(None),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve ext device identifier"
+                    );
+                    Err(error)
+                }
+            },
+            VfsFileEntry::Os(os_file_entry) => Ok(os_file_entry.get_device_identifier()),
+        }
+    }
+
+    /// Retrieves the file mode.
+    pub fn get_file_mode(&self) -> Option<u32> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
+            VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_file_mode() as u32),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_mode(),
+        }
+    }
+
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         match self {
@@ -186,6 +236,46 @@ impl VfsFileEntry {
         }
     }
 
+    /// Retrieves the group identifier.
+    pub fn get_group_identifier(&self) -> Option<u32> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
+            VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_group_identifier()),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_group_identifier(),
+        }
+    }
+
+    /// Retrieves the inode number.
+    pub fn get_inode_number(&self) -> Option<u64> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
+            VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_inode_number() as u64),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_inode_number(),
+        }
+    }
+
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<VfsString> {
         match self {
@@ -247,6 +337,46 @@ impl VfsFileEntry {
                 Some(name) => Some(VfsString::from(name)),
                 None => None,
             },
+        }
+    }
+
+    /// Retrieves the number of links.
+    pub fn get_number_of_links(&self) -> Option<u64> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
+            VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_number_of_links() as u64),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_links(),
+        }
+    }
+
+    /// Retrieves the owner identifier.
+    pub fn get_owner_identifier(&self) -> Option<u32> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => None,
+            VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_owner_identifier()),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_owner_identifier(),
         }
     }
 
@@ -336,6 +466,7 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
+
                 if file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
                     0
                 } else {
@@ -1046,6 +1177,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
 
@@ -1054,6 +1205,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -1074,6 +1245,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("apm2")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -1128,7 +1319,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_apm
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_apm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("apm1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with ext.
 
@@ -1194,6 +1397,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, Some(0o100644));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
@@ -1202,6 +1425,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, Some(1000));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, Some(14));
 
         Ok(())
     }
@@ -1230,6 +1473,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_links_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, Some(2));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, Some(1000));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_size_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
@@ -1254,7 +1517,7 @@ mod tests {
             link_target,
             Some(Path {
                 components: vec![
-                    PathComponent::ByteString(ByteString::from("")),
+                    PathComponent::Root,
                     PathComponent::ByteString(ByteString::from("mnt")),
                     PathComponent::ByteString(ByteString::from("keramics")),
                     PathComponent::ByteString(ByteString::from("testdir1")),
@@ -1280,8 +1543,37 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_number_of_sub_file_entries_with_ext
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_ext
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 10);
+
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(VfsString::from(ByteString::from("TestFile2")))
+        );
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with EWF.
 
@@ -1340,6 +1632,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
 
@@ -1348,6 +1660,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -1368,6 +1700,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("ewf1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -1422,7 +1774,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_ewf
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("ewf1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with fake.
 
@@ -1437,6 +1801,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -1447,6 +1812,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -1457,18 +1823,67 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
     }
 
-    // TODO: add test_get_file_type_with_fake
+    #[test]
+    fn test_get_device_identifier_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_modification_time_with_fake() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
 
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -1480,6 +1895,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("file.txt")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_fake() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -1570,6 +2005,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_fat() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
 
@@ -1578,6 +2033,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -1603,6 +2078,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from(Ucs2String::from("testfile1"))));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
         Ok(())
     }
 
@@ -1641,8 +2136,39 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_number_of_sub_file_entries_with_fat
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_fat
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 3);
+
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(VfsString::from(Ucs2String::from(
+                "My long, very long file name, so very long"
+            )))
+        );
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with GPT.
 
@@ -1701,6 +2227,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_gpt() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
 
@@ -1709,6 +2255,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -1729,6 +2295,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("gpt2")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -1783,7 +2369,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_gpt
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_gpt() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("gpt1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with MBR.
 
@@ -1842,6 +2440,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_mbr() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
 
@@ -1850,6 +2468,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -1870,6 +2508,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("mbr2")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -1924,7 +2582,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_mbr
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_mbr() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("mbr1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with NTFS.
 
@@ -1994,6 +2664,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_ntfs() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
 
@@ -2002,6 +2692,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -2026,6 +2736,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from(Ucs2String::from("testfile1"))));
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
         Ok(())
     }
 
@@ -2066,15 +2796,47 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_number_of_sub_file_entries_with_ntfs
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_ntfs
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 3);
+
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(VfsString::from(Ucs2String::from(
+                "My long, very long file name, so very long"
+            )))
+        );
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with OS.
 
-    fn get_os_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+    fn get_os_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
         let vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Os);
 
-        let path: Path = Path::from(path);
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path: Path = Path::from(test_data_path_string.as_str());
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
@@ -2086,10 +2848,10 @@ mod tests {
 
     #[test]
     fn test_get_access_time_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -2097,13 +2859,13 @@ mod tests {
 
     #[test]
     fn test_get_change_time_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_change_time();
         if cfg!(windows) {
-            assert!(result.is_none());
+            assert_eq!(result, None);
         } else {
+            // Note that the value can vary.
             assert!(result.is_some());
         }
         Ok(())
@@ -2111,24 +2873,46 @@ mod tests {
 
     #[test]
     fn test_get_creation_time_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
     }
 
     #[test]
+    fn test_get_device_identifier_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        if cfg!(windows) {
+            assert_eq!(file_mode, None);
+        } else {
+            // Note that the value can vary.
+            assert!(file_mode.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
 
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
 
@@ -2136,11 +2920,39 @@ mod tests {
     }
 
     #[test]
+    fn test_get_group_identifier_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        if cfg!(windows) {
+            assert_eq!(group_identifier, None);
+        } else {
+            // Note that the value can vary.
+            assert!(group_identifier.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        if cfg!(windows) {
+            assert_eq!(inode_number, None);
+        } else {
+            // Note that the value can vary.
+            assert!(inode_number.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_get_modification_time_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        // Note that the value can vary.
         assert!(result.is_some());
 
         Ok(())
@@ -2148,8 +2960,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from(OsString::from("file.txt"))));
@@ -2158,9 +2969,35 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_links_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        if cfg!(windows) {
+            assert_eq!(number_of_links, None);
+        } else {
+            assert_eq!(number_of_links, Some(1));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        if cfg!(windows) {
+            assert_eq!(owner_identifier, None);
+        } else {
+            // Note that the value can vary.
+            assert!(owner_identifier.is_some());
+        }
+        Ok(())
+    }
+
+    #[test]
     fn test_get_size_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry =
-            get_os_file_entry(get_test_data_path("directory/file.txt").as_str())?;
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let size: u64 = vfs_file_entry.get_size();
         assert_eq!(size, 202);
@@ -2168,12 +3005,71 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test_get_symbolic_link_target_with_os
+    #[test]
+    fn test_get_symbolic_link_target_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
-    // TODO: add test_get_data_stream_with_os
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
 
-    // TODO: add tests for test_get_number_of_sub_file_entries_with_os
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_os
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/symbolic_link")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(
+            link_target,
+            Some(Path {
+                components: vec![PathComponent::OsString(OsString::from("file.txt")),],
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 2);
+
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(VfsString::OsString(OsString::from("file.txt")))
+        );
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with QCOW.
 
@@ -2232,6 +3128,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_qcow() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
 
@@ -2240,6 +3156,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -2260,6 +3196,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("qcow1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -2314,7 +3270,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_qcow
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_qcow() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("qcow1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with sparse image.
 
@@ -2373,6 +3341,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_sparseimage_file_system()?;
 
@@ -2390,6 +3378,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_group_identifier_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_modification_time_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
@@ -2400,7 +3408,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_name_with_sparseiamge() -> Result<(), ErrorTrace> {
+    fn test_get_name_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
@@ -2409,7 +3417,27 @@ mod tests {
     }
 
     #[test]
-    fn test_get_size_with_sparseiamge() -> Result<(), ErrorTrace> {
+    fn test_get_number_of_links_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_sparseimage() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
         let size: u64 = vfs_file_entry.get_size();
@@ -2419,7 +3447,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_symbolic_link_target_with_sparseiamge() -> Result<(), ErrorTrace> {
+    fn test_get_symbolic_link_target_with_sparseimage() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
         let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
@@ -2458,7 +3486,22 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_sparseimage
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_sparseimage() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(
+            sub_file_entry.get_name(),
+            Some(VfsString::from("sparseimage1"))
+        );
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with UDIF.
 
@@ -2517,6 +3560,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_udif() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
 
@@ -2525,6 +3588,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -2545,6 +3628,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("udif1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -2599,7 +3702,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_udif
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_udif() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("udif1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with VHD.
 
@@ -2658,6 +3773,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_vhd() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
 
@@ -2666,6 +3801,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -2686,6 +3841,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("vhd2")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -2740,7 +3915,19 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_vhd
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_vhd() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("vhd1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Tests with VHDX.
 
@@ -2799,6 +3986,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_device_identifier_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_type_with_vhdx() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
 
@@ -2807,6 +4014,26 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
         assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
 
         Ok(())
     }
@@ -2827,6 +4054,26 @@ mod tests {
 
         let name: Option<VfsString> = vfs_file_entry.get_name();
         assert_eq!(name, Some(VfsString::from("vhdx2")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
 
         Ok(())
     }
@@ -2881,11 +4128,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_get_sub_file_entry_by_index_with_vhdx
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_vhdx() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        assert_eq!(sub_file_entry.get_name(), Some(VfsString::from("vhdx1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     // Other tests.
-
-    // TODO: add tests for get_group_identifier
 
     // TODO: add tests for get_number_of_data_forks
 

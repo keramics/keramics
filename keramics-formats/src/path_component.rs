@@ -12,7 +12,7 @@
  */
 
 use std::collections::HashMap;
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -26,6 +26,7 @@ pub enum PathComponent {
     ByteString(ByteString),
     OsString(OsString),
     String(String),
+    Root,
     Ucs2String(Ucs2String),
     // TODO: add Utf16String support.
 }
@@ -38,11 +39,12 @@ impl PathComponent {
             PathComponent::OsString(os_string) => {
                 let path_buf: PathBuf = PathBuf::from(os_string);
                 match path_buf.extension() {
-                    Some(os_str) => Ok(Some(PathComponent::OsString(os_str.to_os_string()))),
+                    Some(os_str) => Ok(Some(PathComponent::from(os_str))),
                     None => return Ok(None),
                 }
             }
             PathComponent::String(string) => Ok(Self::extension_from_string(string)),
+            PathComponent::Root => Ok(None),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::extension_from_ucs2_string(ucs2_string))
             }
@@ -142,11 +144,12 @@ impl PathComponent {
             PathComponent::OsString(os_string) => {
                 let path_buf: PathBuf = PathBuf::from(os_string);
                 match path_buf.file_stem() {
-                    Some(os_str) => Ok(Some(PathComponent::OsString(os_str.to_os_string()))),
+                    Some(os_str) => Ok(Some(PathComponent::from(os_str))),
                     None => return Ok(None),
                 }
             }
             PathComponent::String(string) => Ok(Self::file_stem_from_string(string)),
+            PathComponent::Root => Ok(None),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::file_stem_from_ucs2_string(ucs2_string))
             }
@@ -242,6 +245,7 @@ impl PathComponent {
             PathComponent::ByteString(byte_string) => byte_string.is_empty(),
             PathComponent::OsString(os_string) => os_string.is_empty(),
             PathComponent::String(string) => string.is_empty(),
+            PathComponent::Root => true,
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
         }
     }
@@ -258,6 +262,7 @@ impl PathComponent {
             },
             PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => ByteString::from(string),
+            PathComponent::Root => ByteString::new(),
             PathComponent::Ucs2String(ucs2_string) => todo!(),
         };
         Ok(byte_string)
@@ -269,6 +274,7 @@ impl PathComponent {
             PathComponent::ByteString(byte_string) => byte_string.to_string(),
             PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => string.clone(),
+            PathComponent::Root => String::new(),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.to_string(),
         }
     }
@@ -311,6 +317,7 @@ impl PathComponent {
             }
             PathComponent::OsString(os_string) => todo!(),
             PathComponent::String(string) => Ucs2String::from(string),
+            PathComponent::Root => Ucs2String::new(),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.clone(),
         };
         Ok(ucs2_string)
@@ -381,11 +388,19 @@ impl PathComponent {
                 }
                 ucs2_string
             }
+            PathComponent::Root => Ucs2String::new(),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ucs2String::new_with_case_folding(ucs2_string, case_folding_mappings)
             }
         };
         Ok(ucs2_string)
+    }
+}
+
+impl From<&OsStr> for PathComponent {
+    /// Converts a [`&OsStr`] into a [`PathComponent`]
+    fn from(os_str: &OsStr) -> Self {
+        Self::OsString(os_str.to_os_string())
     }
 }
 
@@ -419,6 +434,7 @@ impl PartialEq<&str> for PathComponent {
             PathComponent::ByteString(byte_string) => ByteString::eq(byte_string, other),
             PathComponent::OsString(os_string) => OsString::eq(os_string, other),
             PathComponent::String(string) => String::eq(string, other),
+            PathComponent::Root => other.is_empty(),
             PathComponent::Ucs2String(ucs2_string) => Ucs2String::eq(ucs2_string, other),
         }
     }
@@ -568,6 +584,17 @@ mod tests {
             Some(PathComponent::Ucs2String(Ucs2String::from("file")))
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_from_os_str() {
+        let os_str: &OsStr = OsStr::new("test");
+        let path_component: PathComponent = PathComponent::from(os_str);
+
+        assert_eq!(
+            path_component,
+            PathComponent::OsString(OsString::from("test"))
+        );
     }
 
     #[test]

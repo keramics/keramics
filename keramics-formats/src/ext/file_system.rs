@@ -579,13 +579,13 @@ mod tests {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(2)?;
-        assert_eq!(file_entry.inode_number, 2);
+        assert_eq!(file_entry.get_inode_number(), 2);
 
         let name: Option<&ByteString> = file_entry.get_name();
         assert!(name.is_none());
 
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(12)?;
-        assert_eq!(file_entry.inode_number, 12);
+        assert_eq!(file_entry.get_inode_number(), 12);
 
         let name: Option<&ByteString> = file_entry.get_name();
         assert!(name.is_none());
@@ -600,17 +600,17 @@ mod tests {
         let path: Path = Path::from("/");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.inode_number, 2);
+        assert_eq!(file_entry.get_inode_number(), 2);
 
         let path: Path = Path::from("/emptyfile");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.inode_number, 12);
+        assert_eq!(file_entry.get_inode_number(), 12);
 
         let path: Path = Path::from("/testdir1/testfile1");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.inode_number, 14);
+        assert_eq!(file_entry.get_inode_number(), 14);
 
         let name: Option<&ByteString> = file_entry.get_name();
         assert_eq!(name, Some(ByteString::from("testfile1")).as_ref());
@@ -624,7 +624,7 @@ mod tests {
 
         let file_entry: ExtFileEntry = file_system.get_root_directory()?.unwrap();
 
-        assert_eq!(file_entry.inode_number, 2);
+        assert_eq!(file_entry.get_inode_number(), 2);
 
         Ok(())
     }

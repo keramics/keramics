@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::path::PathBuf;
+use std::path::{MAIN_SEPARATOR_STR, PathBuf};
 
 use keramics_core::ErrorTrace;
 use keramics_formats::{Path, PathComponent};
@@ -30,6 +30,7 @@ impl OsFileSystem {
                 PathComponent::ByteString(_) => todo!(),
                 PathComponent::OsString(os_string) => path_buf.push(os_string),
                 PathComponent::String(string) => path_buf.push(string),
+                PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
                 PathComponent::Ucs2String(ucs2_string) => todo!(),
             }
         }
@@ -80,6 +81,20 @@ impl OsFileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::tests::get_test_data_path;
+
+    #[test]
+    fn test_get_path_buf() -> Result<(), ErrorTrace> {
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let path: Path = Path::from(&path_string);
+
+        let path_buf: PathBuf = OsFileSystem::get_path_buf(&path)?;
+        let expected_path_buf: PathBuf = PathBuf::from(&path_string);
+        assert_eq!(path_buf, expected_path_buf);
+
+        Ok(())
+    }
 
     // TODO: add tests
 }

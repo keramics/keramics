@@ -243,7 +243,7 @@ impl ExtInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut ExtFileEntry) -> Result<(), ErrorTrace> {
-        println!("    Inode number\t\t\t: {}", file_entry.inode_number);
+        println!("    Inode number\t\t\t: {}", file_entry.get_inode_number());
 
         match file_entry.get_name() {
             Some(name) => println!("    Name\t\t\t\t: {}", name),

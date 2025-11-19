@@ -35,7 +35,7 @@ pub struct ExtFileEntry {
     inode_table: Arc<ExtInodeTable>,
 
     /// The inode number.
-    pub inode_number: u32,
+    inode_number: u32,
 
     /// The inode.
     inode: ExtInode,
@@ -92,7 +92,7 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the device identifier.
-    pub fn get_device_identifier(&mut self) -> Result<Option<u16>, ErrorTrace> {
+    pub fn get_device_identifier(&self) -> Result<Option<u16>, ErrorTrace> {
         if self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_CHARACTER_DEVICE
             || self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_BLOCK_DEVICE
         {
@@ -116,6 +116,11 @@ impl ExtFileEntry {
     /// Retrieves the group identifier.
     pub fn get_group_identifier(&self) -> u32 {
         self.inode.group_identifier
+    }
+
+    /// Retrieves the inode number.
+    pub fn get_inode_number(&self) -> u32 {
+        self.inode_number
     }
 
     /// Retrieves the modification time.
@@ -483,13 +488,22 @@ mod tests {
         let ext_file_system: ExtFileSystem = get_file_system()?;
 
         let path: Path = Path::from("/testdir1/testfile1");
-        let mut ext_file_entry: ExtFileEntry =
-            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
         assert_eq!(device_identifier, None);
 
-        // TODO: test with block or character device file entry
+        let path: Path = Path::from("/testdir1/blockdev1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, Some(0x1839));
+
+        let path: Path = Path::from("/testdir1/chardev1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let device_identifier: Option<u16> = ext_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, Some(0x0d44));
 
         Ok(())
     }
@@ -514,6 +528,18 @@ mod tests {
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(ext_file_entry.get_group_identifier(), 1000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(ext_file_entry.get_inode_number(), 14);
 
         Ok(())
     }
