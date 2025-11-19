@@ -81,7 +81,7 @@ impl DisplayPath {
                                 string_parts.push(string);
                             }
                         }
-                        Err(error) => return String::from(format!("{}", error)),
+                        Err(error) => return format!("{}", error),
                     }
                 }
                 string_parts.join("")

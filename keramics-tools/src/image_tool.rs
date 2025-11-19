@@ -1163,22 +1163,19 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            let result: Option<FormatIdentifier> = match image_tool
+            let format_identifier: FormatIdentifier = match image_tool
                 .scan_for_storage_image_formats(&data_stream)
             {
-                Ok(result) => result,
+                Ok(Some(format_identifier)) => format_identifier,
+                Ok(None) => {
+                    println!("No known storage media image format signatures found");
+                    return ExitCode::FAILURE;
+                }
                 Err(error) => {
                     println!(
                         "Unable to scan data stream for known storage media image format signatures with error:\n{}",
                         error
                     );
-                    return ExitCode::FAILURE;
-                }
-            };
-            let format_identifier: FormatIdentifier = match result {
-                Some(format_identifier) => format_identifier,
-                None => {
-                    println!("No known storage media image format signatures found");
                     return ExitCode::FAILURE;
                 }
             };

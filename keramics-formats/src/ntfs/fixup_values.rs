@@ -52,7 +52,7 @@ pub fn apply_fixup_values(
         ));
         mediator.debug_print_data(&buffer[fixup_value_offset..fixup_values_end_offset], true);
 
-        mediator.debug_print(format!("NtfsFixupValues {{\n"));
+        mediator.debug_print(String::from("NtfsFixupValues {\n"));
 
         let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
         mediator.debug_print(format!("    placeholder_value: {},\n", placeholder_value));
@@ -63,7 +63,7 @@ pub fn apply_fixup_values(
             .collect::<Vec<String>>();
 
         mediator.debug_print(format!("    fixup_values: [{}]\n", fixup_values.join(", ")));
-        mediator.debug_print(format!("}}\n\n"));
+        mediator.debug_print(String::from("}\n\n"));
     }
     fixup_value_offset = fixup_value_end_offset;
 

@@ -100,12 +100,13 @@ impl ExtDirectoryTree {
         let parent_inode_number: u32 = bytes_to_u32_le!(data, 0);
 
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("ExtDirectoryTree {{\n"));
+            self.mediator
+                .debug_print(String::from("ExtDirectoryTree {\n"));
             self.mediator.debug_print(format!(
                 "    parent_inode_number: {},\n",
                 parent_inode_number
             ));
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         self.read_node_data(&data, 4, data_size, entries)
     }

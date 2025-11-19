@@ -17,8 +17,6 @@ use std::sync::Arc;
 use keramics_core::ErrorTrace;
 use keramics_formats::{Path, PathComponent};
 
-use crate::enums::VfsType;
-
 use super::file_entry::FakeFileEntry;
 
 /// Fake (or virtual) file system.

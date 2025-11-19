@@ -288,7 +288,7 @@ impl VhdxFile {
         }
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(format!("VhdxMetadataValues {{\n"));
+                .debug_print(String::from("VhdxMetadataValues {\n"));
         }
         match metadata_table
             .entries
@@ -490,7 +490,7 @@ impl VhdxFile {
             }
         };
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         match metadata_table
             .entries
