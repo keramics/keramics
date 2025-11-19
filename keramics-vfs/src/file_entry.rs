@@ -3059,10 +3059,8 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
         let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(
-            sub_file_entry.get_name(),
-            Some(VfsString::OsString(OsString::from("file.txt")))
-        );
+        // Note that the value can vary.
+        assert_eq!(sub_file_entry.get_name().is_some());
 
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
