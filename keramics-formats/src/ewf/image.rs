@@ -51,6 +51,12 @@ pub struct EwfImage {
     /// Segment file set identifier.
     pub set_identifier: Uuid,
 
+    /// Name.
+    name: String,
+
+    /// Segment file cache.
+    naming_schema: EwfNamingSchema,
+
     /// Segment file cache.
     segment_file_cache: LruCache<u16, EwfFile>,
 
@@ -104,6 +110,8 @@ impl EwfImage {
             mediator: Mediator::current(),
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             set_identifier: Uuid::new(),
+            name: String::new(),
+            naming_schema: EwfNamingSchema::E01UpperCase,
             segment_file_cache: LruCache::new(16),
             number_of_chunks: 0,
             sectors_per_chunk: 0,
@@ -129,7 +137,6 @@ impl EwfImage {
 
     /// Determines the segment file extension for a given segment number.
     fn get_segment_file_extension(
-        &self,
         segment_number: u16,
         naming_schema: &EwfNamingSchema,
     ) -> Result<String, ErrorTrace> {
@@ -190,6 +197,63 @@ impl EwfImage {
         Ok(segment_extension)
     }
 
+    /// Determines the segment file name.
+    fn get_segment_file_name(
+        name: &String,
+        segment_number: u16,
+        naming_schema: &EwfNamingSchema,
+    ) -> Result<String, ErrorTrace> {
+        let segment_extension: String =
+            match Self::get_segment_file_extension(segment_number, naming_schema) {
+                Ok(extension) => extension,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to determine segment file extension"
+                    );
+                    return Err(error);
+                }
+            };
+        Ok(format!("{}.{}", name, segment_extension))
+    }
+
+    /// Determines the segment file naming schema.
+    fn get_segment_file_naming_schema(
+        file_name: &PathComponent,
+    ) -> Result<EwfNamingSchema, ErrorTrace> {
+        let extension: String = match file_name.extension() {
+            Ok(Some(extension)) => extension.to_string(),
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Extension missing in segment file: {}",
+                    file_name.to_string(),
+                )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve extension of segment file: {}",
+                        file_name.to_string()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        match extension.as_str() {
+            "E01" => Ok(EwfNamingSchema::E01UpperCase),
+            "S01" => Ok(EwfNamingSchema::S01UpperCase),
+            "e01" => Ok(EwfNamingSchema::E01LowerCase),
+            "s01" => Ok(EwfNamingSchema::S01LowerCase),
+            _ => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported extension in segment file: {}",
+                    file_name.to_string(),
+                )));
+            }
+        }
+    }
+
     /// Opens a storage media image.
     pub fn open(
         &mut self,
@@ -206,6 +270,42 @@ impl EwfImage {
         self.file_resolver = file_resolver.clone();
 
         Ok(())
+    }
+
+    /// Opens a segment file.
+    fn open_segment_file(&self, segment_file_name: &String) -> Result<EwfFile, ErrorTrace> {
+        let path_components: [PathComponent; 1] = [PathComponent::from(segment_file_name)];
+
+        let data_stream: DataStreamReference =
+            match self.file_resolver.get_data_stream(&path_components) {
+                Ok(Some(data_stream)) => data_stream,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing segment file: {}",
+                        segment_file_name
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open segment file: {}", segment_file_name)
+                    );
+                    return Err(error);
+                }
+            };
+        let mut segment_file: EwfFile = EwfFile::new();
+
+        match segment_file.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open segment file: {}", segment_file_name)
+                );
+                return Err(error);
+            }
+        }
+        Ok(segment_file)
     }
 
     /// Reads media data based on the chunk tables.
@@ -233,10 +333,35 @@ impl EwfImage {
                 .segment_file_cache
                 .contains(&block_range.segment_number)
             {
-                let file: EwfFile = EwfFile::new();
-
+                let segment_file_name: String = match Self::get_segment_file_name(
+                    &self.name,
+                    block_range.segment_number,
+                    &self.naming_schema,
+                ) {
+                    Ok(name) => name,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to determine file name of segment number: {}",
+                                block_range.segment_number
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
+                let segment_file: EwfFile = match self.open_segment_file(&segment_file_name) {
+                    Ok(ewf_file) => ewf_file,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to open segment file: {}", segment_file_name)
+                        );
+                        return Err(error);
+                    }
+                };
                 self.segment_file_cache
-                    .insert(block_range.segment_number, file);
+                    .insert(block_range.segment_number, segment_file);
             }
             let segment_file: &mut EwfFile =
                 match self.segment_file_cache.get_mut(&block_range.segment_number) {
@@ -464,12 +589,6 @@ impl EwfImage {
                     self.md5_hash.copy_from_slice(&hash.md5_hash);
                 }
                 &EWF_SECTION_TYPE_HEADER => {
-                    if segment_file.segment_number != 1 {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unsupported header section found in segment file: {}",
-                            segment_file_name
-                        )));
-                    }
                     let mut header: EwfHeader = EwfHeader::new();
 
                     match header.read_at_position(
@@ -575,8 +694,7 @@ impl EwfImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        // TODO: add function that retrieves both file stem and extension
-        let name: String = match file_name.file_stem() {
+        self.name = match file_name.file_stem() {
             Ok(Some(file_stem)) => file_stem.to_string(),
             Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -595,35 +713,17 @@ impl EwfImage {
                 return Err(error);
             }
         };
-        let extension: String = match file_name.extension() {
-            Ok(Some(extension)) => extension.to_string(),
-            Ok(None) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Extension missing in segment file: {}",
-                    file_name.to_string(),
-                )));
-            }
+        self.naming_schema = match Self::get_segment_file_naming_schema(file_name) {
+            Ok(naming_schema) => naming_schema,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to retrieve extension of segment file: {}",
+                        "Unable to determine segment file naming schema: {}",
                         file_name.to_string()
                     )
                 );
                 return Err(error);
-            }
-        };
-        let naming_schema: EwfNamingSchema = match extension.as_str() {
-            "E01" => EwfNamingSchema::E01UpperCase,
-            "S01" => EwfNamingSchema::S01UpperCase,
-            "e01" => EwfNamingSchema::E01LowerCase,
-            "s01" => EwfNamingSchema::S01LowerCase,
-            _ => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported extension in segment file: {}",
-                    file_name.to_string(),
-                )));
             }
         };
         let mut block_media_offset: u64 = 0;
@@ -631,23 +731,34 @@ impl EwfImage {
         let mut segment_number: u16 = 1;
 
         while !last_segment_file {
-            let segment_extension: String =
-                match self.get_segment_file_extension(segment_number, &naming_schema) {
-                    Ok(extension) => extension,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to determine segment file extension"
-                        );
-                        return Err(error);
-                    }
-                };
-            let segment_file_name: String = format!("{}.{}", name, segment_extension);
-
+            let segment_file_name: String = match Self::get_segment_file_name(
+                &self.name,
+                segment_number,
+                &self.naming_schema,
+            ) {
+                Ok(name) => name,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to determine file name of segment number: {}",
+                            segment_number
+                        )
+                    );
+                    return Err(error);
+                }
+            };
             let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
-            let result: Option<DataStreamReference> =
+
+            let data_stream: DataStreamReference =
                 match file_resolver.get_data_stream(&path_components) {
-                    Ok(result) => result,
+                    Ok(Some(data_stream)) => data_stream,
+                    Ok(None) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing segment file: {}",
+                            segment_file_name
+                        )));
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -656,15 +767,6 @@ impl EwfImage {
                         return Err(error);
                     }
                 };
-            let data_stream: DataStreamReference = match result {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "No such segment file: {}",
-                        segment_file_name
-                    )));
-                }
-            };
             let mut segment_file: EwfFile = EwfFile::new();
 
             match segment_file.read_data_stream(&data_stream) {
@@ -673,6 +775,19 @@ impl EwfImage {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!("Unable to open segment file: {}", segment_file_name)
+                    );
+                    return Err(error);
+                }
+            }
+            match segment_file.read_section_headers() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read section headers in segment file: {}",
+                            segment_file_name
+                        )
                     );
                     return Err(error);
                 }
@@ -1044,59 +1159,73 @@ mod tests {
         Ok(image)
     }
 
+    // TODO: add tests for get_header_value
+
     #[test]
     fn test_get_segment_file_extension() -> Result<(), ErrorTrace> {
-        let image: EwfImage = EwfImage::new();
-
         let extension: String =
-            image.get_segment_file_extension(1, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(1, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "E01");
 
         let extension: String =
-            image.get_segment_file_extension(99, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(99, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "E99");
 
         let extension: String =
-            image.get_segment_file_extension(100, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(100, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "EAA");
 
         let extension: String =
-            image.get_segment_file_extension(125, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(125, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "EAZ");
 
         let extension: String =
-            image.get_segment_file_extension(126, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(126, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "EBA");
 
         let extension: String =
-            image.get_segment_file_extension(776, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(776, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "FAA");
 
         let extension: String =
-            image.get_segment_file_extension(14296, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(14296, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "ZAA");
 
         let extension: String =
-            image.get_segment_file_extension(14971, &EwfNamingSchema::E01UpperCase)?;
+            EwfImage::get_segment_file_extension(14971, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(extension, "ZZZ");
 
-        let result = image.get_segment_file_extension(14972, &EwfNamingSchema::E01UpperCase);
+        let result = EwfImage::get_segment_file_extension(14972, &EwfNamingSchema::E01UpperCase);
         assert!(result.is_err());
 
         let extension: String =
-            image.get_segment_file_extension(1, &EwfNamingSchema::S01UpperCase)?;
+            EwfImage::get_segment_file_extension(1, &EwfNamingSchema::S01UpperCase)?;
         assert_eq!(extension, "S01");
 
         let extension: String =
-            image.get_segment_file_extension(1, &EwfNamingSchema::E01LowerCase)?;
+            EwfImage::get_segment_file_extension(1, &EwfNamingSchema::E01LowerCase)?;
         assert_eq!(extension, "e01");
 
         let extension: String =
-            image.get_segment_file_extension(1, &EwfNamingSchema::S01LowerCase)?;
+            EwfImage::get_segment_file_extension(1, &EwfNamingSchema::S01LowerCase)?;
         assert_eq!(extension, "s01");
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_segment_file_name() -> Result<(), ErrorTrace> {
+        let name: String = EwfImage::get_segment_file_name(
+            &String::from("image"),
+            1,
+            &EwfNamingSchema::E01UpperCase,
+        )?;
+        assert_eq!(name, "image.E01");
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_segment_file_naming_schema
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
@@ -1112,6 +1241,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for open_segment_file
+    // TODO: add tests for read_data_from_blocks
     // TODO: add tests for read_sections
     // TODO: add tests for read_table_section
     // TODO: add tests for read_volume_section

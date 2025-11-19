@@ -122,25 +122,26 @@ impl EwfHeader {
         let value_types: Vec<&[u8]> = value_types_line
             .split(|byte| *byte == b'\t')
             .collect::<Vec<&[u8]>>();
+
         let values: Vec<&[u8]> = values_line
             .split(|byte| *byte == b'\t')
             .collect::<Vec<&[u8]>>();
 
-        let number_of_values: usize = values.len();
+        let number_of_value_types: usize = value_types.len();
 
-        if number_of_values != value_types.len() {
+        if number_of_value_types > values.len() {
             return Err(keramics_core::error_trace_new!(
-                "Invalid header data - number of value types does not match number of values"
+                "Invalid header data - number of values does not corresponding to number of value types"
             ));
         }
-        // TODO: if number_of_values == 9 then format is EnCase 1
-        // TODO: if number_of_values == 11 then format is EnCase 2 - 3 or FTK Imager
-        // TODO: if number_of_values == 10 then format is EnCase 4 - 7
-        // TODO: if number_of_values == 16 then format is linen 5 - 7
+        // TODO: if number_of_value_types == 9 then format is EnCase 1
+        // TODO: if number_of_value_types == 11 then format is EnCase 2 - 3 or FTK Imager
+        // TODO: if number_of_value_types == 10 then format is EnCase 4 - 7
+        // TODO: if number_of_value_types == 16 then format is linen 5 - 7
 
         // TODO: store header values in hash map, use enum for value types
 
-        for value_index in 0..number_of_values {
+        for value_index in 0..number_of_value_types {
             let header_value_type: EwfHeaderValueType = match value_types[value_index] {
                 // "a" => description
                 [b'a'] => EwfHeaderValueType::Description,

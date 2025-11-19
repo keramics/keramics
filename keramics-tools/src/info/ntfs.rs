@@ -588,7 +588,7 @@ impl NtfsInfo {
                 }
             };
         if file_entry.is_none() {
-            return Err(keramics_core::error_trace_new!("No such file entry"));
+            return Err(keramics_core::error_trace_new!("Missing file entry"));
         }
         println!("New Technologies File System (NTFS) file entry information:");
 

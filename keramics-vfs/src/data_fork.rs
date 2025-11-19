@@ -75,7 +75,7 @@ mod tests {
         match ext_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path_string
             ))),
         }
@@ -125,7 +125,7 @@ mod tests {
         match ntfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path_string
             ))),
         }

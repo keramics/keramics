@@ -54,7 +54,7 @@ fn read_path(file_system: &ExtFileSystem, path_string: &str) -> Result<(u64, Str
         Some(ext_file_entry) => ext_file_entry,
         None => {
             return Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path_string
             )));
         }

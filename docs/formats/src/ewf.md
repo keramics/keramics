@@ -352,6 +352,10 @@ Also see [header2 values](#header2_values)
 > header2 section) are set to: Thu Jan  1 00:00:00 1970. Where the time is
 > dependent on the time zone and daylight savings.
 
+> Note that in a Logicube Dossier generated header2 section an additional emtpy
+> value in the 4th line was observed. The number of values in the 3rd and 4th
+> can differ.
+
 ##### <a name="sources_category1"></a>Sources category
 
 Line 6 the srce category contains information about acquisition sources.
@@ -460,7 +464,7 @@ Some aspects of this section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and SMART (EWF-S01)
-* Found at the start of the first segment file or in EnCase 4 to 7 after the header2 section in the first segment file. Not found in subsequent segment files.
+* Found at the start of the first segment file or in EnCase 4 to 7 after the header2 section in the first segment file. Typically not found in subsequent segment files with the exception of Logicube Dossier generated EWF-E01 files.
 
 The additional data this section contains is the following:
 

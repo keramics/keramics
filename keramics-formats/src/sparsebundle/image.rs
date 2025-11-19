@@ -72,24 +72,22 @@ impl SparseBundleImage {
         file_name: &str,
     ) -> Result<(), ErrorTrace> {
         let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
-        let result: Option<DataStreamReference> =
-            match file_resolver.get_data_stream(&path_components) {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open info.plist file: {}", file_name)
-                    );
-                    return Err(error);
-                }
-            };
-        let data_stream: DataStreamReference = match result {
-            Some(data_stream) => data_stream,
-            None => {
+
+        let data_stream: DataStreamReference = match file_resolver.get_data_stream(&path_components)
+        {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "No such file: {}",
+                    "Missing data stream: {}",
                     file_name
                 )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open info.plist file: {}", file_name)
+                );
+                return Err(error);
             }
         };
         let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
@@ -219,9 +217,15 @@ impl SparseBundleImage {
                 PathComponent::from("bands"),
                 PathComponent::from(&band_file_name),
             ];
-            let result: Option<DataStreamReference> =
+            let data_stream: DataStreamReference =
                 match self.file_resolver.get_data_stream(&path_components) {
-                    Ok(result) => result,
+                    Ok(Some(data_stream)) => data_stream,
+                    Ok(None) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing bands file: {}",
+                            band_file_name
+                        )));
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -230,15 +234,6 @@ impl SparseBundleImage {
                         return Err(error);
                     }
                 };
-            let data_stream: DataStreamReference = match result {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "No such bands file: {}",
-                        band_file_name
-                    )));
-                }
-            };
             let mut range_read_size: usize = read_size - data_offset;
 
             if (range_read_size as u64) > range_remainder_size {

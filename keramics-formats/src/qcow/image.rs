@@ -59,24 +59,21 @@ impl QcowImage {
         let mut files: Vec<QcowFile> = Vec::new();
 
         let path_components: [PathComponent; 1] = [file_name.clone()];
-        let result: Option<DataStreamReference> =
-            match file_resolver.get_data_stream(&path_components) {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open file: {}", file_name.to_string())
-                    );
-                    return Err(error);
-                }
-            };
-        let data_stream: DataStreamReference = match result {
-            Some(data_stream) => data_stream,
-            None => {
+        let data_stream: DataStreamReference = match file_resolver.get_data_stream(&path_components)
+        {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "No such file: {}",
+                    "Missing data stream: {}",
                     file_name.to_string()
                 )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open file: {}", file_name.to_string())
+                );
+                return Err(error);
             }
         };
         let mut file: QcowFile = QcowFile::new();
@@ -92,23 +89,20 @@ impl QcowImage {
             let backing_file_name: String = file_name.to_string();
 
             let path_components: [PathComponent; 1] = [PathComponent::from(&backing_file_name)];
-            let result: Option<DataStreamReference> =
+            let data_stream: DataStreamReference =
                 match file_resolver.get_data_stream(&path_components) {
-                    Ok(result) => result,
+                    Ok(Some(data_stream)) => data_stream,
+                    Ok(None) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing backing file: {}",
+                            backing_file_name
+                        )));
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open backing file");
                         return Err(error);
                     }
                 };
-            let data_stream: DataStreamReference = match result {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing backing file: {}",
-                        backing_file_name
-                    )));
-                }
-            };
             let mut backing_file: QcowFile = QcowFile::new();
 
             match backing_file.read_data_stream(&data_stream) {

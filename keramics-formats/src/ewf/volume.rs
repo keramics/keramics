@@ -105,7 +105,7 @@ impl EwfE01Volume {
         adler32_context.update(&data[0..1048]);
         let calculated_checksum: u32 = adler32_context.finalize();
 
-        if stored_checksum != calculated_checksum {
+        if stored_checksum != 0 && stored_checksum != calculated_checksum {
             return Err(keramics_core::error_trace_new!(format!(
                 "Mismatch between stored: 0x{:08x} and calculated: 0x{:08x} checksums",
                 stored_checksum, calculated_checksum

@@ -174,20 +174,17 @@ impl GptFileSystem {
         file_system: &VfsFileSystemReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let result: Option<DataStreamReference> =
+        let data_stream: DataStreamReference =
             match file_system.get_data_stream_by_path_and_name(path, None) {
-                Ok(result) => result,
+                Ok(Some(data_stream)) => data_stream,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!("Missing data stream"));
+                }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
                     return Err(error);
                 }
             };
-        let data_stream: DataStreamReference = match result {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         match volume_system.read_data_stream(&data_stream) {
             Ok(()) => {}
             Err(mut error) => {

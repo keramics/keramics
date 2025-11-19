@@ -140,18 +140,19 @@ impl EwfHeader2 {
         let value_types: Vec<&[u16]> = value_types_line
             .split(|value_16bit| *value_16bit == 0x0009)
             .collect::<Vec<&[u16]>>();
+
         let values: Vec<&[u16]> = values_line
             .split(|value_16bit| *value_16bit == 0x0009)
             .collect::<Vec<&[u16]>>();
 
-        let number_of_values: usize = values.len();
+        let number_of_value_types: usize = value_types.len();
 
-        if number_of_values != value_types.len() {
+        if number_of_value_types > values.len() {
             return Err(keramics_core::error_trace_new!(
-                "Invalid header data - number of value types does not match number of values"
+                "Invalid header data - number of values does not corresponding to number of value types"
             ));
         }
-        for value_index in 0..number_of_values {
+        for value_index in 0..number_of_value_types {
             let header_value_type: EwfHeaderValueType = match value_types[value_index] {
                 // "a" => description
                 [0x0061] => EwfHeaderValueType::Description,

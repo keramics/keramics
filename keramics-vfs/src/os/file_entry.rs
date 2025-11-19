@@ -361,9 +361,7 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
         file_entry.open(&path_buf)?;
 
-        let result: Option<DataStreamReference> = file_entry.get_data_stream()?;
-
-        let data_stream: DataStreamReference = match result {
+        let data_stream: DataStreamReference = match file_entry.get_data_stream()? {
             Some(data_stream) => data_stream,
             None => {
                 return Err(keramics_core::error_trace_new!("Missing data stream"));

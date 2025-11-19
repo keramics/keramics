@@ -1009,7 +1009,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -1149,7 +1149,7 @@ mod tests {
         match ext_file_system.get_file_entry_by_path(&path)? {
             Some(ext_file_entry) => Ok(VfsFileEntry::Ext(ext_file_entry)),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path_string
             ))),
         }
@@ -1303,7 +1303,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -1528,7 +1528,7 @@ mod tests {
         match fat_file_system.get_file_entry_by_path(&path)? {
             Some(fat_file_entry) => Ok(VfsFileEntry::Fat(fat_file_entry)),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path_string
             ))),
         }
@@ -1664,7 +1664,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -1805,7 +1805,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -1945,7 +1945,7 @@ mod tests {
         match ntfs_file_system.get_file_entry_by_path(&path)? {
             Some(ntfs_file_entry) => Ok(VfsFileEntry::Ntfs(ntfs_file_entry)),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path_string
             ))),
         }
@@ -2078,7 +2078,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -2195,7 +2195,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -2336,7 +2336,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -2480,7 +2480,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -2621,7 +2621,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
@@ -2762,7 +2762,7 @@ mod tests {
         match vfs_file_system.get_file_entry_by_path(&path)? {
             Some(file_entry) => Ok(file_entry),
             None => Err(keramics_core::error_trace_new!(format!(
-                "No such file entry: {}",
+                "Missing file entry: {}",
                 path
             ))),
         }
