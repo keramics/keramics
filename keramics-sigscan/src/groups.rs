@@ -30,7 +30,7 @@ impl ByteValueGroup {
     /// Creates a new byte value group.
     pub fn new(pattern_offset: usize) -> Self {
         Self {
-            pattern_offset: pattern_offset,
+            pattern_offset,
             signature_groups: HashMap::new(),
         }
     }
@@ -84,7 +84,7 @@ impl SignatureGroup {
     /// Creates a new signature group.
     pub fn new(byte_value: u8) -> Self {
         Self {
-            byte_value: byte_value,
+            byte_value,
             signatures: Vec::new(),
         }
     }

@@ -86,7 +86,7 @@ impl ExtDirectoryEntries {
         &mut self,
         data_stream: &DataStreamReference,
         block_size: u32,
-        block_ranges: &Vec<ExtBlockRange>,
+        block_ranges: &[ExtBlockRange],
     ) -> Result<(), ErrorTrace> {
         let mut directory_tree: ExtDirectoryTree =
             ExtDirectoryTree::new(&self.encoding, block_size);
@@ -226,7 +226,7 @@ mod tests {
 
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let block_ranges: &Vec<ExtBlockRange> = &vec![ExtBlockRange {
+        let block_ranges: Vec<ExtBlockRange> = vec![ExtBlockRange {
             logical_block_number: 0,
             physical_block_number: 0,
             number_of_blocks: 1,

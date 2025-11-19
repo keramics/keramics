@@ -257,7 +257,7 @@ impl<'a> DecoderMacDingbats<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -519,7 +519,7 @@ impl<'a> EncoderMacDingbats<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -536,28 +536,20 @@ impl<'a> Iterator for EncoderMacDingbats<'a> {
 
                 match *code_point {
                     0x0000..=0x0020 | 0x007f => Some(Ok(vec![*code_point as u8])),
-                    0x2460..0x2470 => {
-                        match Self::BASE_0X2460[(*code_point as u32 - 0x2460) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacDingbats",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2700..0x27c0 => {
-                        match Self::BASE_0X2700[(*code_point as u32 - 0x2700) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacDingbats",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x2460..0x2470 => match Self::BASE_0X2460[(*code_point - 0x2460) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacDingbats",
+                            *code_point
+                        )))),
+                    },
+                    0x2700..0x27c0 => match Self::BASE_0X2700[(*code_point - 0x2700) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacDingbats",
+                            *code_point
+                        )))),
+                    },
                     0x2192 => Some(Ok(vec![0xd5])),
                     0x2194 => Some(Ok(vec![0xd6])),
                     0x2195 => Some(Ok(vec![0xd7])),
@@ -575,12 +567,10 @@ impl<'a> Iterator for EncoderMacDingbats<'a> {
                     0x2663 => Some(Ok(vec![0xa8])),
                     0x2665 => Some(Ok(vec![0xaa])),
                     0x2666 => Some(Ok(vec![0xa9])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacDingbats",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacDingbats",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::fmt;
+
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
 /// 16-bit Unicode Transformation Format (UTF-16) string.
@@ -40,7 +42,7 @@ impl Utf16String {
             }
             elements.push(value_16bit);
         }
-        Self { elements: elements }
+        Self { elements }
     }
 
     /// Reads a little-endian UTF-16 string from a byte sequence.
@@ -55,13 +57,16 @@ impl Utf16String {
             }
             elements.push(value_16bit);
         }
-        Self { elements: elements }
+        Self { elements }
     }
+}
 
-    /// Converts the UTF-16 string to a `String`.
-    // TODO: change to use fmt::Display
-    pub fn to_string(&self) -> String {
-        String::from_utf16(&self.elements).unwrap()
+impl fmt::Display for Utf16String {
+    /// Formats the UTF-16 string for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let string: String = String::from_utf16(&self.elements).unwrap();
+
+        write!(formatter, "{}", string)
     }
 }
 
@@ -90,4 +95,6 @@ mod tests {
         let ucs2_string: Utf16String = Utf16String::from_le_bytes(&test_data);
         assert_eq!(ucs2_string.to_string(), String::from("UTF-16 string"));
     }
+
+    // TODO: add tests for to_string()
 }

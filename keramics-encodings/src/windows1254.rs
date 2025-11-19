@@ -75,7 +75,7 @@ impl<'a> DecoderWindows1254<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -202,7 +202,7 @@ impl<'a> EncoderWindows1254<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -219,28 +219,20 @@ impl<'a> Iterator for EncoderWindows1254<'a> {
 
                 match *code_point {
                     0x0000..0x0080 | 0x00a0..0x00d0 => Some(Ok(vec![*code_point as u8])),
-                    0x00d0..0x0100 => {
-                        match Self::BASE_0X00D0[(*code_point as u32 - 0x00d0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 1254",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2028 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 1254",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00d0..0x0100 => match Self::BASE_0X00D0[(*code_point - 0x00d0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 1254",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2028 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 1254",
+                            *code_point
+                        )))),
+                    },
                     0x011e => Some(Ok(vec![0xd0])),
                     0x011f => Some(Ok(vec![0xf0])),
                     0x0130 => Some(Ok(vec![0xdd])),
@@ -260,12 +252,10 @@ impl<'a> Iterator for EncoderWindows1254<'a> {
                     0x203a => Some(Ok(vec![0x9b])),
                     0x20ac => Some(Ok(vec![0x80])),
                     0x2122 => Some(Ok(vec![0x99])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as Windows 1254",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as Windows 1254",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

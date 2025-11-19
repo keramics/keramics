@@ -36,12 +36,12 @@ pub(crate) struct StructureLayoutBitField {
 
 impl StructureLayoutBitField {
     /// Creates a new bitfield.
-    pub fn new(name: &String, number_of_bits: usize, modifier: &String, format: Format) -> Self {
+    pub fn new(name: &str, number_of_bits: usize, modifier: &str, format: Format) -> Self {
         Self {
-            name: name.clone(),
-            number_of_bits: number_of_bits,
-            modifier: modifier.clone(),
-            format: format,
+            name: name.to_string(),
+            number_of_bits,
+            modifier: modifier.to_string(),
+            format,
         }
     }
 
@@ -50,9 +50,10 @@ impl StructureLayoutBitField {
         match self.format {
             Format::Hexadecimal => {
                 let number_of_nibbles: usize = self.number_of_bits.div_ceil(4);
+
                 format!("0x{{:0{}x}}", number_of_nibbles)
             }
-            _ => format!("{{}}"),
+            _ => String::from("{}"),
         }
     }
 
@@ -84,8 +85,8 @@ impl StructureLayoutBitFieldsGroup {
     /// Creates a new group.
     pub fn new(data_type: DataType, byte_order: ByteOrder) -> Self {
         Self {
-            data_type: data_type,
-            byte_order: byte_order,
+            data_type,
+            byte_order,
             bitfields: Vec::new(),
         }
     }
@@ -120,29 +121,29 @@ impl StructureLayoutBitFieldsGroup {
     ) -> TokenStream {
         match &self.data_type {
             DataType::BitField8 => quote!(data[#data_offset]),
-            DataType::BitField16 => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::BitField16 => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_u16_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_u16_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::BitField32 => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::BitField32 => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_u32_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_u32_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::BitField64 => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::BitField64 => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_u64_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_u64_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
@@ -184,18 +185,18 @@ pub(crate) struct StructureLayoutField {
 impl StructureLayoutField {
     /// Creates a new field.
     pub fn new(
-        name: &String,
+        name: &str,
         data_type: DataType,
         byte_order: ByteOrder,
-        modifier: &String,
+        modifier: &str,
         format: Format,
     ) -> Self {
         Self {
-            name: name.clone(),
-            data_type: data_type,
-            byte_order: byte_order,
-            modifier: modifier.clone(),
-            format: format,
+            name: name.to_string(),
+            data_type,
+            byte_order,
+            modifier: modifier.to_string(),
+            format,
         }
     }
 
@@ -204,10 +205,8 @@ impl StructureLayoutField {
         if self.byte_order != ByteOrder::NotSet {
             return self.byte_order.clone();
         }
-        if self.requires_byte_order() {
-            if parent_byte_order == &ByteOrder::NotSet {
-                panic!("Byte order missing in field: {}", self.name);
-            }
+        if self.requires_byte_order() && *parent_byte_order == ByteOrder::NotSet {
+            panic!("Byte order missing in field: {}", self.name);
         }
         parent_byte_order.clone()
     }
@@ -252,7 +251,7 @@ impl StructureLayoutField {
 
         let field_format_string: String = match self.format {
             Format::Hexadecimal => format!("0x{{:0{}x}}", value_data_size * 2),
-            _ => format!("{{}}"),
+            _ => String::from("{}"),
         };
         match &self.data_type {
             DataType::Struct { .. } => {
@@ -271,7 +270,7 @@ impl StructureLayoutField {
 
                 let quote_data_offset = quote!(#data_offset_literal);
                 let quote_from_bytes: TokenStream =
-                    self.get_from_bytes_token_stream(&byte_order, quote_data_offset);
+                    self.get_from_bytes_token_stream(byte_order, quote_data_offset);
                 let field_modifier: TokenStream = self.get_modifier_token_stream();
 
                 let format_string: String =
@@ -353,11 +352,11 @@ impl StructureLayoutField {
             _ => {
                 let field_format_string: String = match self.format {
                     Format::Hexadecimal => format!("0x{{:0{}x}}", element_data_size * 2),
-                    _ => format!("{{}}"),
+                    _ => String::from("{}"),
                 };
                 let quote_data_offset = quote!(data_offset);
                 let quote_from_bytes: TokenStream =
-                    self.get_from_bytes_token_stream(&byte_order, quote_data_offset);
+                    self.get_from_bytes_token_stream(byte_order, quote_data_offset);
                 let quote_format = match self.format {
                     Format::Character => {
                         quote!(format!(#field_format_string, #field_name as char))
@@ -396,11 +395,11 @@ impl StructureLayoutField {
             DataType::Filetime => {
                 quote!(keramics_datetime::Filetime::from_bytes(&data[#data_offset..#data_offset + 8]))
             }
-            DataType::PosixTime32 => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::PosixTime32 => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_datetime::PosixTime32::from_be_bytes(&data[#data_offset..#data_offset + 4]))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_datetime::PosixTime32::from_le_bytes(&data[#data_offset..#data_offset + 4]))
                 }
                 _ => panic!("Unsupported byte order"),
@@ -408,65 +407,65 @@ impl StructureLayoutField {
             DataType::SignedInteger8Bit | DataType::UnsignedInteger8Bit => {
                 quote!(data[#data_offset])
             }
-            DataType::SignedInteger16Bit => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::SignedInteger16Bit => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_i16_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_i16_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::SignedInteger32Bit => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::SignedInteger32Bit => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_i32_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_i32_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::SignedInteger64Bit => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::SignedInteger64Bit => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_i64_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_i64_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::UnsignedInteger16Bit => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::UnsignedInteger16Bit => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_u16_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_u16_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::UnsignedInteger32Bit => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::UnsignedInteger32Bit => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_u32_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_u32_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::UnsignedInteger64Bit => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::UnsignedInteger64Bit => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::bytes_to_u64_be!(data, #data_offset))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::bytes_to_u64_le!(data, #data_offset))
                 }
                 _ => panic!("Unsupported byte order"),
             },
-            DataType::Uuid => match byte_order {
-                &ByteOrder::BigEndian => {
+            DataType::Uuid => match *byte_order {
+                ByteOrder::BigEndian => {
                     quote!(keramics_types::Uuid::from_be_bytes(&data[#data_offset..#data_offset + 16]))
                 }
-                &ByteOrder::LittleEndian => {
+                ByteOrder::LittleEndian => {
                     quote!(keramics_types::Uuid::from_le_bytes(&data[#data_offset..#data_offset + 16]))
                 }
                 _ => panic!("Unsupported byte order"),
@@ -516,10 +515,10 @@ impl StructureLayoutField {
 
     /// Determines if field requires a byte order.
     pub fn requires_byte_order(&self) -> bool {
-        match self.data_type {
-            DataType::SignedInteger8Bit | DataType::UnsignedInteger8Bit => false,
-            _ => true,
-        }
+        !matches!(
+            self.data_type,
+            DataType::SignedInteger8Bit | DataType::UnsignedInteger8Bit
+        )
     }
 }
 
@@ -534,9 +533,9 @@ pub(crate) struct StructureLayoutGroup {
 
 impl StructureLayoutGroup {
     /// Creates a new group.
-    pub fn new(condition: &String) -> Self {
+    pub fn new(condition: &str) -> Self {
         Self {
-            condition: condition.clone(),
+            condition: condition.to_string(),
             fields: Vec::new(),
         }
     }
@@ -580,8 +579,8 @@ impl StructureLayoutSequence {
     /// Creates a new sequence.
     pub fn new(element: StructureLayoutField, number_of_elements: usize) -> Self {
         Self {
-            element: element,
-            number_of_elements: number_of_elements,
+            element,
+            number_of_elements,
         }
     }
 
@@ -627,10 +626,10 @@ pub(crate) struct StructureLayout {
 
 impl StructureLayout {
     /// Creates a new layout.
-    pub fn new(name: &String, byte_order: ByteOrder) -> Self {
+    pub fn new(name: &str, byte_order: ByteOrder) -> Self {
         Self {
-            name: name.clone(),
-            byte_order: byte_order,
+            name: name.to_string(),
+            byte_order,
             members: Vec::new(),
         }
     }
@@ -732,8 +731,8 @@ impl StructureLayout {
                         Some(byte_size) => byte_size,
                         None => panic!("Unable to determine byte size of bitfields",),
                     };
-                    let debug_read_bitfields: TokenStream = self
-                        .generate_debug_read_bitfields(data_offset, &structure_layout_bitfields);
+                    let debug_read_bitfields: TokenStream =
+                        self.generate_debug_read_bitfields(data_offset, structure_layout_bitfields);
                     debug_read_fields.extend(debug_read_bitfields);
 
                     data_offset += value_data_size;
@@ -760,7 +759,7 @@ impl StructureLayout {
                 }
                 StructureLayoutMember::Group(structure_layout_group) => {
                     let debug_read_group: TokenStream =
-                        self.generate_debug_read_group(data_offset, &structure_layout_group);
+                        self.generate_debug_read_group(data_offset, structure_layout_group);
                     debug_read_fields.extend(debug_read_group);
 
                     let group_data_size = structure_layout_group.get_data_size();
@@ -887,13 +886,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
@@ -901,10 +900,10 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field2"),
+            "field2",
             DataType::UnsignedInteger16Bit,
             ByteOrder::LittleEndian,
-            &String::from("- 7"),
+            "- 7",
             Format::NotSet,
         );
         structure_layout
@@ -937,13 +936,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_sequence_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::UnsignedInteger64Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
@@ -951,10 +950,10 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field2"),
+            "field2",
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 64);
@@ -992,13 +991,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_string_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::UnsignedInteger64Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
@@ -1006,10 +1005,10 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field2"),
+            "field2",
             DataType::ByteString,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 32);
@@ -1043,25 +1042,17 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_bit_fields() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::LittleEndian);
+            StructureLayout::new("TestStruct", ByteOrder::LittleEndian);
 
         let mut group: StructureLayoutBitFieldsGroup =
             StructureLayoutBitFieldsGroup::new(DataType::BitField32, ByteOrder::NotSet);
 
-        let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
-            &String::from("field1"),
-            9,
-            &String::from(""),
-            Format::NotSet,
-        );
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 9, "", Format::NotSet);
         group.bitfields.push(bitfield);
 
-        let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
-            &String::from("field2"),
-            23,
-            &String::from(""),
-            Format::NotSet,
-        );
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 23, "", Format::NotSet);
         group.bitfields.push(bitfield);
 
         structure_layout
@@ -1104,27 +1095,26 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_group() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::UnsignedInteger64Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
             .members
             .push(StructureLayoutMember::Field(field));
 
-        let mut group: StructureLayoutGroup =
-            StructureLayoutGroup::new(&String::from("data.len() > 8"));
+        let mut group: StructureLayoutGroup = StructureLayoutGroup::new("data.len() > 8");
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field2"),
+            "field2",
             DataType::UnsignedInteger32Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         group.fields.push(field);
@@ -1160,13 +1150,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_struct_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::UnsignedInteger32Bit,
             ByteOrder::LittleEndian,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
@@ -1174,13 +1164,13 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field2"),
+            "field2",
             DataType::Struct {
                 name: String::from("MyStruct"),
                 size: 7,
             },
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
@@ -1214,13 +1204,13 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_struct_sequence_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::SignedInteger32Bit,
             ByteOrder::LittleEndian,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         structure_layout
@@ -1228,13 +1218,13 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field2"),
+            "field2",
             DataType::Struct {
                 name: String::from("MyStruct"),
                 size: 5,
             },
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 10);
@@ -1274,13 +1264,13 @@ mod tests {
     #[test]
     fn test_read_at_position() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new(&String::from("TestStruct"), ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
-            &String::from("field1"),
+            "field1",
             DataType::UnsignedInteger8Bit,
             ByteOrder::NotSet,
-            &String::from(""),
+            "",
             Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 16);

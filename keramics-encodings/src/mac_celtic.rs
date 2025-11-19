@@ -45,7 +45,7 @@ impl<'a> DecoderMacCeltic<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -243,7 +243,7 @@ impl<'a> EncoderMacCeltic<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -260,28 +260,20 @@ impl<'a> Iterator for EncoderMacCeltic<'a> {
 
                 match *code_point {
                     0x0000..0x0080 => Some(Ok(vec![*code_point as u8])),
-                    0x00a0..0x0100 => {
-                        match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCeltic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2048 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCeltic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00a0..0x0100 => match Self::BASE_0X00A0[(*code_point - 0x00a0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCeltic",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2048 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCeltic",
+                            *code_point
+                        )))),
+                    },
                     0x0131 => Some(Ok(vec![0xf5])),
                     0x0152 => Some(Ok(vec![0xce])),
                     0x0153 => Some(Ok(vec![0xcf])),
@@ -316,12 +308,10 @@ impl<'a> Iterator for EncoderMacCeltic<'a> {
                     0x2265 => Some(Ok(vec![0xb3])),
                     0x25ca => Some(Ok(vec![0xd7])),
                     0x2663 => Some(Ok(vec![0xf0])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacCeltic",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacCeltic",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

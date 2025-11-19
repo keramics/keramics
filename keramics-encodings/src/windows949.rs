@@ -18736,7 +18736,7 @@ impl<'a> DecoderWindows949<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -52413,7 +52413,7 @@ impl<'a> EncoderWindows949<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -52430,335 +52430,217 @@ impl<'a> Iterator for EncoderWindows949<'a> {
 
                 match *code_point {
                     0x0000..0x0080 => Some(Ok(vec![*code_point as u8])),
-                    0x00a0..0x0168 => {
-                        match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x02c0..0x02e0 => {
-                        match Self::BASE_0X02C0[(*code_point as u32 - 0x02c0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0390..0x03d0 => {
-                        match Self::BASE_0X0390[(*code_point as u32 - 0x0390) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0400..0x0458 => {
-                        match Self::BASE_0X0400[(*code_point as u32 - 0x0400) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2040 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2070..0x2088 => {
-                        match Self::BASE_0X2070[(*code_point as u32 - 0x2070) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x20ac => Some(Ok(vec![0xa2, 0xe6])),
-                    0x2100..0x21a0 => {
-                        match Self::BASE_0X2100[(*code_point as u32 - 0x2100) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x21d2 => Some(Ok(vec![0xa2, 0xa1])),
-                    0x21d4 => Some(Ok(vec![0xa2, 0xa2])),
-                    0x2200..0x22a8 => {
-                        match Self::BASE_0X2200[(*code_point as u32 - 0x2200) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2312 => Some(Ok(vec![0xa1, 0xd2])),
-                    0x2460..0x2550 => {
-                        match Self::BASE_0X2460[(*code_point as u32 - 0x2460) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2590..0x2670 => {
-                        match Self::BASE_0X2590[(*code_point as u32 - 0x2590) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x3000..0x30f8 => {
-                        match Self::BASE_0X3000[(*code_point as u32 - 0x3000) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x3130..0x3190 => {
-                        match Self::BASE_0X3130[(*code_point as u32 - 0x3130) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x3200..0x3220 => {
-                        match Self::BASE_0X3200[(*code_point as u32 - 0x3200) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x3260..0x3280 => {
-                        match Self::BASE_0X3260[(*code_point as u32 - 0x3260) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x3380..0x3400 => {
-                        match Self::BASE_0X3380[(*code_point as u32 - 0x3380) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x4e00..0x7ea0 => {
-                        match Self::BASE_0X4E00[(*code_point as u32 - 0x4e00) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x7f30..0x8ba0 => {
-                        match Self::BASE_0X7F30[(*code_point as u32 - 0x7f30) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x8c30..0x8d18 => {
-                        match Self::BASE_0X8C30[(*code_point as u32 - 0x8c30) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x8d60..0x9480 => {
-                        match Self::BASE_0X8D60[(*code_point as u32 - 0x8d60) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x9570..0x9870 => {
-                        match Self::BASE_0X9570[(*code_point as u32 - 0x9570) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x98a8..0x9958 => {
-                        match Self::BASE_0X98A8[(*code_point as u32 - 0x98a8) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x9990..0x9a70 => {
-                        match Self::BASE_0X9990[(*code_point as u32 - 0x9990) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x9aa8..0x9c58 => {
-                        match Self::BASE_0X9AA8[(*code_point as u32 - 0x9aa8) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x9ce0..0x9e20 => {
-                        match Self::BASE_0X9CE0[(*code_point as u32 - 0x9ce0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x9e70..0x9fa0 => {
-                        match Self::BASE_0X9E70[(*code_point as u32 - 0x9e70) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0xac00..0xd7a4 => {
-                        match Self::BASE_0XAC00[(*code_point as u32 - 0xac00) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0xf900..0xfa0c => {
-                        match Self::BASE_0XF900[(*code_point as u32 - 0xf900) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0xff00..0xff60 => {
-                        match Self::BASE_0XFF00[(*code_point as u32 - 0xff00) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0xffe0..0xffe8 => {
-                        match Self::BASE_0XFFE0[(*code_point as u32 - 0xffe0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 949",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
+                    0x00a0..0x0168 => match Self::BASE_0X00A0[(*code_point - 0x00a0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as Windows 949",
                             *code_point
-                        ))));
-                    }
+                        )))),
+                    },
+                    0x02c0..0x02e0 => match Self::BASE_0X02C0[(*code_point - 0x02c0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x0390..0x03d0 => match Self::BASE_0X0390[(*code_point - 0x0390) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x0400..0x0458 => match Self::BASE_0X0400[(*code_point - 0x0400) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2040 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x2070..0x2088 => match Self::BASE_0X2070[(*code_point - 0x2070) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x20ac => Some(Ok(vec![0xa2, 0xe6])),
+                    0x2100..0x21a0 => match Self::BASE_0X2100[(*code_point - 0x2100) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x21d2 => Some(Ok(vec![0xa2, 0xa1])),
+                    0x21d4 => Some(Ok(vec![0xa2, 0xa2])),
+                    0x2200..0x22a8 => match Self::BASE_0X2200[(*code_point - 0x2200) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x2312 => Some(Ok(vec![0xa1, 0xd2])),
+                    0x2460..0x2550 => match Self::BASE_0X2460[(*code_point - 0x2460) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x2590..0x2670 => match Self::BASE_0X2590[(*code_point - 0x2590) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x3000..0x30f8 => match Self::BASE_0X3000[(*code_point - 0x3000) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x3130..0x3190 => match Self::BASE_0X3130[(*code_point - 0x3130) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x3200..0x3220 => match Self::BASE_0X3200[(*code_point - 0x3200) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x3260..0x3280 => match Self::BASE_0X3260[(*code_point - 0x3260) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x3380..0x3400 => match Self::BASE_0X3380[(*code_point - 0x3380) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x4e00..0x7ea0 => match Self::BASE_0X4E00[(*code_point - 0x4e00) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x7f30..0x8ba0 => match Self::BASE_0X7F30[(*code_point - 0x7f30) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x8c30..0x8d18 => match Self::BASE_0X8C30[(*code_point - 0x8c30) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x8d60..0x9480 => match Self::BASE_0X8D60[(*code_point - 0x8d60) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x9570..0x9870 => match Self::BASE_0X9570[(*code_point - 0x9570) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x98a8..0x9958 => match Self::BASE_0X98A8[(*code_point - 0x98a8) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x9990..0x9a70 => match Self::BASE_0X9990[(*code_point - 0x9990) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x9aa8..0x9c58 => match Self::BASE_0X9AA8[(*code_point - 0x9aa8) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x9ce0..0x9e20 => match Self::BASE_0X9CE0[(*code_point - 0x9ce0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0x9e70..0x9fa0 => match Self::BASE_0X9E70[(*code_point - 0x9e70) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0xac00..0xd7a4 => match Self::BASE_0XAC00[(*code_point - 0xac00) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0xf900..0xfa0c => match Self::BASE_0XF900[(*code_point - 0xf900) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0xff00..0xff60 => match Self::BASE_0XFF00[(*code_point - 0xff00) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    0xffe0..0xffe8 => match Self::BASE_0XFFE0[(*code_point - 0xffe0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 949",
+                            *code_point
+                        )))),
+                    },
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as Windows 949",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

@@ -50,7 +50,7 @@ impl AdcContext {
         let uncompressed_data_size: usize = uncompressed_data.len();
 
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("AdcContext {{\n",));
+            self.mediator.debug_print(String::from("AdcContext {\n"));
         }
         while compressed_data_offset < compressed_data_size {
             if uncompressed_data_offset >= uncompressed_data_size {
@@ -87,7 +87,8 @@ impl AdcContext {
                     uncompressed_data_offset + literal_size as usize;
 
                 if self.mediator.debug_output {
-                    self.mediator.debug_print(format!("    literal data:\n"));
+                    self.mediator
+                        .debug_print(String::from("    literal data:\n"));
                     self.mediator.debug_print_data(
                         &compressed_data[compressed_data_offset..compressed_data_end_offset],
                         true,
@@ -154,14 +155,14 @@ impl AdcContext {
                 if self.mediator.debug_output {
                     self.mediator
                         .debug_print(format!("    match offset: {}\n", match_offset));
-                    self.mediator.debug_print(format!("    match data:\n"));
+                    self.mediator.debug_print(String::from("    match data:\n"));
                     self.mediator
                         .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
                 }
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n",));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         self.uncompressed_data_size = uncompressed_data_offset;
 

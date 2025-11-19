@@ -44,8 +44,8 @@ impl HuffmanTree {
         let maximum_code_size: usize = largest_code_size + 1;
         Self {
             mediator: Mediator::current(),
-            largest_code_size: largest_code_size,
-            maximum_code_size: maximum_code_size,
+            largest_code_size,
+            maximum_code_size,
             symbols: vec![0; number_of_symbols],
             code_size_counts: vec![0; maximum_code_size],
         }

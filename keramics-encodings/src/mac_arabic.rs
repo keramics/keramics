@@ -45,7 +45,7 @@ impl<'a> DecoderMacArabic<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -406,7 +406,7 @@ impl<'a> EncoderMacArabic<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -426,33 +426,24 @@ impl<'a> Iterator for EncoderMacArabic<'a> {
                         Some(Ok(vec![*code_point as u8]))
                     }
                     0x0020..0x0040 => {
-                        let bytes: &[u8] =
-                            Self::BASE_0X0020[(*code_point as u32 - 0x0020) as usize];
+                        let bytes: &[u8] = Self::BASE_0X0020[(*code_point - 0x0020) as usize];
 
                         Some(Ok(bytes.to_vec()))
                     }
-                    0x00a0..0x0100 => {
-                        match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacArabic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0608..0x06c0 => {
-                        match Self::BASE_0X0608[(*code_point as u32 - 0x0608) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacArabic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00a0..0x0100 => match Self::BASE_0X00A0[(*code_point - 0x00a0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacArabic",
+                            *code_point
+                        )))),
+                    },
+                    0x0608..0x06c0 => match Self::BASE_0X0608[(*code_point - 0x0608) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacArabic",
+                            *code_point
+                        )))),
+                    },
                     0x005b => Some(Ok(vec![0xdb])),
                     0x005c => Some(Ok(vec![0xdc])),
                     0x005d => Some(Ok(vec![0xdd])),
@@ -465,12 +456,10 @@ impl<'a> Iterator for EncoderMacArabic<'a> {
                     0x06d5 => Some(Ok(vec![0xf6])),
                     0x2026 => Some(Ok(vec![0x93])),
                     0x274a => Some(Ok(vec![0xc0])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacArabic",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacArabic",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

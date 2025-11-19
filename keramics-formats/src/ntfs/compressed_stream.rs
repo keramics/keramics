@@ -309,7 +309,7 @@ impl NtfsCompressedStream {
                             }
                             self.block_cache.insert(range_offset, block_data);
                         }
-                        let block_data: &Vec<u8> = match self.block_cache.get(&range_offset) {
+                        let block_data: &[u8] = match self.block_cache.get(&range_offset) {
                             Some(data) => data,
                             None => {
                                 return Err(keramics_core::error_trace_new!(

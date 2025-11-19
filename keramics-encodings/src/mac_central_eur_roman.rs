@@ -45,7 +45,7 @@ impl<'a> DecoderMacCentralEurRoman<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -339,7 +339,7 @@ impl<'a> EncoderMacCentralEurRoman<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -356,28 +356,20 @@ impl<'a> Iterator for EncoderMacCentralEurRoman<'a> {
 
                 match *code_point {
                     0x0000..0x0080 => Some(Ok(vec![*code_point as u8])),
-                    0x00a0..0x0180 => {
-                        match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCentralEurRoman",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2028 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCentralEurRoman",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00a0..0x0180 => match Self::BASE_0X00A0[(*code_point - 0x00a0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCentralEurRoman",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2028 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCentralEurRoman",
+                            *code_point
+                        )))),
+                    },
                     0x02c7 => Some(Ok(vec![0xff])),
                     0x2039 => Some(Ok(vec![0xdc])),
                     0x203a => Some(Ok(vec![0xdd])),
@@ -390,12 +382,10 @@ impl<'a> Iterator for EncoderMacCentralEurRoman<'a> {
                     0x2264 => Some(Ok(vec![0xb2])),
                     0x2265 => Some(Ok(vec![0xb3])),
                     0x25ca => Some(Ok(vec![0xd7])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacCentralEurRoman",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacCentralEurRoman",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

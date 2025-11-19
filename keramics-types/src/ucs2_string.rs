@@ -41,9 +41,9 @@ impl Ucs2String {
                 Some(&value) => value,
                 None => *element,
             })
-            .collect();
+            .collect::<Vec<u16>>();
 
-        Self { elements: elements }
+        Self { elements }
     }
 
     /// Creates a new UCS-2 string from a byte sequence in big-endian.
@@ -58,7 +58,7 @@ impl Ucs2String {
             }
             elements.push(value_16bit);
         }
-        Self { elements: elements }
+        Self { elements }
     }
 
     /// Creates a new UCS-2 string from a byte sequence in little-endian.
@@ -73,7 +73,7 @@ impl Ucs2String {
             }
             elements.push(value_16bit);
         }
-        Self { elements: elements }
+        Self { elements }
     }
 
     /// Determines if the UCS-2 string is empty.
@@ -134,10 +134,10 @@ impl From<&[u16]> for Ucs2String {
     fn from(slice: &[u16]) -> Self {
         let elements: &[u16] = match slice.iter().position(|ucs2_value| *ucs2_value == 0) {
             Some(slice_index) => &slice[0..slice_index],
-            None => &slice,
+            None => slice,
         };
         Self {
-            elements: Vec::from(elements),
+            elements: elements.to_vec(),
         }
     }
 }
@@ -145,8 +145,9 @@ impl From<&[u16]> for Ucs2String {
 impl From<&str> for Ucs2String {
     /// Converts a [`&str`] into a [`Ucs2String`]
     fn from(string: &str) -> Self {
-        let elements: Vec<u16> = string.encode_utf16().collect::<Vec<u16>>();
-        Self { elements: elements }
+        Self {
+            elements: string.encode_utf16().collect::<Vec<u16>>(),
+        }
     }
 }
 
@@ -155,14 +156,6 @@ impl From<&String> for Ucs2String {
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::from(string.as_str())
-    }
-}
-
-impl From<&Vec<u16>> for Ucs2String {
-    /// Converts a [`&Vec<u16>`] into a [`Ucs2String`]
-    #[inline(always)]
-    fn from(vector: &Vec<u16>) -> Self {
-        Self::from(vector.as_slice())
     }
 }
 
@@ -330,21 +323,6 @@ mod tests {
     fn test_from_string() {
         let test_string: String = String::from("UCS-2 string");
         let ucs2_string: Ucs2String = Ucs2String::from(&test_string);
-
-        let expected_elements: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067,
-        ];
-        assert_eq!(ucs2_string.elements, expected_elements);
-    }
-
-    #[test]
-    fn test_from_vector() {
-        let test_vector: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067, 0x0000, 0x0000,
-        ];
-        let ucs2_string: Ucs2String = Ucs2String::from(&test_vector);
 
         let expected_elements: Vec<u16> = vec![
             0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,

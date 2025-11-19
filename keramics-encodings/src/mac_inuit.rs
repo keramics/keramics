@@ -45,7 +45,7 @@ impl<'a> DecoderMacInuit<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -441,7 +441,7 @@ impl<'a> EncoderMacInuit<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -458,50 +458,34 @@ impl<'a> Iterator for EncoderMacInuit<'a> {
 
                 match *code_point {
                     0x0000..0x0080 | 0x00a9 => Some(Ok(vec![*code_point as u8])),
-                    0x1430..0x1508 => {
-                        match Self::BASE_0X1430[(*code_point as u32 - 0x1430) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacInuit",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x1528..0x1560 => {
-                        match Self::BASE_0X1528[(*code_point as u32 - 0x1528) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacInuit",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x1578..0x15a8 => {
-                        match Self::BASE_0X1578[(*code_point as u32 - 0x1578) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacInuit",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2028 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacInuit",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x1430..0x1508 => match Self::BASE_0X1430[(*code_point - 0x1430) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacInuit",
+                            *code_point
+                        )))),
+                    },
+                    0x1528..0x1560 => match Self::BASE_0X1528[(*code_point - 0x1528) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacInuit",
+                            *code_point
+                        )))),
+                    },
+                    0x1578..0x15a8 => match Self::BASE_0X1578[(*code_point - 0x1578) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacInuit",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2028 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacInuit",
+                            *code_point
+                        )))),
+                    },
                     0x00a0 => Some(Ok(vec![0xca])),
                     0x00ae => Some(Ok(vec![0xa8])),
                     0x00b0 => Some(Ok(vec![0xa1])),
@@ -521,12 +505,10 @@ impl<'a> Iterator for EncoderMacInuit<'a> {
                     0x1675 => Some(Ok(vec![0xf3])),
                     0x1676 => Some(Ok(vec![0xf4])),
                     0x2122 => Some(Ok(vec![0xaa])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacInuit",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacInuit",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

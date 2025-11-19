@@ -55,9 +55,9 @@ impl<'a> Bzip2Bitstream<'a> {
     pub fn new(data: &'a [u8], data_offset: usize) -> Self {
         let data_size: usize = data.len();
         Self {
-            data: data,
-            data_offset: data_offset,
-            data_size: data_size,
+            data,
+            data_offset,
+            data_size,
             bits: 0,
             number_of_bits: 0,
         }
@@ -171,7 +171,7 @@ impl Bzip2StreamHeader {
         }
         let compression_level: u8 = data[3];
 
-        if compression_level < 0x31 || compression_level > 0x39 {
+        if !(0x31..=0x39).contains(&compression_level) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported compression level: {}",
                 compression_level as char
@@ -230,7 +230,7 @@ impl Bzip2BlockHeader {
         let mediator = Mediator::current();
         if mediator.debug_output {
             let mut string_parts: Vec<String> = Vec::new();
-            string_parts.push(format!("Bzip2BlockHeader {{\n"));
+            string_parts.push(String::from("Bzip2BlockHeader {\n"));
             string_parts.push(format!("    signature: 0x{:012x},\n", self.signature));
             string_parts.push(format!("    checksum: 0x{:08x},\n", self.checksum));
 
@@ -241,7 +241,7 @@ impl Bzip2BlockHeader {
                     self.origin_pointer
                 ));
             }
-            string_parts.push(format!("}}\n\n"));
+            string_parts.push(String::from("}\n\n"));
 
             mediator.debug_print(string_parts.join(""));
         }
@@ -295,7 +295,7 @@ impl Bzip2Context {
         }
         data_header.read_data(compressed_data)?;
 
-        let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&compressed_data, 4);
+        let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(compressed_data, 4);
         self.decompress_bitstream(&mut bitstream, uncompressed_data)?;
 
         Ok(())
@@ -331,7 +331,8 @@ impl Bzip2Context {
             let number_of_selectors: u32 = bitstream.get_value(15);
 
             if self.mediator.debug_output {
-                self.mediator.debug_print(format!("Bzip2Bitstream {{\n",));
+                self.mediator
+                    .debug_print(String::from("Bzip2Bitstream {\n"));
                 self.mediator
                     .debug_print(format!("    number_of_symbols: {}\n", number_of_symbols));
                 self.mediator
@@ -340,7 +341,7 @@ impl Bzip2Context {
                     "    number_of_selectors: {}\n",
                     number_of_selectors
                 ));
-                self.mediator.debug_print(format!("}}\n\n",));
+                self.mediator.debug_print(String::from("}\n\n"));
             }
             self.read_selectors(
                 bitstream,
@@ -411,7 +412,8 @@ impl Bzip2Context {
         let mut tree_index: usize = selectors[0] as usize;
 
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("Bzip2BlockData {{\n",));
+            self.mediator
+                .debug_print(String::from("Bzip2BlockData {\n"));
         }
         loop {
             if tree_index >= number_of_trees {
@@ -457,7 +459,7 @@ impl Bzip2Context {
                 break;
             }
             if symbol == 0 || symbol == 1 {
-                run_length_value |= (symbol as u64) << (number_of_run_length_symbols as u64);
+                run_length_value |= (symbol as u64) << number_of_run_length_symbols;
                 number_of_run_length_symbols += 1;
 
                 if self.mediator.debug_output {
@@ -496,7 +498,7 @@ impl Bzip2Context {
             }
             symbol_index += 1;
 
-            if symbol_index % 50 == 0 {
+            if symbol_index.is_multiple_of(50) {
                 let selector_index: usize = symbol_index / 50;
 
                 if selector_index > number_of_selectors {
@@ -509,7 +511,7 @@ impl Bzip2Context {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("}}\n\n",));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         Ok(block_data_offset)
     }
@@ -609,7 +611,8 @@ impl Bzip2Context {
             selector_index += 1;
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("Bzip2Selectors {{\n",));
+            self.mediator
+                .debug_print(String::from("Bzip2Selectors {\n"));
 
             let array_parts: Vec<String> = selectors
                 .iter()
@@ -619,7 +622,7 @@ impl Bzip2Context {
                 "    selectors: {},",
                 debug_format_array(&array_parts),
             ));
-            self.mediator.debug_print(format!("}}\n\n",));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         Ok(())
     }
@@ -635,10 +638,12 @@ impl Bzip2Context {
         let mut symbol_index: usize = 0;
 
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("Bzip2SymbolStack {{\n",));
+            self.mediator
+                .debug_print(String::from("Bzip2SymbolStack {\n"));
             self.mediator
                 .debug_print(format!("    level1_value: 0x{:04x},\n", level1_value,));
-            self.mediator.debug_print(format!("    level2_values: [",));
+            self.mediator
+                .debug_print(String::from("    level2_values: ["));
         }
         for level1_bit_index in 0..16 {
             if level1_value & level1_bitmask != 0 {
@@ -647,7 +652,7 @@ impl Bzip2Context {
 
                 if self.mediator.debug_output {
                     if level1_bit_index > 0 {
-                        self.mediator.debug_print(format!(", "));
+                        self.mediator.debug_print(String::from(", "));
                     }
                     self.mediator.debug_print(format!("0x{:04x}", level2_value));
                 }
@@ -669,15 +674,15 @@ impl Bzip2Context {
             level1_bitmask >>= 1;
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!("],\n",));
+            self.mediator.debug_print(String::from("],\n"));
             // TODO: move to a debug_format_array like function.
             self.mediator
                 .debug_print(format!("    symbols: [0x{:02x}", symbol_stack[0]));
             for symbol in &symbol_stack[1..symbol_index] {
                 self.mediator.debug_print(format!(", 0x{:02x}", symbol));
             }
-            self.mediator.debug_print(format!("],\n",));
-            self.mediator.debug_print(format!("}}\n\n",));
+            self.mediator.debug_print(String::from("],\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         Ok(symbol_index + 2)
     }

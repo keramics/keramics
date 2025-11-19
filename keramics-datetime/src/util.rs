@@ -54,12 +54,12 @@ const fn calculate_days_in_year_lookup_table() -> [i16; 10000] {
     lookup_table
 }
 
-const DAYS_IN_YEAR: [i16; 10000] = calculate_days_in_year_lookup_table();
+static DAYS_IN_YEAR: [i16; 10000] = calculate_days_in_year_lookup_table();
 
 /// Retrieves the number of days in a specific year.
 #[inline(always)]
 fn get_days_in_year(year: i16) -> i16 {
-    if year >= 0 && year <= 10000 {
+    if (0..=10000).contains(&year) {
         DAYS_IN_YEAR[year as usize]
     } else if is_leap_year(year) {
         366
@@ -91,7 +91,7 @@ const DAYS_IN_CENTURY: [i32; 100] = calculate_days_in_century_lookup_table();
 /// Retrieves the number of days in a specific century.
 #[inline(always)]
 fn get_days_in_century(year: i16) -> i32 {
-    if year >= 0 && year <= 10000 {
+    if (0..=10000).contains(&year) {
         DAYS_IN_CENTURY[(year / 100) as usize]
     } else if is_leap_year(year) {
         36525
@@ -111,7 +111,7 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
     if before_epoch {
         month -= 1;
 
-        if month <= 0 {
+        if month == 0 {
             month = 12;
             year -= 1;
         }
@@ -177,7 +177,7 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
         } else {
             month += 1;
         }
-        if month <= 0 {
+        if month == 0 {
             month = 12;
             year -= 1;
         } else if month > 12 {

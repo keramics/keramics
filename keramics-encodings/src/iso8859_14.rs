@@ -42,7 +42,7 @@ impl<'a> DecoderIso8859_14<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -171,7 +171,7 @@ impl<'a> EncoderIso8859_14<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -188,39 +188,27 @@ impl<'a> Iterator for EncoderIso8859_14<'a> {
 
                 match *code_point {
                     0x0000..0x00a1 => Some(Ok(vec![*code_point as u8])),
-                    0x00c0..0x0100 => {
-                        match Self::BASE_0X00C0[(*code_point as u32 - 0x00c0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as ISO-8859-14",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0170..0x0178 => {
-                        match Self::BASE_0X0170[(*code_point as u32 - 0x0170) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as ISO-8859-14",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x1e80..0x1e88 => {
-                        match Self::BASE_0X1E80[(*code_point as u32 - 0x1e80) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as ISO-8859-14",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00c0..0x0100 => match Self::BASE_0X00C0[(*code_point - 0x00c0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as ISO-8859-14",
+                            *code_point
+                        )))),
+                    },
+                    0x0170..0x0178 => match Self::BASE_0X0170[(*code_point - 0x0170) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as ISO-8859-14",
+                            *code_point
+                        )))),
+                    },
+                    0x1e80..0x1e88 => match Self::BASE_0X1E80[(*code_point - 0x1e80) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as ISO-8859-14",
+                            *code_point
+                        )))),
+                    },
                     0x00a3 => Some(Ok(vec![0xa3])),
                     0x00a7 => Some(Ok(vec![0xa7])),
                     0x00a9 => Some(Ok(vec![0xa9])),
@@ -248,12 +236,10 @@ impl<'a> Iterator for EncoderIso8859_14<'a> {
                     0x1e6b => Some(Ok(vec![0xf7])),
                     0x1ef2 => Some(Ok(vec![0xac])),
                     0x1ef3 => Some(Ok(vec![0xbc])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as ISO-8859-14",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as ISO-8859-14",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

@@ -61,12 +61,12 @@ impl<'a> ScanContext<'a> {
         let unbound_range_size: usize = range_end_offset - range_start_offset;
 
         Self {
-            scanner: scanner,
+            scanner,
             data_offset: 0,
-            data_size: data_size,
+            data_size,
             header_range_size: header_end_offset as u64,
             footer_range_size: footer_end_offset as u64,
-            unbound_range_size: unbound_range_size,
+            unbound_range_size,
             results: HashMap::new(),
         }
     }
@@ -147,20 +147,12 @@ impl<'a> ScanContext<'a> {
             self.scan_buffer_with_scan_tree(&self.scanner.header_scan_tree, buffer, 0, buffer_size);
         }
         let next_data_offset: u64 = self.data_offset + buffer_size as u64;
+        let footer_start_offset: u64 = self.data_size.saturating_sub(self.footer_range_size);
 
-        let footer_start_offset: u64 = if self.footer_range_size <= self.data_size {
-            self.data_size - self.footer_range_size
-        } else {
-            0
-        };
         if next_data_offset >= footer_start_offset {
             let remaining_data_size: usize = (next_data_offset - footer_start_offset) as usize;
+            let buffer_start_offset: usize = buffer_size.saturating_sub(remaining_data_size);
 
-            let buffer_start_offset: usize = if remaining_data_size < buffer_size {
-                buffer_size - remaining_data_size
-            } else {
-                0
-            };
             self.scan_buffer_with_scan_tree(
                 &self.scanner.footer_scan_tree,
                 buffer,

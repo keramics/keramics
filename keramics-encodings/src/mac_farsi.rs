@@ -45,7 +45,7 @@ impl<'a> DecoderMacFarsi<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -412,7 +412,7 @@ impl<'a> EncoderMacFarsi<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -431,53 +431,37 @@ impl<'a> Iterator for EncoderMacFarsi<'a> {
                     0x0000..0x0020 | 0x0040..0x005b | 0x0060..0x007b | 0x007e..0x0080 => {
                         Some(Ok(vec![*code_point as u8]))
                     }
-                    0x0020..0x0040 => Some(Ok(Self::BASE_0X0020
-                        [(*code_point as u32 - 0x0020) as usize]
-                        .to_vec())),
-                    0x00a0..0x0100 => {
-                        match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacFarsi",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0608..0x0658 => {
-                        match Self::BASE_0X0608[(*code_point as u32 - 0x0608) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacFarsi",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0668..0x06c0 => {
-                        match Self::BASE_0X0668[(*code_point as u32 - 0x0668) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacFarsi",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x06f0..0x0700 => {
-                        match Self::BASE_0X06F0[(*code_point as u32 - 0x06f0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacFarsi",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x0020..0x0040 => Some(Ok(
+                        Self::BASE_0X0020[(*code_point - 0x0020) as usize].to_vec()
+                    )),
+                    0x00a0..0x0100 => match Self::BASE_0X00A0[(*code_point - 0x00a0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacFarsi",
+                            *code_point
+                        )))),
+                    },
+                    0x0608..0x0658 => match Self::BASE_0X0608[(*code_point - 0x0608) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacFarsi",
+                            *code_point
+                        )))),
+                    },
+                    0x0668..0x06c0 => match Self::BASE_0X0668[(*code_point - 0x0668) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacFarsi",
+                            *code_point
+                        )))),
+                    },
+                    0x06f0..0x0700 => match Self::BASE_0X06F0[(*code_point - 0x06f0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacFarsi",
+                            *code_point
+                        )))),
+                    },
                     0x005b => Some(Ok(vec![0xdb])),
                     0x005c => Some(Ok(vec![0xdc])),
                     0x005d => Some(Ok(vec![0xdd])),
@@ -490,12 +474,10 @@ impl<'a> Iterator for EncoderMacFarsi<'a> {
                     0x06d5 => Some(Ok(vec![0xf6])),
                     0x2026 => Some(Ok(vec![0x93])),
                     0x274a => Some(Ok(vec![0xc0])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacFarsi",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacFarsi",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

@@ -45,7 +45,7 @@ impl<'a> DecoderKoi8U<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -195,7 +195,7 @@ impl<'a> EncoderKoi8U<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -212,28 +212,20 @@ impl<'a> Iterator for EncoderKoi8U<'a> {
 
                 match *code_point {
                     0x0000..0x0080 => Some(Ok(vec![*code_point as u8])),
-                    0x0410..0x0458 => {
-                        match Self::BASE_0X0410[(*code_point as u32 - 0x0410) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as KOI8-U",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2550..0x2570 => {
-                        match Self::BASE_0X2550[(*code_point as u32 - 0x2550) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as KOI8-U",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x0410..0x0458 => match Self::BASE_0X0410[(*code_point - 0x0410) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as KOI8-U",
+                            *code_point
+                        )))),
+                    },
+                    0x2550..0x2570 => match Self::BASE_0X2550[(*code_point - 0x2550) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as KOI8-U",
+                            *code_point
+                        )))),
+                    },
                     0x00a0 => Some(Ok(vec![0x9a])),
                     0x00a9 => Some(Ok(vec![0xbf])),
                     0x00b0 => Some(Ok(vec![0x9c])),
@@ -273,12 +265,10 @@ impl<'a> Iterator for EncoderKoi8U<'a> {
                     0x2592 => Some(Ok(vec![0x91])),
                     0x2593 => Some(Ok(vec![0x92])),
                     0x25a0 => Some(Ok(vec![0x94])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as KOI8-U",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as KOI8-U",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

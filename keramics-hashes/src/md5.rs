@@ -92,8 +92,8 @@ impl Md5Context {
         let mut values_32bit: [u32; 16] = [0; 16];
 
         // Break the block of data into 16 x 32-bit little-endian values
-        for value_index in 0..16 {
-            values_32bit[value_index] = bytes_to_u32_le!(data, data_offset);
+        for value_32bit in &mut values_32bit {
+            *value_32bit = bytes_to_u32_le!(data, data_offset);
 
             data_offset += 4;
         }
@@ -154,8 +154,7 @@ impl DigestHashContext for Md5Context {
         let hash: Vec<u8> = self
             .hash_values
             .iter()
-            .map(|hash_value| hash_value.to_le_bytes())
-            .flatten()
+            .flat_map(|hash_value| hash_value.to_le_bytes())
             .collect::<Vec<u8>>();
 
         self.hash_values = MD5_HASH_VALUES;
@@ -191,7 +190,7 @@ impl DigestHashContext for Md5Context {
             }
         }
         while data_offset + MD5_BLOCK_SIZE < data_size {
-            let hash_values: [u32; 4] = self.transform_block(&self.hash_values, &data, data_offset);
+            let hash_values: [u32; 4] = self.transform_block(&self.hash_values, data, data_offset);
 
             self.hash_values.copy_from_slice(&hash_values);
             self.number_of_bytes_hashed += MD5_BLOCK_SIZE as u64;

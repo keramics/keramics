@@ -433,8 +433,7 @@ impl EwfImage {
                         }
                         self.block_cache.insert(block_range.data_offset, block_data);
                     }
-                    let range_data: &Vec<u8> = match self.block_cache.get(&block_range.data_offset)
-                    {
+                    let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
                         Some(data) => data,
                         None => {
                             return Err(keramics_core::error_trace_new!(

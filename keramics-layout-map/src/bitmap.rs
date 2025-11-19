@@ -21,8 +21,8 @@ pub(crate) struct BitmapLayout {
 impl BitmapLayout {
     pub fn new(data_type: DataType, bit_order: BitOrder) -> Self {
         Self {
-            data_type: data_type,
-            bit_order: bit_order,
+            data_type,
+            bit_order,
         }
     }
 }

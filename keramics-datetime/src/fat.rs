@@ -25,13 +25,13 @@ pub struct FatDate {
 impl FatDate {
     /// Creates a new timestamp.
     pub fn new(date: u16) -> Self {
-        Self { date: date }
+        Self { date }
     }
 
     /// Reads a timestamp from a byte sequence.
     pub fn from_bytes(data: &[u8]) -> Self {
         let date: u16 = bytes_to_u16_le!(data, 0);
-        Self { date: date }
+        Self { date }
     }
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
@@ -69,20 +69,14 @@ pub struct FatTimeDate {
 impl FatTimeDate {
     /// Creates a new timestamp.
     pub fn new(date: u16, time: u16) -> Self {
-        Self {
-            date: date,
-            time: time,
-        }
+        Self { date, time }
     }
 
     /// Reads a timestamp from a byte sequence.
     pub fn from_bytes(data: &[u8]) -> Self {
         let time: u16 = bytes_to_u16_le!(data, 0);
         let date: u16 = bytes_to_u16_le!(data, 2);
-        Self {
-            date: date,
-            time: time,
-        }
+        Self { date, time }
     }
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
@@ -131,9 +125,9 @@ impl FatTimeDate10Ms {
     /// Creates a new timestamp.
     pub fn new(date: u16, time: u16, fraction: u8) -> Self {
         Self {
-            date: date,
-            time: time,
-            fraction: fraction,
+            date,
+            time,
+            fraction,
         }
     }
 
@@ -142,8 +136,8 @@ impl FatTimeDate10Ms {
         let time: u16 = bytes_to_u16_le!(data, 1);
         let date: u16 = bytes_to_u16_le!(data, 3);
         Self {
-            date: date,
-            time: time,
+            date,
+            time,
             fraction: data[0],
         }
     }

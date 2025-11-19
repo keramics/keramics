@@ -40,7 +40,7 @@ impl SkipTable {
     }
 
     /// Fills the skip table.
-    pub fn fill(&mut self, signatures: &Vec<SignatureReference>) {
+    pub fn fill(&mut self, signatures: &[SignatureReference]) {
         for signature in signatures.iter() {
             self.smallest_pattern_size = if self.smallest_pattern_size == 0 {
                 signature.pattern_size

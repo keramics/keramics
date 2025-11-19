@@ -164,7 +164,7 @@ impl HashTool {
         &self,
         file_entry: &VfsFileEntry,
         file_system_display_path: &String,
-        path_components: &Vec<VfsString>,
+        path_components: &[VfsString],
     ) -> Result<(), ErrorTrace> {
         let display_path: String = self.display_path.join_path_components(path_components);
 

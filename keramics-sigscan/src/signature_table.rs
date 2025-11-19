@@ -94,8 +94,8 @@ impl SignatureTable {
     /// Fills the signature table.
     pub fn fill(
         &mut self,
-        signatures: &Vec<SignatureReference>,
-        offsets_to_ignore: &Vec<usize>,
+        signatures: &[SignatureReference],
+        offsets_to_ignore: &[usize],
         largest_pattern_offset: usize,
     ) {
         for signature in signatures.iter() {
@@ -107,7 +107,7 @@ impl SignatureTable {
                 PatternType::BoundToStart => signature.pattern_offset,
                 PatternType::Unbound => 0,
             };
-            self.signatures.push(Arc::clone(&signature));
+            self.signatures.push(Arc::clone(signature));
 
             for pattern_index in 0..signature.pattern_size {
                 if !offsets_to_ignore.contains(&pattern_offset) {
@@ -130,23 +130,23 @@ impl SignatureTable {
             2 => self.get_pattern_offset_by_occurrence_weights(),
             _ => self.get_pattern_offset_by_similarity_weights(),
         };
-        if result.is_none() && self.byte_value_groups.len() > 0 {
+        if result.is_none() && !self.byte_value_groups.is_empty() {
             result = Some(self.smallest_pattern_offset);
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "SignatureTable::get_most_significant_pattern_offset {{\n"
+            self.mediator.debug_print(String::from(
+                "SignatureTable::get_most_significant_pattern_offset {\n",
             ));
             if result.is_none() {
                 self.mediator
-                    .debug_print(format!("    most_significant_pattern_offset: N/A\n"));
+                    .debug_print(String::from("    most_significant_pattern_offset: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
                     "    most_significant_pattern_offset: {}\n",
                     result.unwrap(),
                 ));
             }
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
         result
     }
@@ -154,12 +154,12 @@ impl SignatureTable {
     /// Retrieves the pattern offset for specific byte value weights.
     fn get_pattern_offset_by_byte_value_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "SignatureTable::get_pattern_offset_by_byte_value_weights {{\n"
+            self.mediator.debug_print(String::from(
+                "SignatureTable::get_pattern_offset_by_byte_value_weights {\n",
             ));
             if self.byte_value_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(format!("    largest_byte_value_weight: N/A\n"));
+                    .debug_print(String::from("    largest_byte_value_weight: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
                     "    largest_byte_value_weight: {}\n",
@@ -176,27 +176,23 @@ impl SignatureTable {
             };
             self.mediator
                 .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets,));
-            self.mediator.debug_print(format!("}}\n\n"));
+            self.mediator.debug_print(String::from("}\n\n"));
         }
-        match self
-            .byte_value_weights
+        self.byte_value_weights
             .offset_groups
             .get(&self.byte_value_weights.largest_weight)
-        {
-            Some(offset_group) => Some(offset_group.offsets[0]),
-            None => None,
-        }
+            .map(|offset_group| offset_group.offsets[0])
     }
 
     /// Retrieves the pattern offset for specific occurrence weights.
     fn get_pattern_offset_by_occurrence_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "SignatureTable::get_pattern_offset_by_occurrence_weights {{\n"
+            self.mediator.debug_print(String::from(
+                "SignatureTable::get_pattern_offset_by_occurrence_weights {\n",
             ));
             if self.occurrence_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(format!("    largest_occurrence_weight: N/A\n"));
+                    .debug_print(String::from("    largest_occurrence_weight: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
                     "    largest_occurrence_weight: {}\n",
@@ -237,7 +233,7 @@ impl SignatureTable {
                             "        byte_value_weight: {},\n",
                             byte_value_weight
                         ));
-                        self.mediator.debug_print(format!("    }},\n"));
+                        self.mediator.debug_print(String::from("    },\n"));
                     }
                 }
                 if self.mediator.debug_output {
@@ -247,13 +243,13 @@ impl SignatureTable {
                         "    largest_byte_value_weight: {},\n",
                         largest_byte_value_weight
                     ));
-                    self.mediator.debug_print(format!("}}\n\n"));
+                    self.mediator.debug_print(String::from("}\n\n"));
                 }
                 Some(pattern_offset)
             }
             None => {
                 if self.mediator.debug_output {
-                    self.mediator.debug_print(format!("}}\n\n"));
+                    self.mediator.debug_print(String::from("}\n\n"));
                 }
                 self.get_pattern_offset_by_byte_value_weights()
             }
@@ -263,12 +259,12 @@ impl SignatureTable {
     /// Retrieves the pattern offset for specific similarity weights.
     fn get_pattern_offset_by_similarity_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "SignatureTable::get_pattern_offset_by_similarity_weights {{\n"
+            self.mediator.debug_print(String::from(
+                "SignatureTable::get_pattern_offset_by_similarity_weights {\n",
             ));
             if self.similarity_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(format!("    largest_similarity_weight: N/A\n"));
+                    .debug_print(String::from("    largest_similarity_weight: N/A\n"));
             } else {
                 self.mediator.debug_print(format!(
                     "    largest_similarity_weight: {}\n",
@@ -304,10 +300,9 @@ impl SignatureTable {
 
                     if largest_occurrence_weight > 0
                         && occurrence_weight == largest_occurrence_weight
+                        && byte_value_weight > largest_byte_value_weight
                     {
-                        if byte_value_weight > largest_byte_value_weight {
-                            largest_occurrence_weight = 0;
-                        }
+                        largest_occurrence_weight = 0;
                     }
                     if offset_index == 0 || occurrence_weight > largest_occurrence_weight {
                         largest_byte_value_weight = byte_value_weight;
@@ -325,7 +320,7 @@ impl SignatureTable {
                             "        byte_value_weight: {},\n",
                             byte_value_weight
                         ));
-                        self.mediator.debug_print(format!("    }},\n"));
+                        self.mediator.debug_print(String::from("    },\n"));
                     }
                 }
                 if self.mediator.debug_output {
@@ -339,13 +334,13 @@ impl SignatureTable {
                         "    largest_byte_value_weight: {},\n",
                         largest_byte_value_weight
                     ));
-                    self.mediator.debug_print(format!("}}\n\n"));
+                    self.mediator.debug_print(String::from("}\n\n"));
                 }
                 Some(pattern_offset)
             }
             None => {
                 if self.mediator.debug_output {
-                    self.mediator.debug_print(format!("}}\n\n"));
+                    self.mediator.debug_print(String::from("}\n\n"));
                 }
                 self.get_pattern_offset_by_occurrence_weights()
             }
@@ -359,17 +354,14 @@ impl SignatureTable {
     ) -> Vec<SignatureReference> {
         let mut signatures: Vec<SignatureReference> = Vec::new();
 
-        match self.byte_value_groups.get(&pattern_offset) {
-            Some(byte_value_group) => {
-                for (_, signature_group) in byte_value_group.signature_groups.iter() {
-                    for signature in signature_group.signatures.iter() {
-                        if !signatures.contains(signature) {
-                            signatures.push(Arc::clone(signature));
-                        }
+        if let Some(byte_value_group) = self.byte_value_groups.get(&pattern_offset) {
+            for (_, signature_group) in byte_value_group.signature_groups.iter() {
+                for signature in signature_group.signatures.iter() {
+                    if !signatures.contains(signature) {
+                        signatures.push(Arc::clone(signature));
                     }
                 }
             }
-            None => {}
         }
         signatures
     }
@@ -392,7 +384,7 @@ impl SignatureTable {
                 self.byte_value_groups
                     .insert(pattern_offset, byte_value_group);
             }
-        };
+        }
     }
 }
 

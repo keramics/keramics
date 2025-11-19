@@ -45,7 +45,7 @@ impl<'a> DecoderMacCyrillic<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -246,7 +246,7 @@ impl<'a> EncoderMacCyrillic<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -263,39 +263,27 @@ impl<'a> Iterator for EncoderMacCyrillic<'a> {
 
                 match *code_point {
                     0x0000..0x0080 => Some(Ok(vec![*code_point as u8])),
-                    0x00a0..0x00c0 => {
-                        match Self::BASE_0X00A0[(*code_point as u32 - 0x00a0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCyrillic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x0400..0x0460 => {
-                        match Self::BASE_0X0400[(*code_point as u32 - 0x0400) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCyrillic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2028 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacCyrillic",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00a0..0x00c0 => match Self::BASE_0X00A0[(*code_point - 0x00a0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCyrillic",
+                            *code_point
+                        )))),
+                    },
+                    0x0400..0x0460 => match Self::BASE_0X0400[(*code_point - 0x0400) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCyrillic",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2028 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacCyrillic",
+                            *code_point
+                        )))),
+                    },
                     0x00f7 => Some(Ok(vec![0xd6])),
                     0x0192 => Some(Ok(vec![0xc4])),
                     0x0490 => Some(Ok(vec![0xa2])),
@@ -310,12 +298,10 @@ impl<'a> Iterator for EncoderMacCyrillic<'a> {
                     0x2260 => Some(Ok(vec![0xad])),
                     0x2264 => Some(Ok(vec![0xb2])),
                     0x2265 => Some(Ok(vec![0xb3])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacCyrillic",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacCyrillic",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

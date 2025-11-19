@@ -737,10 +737,10 @@ mod tests {
         let hashmap: &HashMap<String, PlistObject> = dictionary_object.as_hashmap().unwrap();
 
         let array_object: &PlistObject = hashmap.get("blkx").unwrap();
-        let vector: &Vec<PlistObject> = array_object.as_vector().unwrap();
-        assert_eq!(vector.len(), 1);
+        let slice: &[PlistObject] = array_object.as_slice().unwrap();
+        assert_eq!(slice.len(), 1);
 
-        let dictionary_object: &PlistObject = vector.get(0).unwrap();
+        let dictionary_object: &PlistObject = slice.get(0).unwrap();
         let hashmap: &HashMap<String, PlistObject> = dictionary_object.as_hashmap().unwrap();
 
         let data_object: &PlistObject = hashmap.get("Data").unwrap();

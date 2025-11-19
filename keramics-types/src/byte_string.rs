@@ -15,8 +15,7 @@ use std::fmt;
 
 use keramics_core::ErrorTrace;
 use keramics_encodings::{
-    CharacterDecoder, CharacterEncoder, CharacterEncoding, new_character_decoder,
-    new_character_encoder,
+    CharacterDecoder, CharacterEncoding, new_character_decoder, new_character_encoder,
 };
 
 /// String of 8-bit elements.
@@ -48,12 +47,9 @@ impl ByteString {
 
     /// Decodes the byte string.
     pub fn decode(&self) -> Result<Vec<u32>, ErrorTrace> {
-        let mut character_decoder: CharacterDecoder =
-            new_character_decoder(&self.encoding, &self.elements);
-
         let mut code_points: Vec<u32> = Vec::new();
 
-        while let Some(result) = character_decoder.next() {
+        for result in new_character_decoder(&self.encoding, &self.elements) {
             match result {
                 Ok(mut decoded_code_points) => code_points.append(&mut decoded_code_points),
                 Err(mut error) => {
@@ -89,9 +85,6 @@ impl ByteString {
         if self.encoding == byte_string.encoding {
             self.elements.extend_from_slice(&byte_string.elements);
         } else {
-            let character_decoder: CharacterDecoder =
-                new_character_decoder(&byte_string.encoding, &byte_string.elements);
-
             let code_points: Vec<u32> = match byte_string.decode() {
                 Ok(code_points) => code_points,
                 Err(mut error) => {
@@ -114,11 +107,8 @@ impl ByteString {
     }
 
     /// Extends the byte string from code points.
-    fn extend_from_codepoints(&mut self, code_points: &Vec<u32>) -> Result<(), ErrorTrace> {
-        let mut character_encoder: CharacterEncoder =
-            new_character_encoder(&self.encoding, code_points);
-
-        while let Some(result) = character_encoder.next() {
+    fn extend_from_codepoints(&mut self, code_points: &[u32]) -> Result<(), ErrorTrace> {
+        for result in new_character_encoder(&self.encoding, code_points) {
             match result {
                 Ok(slice) => self.elements.extend_from_slice(&slice),
                 Err(mut error) => {
@@ -149,9 +139,9 @@ impl ByteString {
     pub fn read_data(&mut self, data: &[u8]) {
         let slice: &[u8] = match data.iter().position(|value| *value == 0) {
             Some(data_index) => &data[0..data_index],
-            None => &data,
+            None => data,
         };
-        self.elements.extend_from_slice(&slice);
+        self.elements.extend_from_slice(slice);
     }
 }
 
@@ -160,11 +150,11 @@ impl From<&[u8]> for ByteString {
     fn from(slice: &[u8]) -> Self {
         let elements: &[u8] = match slice.iter().position(|value| *value == 0) {
             Some(slice_index) => &slice[0..slice_index],
-            None => &slice,
+            None => slice,
         };
         Self {
             encoding: CharacterEncoding::Utf8,
-            elements: Vec::from(elements),
+            elements: elements.to_vec(),
         }
     }
 }
@@ -182,14 +172,6 @@ impl From<&String> for ByteString {
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::from(string.as_str().as_bytes())
-    }
-}
-
-impl From<&Vec<u8>> for ByteString {
-    /// Converts a [`&Vec<u8>`] into a [`ByteString`]
-    #[inline(always)]
-    fn from(vector: &Vec<u8>) -> Self {
-        Self::from(vector.as_slice())
     }
 }
 
@@ -223,13 +205,11 @@ impl fmt::Display for ByteString {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let mut string_parts: Vec<String> = Vec::new();
 
-        let mut character_decoder: CharacterDecoder = self.get_character_decoder();
-
-        while let Some(result) = character_decoder.next() {
+        for result in self.get_character_decoder() {
             match result {
                 Ok(code_points) => {
                     for code_point in code_points {
-                        let string: String = match char::from_u32(code_point as u32) {
+                        let string: String = match char::from_u32(code_point) {
                             Some(unicode_character) => {
                                 if unicode_character == '\\' {
                                     String::from("\\\\")
@@ -330,24 +310,11 @@ mod tests {
     }
 
     #[test]
-    fn test_from_vector() {
-        let test_vector: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
-        ];
-        let byte_string: ByteString = ByteString::from(&test_vector);
-
-        let expected_elements: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-        ];
-        assert_eq!(byte_string.elements, expected_elements);
-    }
-
-    #[test]
     fn test_eq_u8_slice() {
         let test_vector: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
         ];
-        let byte_string: ByteString = ByteString::from(&test_vector);
+        let byte_string: ByteString = ByteString::from(test_vector.as_slice());
 
         let expected_elements: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
@@ -360,7 +327,7 @@ mod tests {
         let test_vector: Vec<u8> = vec![
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
         ];
-        let byte_string: ByteString = ByteString::from(&test_vector);
+        let byte_string: ByteString = ByteString::from(test_vector.as_slice());
 
         let expected_str: &str = "ASCII string";
 

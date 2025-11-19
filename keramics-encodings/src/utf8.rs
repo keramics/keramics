@@ -30,7 +30,7 @@ impl<'a> DecoderUtf8<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -51,7 +51,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
             }
             None => return None,
         };
-        if (byte_value1 >= 0x80 && byte_value1 < 0xc0) || byte_value1 > 0xf4 {
+        if (0x80..0xc0).contains(&byte_value1) || byte_value1 > 0xf4 {
             return Some(Err(keramics_core::error_trace_new!(format!(
                 "Unable to decode UTF-8: 0x{:02x} as Unicode",
                 byte_value1
@@ -71,13 +71,13 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     ))));
                 }
             };
-            let is_invalid: bool = match byte_value1 {
-                0xe0 => byte_value < 0xa0 || byte_value > 0xbf,
-                0xed => byte_value < 0x80 || byte_value > 0x9f,
-                0xf0 => byte_value < 0x90 || byte_value > 0xbf,
-                _ => byte_value < 0x80 || byte_value > 0xbf,
+            let is_valid: bool = match byte_value1 {
+                0xe0 => (0xa0..=0xbf).contains(&byte_value),
+                0xed => (0x80..=0x9f).contains(&byte_value),
+                0xf0 => (0x90..=0xbf).contains(&byte_value),
+                _ => (0x80..=0xbf).contains(&byte_value),
             };
-            if is_invalid {
+            if !is_valid {
                 return Some(Err(keramics_core::error_trace_new!(format!(
                     "Unable to decode UTF-8: 0x{:02x}, 0x{:02x} as Unicode",
                     byte_value1, byte_value
@@ -101,12 +101,12 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     ))));
                 }
             };
-            let is_invalid: bool = match byte_value2 {
-                0xe0 => byte_value < 0xa0 || byte_value > 0xbf,
-                0xed => byte_value < 0x80 || byte_value > 0x9f,
-                _ => byte_value < 0x80 || byte_value > 0xbf,
+            let is_valid: bool = match byte_value2 {
+                0xe0 => (0xa0..=0xbf).contains(&byte_value),
+                0xed => (0x80..=0x9f).contains(&byte_value),
+                _ => (0x80..=0xbf).contains(&byte_value),
             };
-            if is_invalid {
+            if !is_valid {
                 return Some(Err(keramics_core::error_trace_new!(format!(
                     "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
                     byte_value1, byte_value2, byte_value
@@ -130,7 +130,7 @@ impl<'a> Iterator for DecoderUtf8<'a> {
                     ))));
                 }
             };
-            if byte_value < 0x80 || byte_value > 0xbf {
+            if !(0x80..=0xbf).contains(&byte_value) {
                 return Some(Err(keramics_core::error_trace_new!(format!(
                     "Unable to decode UTF-8: 0x{:02x}, 0x{:02x}, 0x{:02x}, 0x{:02x} as Unicode",
                     byte_value1, byte_value2, byte_value3, byte_value

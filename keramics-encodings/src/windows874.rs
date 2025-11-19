@@ -161,7 +161,7 @@ impl<'a> DecoderWindows874<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -319,7 +319,7 @@ impl<'a> EncoderWindows874<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -336,39 +336,29 @@ impl<'a> Iterator for EncoderWindows874<'a> {
 
                 match *code_point {
                     0x0000..0x0080 | 0x00a0 => Some(Ok(vec![*code_point as u8])),
-                    0x0e00..0x0e60 => {
-                        match Self::BASE_0X0E00[(*code_point as u32 - 0x0e00) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 874",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2018..0x2020 => {
-                        match Self::BASE_0X2018[(*code_point as u32 - 0x2018) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as Windows 874",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x0e00..0x0e60 => match Self::BASE_0X0E00[(*code_point - 0x0e00) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 874",
+                            *code_point
+                        )))),
+                    },
+                    0x2018..0x2020 => match Self::BASE_0X2018[(*code_point - 0x2018) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as Windows 874",
+                            *code_point
+                        )))),
+                    },
                     0x2013 => Some(Ok(vec![0x96])),
                     0x2014 => Some(Ok(vec![0x97])),
                     0x2022 => Some(Ok(vec![0x95])),
                     0x2026 => Some(Ok(vec![0x85])),
                     0x20ac => Some(Ok(vec![0x80])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as Windows 874",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as Windows 874",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

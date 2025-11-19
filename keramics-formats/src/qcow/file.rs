@@ -313,7 +313,7 @@ impl QcowFile {
             ));
             self.mediator.debug_print_data(&data, true);
         }
-        self.backing_file_name = Some(ByteString::from(&data));
+        self.backing_file_name = Some(ByteString::from(data.as_slice()));
 
         Ok(())
     }

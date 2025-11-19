@@ -26,9 +26,9 @@ pub struct Epoch {
 impl Epoch {
     pub fn new(year: i16, month: u8, day_of_month: u8) -> Self {
         Self {
-            year: year,
-            month: month,
-            day_of_month: day_of_month,
+            year,
+            month,
+            day_of_month,
         }
     }
 }

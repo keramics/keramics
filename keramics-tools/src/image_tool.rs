@@ -564,7 +564,7 @@ impl ImageTool {
         &self,
         file_entry: &mut VfsFileEntry,
         file_system_display_path: &String,
-        path_components: &Vec<VfsString>,
+        path_components: &[VfsString],
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
         let md5: String = if !calculate_md5 {

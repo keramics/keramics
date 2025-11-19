@@ -34,9 +34,7 @@ pub struct Filetime {
 impl Filetime {
     /// Creates a new timestamp.
     pub fn new(timestamp: u64) -> Self {
-        Self {
-            timestamp: timestamp,
-        }
+        Self { timestamp }
     }
 
     /// Reads a timestamp from a byte sequence.

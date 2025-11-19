@@ -62,8 +62,8 @@ impl Sha1Context {
         let mut values_32bit: [u32; 80] = [0; 80];
 
         // Break the block of data into 16 x 32-bit big-endian values
-        for value_index in 0..16 {
-            values_32bit[value_index] = bytes_to_u32_be!(data, data_offset);
+        for value_32bit in &mut values_32bit[0..16] {
+            *value_32bit = bytes_to_u32_be!(data, data_offset);
 
             data_offset += 4;
         }
@@ -79,7 +79,7 @@ impl Sha1Context {
         let mut block_hashes: [u32; 5] = [0; 5];
         block_hashes.copy_from_slice(hash_values);
 
-        for value_index in 0..80 {
+        for (value_index, value_32bit) in values_32bit.iter().enumerate() {
             let block_hash: u32 = if value_index < 20 {
                 0x5a827999_u32.wrapping_add(
                     (block_hashes[1] & block_hashes[2]) | (!(block_hashes[1]) & block_hashes[3]),
@@ -97,7 +97,7 @@ impl Sha1Context {
             }
             .wrapping_add(block_hashes[4])
             .wrapping_add(block_hashes[0].rotate_left(5))
-            .wrapping_add(values_32bit[value_index]);
+            .wrapping_add(*value_32bit);
 
             block_hashes[4] = block_hashes[3];
             block_hashes[3] = block_hashes[2];
@@ -138,8 +138,7 @@ impl DigestHashContext for Sha1Context {
         let hash: Vec<u8> = self
             .hash_values
             .iter()
-            .map(|hash_value| hash_value.to_be_bytes())
-            .flatten()
+            .flat_map(|hash_value| hash_value.to_be_bytes())
             .collect::<Vec<u8>>();
 
         self.hash_values = SHA1_HASH_VALUES;
@@ -175,7 +174,7 @@ impl DigestHashContext for Sha1Context {
             }
         }
         while data_offset + SHA1_BLOCK_SIZE < data_size {
-            let hash_values: [u32; 5] = self.transform_block(&self.hash_values, &data, data_offset);
+            let hash_values: [u32; 5] = self.transform_block(&self.hash_values, data, data_offset);
 
             self.hash_values.copy_from_slice(&hash_values);
             self.number_of_bytes_hashed += SHA1_BLOCK_SIZE as u64;

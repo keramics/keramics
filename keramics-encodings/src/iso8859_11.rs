@@ -129,7 +129,7 @@ impl<'a> DecoderIso8859_11<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -276,7 +276,7 @@ impl<'a> EncoderIso8859_11<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -293,23 +293,17 @@ impl<'a> Iterator for EncoderIso8859_11<'a> {
 
                 match *code_point {
                     0x0000..0x00a1 => Some(Ok(vec![*code_point as u8])),
-                    0x0e00..0x0e60 => {
-                        match Self::BASE_0X0E00[(*code_point as u32 - 0x0e00) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as ISO-8859-11",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
+                    0x0e00..0x0e60 => match Self::BASE_0X0E00[(*code_point - 0x0e00) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
                             "Unable to encode code point: U+{:04x} as ISO-8859-11",
                             *code_point
-                        ))));
-                    }
+                        )))),
+                    },
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as ISO-8859-11",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

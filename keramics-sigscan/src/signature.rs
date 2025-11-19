@@ -47,10 +47,10 @@ impl Signature {
         let pattern_size: usize = pattern.len();
         Self {
             identifier: identifier.to_string(),
-            pattern_type: pattern_type,
-            pattern_offset: pattern_offset,
-            pattern: Vec::from(pattern),
-            pattern_size: pattern_size,
+            pattern_type,
+            pattern_offset,
+            pattern: pattern.to_vec(),
+            pattern_size,
         }
     }
 
@@ -70,12 +70,12 @@ impl Signature {
         };
         let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
-            mediator.debug_print(format!("Signature::scan_buffer {{\n"));
+            mediator.debug_print(String::from("Signature::scan_buffer {\n"));
             mediator.debug_print(format!(
                 "    scanning at offset: {} (0x{:08x}) for signature: {} of size: {}\n",
                 pattern_offset, pattern_offset, self.identifier, self.pattern_size,
             ));
-            mediator.debug_print(format!("}}\n\n"));
+            mediator.debug_print(String::from("}\n\n"));
         }
         if pattern_offset < data_offset {
             return false;

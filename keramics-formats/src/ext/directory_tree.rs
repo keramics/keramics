@@ -48,7 +48,7 @@ impl ExtDirectoryTree {
     pub fn read_block_data(
         &mut self,
         data_stream: &DataStreamReference,
-        block_ranges: &Vec<ExtBlockRange>,
+        block_ranges: &[ExtBlockRange],
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         for block_range in block_ranges.iter() {
@@ -229,7 +229,7 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let block_ranges: &Vec<ExtBlockRange> = &vec![ExtBlockRange {
+        let block_ranges: Vec<ExtBlockRange> = vec![ExtBlockRange {
             logical_block_number: 0,
             physical_block_number: 0,
             number_of_blocks: 1,

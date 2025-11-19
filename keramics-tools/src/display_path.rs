@@ -224,7 +224,7 @@ impl DisplayPath {
     }
 
     /// Joins the path components into a path string.
-    pub fn join_path_components(&self, path_components: &Vec<VfsString>) -> String {
+    pub fn join_path_components(&self, path_components: &[VfsString]) -> String {
         if path_components.len() == 1 && path_components[0].is_empty() {
             return String::from("/");
         } else {

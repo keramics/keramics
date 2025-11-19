@@ -163,8 +163,7 @@ impl UdifFile {
                         ));
                     }
                 };
-            let blkx_array: &Vec<PlistObject> = match resource_fork_object.get_vector_by_key("blkx")
-            {
+            let blkx_array: &[PlistObject] = match resource_fork_object.get_slice_by_key("blkx") {
                 Some(string) => string,
                 None => {
                     return Err(keramics_core::error_trace_new!(
@@ -393,8 +392,7 @@ impl UdifFile {
                         }
                         self.block_cache.insert(block_range.data_offset, data);
                     }
-                    let range_data: &Vec<u8> = match self.block_cache.get(&block_range.data_offset)
-                    {
+                    let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
                         Some(data) => data,
                         None => {
                             return Err(keramics_core::error_trace_new!(format!(

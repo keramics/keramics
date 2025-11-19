@@ -201,7 +201,7 @@ impl NtfsWofCompressedStream {
                     }
                     self.block_cache.insert(block_offset, data);
                 }
-                let block_data: &Vec<u8> = match self.block_cache.get(&block_offset) {
+                let block_data: &[u8] = match self.block_cache.get(&block_offset) {
                     Some(data) => data,
                     None => {
                         return Err(keramics_core::error_trace_new!(

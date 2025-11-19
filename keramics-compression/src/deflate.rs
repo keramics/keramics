@@ -81,9 +81,9 @@ impl<'a> DeflateBitstream<'a> {
     pub fn new(data: &'a [u8], data_offset: usize) -> Self {
         let data_size: usize = data.len();
         Self {
-            data: data,
-            data_offset: data_offset,
-            data_size: data_size,
+            data,
+            data_offset,
+            data_size,
             bits: 0,
             number_of_bits: 0,
         }
@@ -238,10 +238,10 @@ impl DeflateBlockHeader {
         let mediator = Mediator::current();
         if mediator.debug_output {
             let mut string_parts: Vec<String> = Vec::new();
-            string_parts.push(format!("DeflateBlockHeader {{\n"));
+            string_parts.push(String::from("DeflateBlockHeader {\n"));
             string_parts.push(format!("    last_block_flag: {},\n", self.last_block_flag));
             string_parts.push(format!("    block_type: {},\n", self.block_type));
-            string_parts.push(format!("}}\n\n"));
+            string_parts.push(String::from("}\n\n"));
 
             mediator.debug_print(string_parts.join(""));
         }
@@ -313,7 +313,9 @@ impl DeflateContext {
         let mediator = Mediator::current();
         if mediator.debug_output {
             let mut string_parts: Vec<String> = Vec::new();
-            string_parts.push(format!("DeflateContext::build_dynamic_huffman_trees {{\n"));
+            string_parts.push(String::from(
+                "DeflateContext::build_dynamic_huffman_trees {\n",
+            ));
             string_parts.push(format!(
                 "    number_of_literal_codes: {},\n",
                 number_of_literal_codes
@@ -326,7 +328,7 @@ impl DeflateContext {
                 "    number_of_code_sizes: {},\n",
                 number_of_code_sizes
             ));
-            string_parts.push(format!("}}\n\n"));
+            string_parts.push(String::from("}\n\n"));
 
             mediator.debug_print(string_parts.join(""));
         }
@@ -541,8 +543,8 @@ impl DeflateContext {
 
         let mediator = Mediator::current();
         if mediator.debug_output {
-            mediator.debug_print(format!(
-                "DeflateContext::decompress_huffmann_encoded_block {{\n"
+            mediator.debug_print(String::from(
+                "DeflateContext::decompress_huffmann_encoded_block {\n",
             ));
         }
         loop {
@@ -625,7 +627,7 @@ impl DeflateContext {
             }
         }
         if mediator.debug_output {
-            mediator.debug_print(format!("}}\n\n"));
+            mediator.debug_print(String::from("}\n\n"));
         }
         *uncompressed_data_offset = data_offset;
 

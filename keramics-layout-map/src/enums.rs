@@ -15,7 +15,6 @@
 pub enum BitOrder {
     MostSignificantBit,
     LeastSignificantBit,
-    NotSet,
 }
 
 #[derive(Clone, PartialEq)]
@@ -36,7 +35,6 @@ pub enum DataType {
     FatTimeDate,
     FatTimeDate10Ms,
     Filetime,
-    NotSet,
     PosixTime32,
     SignedInteger8Bit,
     SignedInteger16Bit,
@@ -64,7 +62,6 @@ impl Clone for DataType {
             DataType::FatTimeDate => DataType::FatTimeDate,
             DataType::FatTimeDate10Ms => DataType::FatTimeDate10Ms,
             DataType::Filetime => DataType::Filetime,
-            DataType::NotSet => DataType::NotSet,
             DataType::PosixTime32 => DataType::PosixTime32,
             DataType::SignedInteger8Bit => DataType::SignedInteger8Bit,
             DataType::SignedInteger16Bit => DataType::SignedInteger16Bit,

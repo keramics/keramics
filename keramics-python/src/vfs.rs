@@ -40,19 +40,15 @@ impl PyVfsDataStream {
         match self.data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_offset() {
                 Ok(offset) => Ok(offset),
-                Err(error) => {
-                    return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                        "Unable to determine offset of data stream with error: {}",
-                        error
-                    )));
-                }
-            },
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to obtain write lock on data stream with error: {}",
+                Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                    "Unable to determine offset of data stream with error: {}",
                     error
-                )));
-            }
+                ))),
+            },
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to obtain write lock on data stream with error: {}",
+                error
+            ))),
         }
     }
 
@@ -60,19 +56,15 @@ impl PyVfsDataStream {
         match self.data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_size() {
                 Ok(size) => Ok(size),
-                Err(error) => {
-                    return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                        "Unable to determine size of data stream with error: {}",
-                        error
-                    )));
-                }
-            },
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to obtain write lock on data stream with error: {}",
+                Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                    "Unable to determine size of data stream with error: {}",
                     error
-                )));
-            }
+                ))),
+            },
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to obtain write lock on data stream with error: {}",
+                error
+            ))),
         }
     }
 
@@ -125,19 +117,15 @@ impl PyVfsDataStream {
         match self.data_stream.write() {
             Ok(mut data_stream) => match data_stream.seek(position) {
                 Ok(offset) => Ok(offset),
-                Err(error) => {
-                    return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                        "Unable to read from data stream with error: {}",
-                        error
-                    )));
-                }
-            },
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to obtain write lock on data stream with error: {}",
+                Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                    "Unable to read from data stream with error: {}",
                     error
-                )));
-            }
+                ))),
+            },
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to obtain write lock on data stream with error: {}",
+                error
+            ))),
         }
     }
 }
@@ -232,12 +220,10 @@ impl PyVfsFileEntry {
                 path: Arc::new(link_target),
             })),
             Ok(None) => Ok(None),
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve symbolic link target with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve symbolic link target with error: {}",
+                error
+            ))),
         }
     }
 
@@ -249,12 +235,10 @@ impl PyVfsFileEntry {
             Ok(None) => {
                 return Ok(None);
             }
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve data stream with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve data stream with error: {}",
+                error
+            ))),
         }
     }
 
@@ -269,12 +253,10 @@ impl PyVfsFileEntry {
         };
         match vfs_file_entry.get_number_of_sub_file_entries() {
             Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve number of sub file entries with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve number of sub file entries with error: {}",
+                error
+            ))),
         }
     }
 
@@ -294,12 +276,10 @@ impl PyVfsFileEntry {
             Ok(sub_file_entry) => Ok(PyVfsFileEntry {
                 file_entry: Arc::new(sub_file_entry),
             }),
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve sub file entry: {} with error: {}",
-                    sub_file_entry_index, error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve sub file entry: {} with error: {}",
+                sub_file_entry_index, error
+            ))),
         }
     }
 }
@@ -317,12 +297,10 @@ impl PyVfsFileSystem {
     pub fn file_entry_exists(&self, path: PyVfsPath) -> PyResult<bool> {
         match self.file_system.file_entry_exists(&path.path) {
             Ok(result) => Ok(result),
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to determine if file entry exists with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to determine if file entry exists with error: {}",
+                error
+            ))),
         }
     }
 
@@ -336,12 +314,10 @@ impl PyVfsFileSystem {
             Ok(None) => {
                 return Ok(None);
             }
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve file entry with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve file entry with error: {}",
+                error
+            ))),
         }
     }
 
@@ -353,12 +329,10 @@ impl PyVfsFileSystem {
             Ok(None) => {
                 return Ok(None);
             }
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve root file entry with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve root file entry with error: {}",
+                error
+            ))),
         }
     }
 }
@@ -593,12 +567,10 @@ impl PyVfsResolver {
             Ok(None) => {
                 return Ok(None);
             }
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve data stream with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve data stream with error: {}",
+                error
+            ))),
         }
     }
 
@@ -616,12 +588,10 @@ impl PyVfsResolver {
             Ok(None) => {
                 return Ok(None);
             }
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to retrieve file entry with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve file entry with error: {}",
+                error
+            ))),
         }
     }
 
@@ -630,12 +600,10 @@ impl PyVfsResolver {
             Ok(file_system) => Ok(PyVfsFileSystem {
                 file_system: file_system,
             }),
-            Err(error) => {
-                return Err(PyErr::new::<PyRuntimeError, String>(format!(
-                    "Unable to open file system with error: {}",
-                    error
-                )));
-            }
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to open file system with error: {}",
+                error
+            ))),
         }
     }
 }

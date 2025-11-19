@@ -40,44 +40,39 @@ struct BitmapOptions {
 impl BitmapOptions {
     /// Determines if the options are empty.
     pub fn is_empty(&self) -> bool {
-        return self.bit_order.is_empty() && self.data_type.is_empty();
+        self.bit_order.is_empty() && self.data_type.is_empty()
     }
 
     /// Parses the bit order.
     pub fn parse_bit_order(&self) -> Result<BitOrder, ParseError> {
         if self.bit_order.is_empty() {
-            panic!("Bit order missing")
+            return Err(ParseError::new(String::from("Missing bit order")));
         }
         match self.bit_order.as_str() {
             "msb" | "most" | "MostSignificantBit" => Ok(BitOrder::MostSignificantBit),
             "lsb" | "least" | "LeastSignificantBit" => Ok(BitOrder::LeastSignificantBit),
-            _ => {
-                return Err(ParseError::new(format!(
-                    "Unsupported bit order: {}",
-                    self.bit_order
-                )));
-            }
+            _ => Err(ParseError::new(format!(
+                "Unsupported bit order: {}",
+                self.bit_order
+            ))),
         }
     }
 
     /// Parses the data type.
     fn parse_data_type(&self) -> Result<DataType, ParseError> {
         if self.data_type.is_empty() {
-            panic!("Data type missing")
+            return Err(ParseError::new(String::from("Missing data type")));
         }
-        let data_type: DataType = match self.data_type.as_str() {
-            "u8" | "uint8" | "UnsignedInteger8Bit" => DataType::UnsignedInteger8Bit,
-            "u16" | "uint16" | "UnsignedInteger16Bit" => DataType::UnsignedInteger16Bit,
-            "u32" | "uint32" | "UnsignedInteger32Bit" => DataType::UnsignedInteger32Bit,
-            "u64" | "uint64" | "UnsignedInteger64Bit" => DataType::UnsignedInteger64Bit,
-            _ => {
-                return Err(ParseError::new(format!(
-                    "Unsupported data type: {}",
-                    self.data_type
-                )));
-            }
-        };
-        Ok(data_type)
+        match self.data_type.as_str() {
+            "u8" | "uint8" | "UnsignedInteger8Bit" => Ok(DataType::UnsignedInteger8Bit),
+            "u16" | "uint16" | "UnsignedInteger16Bit" => Ok(DataType::UnsignedInteger16Bit),
+            "u32" | "uint32" | "UnsignedInteger32Bit" => Ok(DataType::UnsignedInteger32Bit),
+            "u64" | "uint64" | "UnsignedInteger64Bit" => Ok(DataType::UnsignedInteger64Bit),
+            _ => Err(ParseError::new(format!(
+                "Unsupported data type: {}",
+                self.data_type
+            ))),
+        }
     }
 }
 
@@ -107,19 +102,17 @@ impl FieldOptions {
             "be" | "big" | "BigEndian" => Ok(ByteOrder::BigEndian),
             "le" | "little" | "LittleEndian" => Ok(ByteOrder::LittleEndian),
             "" => Ok(ByteOrder::NotSet),
-            _ => {
-                return Err(ParseError::new(format!(
-                    "Unsupported byte order: {}",
-                    self.byte_order
-                )));
-            }
+            _ => Err(ParseError::new(format!(
+                "Unsupported byte order: {}",
+                self.byte_order
+            ))),
         }
     }
 
     /// Parses the data type.
     fn parse_data_type(&self) -> Result<(DataType, usize), ParseError> {
         if self.data_type.is_empty() {
-            panic!("Data type missing")
+            return Err(ParseError::new(String::from("Missing data type")));
         }
         let mut data_type_str: &str = self.data_type.as_str();
         let mut number_of_elements_str: &str = "";
@@ -214,12 +207,10 @@ impl FieldOptions {
             "char" | "Character" => Ok(Format::Character),
             "hex" | "Hexadecimal" => Ok(Format::Hexadecimal),
             "" => Ok(Format::NotSet),
-            _ => {
-                return Err(ParseError::new(format!(
-                    "Unsupported format: {}",
-                    self.format
-                )));
-            }
+            _ => Err(ParseError::new(format!(
+                "Unsupported format: {}",
+                self.format
+            ))),
         }
     }
 }
@@ -278,7 +269,7 @@ struct StructureOptions {
 impl StructureOptions {
     /// Determines if the options are empty.
     pub fn is_empty(&self) -> bool {
-        return self.byte_order.is_empty() && (self.fields.len() == 0 || self.members.len() == 0);
+        self.byte_order.is_empty() && (self.fields.len() == 0 || self.members.len() == 0)
     }
 
     /// Parses the byte order.
@@ -287,12 +278,10 @@ impl StructureOptions {
             "be" | "big" | "BigEndian" => Ok(ByteOrder::BigEndian),
             "le" | "little" | "LittleEndian" => Ok(ByteOrder::LittleEndian),
             "" => Ok(ByteOrder::NotSet),
-            _ => {
-                return Err(ParseError::new(format!(
-                    "Unsupported byte order: {}",
-                    self.byte_order
-                )));
-            }
+            _ => Err(ParseError::new(format!(
+                "Unsupported byte order: {}",
+                self.byte_order
+            ))),
         }
     }
 }
@@ -447,38 +436,35 @@ fn parse_structure_layout_member(
             )));
         }
     };
-    let field_member: StructureLayoutMember = match data_type {
+    match data_type {
         DataType::BitField8
         | DataType::BitField16
         | DataType::BitField32
-        | DataType::BitField64 => {
-            return Err(ParseError::new(format!(
-                "Unsupported data type of field: {}",
-                field_options.name
-            )));
-        }
+        | DataType::BitField64 => Err(ParseError::new(format!(
+            "Unsupported data type of field: {}",
+            field_options.name
+        ))),
         DataType::ByteString | DataType::Ucs2String | DataType::Utf16String => {
             // TODO: change to StructureLayoutString
             let sequence: StructureLayoutSequence =
-                parse_structure_layout_sequence(&name, field_options)?;
+                parse_structure_layout_sequence(name, field_options)?;
 
-            StructureLayoutMember::Sequence(sequence)
+            Ok(StructureLayoutMember::Sequence(sequence))
         }
         _ => {
             if number_of_elements == 1 {
                 let field: StructureLayoutField =
-                    parse_structure_layout_field(&name, field_options)?;
+                    parse_structure_layout_field(name, field_options)?;
 
-                StructureLayoutMember::Field(field)
+                Ok(StructureLayoutMember::Field(field))
             } else {
                 let sequence: StructureLayoutSequence =
-                    parse_structure_layout_sequence(&name, field_options)?;
+                    parse_structure_layout_sequence(name, field_options)?;
 
-                StructureLayoutMember::Sequence(sequence)
+                Ok(StructureLayoutMember::Sequence(sequence))
             }
         }
-    };
-    Ok(field_member)
+    }
 }
 
 /// Parses a structure layout sequence.
@@ -559,7 +545,7 @@ fn parse_structure_layout_group(
     let mut group: StructureLayoutGroup = StructureLayoutGroup::new(&condition);
 
     for field_options in group_options.fields.iter() {
-        let field: StructureLayoutField = parse_structure_layout_field(&name, field_options)?;
+        let field: StructureLayoutField = parse_structure_layout_field(name, field_options)?;
 
         group.fields.push(field);
     }
@@ -669,10 +655,10 @@ fn parse_structure_layout(
                         }
                     }
                     if bit_offset != number_of_bits {
-                        panic!(
+                        return Err(ParseError::new(format!(
                             "BitField{} mismatch in number of bits: {} after field: {}",
                             number_of_bits, bit_offset, field_options.name
-                        );
+                        )));
                     }
                     structure_layout
                         .members

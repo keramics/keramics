@@ -76,8 +76,8 @@ impl Sha256Context {
         let mut values_32bit: [u32; 64] = [0; 64];
 
         // Break the block of data into 16 x 32-bit big-endian values
-        for value_index in 0..16 {
-            values_32bit[value_index] = bytes_to_u32_be!(data, data_offset);
+        for value_32bit in &mut values_32bit[0..16] {
+            *value_32bit = bytes_to_u32_be!(data, data_offset);
 
             data_offset += 4;
         }
@@ -100,7 +100,7 @@ impl Sha256Context {
         let mut block_hashes: [u32; 8] = [0; 8];
         block_hashes.copy_from_slice(hash_values);
 
-        for value_index in 0..64 {
+        for (value_index, value_32bit) in values_32bit.iter().enumerate() {
             let s0: u32 = block_hashes[0].rotate_right(2)
                 ^ block_hashes[0].rotate_right(13)
                 ^ block_hashes[0].rotate_right(22);
@@ -115,7 +115,7 @@ impl Sha256Context {
                     (block_hashes[4] & block_hashes[5]) ^ (!(block_hashes[4]) & block_hashes[6]),
                 )
                 .wrapping_add(SHA256_PRIME_CUBE_ROOTS[value_index])
-                .wrapping_add(values_32bit[value_index]);
+                .wrapping_add(*value_32bit);
 
             let t2: u32 = s0.wrapping_add(
                 (block_hashes[0] & block_hashes[1])
@@ -165,8 +165,7 @@ impl DigestHashContext for Sha256Context {
         let hash: Vec<u8> = self
             .hash_values
             .iter()
-            .map(|hash_value| hash_value.to_be_bytes())
-            .flatten()
+            .flat_map(|hash_value| hash_value.to_be_bytes())
             .collect::<Vec<u8>>();
 
         self.hash_values = SHA256_PRIME_SQUARE_ROOTS;
@@ -202,7 +201,7 @@ impl DigestHashContext for Sha256Context {
             }
         }
         while data_offset + SHA256_BLOCK_SIZE < data_size {
-            let hash_values: [u32; 8] = self.transform_block(&self.hash_values, &data, data_offset);
+            let hash_values: [u32; 8] = self.transform_block(&self.hash_values, data, data_offset);
 
             self.hash_values.copy_from_slice(&hash_values);
             self.number_of_bytes_hashed += SHA256_BLOCK_SIZE as u64;

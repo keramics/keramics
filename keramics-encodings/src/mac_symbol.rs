@@ -257,7 +257,7 @@ impl<'a> DecoderMacSymbol<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -536,7 +536,7 @@ impl<'a> EncoderMacSymbol<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -564,50 +564,34 @@ impl<'a> Iterator for EncoderMacSymbol<'a> {
                     | 0x007b..=0x007d
                     | 0x007f
                     | 0x00b0..=0x00b1 => Some(Ok(vec![*code_point as u8])),
-                    0x0390..0x03d8 => {
-                        match Self::BASE_0X0390[(*code_point as u32 - 0x0390) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacSymbol",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2200..0x2250 => {
-                        match Self::BASE_0X2200[(*code_point as u32 - 0x2200) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacSymbol",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2280..0x22a8 => {
-                        match Self::BASE_0X2280[(*code_point as u32 - 0x2280) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacSymbol",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2398..0x23b0 => {
-                        match Self::BASE_0X2398[(*code_point as u32 - 0x2398) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacSymbol",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x0390..0x03d8 => match Self::BASE_0X0390[(*code_point - 0x0390) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacSymbol",
+                            *code_point
+                        )))),
+                    },
+                    0x2200..0x2250 => match Self::BASE_0X2200[(*code_point - 0x2200) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacSymbol",
+                            *code_point
+                        )))),
+                    },
+                    0x2280..0x22a8 => match Self::BASE_0X2280[(*code_point - 0x2280) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacSymbol",
+                            *code_point
+                        )))),
+                    },
+                    0x2398..0x23b0 => match Self::BASE_0X2398[(*code_point - 0x2398) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacSymbol",
+                            *code_point
+                        )))),
+                    },
                     0x00a9 => match self.code_points.get(self.code_point_index) {
                         Some(0xf87f) => {
                             self.code_point_index += 1;
@@ -674,12 +658,10 @@ impl<'a> Iterator for EncoderMacSymbol<'a> {
                     0x3009 => Some(Ok(vec![0xf1])),
                     0xf8e5 => Some(Ok(vec![0x60])),
                     0xf8ff => Some(Ok(vec![0xf0])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacSymbol",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacSymbol",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

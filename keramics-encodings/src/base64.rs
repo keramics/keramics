@@ -46,12 +46,12 @@ impl<'a> Base64Stream<'a> {
     pub fn new(data: &'a [u8], data_offset: usize, skip_white_space: bool) -> Self {
         let data_size: usize = data.len();
         Self {
-            data: data,
-            data_offset: data_offset,
-            data_size: data_size,
+            data,
+            data_offset,
+            data_size,
             bits: 0,
             number_of_bits: 0,
-            skip_white_space: skip_white_space,
+            skip_white_space,
             found_padding: false,
         }
     }
@@ -126,7 +126,7 @@ impl Base64Context {
 
     /// Decode data.
     pub fn decode(&mut self, encoded_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
-        let mut base64_stream: Base64Stream = Base64Stream::new(&encoded_data, 0, false);
+        let mut base64_stream: Base64Stream = Base64Stream::new(encoded_data, 0, false);
         let mut data_offset: usize = 0;
 
         while let Some(byte_value) = base64_stream.get_value()? {

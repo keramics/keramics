@@ -161,7 +161,7 @@ impl<'a> DecoderMacHebrew<'a> {
     /// Creates a new decoder.
     pub fn new(bytes: &'a [u8]) -> Self {
         Self {
-            bytes: bytes,
+            bytes,
             byte_index: 0,
         }
     }
@@ -365,7 +365,7 @@ impl<'a> EncoderMacHebrew<'a> {
     /// Creates a new encoder.
     pub fn new(code_points: &'a [u32]) -> Self {
         Self {
-            code_points: code_points,
+            code_points,
             code_point_index: 0,
         }
     }
@@ -414,48 +414,36 @@ impl<'a> Iterator for EncoderMacHebrew<'a> {
                 };
                 match *code_point {
                     0x0000..0x0080 => Some(Ok(vec![*code_point as u8])),
-                    0x00c0..0x0100 => {
-                        match Self::BASE_0X00C0[(*code_point as u32 - 0x00c0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacHebrew",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x05b0..0x05f0 => {
-                        match Self::BASE_0X05B0[(*code_point as u32 - 0x05b0) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacHebrew",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
-                    0x2010..0x2028 => {
-                        match Self::BASE_0X2010[(*code_point as u32 - 0x2010) as usize] {
-                            Some(bytes) => Some(Ok(bytes.to_vec())),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to encode code point: U+{:04x} as MacHebrew",
-                                    *code_point
-                                ))));
-                            }
-                        }
-                    }
+                    0x00c0..0x0100 => match Self::BASE_0X00C0[(*code_point - 0x00c0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacHebrew",
+                            *code_point
+                        )))),
+                    },
+                    0x05b0..0x05f0 => match Self::BASE_0X05B0[(*code_point - 0x05b0) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacHebrew",
+                            *code_point
+                        )))),
+                    },
+                    0x2010..0x2028 => match Self::BASE_0X2010[(*code_point - 0x2010) as usize] {
+                        Some(bytes) => Some(Ok(bytes.to_vec())),
+                        None => Some(Err(keramics_core::error_trace_new!(format!(
+                            "Unable to encode code point: U+{:04x} as MacHebrew",
+                            *code_point
+                        )))),
+                    },
                     0x00a0 => Some(Ok(vec![0xca])),
                     0x05f2 => {
                         if first_additional_code_point == 0x05b7 {
                             Some(Ok(vec![0x81]))
                         } else {
-                            return Some(Err(keramics_core::error_trace_new!(format!(
+                            Some(Err(keramics_core::error_trace_new!(format!(
                                 "Unable to encode code point: U+{:04x} U+{:04x} as MacHebrew",
                                 *code_point, first_additional_code_point
-                            ))));
+                            ))))
                         }
                     }
                     0x20aa => Some(Ok(vec![0xa6])),
@@ -469,24 +457,22 @@ impl<'a> Iterator for EncoderMacHebrew<'a> {
                         {
                             Some(Ok(vec![0xc0]))
                         } else {
-                            return Some(Err(keramics_core::error_trace_new!(format!(
+                            Some(Err(keramics_core::error_trace_new!(format!(
                                 "Unable to encode code point: U+{:04x} U+{:04x} U+{:04x} as MacHebrew",
                                 *code_point,
                                 first_additional_code_point,
                                 second_additional_code_point
-                            ))));
+                            ))))
                         }
                     }
                     0xfb2a => Some(Ok(vec![0xd6])),
                     0xfb2b => Some(Ok(vec![0xd7])),
                     0xfb35 => Some(Ok(vec![0xc8])),
                     0xfb4b => Some(Ok(vec![0xc7])),
-                    _ => {
-                        return Some(Err(keramics_core::error_trace_new!(format!(
-                            "Unable to encode code point: U+{:04x} as MacHebrew",
-                            *code_point
-                        ))));
-                    }
+                    _ => Some(Err(keramics_core::error_trace_new!(format!(
+                        "Unable to encode code point: U+{:04x} as MacHebrew",
+                        *code_point
+                    )))),
                 }
             }
             None => None,

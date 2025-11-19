@@ -240,22 +240,6 @@ impl From<&[String]> for Path {
     }
 }
 
-impl From<&Vec<&str>> for Path {
-    /// Converts a [`&Vec<&str>`] into a [`Path`]
-    #[inline(always)]
-    fn from(path_components: &Vec<&str>) -> Self {
-        Self::from(path_components.as_slice())
-    }
-}
-
-impl From<&Vec<String>> for Path {
-    /// Converts a [`&Vec<String>`] into a [`Path`]
-    #[inline]
-    fn from(path_components: &Vec<String>) -> Self {
-        Self::from(path_components.as_slice())
-    }
-}
-
 impl From<&[PathComponent]> for Path {
     /// Converts a [`Vec<PathComponent>`] into a [`Path`]
     #[inline]
@@ -588,94 +572,6 @@ mod tests {
             String::from("filename.txt"),
         ];
         let test_struct: Path = Path::from(string_array.as_slice());
-        assert_eq!(test_struct.components.len(), 2);
-    }
-
-    #[test]
-    fn test_from_str_vector() {
-        let str_vector: Vec<&str> = vec![""];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 1);
-
-        let str_vector: Vec<&str> = vec!["", "directory"];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 2);
-
-        let str_vector: Vec<&str> = vec!["", "directory", "filename.txt"];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 3);
-
-        let str_vector: Vec<&str> = vec!["", "directory", ".", "filename.txt"];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 3);
-
-        let str_vector: Vec<&str> = vec!["", "directory", ""];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 3);
-
-        let str_vector: Vec<&str> = vec![".", "directory"];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 1);
-
-        let str_vector: Vec<&str> = vec!["..", "directory"];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 2);
-
-        let str_vector: Vec<&str> = vec!["..", "directory", "..", "filename.txt"];
-        let test_struct: Path = Path::from(&str_vector);
-        assert_eq!(test_struct.components.len(), 2);
-    }
-
-    #[test]
-    fn test_from_string_vector() {
-        let string_vector: Vec<String> = vec![String::from("")];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 1);
-
-        let string_vector: Vec<String> = vec![String::from(""), String::from("directory")];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 2);
-
-        let string_vector: Vec<String> = vec![
-            String::from(""),
-            String::from("directory"),
-            String::from("filename.txt"),
-        ];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 3);
-
-        let string_vector: Vec<String> = vec![
-            String::from(""),
-            String::from("directory"),
-            String::from("."),
-            String::from("filename.txt"),
-        ];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 3);
-
-        let string_vector: Vec<String> = vec![
-            String::from(""),
-            String::from("directory"),
-            String::from(""),
-        ];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 3);
-
-        let string_vector: Vec<String> = vec![String::from("."), String::from("directory")];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 1);
-
-        let string_vector: Vec<String> = vec![String::from(".."), String::from("directory")];
-        let test_struct: Path = Path::from(&string_vector);
-        assert_eq!(test_struct.components.len(), 2);
-
-        let string_vector: Vec<String> = vec![
-            String::from(".."),
-            String::from("directory"),
-            String::from(".."),
-            String::from("filename.txt"),
-        ];
-        let test_struct: Path = Path::from(&string_vector);
         assert_eq!(test_struct.components.len(), 2);
     }
 

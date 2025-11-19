@@ -35,25 +35,19 @@ pub struct PosixTime32 {
 impl PosixTime32 {
     /// Creates a new timestamp.
     pub fn new(timestamp: i32) -> Self {
-        Self {
-            timestamp: timestamp,
-        }
+        Self { timestamp }
     }
 
     /// Reads a big-endian timestamp from a byte sequence.
     pub fn from_be_bytes(data: &[u8]) -> Self {
         let timestamp: i32 = bytes_to_i32_be!(data, 0);
-        Self {
-            timestamp: timestamp,
-        }
+        Self { timestamp }
     }
 
     /// Reads a little-endian timestamp from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
         let timestamp: i32 = bytes_to_i32_le!(data, 0);
-        Self {
-            timestamp: timestamp,
-        }
+        Self { timestamp }
     }
 
     /// Retrieves an ISO 8601 string representation of the timestamp.
@@ -95,8 +89,8 @@ impl PosixTime64Ns {
     /// Creates a new timestamp.
     pub fn new(timestamp: i64, fraction: u32) -> Self {
         Self {
-            timestamp: timestamp,
-            fraction: fraction,
+            timestamp,
+            fraction,
         }
     }
 

@@ -62,9 +62,9 @@ impl<'a> LzxBitstream<'a> {
     pub fn new(data: &'a [u8], data_offset: usize) -> Self {
         let data_size: usize = data.len();
         Self {
-            data: data,
-            data_offset: data_offset,
-            data_size: data_size,
+            data,
+            data_offset,
+            data_size,
             bits: 0,
             number_of_bits: 0,
         }

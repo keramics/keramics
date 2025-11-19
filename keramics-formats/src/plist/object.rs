@@ -94,10 +94,10 @@ impl PlistObject {
         }
     }
 
-    /// Retrieves the reference to a wrapped vector.
-    pub fn as_vector(&self) -> Option<&Vec<PlistObject>> {
+    /// Retrieves the reference to a wrapped slice.
+    pub fn as_slice(&self) -> Option<&[PlistObject]> {
         match *self {
-            PlistObject::Array(ref vector) => Some(vector),
+            PlistObject::Array(ref vector) => Some(vector.as_slice()),
             _ => None,
         }
     }
@@ -138,12 +138,12 @@ impl PlistObject {
         string_object.as_string()
     }
 
-    /// Retrieves a vector value for a specific key.
-    pub fn get_vector_by_key(&self, key: &str) -> Option<&Vec<PlistObject>> {
+    /// Retrieves a slice value for a specific key.
+    pub fn get_slice_by_key(&self, key: &str) -> Option<&[PlistObject]> {
         let array_object: &PlistObject = match self.get_object_by_key(key) {
             Some(plist_object) => plist_object,
             None => return None,
         };
-        array_object.as_vector()
+        array_object.as_slice()
     }
 }

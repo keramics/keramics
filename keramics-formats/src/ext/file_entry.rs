@@ -194,7 +194,7 @@ impl ExtFileEntry {
                         return Err(error);
                     }
                 }
-                ByteString::from(&data)
+                ByteString::from(data.as_slice())
             };
             self.symbolic_link_target = Some(byte_string);
         }

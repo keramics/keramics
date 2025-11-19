@@ -54,7 +54,7 @@ impl ExtBlockStream {
         &mut self,
         data_stream: &DataStreamReference,
         number_of_blocks: u64,
-        block_ranges: &Vec<ExtBlockRange>,
+        block_ranges: &[ExtBlockRange],
     ) -> Result<(), ErrorTrace> {
         let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
         self.block_tree =
