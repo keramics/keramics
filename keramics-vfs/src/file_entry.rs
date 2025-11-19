@@ -3060,7 +3060,7 @@ mod tests {
 
         let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
         // Note that the value can vary.
-        assert_eq!(sub_file_entry.get_name().is_some());
+        assert!(sub_file_entry.get_name().is_some());
 
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
