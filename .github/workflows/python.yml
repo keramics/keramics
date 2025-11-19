@@ -5,6 +5,15 @@ permissions: read-all
 env:
   CARGO_TERM_COLOR: always
 jobs:
+  black:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check format of Python code
+        uses: psf/black@stable
+        with:
+          options: "--check"
+          src: "./keramics-python/"
   tox:
     runs-on: ubuntu-latest
     strategy:
@@ -31,6 +40,6 @@ jobs:
     - name: Install tox
       run: |
         python3 -m pip install tox
-    - name: Build Python module
+    - name: Build and test Python module
       run: |
         cd keramics-python && tox -e${{ matrix.toxenv }}

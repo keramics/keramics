@@ -15,5 +15,5 @@ jobs:
         profile: minimal
         toolchain: stable
         components: rustfmt
-    - name: Format check
+    - name: Check format of Rust code
       run: cargo fmt --check
