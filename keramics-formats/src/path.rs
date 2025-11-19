@@ -46,9 +46,7 @@ impl Path {
                 components.push(path_component.clone());
             }
         }
-        Self {
-            components: components,
-        }
+        Self { components }
     }
 
     /// Creates a new path of the parent directory.
@@ -134,9 +132,7 @@ impl From<&ByteString> for Path {
             }
             components
         };
-        Self {
-            components: components,
-        }
+        Self { components }
     }
 }
 
@@ -149,9 +145,7 @@ impl From<&PathBuf> for Path {
             .map(|component| PathComponent::OsString(component.to_os_string()))
             .collect();
 
-        Self {
-            components: components,
-        }
+        Self { components }
     }
 }
 
@@ -180,9 +174,7 @@ impl From<&str> for Path {
             }
             components
         };
-        Self {
-            components: components,
-        }
+        Self { components }
     }
 }
 
@@ -211,9 +203,7 @@ impl From<&[&str]> for Path {
                 components.push(PathComponent::from(*path_component));
             }
         }
-        Self {
-            components: components,
-        }
+        Self { components }
     }
 }
 
@@ -234,9 +224,7 @@ impl From<&[String]> for Path {
                 components.push(PathComponent::from(path_component));
             }
         }
-        Self {
-            components: components,
-        }
+        Self { components }
     }
 }
 

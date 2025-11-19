@@ -61,7 +61,7 @@ impl<'a> VfsFinder<'a> {
     /// Creates a new finder.
     pub fn new(file_system: &'a VfsFileSystem) -> Self {
         Self {
-            file_system: file_system,
+            file_system,
             path_components: Vec::new(),
             states: Vec::new(),
             search_started: false,

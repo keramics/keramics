@@ -60,10 +60,7 @@ impl EwfInfo {
         println!("Expert Witness Compression Format (EWF) information:");
         // File format
         if !ewf_image.set_identifier.is_nil() {
-            println!(
-                "    Set identifier\t\t\t\t: {}",
-                ewf_image.set_identifier.to_string(),
-            );
+            println!("    Set identifier\t\t\t\t: {}", ewf_image.set_identifier,);
         }
         println!(
             "    Sectors per chunk\t\t\t\t: {}",

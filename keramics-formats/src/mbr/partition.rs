@@ -51,11 +51,11 @@ impl MbrPartition {
         Self {
             data_stream: None,
             current_offset: 0,
-            entry_index: entry_index,
-            offset: offset,
-            size: size,
-            partition_type: partition_type,
-            flags: flags,
+            entry_index,
+            offset,
+            size,
+            partition_type,
+            flags,
         }
     }
 

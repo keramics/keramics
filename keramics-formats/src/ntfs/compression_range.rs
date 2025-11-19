@@ -35,9 +35,9 @@ impl NtfsCompressionRange {
     /// Creates a new compression range.
     pub fn new(offset: u64, size: u64, range_type: NtfsCompressionRangeType) -> Self {
         Self {
-            offset: offset,
-            size: size,
-            range_type: range_type,
+            offset,
+            size,
+            range_type,
         }
     }
 }

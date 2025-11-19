@@ -76,7 +76,7 @@ impl FatInfo {
         println!("    Identifier\t\t\t\t: 0x{:08x}", file_entry.identifier);
 
         match file_entry.get_name() {
-            Some(name) => println!("    Name\t\t\t\t: {}", name.to_string()),
+            Some(name) => println!("    Name\t\t\t\t: {}", name),
             None => {}
         };
         println!("    Size\t\t\t\t: {}", file_entry.get_size());

@@ -45,8 +45,8 @@ impl<T> BlockTreeNode<T> {
     pub fn new(node_type: &BlockTreeNodeType, offset: u64, element_size: u64) -> Self {
         BlockTreeNode {
             node_type: node_type.clone(),
-            offset: offset,
-            element_size: element_size,
+            offset,
+            element_size,
             sub_nodes: Vec::new(),
             values: Vec::new(),
         }

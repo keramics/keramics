@@ -31,7 +31,7 @@ impl<'a> EwfByteObjectStorage<'a> {
     /// Creates a new byte string object storage.
     pub fn new(data: &'a [u8]) -> Self {
         Self {
-            data: data,
+            data,
             data_size: data.len(),
             data_offset: 0,
         }
@@ -85,7 +85,7 @@ impl<'a> EwfUtf16ObjectStorage<'a> {
     /// Creates a new iterator.
     pub fn new(data: &'a [u8], byte_order: ByteOrder) -> Self {
         Self {
-            data: data,
+            data,
             data_size: data.len(),
             data_offset: 0,
             byte_order: byte_order,

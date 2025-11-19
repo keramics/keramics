@@ -52,9 +52,9 @@ impl GptPartition {
         Self {
             data_stream: None,
             current_offset: 0,
-            entry_index: entry_index,
-            offset: offset,
-            size: size,
+            entry_index,
+            offset,
+            size,
             type_identifier: type_identifier.clone(),
             identifier: identifier.clone(),
         }

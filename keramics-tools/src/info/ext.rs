@@ -246,7 +246,7 @@ impl ExtInfo {
         println!("    Inode number\t\t\t: {}", file_entry.inode_number);
 
         match file_entry.get_name() {
-            Some(name) => println!("    Name\t\t\t\t: {}", name.to_string()),
+            Some(name) => println!("    Name\t\t\t\t: {}", name),
             None => {}
         };
         println!("    Size\t\t\t\t: {}", file_entry.get_size());
@@ -334,10 +334,7 @@ impl ExtInfo {
         };
         match result {
             Some(symbolic_link_target) => {
-                println!(
-                    "    Symbolic link target\t\t: {}",
-                    symbolic_link_target.to_string()
-                );
+                println!("    Symbolic link target\t\t: {}", symbolic_link_target);
             }
             None => {}
         };
@@ -532,7 +529,7 @@ impl ExtInfo {
         );
         println!(
             "    Last mount path\t\t\t: {}",
-            ext_file_system.last_mount_path.to_string()
+            ext_file_system.last_mount_path
         );
         let date_time_string: String = match ext_file_system.last_mount_time {
             DateTime::NotSet => String::from("Not set (0)"),

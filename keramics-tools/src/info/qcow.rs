@@ -71,10 +71,7 @@ impl QcowInfo {
 
         match qcow_file.get_backing_file_name() {
             Some(backing_file_name) => {
-                println!(
-                    "    Backing file name\t\t\t: {}",
-                    backing_file_name.to_string()
-                );
+                println!("    Backing file name\t\t\t: {}", backing_file_name);
             }
             None => {}
         }

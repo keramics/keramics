@@ -35,9 +35,9 @@ impl<T> BlockTree<T> {
     /// Creates a new block tree.
     pub fn new(data_size: u64, elements_per_node: u64, leaf_value_size: u64) -> Self {
         Self {
-            data_size: data_size,
-            elements_per_node: elements_per_node,
-            leaf_value_size: leaf_value_size,
+            data_size,
+            elements_per_node,
+            leaf_value_size,
             root_node: None,
         }
     }

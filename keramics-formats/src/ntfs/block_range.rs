@@ -43,10 +43,10 @@ impl NtfsBlockRange {
         range_type: NtfsBlockRangeType,
     ) -> Self {
         Self {
-            virtual_cluster_offset: virtual_cluster_offset,
-            cluster_block_number: cluster_block_number,
-            size: size,
-            range_type: range_type,
+            virtual_cluster_offset,
+            cluster_block_number,
+            size,
+            range_type,
         }
     }
 }

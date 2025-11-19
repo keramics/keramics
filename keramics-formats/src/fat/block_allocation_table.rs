@@ -52,10 +52,10 @@ impl FatBlockAllocationTable {
         Self {
             mediator: Mediator::current(),
             format: format.clone(),
-            offset: offset,
-            number_of_entries: number_of_entries,
-            first_cluster_offset: first_cluster_offset,
-            cluster_block_size: cluster_block_size,
+            offset,
+            number_of_entries,
+            first_cluster_offset,
+            cluster_block_size,
         }
     }
 

@@ -52,11 +52,11 @@ impl ApmPartition {
         Self {
             data_stream: None,
             current_offset: 0,
-            offset: offset,
-            size: size,
+            offset,
+            size,
             type_identifier: type_identifier.clone(),
             name: name.clone(),
-            status_flags: status_flags,
+            status_flags,
         }
     }
 

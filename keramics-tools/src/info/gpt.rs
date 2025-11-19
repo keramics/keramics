@@ -34,7 +34,7 @@ impl GptInfo {
         println!("GUID Partition Table (GPT) information:");
         println!(
             "    Disk identifier\t\t\t: {}",
-            gpt_volume_system.disk_identifier.to_string()
+            gpt_volume_system.disk_identifier
         );
         println!(
             "    Bytes per sector\t\t\t: {} bytes",
@@ -58,13 +58,10 @@ impl GptInfo {
                     }
                 };
             println!("Partition: {}", partition_index + 1);
-            println!(
-                "    Identifier\t\t\t\t: {}",
-                gpt_partition.identifier.to_string()
-            );
+            println!("    Identifier\t\t\t\t: {}", gpt_partition.identifier);
             println!(
                 "    Type identifier\t\t\t: {}",
-                gpt_partition.type_identifier.to_string()
+                gpt_partition.type_identifier
             );
             println!(
                 "    Offset\t\t\t\t: {} (0x{:08x})",

@@ -58,23 +58,17 @@ impl VhdInfo {
             "    Bytes per sector\t\t\t: {} bytes",
             vhd_file.bytes_per_sector
         );
-        println!(
-            "    Identifier\t\t\t\t: {}",
-            vhd_file.identifier.to_string()
-        );
+        println!("    Identifier\t\t\t\t: {}", vhd_file.identifier);
 
         match &vhd_file.parent_identifier {
             Some(parent_identifier) => {
-                println!(
-                    "    Parent identifier\t\t\t: {}",
-                    parent_identifier.to_string()
-                );
+                println!("    Parent identifier\t\t\t: {}", parent_identifier);
             }
             None => {}
         }
         match &vhd_file.parent_name {
             Some(parent_name) => {
-                println!("    Parent name\t\t\t\t: {}", parent_name.to_string());
+                println!("    Parent name\t\t\t\t: {}", parent_name);
             }
             None => {}
         }

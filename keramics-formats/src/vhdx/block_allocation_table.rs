@@ -79,8 +79,8 @@ impl VhdxBlockAllocationTable {
     pub fn new(offset: u64, number_of_entries: u32) -> Self {
         Self {
             mediator: Mediator::current(),
-            offset: offset,
-            number_of_entries: number_of_entries,
+            offset,
+            number_of_entries,
         }
     }
 

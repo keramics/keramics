@@ -48,11 +48,11 @@ impl UdifBlockRange {
         range_type: UdifBlockRangeType,
     ) -> Self {
         Self {
-            media_offset: media_offset,
-            data_offset: data_offset,
-            size: size,
-            compressed_data_size: compressed_data_size,
-            range_type: range_type,
+            media_offset,
+            data_offset,
+            size,
+            compressed_data_size,
+            range_type,
         }
     }
 }

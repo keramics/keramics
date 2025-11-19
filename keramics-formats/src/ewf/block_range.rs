@@ -47,11 +47,11 @@ impl EwfBlockRange {
         range_type: EwfBlockRangeType,
     ) -> Self {
         Self {
-            media_offset: media_offset,
-            segment_number: segment_number,
-            data_offset: data_offset,
-            data_size: data_size,
-            range_type: range_type,
+            media_offset,
+            segment_number,
+            data_offset,
+            data_size,
+            range_type,
         }
     }
 }

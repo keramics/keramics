@@ -23,7 +23,7 @@ struct LruCacheEntry<V> {
 impl<V> LruCacheEntry<V> {
     /// Creates a new cache entry.
     pub fn new(value: V) -> Self {
-        Self { value: value }
+        Self { value }
     }
 }
 
@@ -43,7 +43,7 @@ impl<K: Hash + Eq + Copy, V> LruCache<K, V> {
     /// Creates a new cache.
     pub fn new(number_of_entries: usize) -> Self {
         Self {
-            number_of_entries: number_of_entries,
+            number_of_entries,
             values: HashMap::new(),
             usage: VecDeque::new(),
         }

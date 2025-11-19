@@ -229,12 +229,8 @@ impl PyVfsFileEntry {
 
     pub fn get_data_stream(&self) -> PyResult<Option<PyVfsDataStream>> {
         match self.file_entry.get_data_stream() {
-            Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream {
-                data_stream: data_stream,
-            })),
-            Ok(None) => {
-                return Ok(None);
-            }
+            Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream { data_stream })),
+            Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to retrieve data stream with error: {}",
                 error
@@ -311,9 +307,7 @@ impl PyVfsFileSystem {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
             })),
-            Ok(None) => {
-                return Ok(None);
-            }
+            Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to retrieve file entry with error: {}",
                 error
@@ -326,9 +320,7 @@ impl PyVfsFileSystem {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
             })),
-            Ok(None) => {
-                return Ok(None);
-            }
+            Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to retrieve root file entry with error: {}",
                 error
@@ -467,9 +459,7 @@ impl PyVfsPath {
             .map(|path_component| path_component.path_component.as_ref().clone())
             .collect::<Vec<PathComponent>>();
 
-        let vfs_path: Path = self
-            .path
-            .new_with_join_path_components(&vfs_path_components);
+        let vfs_path: Path = self.path.new_with_join_path_components(vfs_path_components);
 
         Ok(Self {
             path: Arc::new(vfs_path),
@@ -561,12 +551,8 @@ impl PyVfsResolver {
             .resolver
             .get_data_stream_by_location_and_name(location.location.as_ref(), vfs_name)
         {
-            Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream {
-                data_stream: data_stream,
-            })),
-            Ok(None) => {
-                return Ok(None);
-            }
+            Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream { data_stream })),
+            Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to retrieve data stream with error: {}",
                 error
@@ -585,9 +571,7 @@ impl PyVfsResolver {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
             })),
-            Ok(None) => {
-                return Ok(None);
-            }
+            Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to retrieve file entry with error: {}",
                 error
@@ -597,9 +581,7 @@ impl PyVfsResolver {
 
     pub fn open_file_system(&self, location: &PyVfsLocation) -> PyResult<PyVfsFileSystem> {
         match self.resolver.open_file_system(location.location.as_ref()) {
-            Ok(file_system) => Ok(PyVfsFileSystem {
-                file_system: file_system,
-            }),
+            Ok(file_system) => Ok(PyVfsFileSystem { file_system }),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to open file system with error: {}",
                 error

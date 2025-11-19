@@ -43,10 +43,10 @@ impl ExtBlockRange {
         range_type: ExtBlockRangeType,
     ) -> Self {
         Self {
-            logical_block_number: logical_block_number,
-            physical_block_number: physical_block_number,
-            number_of_blocks: number_of_blocks,
-            range_type: range_type,
+            logical_block_number,
+            physical_block_number,
+            number_of_blocks,
+            range_type,
         }
     }
 }

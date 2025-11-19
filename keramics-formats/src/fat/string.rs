@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::fmt;
+
 use keramics_types::{ByteString, Ucs2String};
 
 /// File Allocation Table (FAT) string.
@@ -44,14 +46,6 @@ impl FatString {
             FatString::Ucs2String(ucs2_string) => ucs2_string.len(),
         }
     }
-
-    /// Converts the `FatString` to `String`.
-    pub fn to_string(&self) -> String {
-        match self {
-            FatString::ByteString(byte_string) => byte_string.to_string(),
-            FatString::Ucs2String(ucs2_string) => ucs2_string.to_string(),
-        }
-    }
 }
 
 impl From<&str> for FatString {
@@ -67,6 +61,16 @@ impl From<&String> for FatString {
     #[inline(always)]
     fn from(string: &String) -> Self {
         Self::Ucs2String(Ucs2String::from(string))
+    }
+}
+
+impl fmt::Display for FatString {
+    /// Formats the byte string for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            FatString::ByteString(byte_string) => byte_string.fmt(formatter),
+            FatString::Ucs2String(ucs2_string) => ucs2_string.fmt(formatter),
+        }
     }
 }
 

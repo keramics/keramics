@@ -45,10 +45,10 @@ impl QcowBlockRange {
         range_type: QcowBlockRangeType,
     ) -> Self {
         Self {
-            media_offset: media_offset,
-            data_offset: data_offset,
-            size: size,
-            range_type: range_type,
+            media_offset,
+            data_offset,
+            size,
+            range_type,
         }
     }
 }

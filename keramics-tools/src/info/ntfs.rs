@@ -254,7 +254,7 @@ impl NtfsInfo {
                     ),
                     None => println!("    Name space\t\t\t\t: {}", file_name.name_space),
                 };
-                println!("    Name\t\t\t\t: {}", file_name.name.to_string());
+                println!("    Name\t\t\t\t: {}", file_name.name);
 
                 if file_name.parent_file_reference == 0 {
                     println!("    Parent file reference\t\t: Not set (0)");
@@ -301,7 +301,7 @@ impl NtfsInfo {
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
             NtfsAttribute::Generic { mft_attribute } => {
                 match &mft_attribute.name {
-                    Some(name) => println!("    Attribute name\t\t\t: {}", name.to_string()),
+                    Some(name) => println!("    Attribute name\t\t\t: {}", name),
                     None => {}
                 };
                 if mft_attribute.data_size < 1024 {
@@ -391,7 +391,7 @@ impl NtfsInfo {
                 println!("");
             }
             NtfsAttribute::VolumeName { volume_name } => {
-                println!("    Volume name\t\t\t\t: {}", volume_name.to_string());
+                println!("    Volume name\t\t\t\t: {}", volume_name);
                 println!("");
             }
         }
@@ -409,7 +409,7 @@ impl NtfsInfo {
             file_reference >> 48,
         );
         match file_entry.get_name() {
-            Some(name) => println!("    Name\t\t\t\t: {}", name.to_string()),
+            Some(name) => println!("    Name\t\t\t\t: {}", name),
             None => {}
         };
         println!("    Size\t\t\t\t: {} bytes", file_entry.get_size());
@@ -629,7 +629,7 @@ impl NtfsInfo {
         }
         match ntfs_file_system.get_volume_label() {
             Some(volume_label) => {
-                println!("    Volume label\t\t\t: {}", volume_label.to_string());
+                println!("    Volume label\t\t\t: {}", volume_label);
             }
             None => {}
         }
@@ -807,7 +807,7 @@ impl NtfsInfo {
                 }
             };
             match data_fork.get_name() {
-                Some(name) => println!("{}:{}", path, name.to_string()),
+                Some(name) => println!("{}:{}", path, name),
                 None => println!("{}", path),
             };
         }

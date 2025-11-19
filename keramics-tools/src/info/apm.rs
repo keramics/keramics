@@ -98,10 +98,10 @@ impl ApmInfo {
             println!("Partition: {}", partition_index + 1);
             println!(
                 "    Type identifier\t\t\t: {}",
-                apm_partition.type_identifier.to_string()
+                apm_partition.type_identifier
             );
             if !apm_partition.name.is_empty() {
-                println!("    Name\t\t\t\t: {}", apm_partition.name.to_string());
+                println!("    Name\t\t\t\t: {}", apm_partition.name);
             }
             println!(
                 "    Offset\t\t\t\t: {} (0x{:08x})",
