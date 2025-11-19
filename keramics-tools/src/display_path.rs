@@ -23,6 +23,9 @@ use crate::enums::DisplayPathType;
 
 /// Helper for creating human readable path representations.
 pub struct DisplayPath {
+    /// VFS resolver reference.
+    vfs_resolver: VfsResolverReference,
+
     /// Character translation table.
     pub translation_table: HashMap<u32, String>,
 
@@ -34,6 +37,7 @@ impl DisplayPath {
     /// Creates a new display path helper.
     pub fn new(volume_path_type: &DisplayPathType) -> Self {
         Self {
+            vfs_resolver: VfsResolver::current(),
             translation_table: Self::get_character_translation_table(),
             volume_path_type: volume_path_type.clone(),
         }
@@ -158,9 +162,8 @@ impl DisplayPath {
         &self,
         vfs_location: &VfsLocation,
     ) -> Result<String, ErrorTrace> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
         let result: Option<VfsFileEntry> =
-            match vfs_resolver.get_file_entry_by_location(vfs_location) {
+            match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
                 Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
@@ -246,10 +249,12 @@ impl DisplayPath {
 mod tests {
     use super::*;
 
+    use keramics_formats::Path;
     use keramics_types::Ucs2String;
+    use keramics_vfs::new_os_vfs_location;
 
     #[test]
-    fn test_internal_escape_string() -> Result<(), ErrorTrace> {
+    fn test_internal_escape_string() {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
         let test_string: String = String::from("test");
@@ -275,12 +280,10 @@ mod tests {
         let test_string: String = String::from("test\u{fdd0}");
         let escaped_string: String = display_path.internal_escape_string(&test_string);
         assert_eq!(escaped_string, "test\\U0000fdd0");
-
-        Ok(())
     }
 
     #[test]
-    fn test_escape_string() -> Result<(), ErrorTrace> {
+    fn test_escape_string() {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
         let test_string: VfsString = VfsString::from("test");
@@ -292,9 +295,105 @@ mod tests {
         });
         let escaped_string: String = display_path.escape_string(&test_string);
         assert_eq!(escaped_string, "test\\U0000d800");
+    }
+
+    #[test]
+    fn test_get_character_translation_table() {
+        let _ = DisplayPath::get_character_translation_table();
+    }
+
+    #[test]
+    fn test_get_identifier_display_path() -> Result<(), ErrorTrace> {
+        let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Identifier);
+
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+
+        let test_path: String = display_path.get_identifier_display_path(&os_vfs_location)?;
+        assert_eq!(test_path, String::from(""));
+
+        let path: Path = Path::from("/gpt1");
+        let gpt_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
+
+        let test_path: String = display_path.get_identifier_display_path(&gpt_vfs_location)?;
+        assert_eq!(
+            test_path,
+            String::from("/gpt{0b119671-75ff-4e2a-a31a-0bc83f857fdd}")
+        );
+
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/mbr/mbr.raw");
+
+        let test_path: String = display_path.get_identifier_display_path(&os_vfs_location)?;
+        assert_eq!(test_path, String::from(""));
+
+        let path: Path = Path::from("/mbr1");
+        let mbr_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Mbr, path);
+
+        let test_path: String = display_path.get_identifier_display_path(&mbr_vfs_location)?;
+        assert_eq!(test_path, String::from("/p1"));
 
         Ok(())
     }
 
-    // TODO: add tests
+    #[test]
+    fn test_get_index_display_path() -> Result<(), ErrorTrace> {
+        let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
+
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+
+        let test_path: String = display_path.get_index_display_path(&os_vfs_location)?;
+        assert_eq!(test_path, String::from(""));
+
+        let path: Path = Path::from("/gpt1");
+        let gpt_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
+
+        let test_path: String = display_path.get_index_display_path(&gpt_vfs_location)?;
+        assert_eq!(test_path, String::from("/p1"));
+
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/mbr/mbr.raw");
+
+        let test_path: String = display_path.get_index_display_path(&os_vfs_location)?;
+        assert_eq!(test_path, String::from(""));
+
+        let path: Path = Path::from("/mbr1");
+        let mbr_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Mbr, path);
+
+        let test_path: String = display_path.get_index_display_path(&mbr_vfs_location)?;
+        assert_eq!(test_path, String::from("/p1"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_path() -> Result<(), ErrorTrace> {
+        let mut display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Identifier);
+
+        let os_vfs_location: VfsLocation = new_os_vfs_location("../test_data/gpt/gpt.raw");
+        let path: Path = Path::from("/gpt1");
+        let gpt_vfs_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
+
+        let test_path: String = display_path.get_path(&gpt_vfs_location)?;
+        assert_eq!(
+            test_path,
+            String::from("/gpt{0b119671-75ff-4e2a-a31a-0bc83f857fdd}")
+        );
+
+        display_path.set_volume_path_type(&DisplayPathType::Index);
+
+        let test_path: String = display_path.get_path(&gpt_vfs_location)?;
+        assert_eq!(test_path, String::from("/p1"));
+
+        Ok(())
+    }
+
+    // TODO: add tests for join_path_components
+
+    #[test]
+    fn test_set_volume_path_type() {
+        let mut display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
+
+        assert_eq!(display_path.volume_path_type, DisplayPathType::Index);
+
+        display_path.set_volume_path_type(&DisplayPathType::Identifier);
+        assert_eq!(display_path.volume_path_type, DisplayPathType::Identifier);
+    }
 }

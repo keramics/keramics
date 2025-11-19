@@ -917,8 +917,8 @@ mod tests {
         }
         let mut vfs_context: VfsContext = VfsContext::new();
 
-        let os_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let os_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         let path: Path = Path::from("/");
         let vfs_file_system_path: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Gpt, path);
         let vfs_file_system: VfsFileSystemReference =
@@ -1160,8 +1160,8 @@ mod tests {
                 ));
             }
         }
-        let data_stream: DataStreamReference =
-            get_data_stream(get_test_data_path("gpt/gpt.raw").as_str())?;
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
 
         let vfs_type: VfsType = format_scanner
             .scan_for_volume_system_format(&data_stream)?

@@ -148,7 +148,8 @@ mod tests {
         let type_identifier: Uuid = Uuid::new();
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("gpt/gpt.raw").as_str());
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 
@@ -161,7 +162,8 @@ mod tests {
         let type_identifier: Uuid = Uuid::new();
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("gpt/gpt.raw").as_str());
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         partition.open(&data_stream)?;
 

@@ -1114,8 +1114,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("gpt/gpt.raw").as_str());
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)

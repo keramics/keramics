@@ -33,7 +33,7 @@ pub enum DigestHashType {
 }
 
 /// Display path types.
-#[derive(Clone, Debug, ValueEnum)]
+#[derive(Clone, Debug, PartialEq, ValueEnum)]
 pub enum DisplayPathType {
     /// Identifier based volume or partition path, such as /apfs{f449e580-e355-4e74-8880-05e46e4e3b1e}
     Identifier,

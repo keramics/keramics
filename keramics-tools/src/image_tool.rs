@@ -13,16 +13,16 @@
 
 use std::collections::HashSet;
 use std::fmt::Write;
-use std::io::SeekFrom;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::{Arc, RwLock};
 
 use clap::{Args, Parser, Subcommand};
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::ntfs::NtfsAttribute;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
@@ -95,12 +95,24 @@ struct BodyfileCommandArguments {
 
 /// Storage media image.
 enum StorageMediaImage {
-    Ewf(EwfImage),
-    Qcow(QcowImage),
-    SparseImage(SparseImageFile),
-    Udif(UdifFile),
-    Vhd(VhdImage),
-    Vhdx(VhdxImage),
+    Ewf {
+        ewf_image: Arc<RwLock<EwfImage>>,
+    },
+    Qcow {
+        qcow_layer: QcowImageLayer,
+    },
+    SparseImage {
+        sparseimage_file: Arc<RwLock<SparseImageFile>>,
+    },
+    Udif {
+        udif_file: Arc<RwLock<UdifFile>>,
+    },
+    Vhd {
+        vhd_layer: VhdImageLayer,
+    },
+    Vhdx {
+        vhdx_layer: VhdxImageLayer,
+    },
 }
 
 impl StorageMediaImage {
@@ -129,292 +141,400 @@ impl StorageMediaImage {
         Ok((base_path, file_name))
     }
 
-    /// Retrieves the stored MD5 hash.
-    fn get_md5_hash(&self) -> Option<&[u8]> {
+    /// Retrieves a data stream.
+    fn get_data_stream(&self) -> DataStreamReference {
         match self {
-            StorageMediaImage::Ewf(image) => Some(&image.md5_hash),
-            _ => None,
+            Self::Ewf { ewf_image } => ewf_image.clone(),
+            Self::Qcow { qcow_layer, .. } => qcow_layer.clone(),
+            Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
+            Self::Udif { udif_file } => udif_file.clone(),
+            Self::Vhd { vhd_layer, .. } => vhd_layer.clone(),
+            Self::Vhdx { vhdx_layer, .. } => vhdx_layer.clone(),
         }
     }
 
-    /// Retrieves the media size.
-    fn get_media_size(&self) -> u64 {
+    /// Retrieves the stored MD5 hash.
+    fn get_md5_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
         match self {
-            StorageMediaImage::Ewf(image) => image.media_size,
-            // TODO: add Qcow layer support.
-            StorageMediaImage::SparseImage(file) => file.media_size,
-            StorageMediaImage::Udif(file) => file.media_size,
-            // TODO: add Vhd layer support.
-            // TODO: add Vhdx layer support.
-            _ => todo!(),
+            Self::Ewf { ewf_image } => match ewf_image.read() {
+                Ok(image) => Ok(Some(image.md5_hash.to_vec())),
+                Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on EWF image",
+                    error
+                )),
+            },
+            _ => Ok(None),
         }
     }
 
     /// Retrieves the stored SHA1 hash.
-    fn get_sha1_hash(&self) -> Option<&[u8]> {
+    fn get_sha1_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
         match self {
-            StorageMediaImage::Ewf(image) => Some(&image.sha1_hash),
-            _ => None,
+            Self::Ewf { ewf_image } => match ewf_image.read() {
+                Ok(image) => Ok(Some(image.sha1_hash.to_vec())),
+                Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on EWF image",
+                    error
+                )),
+            },
+            _ => Ok(None),
         }
     }
 
     /// Opens a storage media image.
-    fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
-        match self {
-            StorageMediaImage::Ewf(ewf_image) => {
-                let (base_path, file_name) =
-                    match StorageMediaImage::get_base_path_and_file_name(path) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            // TODO: get printable version of path instead of using display().
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to determine base path and file name of path: {}",
-                                    path.display()
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-                    Ok(file_resolver) => file_resolver,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to create file resolver for path: {}",
-                                base_path.display()
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-                let path_component: PathComponent = PathComponent::from(file_name);
-                match ewf_image.open(&file_resolver, &path_component) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
-                        return Err(error);
-                    }
-                }
+    fn open(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let data_stream: DataStreamReference = match open_os_data_stream(path) {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                return Err(error);
             }
-            StorageMediaImage::Qcow(qcow_image) => {
-                let (base_path, file_name) =
-                    match StorageMediaImage::get_base_path_and_file_name(path) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            // TODO: get printable version of path instead of using display().
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to determine base path and file name of path: {}",
-                                    path.display()
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-                    Ok(file_resolver) => file_resolver,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to create file resolver for base path: {}",
-                                base_path.display()
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-                let path_component: PathComponent = PathComponent::from(file_name);
-                match qcow_image.open(&file_resolver, &path_component) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
-                        return Err(error);
-                    }
+        };
+        let format_identifier: FormatIdentifier =
+            match Self::scan_for_storage_image_formats(&data_stream) {
+                Ok(Some(format_identifier)) => format_identifier,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(
+                        "No known storage media image format signatures found"
+                    ));
                 }
-            }
-            StorageMediaImage::SparseImage(file) => {
-                let data_stream: DataStreamReference = match open_os_data_stream(path) {
-                    Ok(data_stream) => data_stream,
-                    Err(mut error) => {
-                        // TODO: get printable version of path instead of using display().
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to open data stream: {}", path.display())
-                        );
-                        return Err(error);
-                    }
-                };
-                match file.read_data_stream(&data_stream) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read sparseimage from data stream"
-                        );
-                        return Err(error);
-                    }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for known storage media image format signatures"
+                    );
+                    return Err(error);
                 }
-            }
-            StorageMediaImage::Udif(file) => {
-                let data_stream: DataStreamReference = match open_os_data_stream(path) {
-                    Ok(data_stream) => data_stream,
-                    Err(mut error) => {
-                        // TODO: get printable version of path instead of using display().
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to open data stream: {}", path.display())
-                        );
-                        return Err(error);
-                    }
-                };
-                match file.read_data_stream(&data_stream) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read UDIF image from data stream"
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            StorageMediaImage::Vhd(vhd_image) => {
-                let (base_path, file_name) =
-                    match StorageMediaImage::get_base_path_and_file_name(path) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            // TODO: get printable version of path instead of using display().
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to determine base path and file name of path: {}",
-                                    path.display()
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-                    Ok(file_resolver) => file_resolver,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to create file resolver for base path: {}",
-                                base_path.display()
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-                let path_component: PathComponent = PathComponent::from(file_name);
-                match vhd_image.open(&file_resolver, &path_component) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
-                        return Err(error);
-                    }
-                }
-            }
-            StorageMediaImage::Vhdx(vhdx_image) => {
-                let (base_path, file_name) =
-                    match StorageMediaImage::get_base_path_and_file_name(path) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            // TODO: get printable version of path instead of using display().
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to determine base path and file name of path: {}",
-                                    path.display()
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
-                    Ok(file_resolver) => file_resolver,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to create file resolver for base path: {}",
-                                base_path.display()
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-                let path_component: PathComponent = PathComponent::from(file_name);
-                match vhdx_image.open(&file_resolver, &path_component) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
-                        return Err(error);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl DataStream for StorageMediaImage {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        match self {
-            StorageMediaImage::Ewf(image) => image.get_offset(),
-            // TODO: add Qcow layer support.
-            StorageMediaImage::SparseImage(file) => file.get_offset(),
-            StorageMediaImage::Udif(file) => file.get_offset(),
-            // TODO: add Vhd layer support.
-            // TODO: add Vhdx layer support.
-            _ => todo!(),
+            };
+        match &format_identifier {
+            FormatIdentifier::Ewf => Self::open_ewf_image(path),
+            FormatIdentifier::Qcow => Self::open_qcow_image(path),
+            FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
+            FormatIdentifier::Udif => Self::open_udif_file(path),
+            FormatIdentifier::Vhd => Self::open_vhd_image(path),
+            FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported format: {}",
+                format_identifier.to_string()
+            ))),
         }
     }
 
-    /// Retrieves the size of the data.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        match self {
-            StorageMediaImage::Ewf(image) => image.get_size(),
-            // TODO: add Qcow layer support.
-            StorageMediaImage::SparseImage(file) => file.get_size(),
-            StorageMediaImage::Udif(file) => file.get_size(),
-            // TODO: add Vhd layer support.
-            // TODO: add Vhdx layer support.
-            _ => todo!(),
+    /// Opens an EWF image.
+    fn open_ewf_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut ewf_image: EwfImage = EwfImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match ewf_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open EWF image");
+                return Err(error);
+            }
         }
+        Ok(Self::Ewf {
+            ewf_image: Arc::new(RwLock::new(ewf_image)),
+        })
     }
 
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        match self {
-            StorageMediaImage::Ewf(image) => image.read(buf),
-            // TODO: add Qcow layer support.
-            StorageMediaImage::SparseImage(file) => file.read(buf),
-            StorageMediaImage::Udif(file) => file.read(buf),
-            // TODO: add Vhd layer support.
-            // TODO: add Vhdx layer support.
-            _ => todo!(),
+    /// Opens a QCOW image.
+    fn open_qcow_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for base path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut qcow_image: QcowImage = QcowImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match qcow_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open QCOW image");
+                return Err(error);
+            }
         }
+        let number_of_layers: usize = qcow_image.get_number_of_layers();
+
+        let qcow_layer: QcowImageLayer = match qcow_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(layer) => layer,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve QCOW image upper layer"
+                );
+                return Err(error);
+            }
+        };
+        Ok(Self::Qcow { qcow_layer })
     }
 
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        match self {
-            StorageMediaImage::Ewf(image) => image.seek(pos),
-            // TODO: add Qcow layer support.
-            StorageMediaImage::SparseImage(file) => file.seek(pos),
-            StorageMediaImage::Udif(file) => file.seek(pos),
-            // TODO: add Vhd layer support.
-            // TODO: add Vhdx layer support.
-            _ => todo!(),
+    /// Opens a sparseimage file.
+    fn open_sparseimage_file(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let data_stream: DataStreamReference = match open_os_data_stream(path) {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open data stream: {}", path.display())
+                );
+                return Err(error);
+            }
+        };
+        let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
+
+        match sparseimage_file.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read sparseimage file from data stream"
+                );
+                return Err(error);
+            }
         }
+        Ok(Self::SparseImage {
+            sparseimage_file: Arc::new(RwLock::new(sparseimage_file)),
+        })
+    }
+
+    /// Opens an UDIF file.
+    fn open_udif_file(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let data_stream: DataStreamReference = match open_os_data_stream(path) {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open data stream: {}", path.display())
+                );
+                return Err(error);
+            }
+        };
+        let mut udif_file: UdifFile = UdifFile::new();
+
+        match udif_file.read_data_stream(&data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read UDIF file from data stream"
+                );
+                return Err(error);
+            }
+        }
+        Ok(Self::Udif {
+            udif_file: Arc::new(RwLock::new(udif_file)),
+        })
+    }
+
+    /// Opens a VHD image.
+    fn open_vhd_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for base path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut vhd_image: VhdImage = VhdImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match vhd_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open VHD image");
+                return Err(error);
+            }
+        }
+        let number_of_layers: usize = vhd_image.get_number_of_layers();
+
+        let vhd_layer: VhdImageLayer = match vhd_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(layer) => layer,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve VHD image upper layer"
+                );
+                return Err(error);
+            }
+        };
+        Ok(Self::Vhd {
+            vhd_layer: vhd_layer,
+        })
+    }
+
+    /// Opens a VHDX image.
+    fn open_vhdx_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for base path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut vhdx_image: VhdxImage = VhdxImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match vhdx_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open VHDX image");
+                return Err(error);
+            }
+        }
+        let number_of_layers: usize = vhdx_image.get_number_of_layers();
+
+        let vhdx_layer: VhdxImageLayer = match vhdx_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(layer) => layer,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve VHDX image upper layer"
+                );
+                return Err(error);
+            }
+        };
+        Ok(Self::Vhdx {
+            vhdx_layer: vhdx_layer,
+        })
+    }
+
+    /// Scans a data stream for storage media image format signatures.
+    fn scan_for_storage_image_formats(
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
+        let mut format_scanner: FormatScanner = FormatScanner::new();
+        format_scanner.add_ewf_signatures();
+        format_scanner.add_qcow_signatures();
+        // TODO: support for sparse bundle.
+        format_scanner.add_sparseimage_signatures();
+        format_scanner.add_udif_signatures();
+        format_scanner.add_vhd_signatures();
+        format_scanner.add_vhdx_signatures();
+
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
+        let mut scan_results: HashSet<FormatIdentifier> =
+            match format_scanner.scan_data_stream(data_stream) {
+                Ok(scan_results) => scan_results,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for known format signatures"
+                    );
+                    return Err(error);
+                }
+            };
+        if scan_results.len() > 1 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported multiple known format signatures"
+            ));
+        }
+        let result: Option<FormatIdentifier> = scan_results.drain().next();
+
+        Ok(result)
     }
 }
 
@@ -1039,50 +1159,6 @@ impl ImageTool {
         Ok(())
     }
 
-    /// Scans a data stream for storage media image format signatures.
-    fn scan_for_storage_image_formats(
-        &self,
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
-        let mut format_scanner: FormatScanner = FormatScanner::new();
-        format_scanner.add_ewf_signatures();
-        format_scanner.add_qcow_signatures();
-        // TODO: support for sparse bundle.
-        format_scanner.add_sparseimage_signatures();
-        format_scanner.add_udif_signatures();
-        format_scanner.add_vhd_signatures();
-        format_scanner.add_vhdx_signatures();
-
-        match format_scanner.build() {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
-            }
-        }
-        let mut scan_results: HashSet<FormatIdentifier> =
-            match format_scanner.scan_data_stream(data_stream) {
-                Ok(scan_results) => scan_results,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to scan data stream for known format signatures"
-                    );
-                    return Err(error);
-                }
-            };
-        if scan_results.len() > 1 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported multiple known format signatures"
-            ));
-        }
-        let result: Option<FormatIdentifier> = scan_results.drain().next();
-
-        Ok(result)
-    }
-
     /// Scans and prints the hierarchy of volumes, partitions and file systems.
     fn scan_for_hierarchy(&self, source: &str) -> Result<(), ErrorTrace> {
         let mut vfs_scanner: VfsScanner = VfsScanner::new();
@@ -1157,56 +1233,35 @@ fn main() -> ExitCode {
             }
         }
         Some(Commands::Hash) => {
-            let data_stream: DataStreamReference = match open_os_data_stream(&arguments.source) {
-                Ok(data_stream) => data_stream,
-                Err(error) => {
-                    println!("Unable to open file: {} with error:\n{}", source, error);
-                    return ExitCode::FAILURE;
-                }
-            };
-            let format_identifier: FormatIdentifier = match image_tool
-                .scan_for_storage_image_formats(&data_stream)
-            {
-                Ok(Some(format_identifier)) => format_identifier,
-                Ok(None) => {
-                    println!("No known storage media image format signatures found");
-                    return ExitCode::FAILURE;
-                }
+            let storage_media_image: StorageMediaImage =
+                match StorageMediaImage::open(&arguments.source) {
+                    Ok(storage_media_image) => storage_media_image,
+                    Err(error) => {
+                        println!(
+                            "Unable to open storage media image: {} with error:\n{}",
+                            source, error
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                };
+            let data_stream: DataStreamReference = storage_media_image.get_data_stream();
+
+            let media_size: u64 = match data_stream.write() {
+                Ok(mut data_stream) => match data_stream.get_size() {
+                    Ok(size) => size,
+                    Err(error) => {
+                        println!("Unable to determine media size with error:\n{}", error);
+                        return ExitCode::FAILURE;
+                    }
+                },
                 Err(error) => {
                     println!(
-                        "Unable to scan data stream for known storage media image format signatures with error:\n{}",
+                        "Unable to obtain write lock on data stream with error: {}",
                         error
                     );
                     return ExitCode::FAILURE;
                 }
             };
-            let mut storage_media_image: StorageMediaImage = match &format_identifier {
-                FormatIdentifier::Ewf => StorageMediaImage::Ewf(EwfImage::new()),
-                FormatIdentifier::Qcow => StorageMediaImage::Qcow(QcowImage::new()),
-                // TODO: add support for sparse bundle.
-                FormatIdentifier::SparseImage => {
-                    StorageMediaImage::SparseImage(SparseImageFile::new())
-                }
-                FormatIdentifier::Udif => StorageMediaImage::Udif(UdifFile::new()),
-                FormatIdentifier::Vhd => StorageMediaImage::Vhd(VhdImage::new()),
-                FormatIdentifier::Vhdx => StorageMediaImage::Vhdx(VhdxImage::new()),
-                _ => {
-                    println!("Unsupported format: {}", format_identifier.to_string());
-                    return ExitCode::FAILURE;
-                }
-            };
-            match storage_media_image.open(&arguments.source) {
-                Ok(_) => {}
-                Err(error) => {
-                    println!(
-                        "Unable to open storage media image: {} with error:\n{}",
-                        source, error
-                    );
-                    return ExitCode::FAILURE;
-                }
-            }
-            let media_size: u64 = storage_media_image.get_media_size();
-
             let progress_bar_style: ProgressStyle = match ProgressStyle::with_template(
                 "Hashing at {percent}% [{wide_bar}] {bytes}/{total_bytes} ({binary_bytes_per_sec}) elapsed: {elapsed_precise} (remaining: {eta_precise})",
             ) {
@@ -1232,55 +1287,77 @@ fn main() -> ExitCode {
             let mut md5_context: Md5Context = Md5Context::new();
             let mut data: [u8; 65536] = [0; 65536];
 
-            loop {
-                let read_count = match storage_media_image.read(&mut data) {
-                    Ok(read_count) => read_count,
-                    Err(error) => {
-                        println!(
-                            "Unable to read data at offset {} with error:\n{}",
-                            media_offset, error
-                        );
-                        return ExitCode::FAILURE;
+            match data_stream.write() {
+                Ok(mut data_stream) => loop {
+                    let read_count = match data_stream.read(&mut data) {
+                        Ok(read_count) => read_count,
+                        Err(error) => {
+                            println!(
+                                "Unable to read data at offset {} with error:\n{}",
+                                media_offset, error
+                            );
+                            return ExitCode::FAILURE;
+                        }
+                    };
+                    if read_count == 0 {
+                        break;
                     }
-                };
-                if read_count == 0 {
-                    break;
+                    md5_context.update(&data[0..read_count]);
+
+                    media_offset += read_count as u64;
+
+                    progress_bar.set_position(media_offset);
+                },
+                Err(error) => {
+                    println!(
+                        "Unable to obtain write lock on data stream with error: {}",
+                        error
+                    );
+                    return ExitCode::FAILURE;
                 }
-                md5_context.update(&data[0..read_count]);
-
-                media_offset += read_count as u64;
-
-                progress_bar.set_position(media_offset);
-            }
+            };
             progress_bar.finish();
 
-            println!("");
+            let mut md5_hash_mismatch: bool = false;
 
             let md5_hash: Vec<u8> = md5_context.finalize();
 
             let hash_string: String = format_as_string(&md5_hash);
-            println!("Calculated MD5 hash\t: {}", hash_string);
+            println!("\nCalculated MD5 hash\t: {}", hash_string);
 
             match storage_media_image.get_md5_hash() {
-                Some(stored_hash) => {
+                Ok(Some(stored_hash)) => {
                     if stored_hash != [0; 16] {
-                        let hash_string: String = format_as_string(stored_hash);
+                        let hash_string: String = format_as_string(&stored_hash);
                         println!("Stored MD5 hash\t\t: {}", hash_string);
                     }
+                    if stored_hash != md5_hash.as_slice() {
+                        md5_hash_mismatch = true;
+                    }
                 }
-                None => {}
+                Ok(None) => {}
+                Err(error) => {
+                    println!("Unable to retrieve stored MD5 hash with error:\n{}", error);
+                    return ExitCode::FAILURE;
+                }
             };
             match storage_media_image.get_sha1_hash() {
-                Some(stored_hash) => {
+                Ok(Some(stored_hash)) => {
                     if stored_hash != [0; 20] {
-                        let hash_string: String = format_as_string(stored_hash);
+                        let hash_string: String = format_as_string(&stored_hash);
                         println!("Stored SHA1 hash\t: {}", hash_string);
                     }
                 }
-                None => {}
+                Ok(None) => {}
+                Err(error) => {
+                    println!("Unable to retrieve stored SHA1 hash with error:\n{}", error);
+                    return ExitCode::FAILURE;
+                }
             };
-            // TODO: compare MD5 hashes.
-            // TODO: compare SHA1 hashes.
+            if md5_hash_mismatch {
+                println!("\nMismatch between calculated and stored hashes");
+                return ExitCode::FAILURE;
+            }
         }
         _ => match image_tool.scan_for_hierarchy(source) {
             Ok(_) => {}
