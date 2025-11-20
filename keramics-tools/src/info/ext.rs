@@ -16,7 +16,7 @@ use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::Path;
 use keramics_formats::ext::constants::*;
-use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
+use keramics_formats::ext::{ExtExtendedAttribute, ExtFileEntry, ExtFileSystem};
 use keramics_types::ByteString;
 
 /// Information about an Extended File System (ext).
@@ -338,7 +338,7 @@ impl ExtInfo {
             }
             None => {}
         };
-        let number_of_attributes: usize = match file_entry.get_number_of_attributes() {
+        let number_of_attributes: usize = match file_entry.get_number_of_extended_attributes() {
             Ok(number_of_attributes) => number_of_attributes,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -351,8 +351,26 @@ impl ExtInfo {
         if number_of_attributes > 0 {
             println!("    Extended attributes:");
 
-            // TODO: print extended attribute names.
-            // Attribute: 1	: security.selinux
+            for attribute_index in 0..number_of_attributes {
+                let attribute: ExtExtendedAttribute = match file_entry
+                    .get_extended_attribute_by_index(attribute_index)
+                {
+                    Ok(attribute) => attribute,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve extended attribute: {}", attribute_index)
+                        );
+                        return Err(error);
+                    }
+                };
+                let attribute_name: &ByteString = attribute.get_name();
+                println!(
+                    "        Attribute {}\t\t\t: {}",
+                    attribute_index + 1,
+                    attribute_name
+                );
+            }
         }
         println!("");
 
@@ -459,6 +477,8 @@ impl ExtInfo {
             return Err(keramics_core::error_trace_new!("Missing file entry"));
         }
         println!("Extended File System (ext) file entry information:");
+
+        println!("    Path\t\t\t\t: {}", path);
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}

@@ -144,7 +144,7 @@ impl ExtGroupDescriptorTable {
         Ok(())
     }
 
-    /// Reads the metadata table from a specific position in a data stream.
+    /// Reads the group descriptor table from a specific position in a data stream.
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,

@@ -13,6 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_datetime::{DateTime, PosixTime64Ns};
+use keramics_encodings::CharacterEncoding;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le};
 
@@ -109,19 +110,18 @@ impl Ext4InodeExtension {
                 )));
             }
         }
-        let mut data_offset: usize = extra_size as usize;
+        let data_offset: usize = extra_size as usize;
         let data_end_offset: usize = data_offset + 4;
         let data_size: usize = data.len();
 
         if data_end_offset < data_size {
             if data[data_offset..data_end_offset] == EXT_ATTRIBUTES_HEADER_SIGNATURE {
-                data_offset = data_end_offset;
-
-                let attributes_block: ExtAttributesBlock = ExtAttributesBlock::new();
+                let attributes_block: ExtAttributesBlock =
+                    ExtAttributesBlock::new(data_end_offset, &CharacterEncoding::Utf8);
 
                 match attributes_block.read_entries(
                     data,
-                    data_offset,
+                    data_end_offset,
                     data_size,
                     &mut inode.attributes,
                 ) {

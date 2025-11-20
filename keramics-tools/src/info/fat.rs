@@ -199,6 +199,8 @@ impl FatInfo {
         }
         println!("File Allocation Table (FAT) file entry information:");
 
+        println!("    Path\t\t\t\t: {}", path);
+
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
             Err(mut error) => {

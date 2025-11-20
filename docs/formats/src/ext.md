@@ -89,6 +89,8 @@ block offset = block number x block size
 
 The block size is defined in the superblock.
 
+> Note that mke2fs indicates the maximum block size is 65536.
+
 ## The superblock
 
 ### The ext2 superblock
@@ -1114,7 +1116,7 @@ The last extended attributes entry has the first 4 values set to 0 (8 bytes)
 and is used as a terminator.
 
 > Note that some implementations of older Android versions of ext appear to
-> only set the first 4 bytess to 0.
+> only set the first 4 bytes to 0.
 
 > Note that the name can be empty, for example in combination with a prefix or
 > with an encrypted file.

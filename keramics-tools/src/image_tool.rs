@@ -34,7 +34,7 @@ use keramics_formats::{
     FileResolverReference, FormatIdentifier, FormatScanner, Path, PathComponent,
     open_os_file_resolver,
 };
-use keramics_hashes::{DigestHashContext, Md5Context};
+use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsLocation,
@@ -1262,6 +1262,34 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
+            let stored_md5_hash: Option<Vec<u8>> = match storage_media_image.get_md5_hash() {
+                Ok(Some(stored_hash)) => {
+                    if stored_hash != [0; 16] {
+                        Some(stored_hash)
+                    } else {
+                        None
+                    }
+                }
+                Ok(None) => None,
+                Err(error) => {
+                    println!("Unable to retrieve stored MD5 hash with error:\n{}", error);
+                    return ExitCode::FAILURE;
+                }
+            };
+            let stored_sha1_hash: Option<Vec<u8>> = match storage_media_image.get_sha1_hash() {
+                Ok(Some(stored_hash)) => {
+                    if stored_hash != [0; 20] {
+                        Some(stored_hash)
+                    } else {
+                        None
+                    }
+                }
+                Ok(None) => None,
+                Err(error) => {
+                    println!("Unable to retrieve stored SHA1 hash with error:\n{}", error);
+                    return ExitCode::FAILURE;
+                }
+            };
             let progress_bar_style: ProgressStyle = match ProgressStyle::with_template(
                 "Hashing at {percent}% [{wide_bar}] {bytes}/{total_bytes} ({binary_bytes_per_sec}) elapsed: {elapsed_precise} (remaining: {eta_precise})",
             ) {
@@ -1281,11 +1309,13 @@ fn main() -> ExitCode {
             let progress_bar: ProgressBar = ProgressBar::new(media_size);
             progress_bar.set_style(progress_bar_style.progress_chars("#>-"));
 
-            // TODO: add support for calculating multiple digest hashed concurrently.
-
             let mut media_offset: u64 = 0;
-            let mut md5_context: Md5Context = Md5Context::new();
             let mut data: [u8; 65536] = [0; 65536];
+
+            let mut md5_context: Md5Context = Md5Context::new();
+            let mut sha1_context: Sha1Context = Sha1Context::new();
+
+            let calculate_md5_hash: bool = stored_md5_hash.is_some() || stored_sha1_hash.is_none();
 
             match data_stream.write() {
                 Ok(mut data_stream) => loop {
@@ -1302,8 +1332,12 @@ fn main() -> ExitCode {
                     if read_count == 0 {
                         break;
                     }
-                    md5_context.update(&data[0..read_count]);
-
+                    if calculate_md5_hash {
+                        md5_context.update(&data[0..read_count]);
+                    }
+                    if stored_sha1_hash.is_some() {
+                        sha1_context.update(&data[0..read_count]);
+                    }
                     media_offset += read_count as u64;
 
                     progress_bar.set_position(media_offset);
@@ -1320,41 +1354,37 @@ fn main() -> ExitCode {
 
             let mut md5_hash_mismatch: bool = false;
 
-            let md5_hash: Vec<u8> = md5_context.finalize();
+            if calculate_md5_hash {
+                let md5_hash: Vec<u8> = md5_context.finalize();
 
-            let hash_string: String = format_as_string(&md5_hash);
-            println!("\nCalculated MD5 hash\t: {}", hash_string);
+                let hash_string: String = format_as_string(&md5_hash);
+                println!("\nCalculated MD5 hash\t: {}", hash_string);
 
-            match storage_media_image.get_md5_hash() {
-                Ok(Some(stored_hash)) => {
-                    if stored_hash != [0; 16] {
-                        let hash_string: String = format_as_string(&stored_hash);
-                        println!("Stored MD5 hash\t\t: {}", hash_string);
-                    }
+                if let Some(stored_hash) = stored_md5_hash {
+                    let hash_string: String = format_as_string(&stored_hash);
+                    println!("Stored MD5 hash\t\t: {}", hash_string);
+
                     if stored_hash != md5_hash.as_slice() {
                         md5_hash_mismatch = true;
                     }
                 }
-                Ok(None) => {}
-                Err(error) => {
-                    println!("Unable to retrieve stored MD5 hash with error:\n{}", error);
-                    return ExitCode::FAILURE;
+            }
+            let mut sha1_hash_mismatch: bool = false;
+
+            if let Some(stored_hash) = stored_sha1_hash {
+                let sha1_hash: Vec<u8> = sha1_context.finalize();
+
+                let hash_string: String = format_as_string(&sha1_hash);
+                println!("\nCalculated SHA1 hash\t: {}", hash_string);
+
+                let hash_string: String = format_as_string(&stored_hash);
+                println!("Stored SHA1 hash\t: {}", hash_string);
+
+                if stored_hash != sha1_hash.as_slice() {
+                    sha1_hash_mismatch = true;
                 }
-            };
-            match storage_media_image.get_sha1_hash() {
-                Ok(Some(stored_hash)) => {
-                    if stored_hash != [0; 20] {
-                        let hash_string: String = format_as_string(&stored_hash);
-                        println!("Stored SHA1 hash\t: {}", hash_string);
-                    }
-                }
-                Ok(None) => {}
-                Err(error) => {
-                    println!("Unable to retrieve stored SHA1 hash with error:\n{}", error);
-                    return ExitCode::FAILURE;
-                }
-            };
-            if md5_hash_mismatch {
+            }
+            if md5_hash_mismatch || sha1_hash_mismatch {
                 println!("\nMismatch between calculated and stored hashes");
                 return ExitCode::FAILURE;
             }

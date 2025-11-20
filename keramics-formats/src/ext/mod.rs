@@ -11,7 +11,6 @@
  * under the License.
  */
 
-mod attribute;
 mod attributes_block;
 mod attributes_block_header;
 mod attributes_entry;
@@ -22,6 +21,7 @@ pub mod constants;
 mod directory_entries;
 mod directory_entry;
 mod directory_tree;
+mod extended_attribute;
 mod extent_descriptor;
 mod extent_index;
 mod extents_footer;
@@ -42,5 +42,6 @@ mod inode_extension_ext4;
 mod inode_table;
 mod superblock;
 
+pub use extended_attribute::ExtExtendedAttribute;
 pub use file_entry::ExtFileEntry;
 pub use file_system::ExtFileSystem;

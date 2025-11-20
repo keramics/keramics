@@ -21,7 +21,7 @@ use super::constants::*;
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "signature", data_type = "[u8; 2]"),
+        field(name = "signature", data_type = "[u8; 2]", format = "hex"),
         field(name = "number_of_entries", data_type = "u16"),
         field(name = "maximum_number_of_entries", data_type = "u16"),
         field(name = "depth", data_type = "u16"),

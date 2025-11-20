@@ -16,6 +16,7 @@ use keramics_datetime::{DateTime, PosixTime32};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le};
 
+use crate::ext::constants::*;
 use crate::ext::inode::ExtInode;
 
 #[derive(LayoutMap)]
@@ -70,19 +71,22 @@ impl Ext3Inode {
         inode.group_identifier = ((upper_16bit as u32) << 16) | (lower_16bit as u32);
 
         inode.data_size = bytes_to_u32_le!(data, 4) as u64;
+        inode.flags = bytes_to_u32_le!(data, 32);
 
-        inode.access_timestamp = bytes_to_i32_le!(data, 8);
-        if inode.access_timestamp > 0 {
-            inode.access_time = DateTime::PosixTime32(PosixTime32::new(inode.access_timestamp));
-        }
-        inode.change_timestamp = bytes_to_i32_le!(data, 12);
-        if inode.change_timestamp > 0 {
-            inode.change_time = DateTime::PosixTime32(PosixTime32::new(inode.change_timestamp));
-        }
-        inode.modification_timestamp = bytes_to_i32_le!(data, 16);
-        if inode.modification_timestamp > 0 {
-            inode.modification_time =
-                DateTime::PosixTime32(PosixTime32::new(inode.modification_timestamp));
+        if inode.flags & EXT_INODE_FLAG_IS_EXTENDED_ATTRIBUTE_INODE == 0 {
+            inode.access_timestamp = bytes_to_i32_le!(data, 8);
+            if inode.access_timestamp > 0 {
+                inode.access_time = DateTime::PosixTime32(PosixTime32::new(inode.access_timestamp));
+            }
+            inode.change_timestamp = bytes_to_i32_le!(data, 12);
+            if inode.change_timestamp > 0 {
+                inode.change_time = DateTime::PosixTime32(PosixTime32::new(inode.change_timestamp));
+            }
+            inode.modification_timestamp = bytes_to_i32_le!(data, 16);
+            if inode.modification_timestamp > 0 {
+                inode.modification_time =
+                    DateTime::PosixTime32(PosixTime32::new(inode.modification_timestamp));
+            }
         }
         let timestamp: i32 = bytes_to_i32_le!(data, 20);
         if timestamp > 0 {
@@ -90,9 +94,10 @@ impl Ext3Inode {
         }
         inode.number_of_links = bytes_to_u16_le!(data, 26);
         inode.number_of_blocks = bytes_to_u32_le!(data, 28) as u64;
-        inode.flags = bytes_to_u32_le!(data, 32);
 
         inode.data_reference.copy_from_slice(&data[40..100]);
+
+        inode.file_acl_block_number = bytes_to_u32_le!(data, 104) as u64;
 
         Ok(())
     }
@@ -102,16 +107,18 @@ impl Ext3Inode {
 mod tests {
     use super::*;
 
+    use keramics_datetime::PosixTime32;
+
     fn get_test_data() -> Vec<u8> {
         return vec![
-            0xed, 0x41, 0x00, 0x00, 0x3d, 0x13, 0xc1, 0x3f, 0x44, 0x13, 0xc1, 0x3f, 0x44, 0x13,
-            0xc1, 0x3f, 0x00, 0x00, 0x00, 0x00, 0xf4, 0x01, 0x03, 0x00, 0x02, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xa5, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0xb4, 0x81, 0xe8, 0x03, 0xdc, 0x48, 0x00, 0x00, 0xe8, 0x73, 0x3d, 0x5f, 0xe8, 0x73,
+            0x3d, 0x5f, 0xe8, 0x73, 0x3d, 0x5f, 0x00, 0x00, 0x00, 0x00, 0xe8, 0x03, 0x01, 0x00,
+            0x2a, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x0c,
+            0x00, 0x00, 0x02, 0x0c, 0x00, 0x00, 0x03, 0x0c, 0x00, 0x00, 0x04, 0x0c, 0x00, 0x00,
+            0x05, 0x0c, 0x00, 0x00, 0x06, 0x0c, 0x00, 0x00, 0x07, 0x0c, 0x00, 0x00, 0x08, 0x0c,
+            0x00, 0x00, 0x09, 0x0c, 0x00, 0x00, 0x0a, 0x0c, 0x00, 0x00, 0x0b, 0x0c, 0x00, 0x00,
+            0x0c, 0x0c, 0x00, 0x00, 0xa4, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x52, 0x04, 0x82, 0x3b, 0xa2, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00,
         ];
@@ -124,7 +131,31 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         Ext3Inode::read_data(&mut test_struct, &test_data)?;
 
-        assert_eq!(test_struct.file_mode, 0o40755);
+        assert_eq!(test_struct.file_mode, 0o100664);
+        assert_eq!(test_struct.owner_identifier, 1000);
+        assert_eq!(test_struct.group_identifier, 1000);
+        assert_eq!(test_struct.data_size, 18652);
+        assert_eq!(test_struct.access_timestamp, 1597862888);
+        assert_eq!(
+            test_struct.access_time,
+            DateTime::PosixTime32(PosixTime32::new(1597862888))
+        );
+        assert_eq!(test_struct.change_timestamp, 1597862888);
+        assert_eq!(
+            test_struct.change_time,
+            DateTime::PosixTime32(PosixTime32::new(1597862888))
+        );
+        assert_eq!(test_struct.modification_timestamp, 1597862888);
+        assert_eq!(
+            test_struct.modification_time,
+            DateTime::PosixTime32(PosixTime32::new(1597862888))
+        );
+        assert_eq!(test_struct.deletion_time, DateTime::NotSet);
+        assert_eq!(test_struct.number_of_links, 1);
+        assert_eq!(test_struct.number_of_blocks, 42);
+        assert_eq!(test_struct.flags, 0);
+        assert_eq!(test_struct.data_reference, &test_data[40..100]);
+        assert_eq!(test_struct.file_acl_block_number, 162);
 
         Ok(())
     }

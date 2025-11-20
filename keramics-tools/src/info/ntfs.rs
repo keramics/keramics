@@ -592,6 +592,8 @@ impl NtfsInfo {
         }
         println!("New Technologies File System (NTFS) file entry information:");
 
+        println!("    Path\t\t\t\t: {}", path);
+
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
             Err(mut error) => {

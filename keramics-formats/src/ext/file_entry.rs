@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::max;
+use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
@@ -20,9 +20,11 @@ use keramics_types::{ByteString, bytes_to_u16_le};
 
 use crate::path_component::PathComponent;
 
+use super::attributes_block::ExtAttributesBlock;
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
+use super::extended_attribute::ExtExtendedAttribute;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 
@@ -48,6 +50,9 @@ pub struct ExtFileEntry {
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
+
+    /// Value to indicate the attributes block was read.
+    attributes_block_is_read: bool,
 }
 
 impl ExtFileEntry {
@@ -68,6 +73,7 @@ impl ExtFileEntry {
             name,
             sub_directory_entries,
             symbolic_link_target: None,
+            attributes_block_is_read: false,
         }
     }
 
@@ -167,26 +173,19 @@ impl ExtFileEntry {
             let byte_string: ByteString = if self.inode.data_size < 60 {
                 ByteString::from(self.inode.data_reference.as_slice())
             } else {
-                let number_of_blocks: u64 = max(
-                    self.inode
-                        .data_size
-                        .div_ceil(self.inode_table.block_size as u64),
-                    self.inode.number_of_blocks,
-                );
-                let mut block_stream: ExtBlockStream =
-                    ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-
-                match block_stream.open(
-                    &self.data_stream,
-                    number_of_blocks,
-                    &self.inode.block_ranges,
-                ) {
-                    Ok(_) => {}
+                let mut block_stream: ExtBlockStream = match self
+                    .inode
+                    .get_block_stream(&self.data_stream, self.inode_table.block_size)
+                {
+                    Ok(block_stream) => block_stream,
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve block stream"
+                        );
                         return Err(error);
                     }
-                }
+                };
                 let mut data: Vec<u8> = vec![0; self.inode.data_size as usize];
 
                 match block_stream.read_exact(&mut data) {
@@ -206,46 +205,100 @@ impl ExtFileEntry {
         Ok(self.symbolic_link_target.as_ref())
     }
 
-    /// Retrieves the number of attributes.
-    pub fn get_number_of_attributes(&mut self) -> Result<usize, ErrorTrace> {
-        Ok(self.inode.attributes.len())
-    }
-
-    // TODO: add get extended_attributes iterator
-
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
             return Ok(None);
         }
-        if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
-            Ok(Some(Arc::new(RwLock::new(data_stream))))
-        } else {
-            let number_of_blocks: u64 = max(
-                self.inode
-                    .data_size
-                    .div_ceil(self.inode_table.block_size as u64),
-                self.inode.number_of_blocks,
-            );
-            let mut block_stream: ExtBlockStream =
-                ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
+        match self
+            .inode
+            .get_data_stream(&self.data_stream, self.inode_table.block_size)
+        {
+            Ok(data_stream) => Ok(Some(data_stream)),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                Err(error)
+            }
+        }
+    }
 
-            match block_stream.open(
-                &self.data_stream,
-                number_of_blocks,
-                &self.inode.block_ranges,
-            ) {
+    /// Retrieves the number of extended attributes.
+    pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
+        if !self.attributes_block_is_read {
+            match self.read_attributes_block() {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
                     return Err(error);
                 }
             }
-            Ok(Some(Arc::new(RwLock::new(block_stream))))
+        }
+        Ok(self.inode.attributes.len())
+    }
+
+    /// Retrieves a specific extended attribute.
+    pub fn get_extended_attribute_by_index(
+        &mut self,
+        extended_attribute_index: usize,
+    ) -> Result<ExtExtendedAttribute, ErrorTrace> {
+        if !self.attributes_block_is_read {
+            match self.read_attributes_block() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
+                    return Err(error);
+                }
+            }
+        }
+        match self.inode.attributes.iter().nth(extended_attribute_index) {
+            Some((name, attribute_entry)) => {
+                let data_stream: DataStreamReference = if attribute_entry.value_data_inode_number
+                    == 0
+                {
+                    let data_stream: FakeDataStream = FakeDataStream::new(
+                        &attribute_entry.value_data,
+                        attribute_entry.value_data_size as u64,
+                    );
+                    Arc::new(RwLock::new(data_stream))
+                } else {
+                    let inode: ExtInode = match self
+                        .inode_table
+                        .get_inode(&self.data_stream, attribute_entry.value_data_inode_number)
+                    {
+                        Ok(inode) => inode,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve inode: {}",
+                                    attribute_entry.value_data_inode_number
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                    match inode.get_data_stream(&self.data_stream, self.inode_table.block_size) {
+                        Ok(data_stream) => data_stream,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    }
+                };
+                Ok(ExtExtendedAttribute::new(name, data_stream))
+            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing extended attribute: {}",
+                extended_attribute_index
+            ))),
         }
     }
+
+    // TODO: add get extended_attribute_by_name
+    // TODO: add get extended_attributes iterator
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
@@ -379,6 +432,33 @@ impl ExtFileEntry {
         self.inode_number == EXT_ROOT_DIRECTORY_IDENTIFIER
     }
 
+    /// Reads the attributes block.
+    fn read_attributes_block(&mut self) -> Result<(), ErrorTrace> {
+        if self.inode.file_acl_block_number != 0 {
+            let mut attributes_block: ExtAttributesBlock =
+                ExtAttributesBlock::new(0, &self.sub_directory_entries.encoding);
+
+            let attributes_block_offset =
+                self.inode.file_acl_block_number * (self.inode_table.block_size as u64);
+
+            match attributes_block.read_at_position(
+                &self.data_stream,
+                SeekFrom::Start(attributes_block_offset),
+                self.inode_table.block_size as usize,
+                &mut self.inode.attributes,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
+                    return Err(error);
+                }
+            }
+        }
+        self.attributes_block_is_read = true;
+
+        Ok(())
+    }
+
     /// Reads the sub directory entries.
     fn read_sub_directory_entries(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
@@ -429,10 +509,11 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file_system() -> Result<ExtFileSystem, ErrorTrace> {
+    fn get_file_system(path_string: &str) -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(&test_data_path_string);
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -441,7 +522,7 @@ mod tests {
 
     #[test]
     fn test_get_access_time() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -457,7 +538,7 @@ mod tests {
 
     #[test]
     fn test_get_change_time() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -473,7 +554,7 @@ mod tests {
 
     #[test]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -485,7 +566,7 @@ mod tests {
 
     #[test]
     fn test_get_device_identifier() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -510,7 +591,7 @@ mod tests {
 
     #[test]
     fn test_get_file_mode() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -522,7 +603,7 @@ mod tests {
 
     #[test]
     fn test_get_group_identifier() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -534,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_get_inode_number() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -546,7 +627,7 @@ mod tests {
 
     #[test]
     fn test_get_deletion_time() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -558,7 +639,7 @@ mod tests {
 
     #[test]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -574,7 +655,7 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -587,7 +668,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_links() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -599,7 +680,7 @@ mod tests {
 
     #[test]
     fn test_get_owner_identifier() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -611,7 +692,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -623,7 +704,7 @@ mod tests {
 
     #[test]
     fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
@@ -649,7 +730,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -667,24 +748,44 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_attributes() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+    fn test_get_number_of_extended_attributes() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext4.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let number_of_attributes: usize = ext_file_entry.get_number_of_attributes()?;
-        assert_eq!(number_of_attributes, 0);
+        let number_of_attributes: usize = ext_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_attributes, 1);
 
-        // TODO: test with file entry with attributes
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext4.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let extended_attribute: ExtExtendedAttribute =
+            ext_file_entry.get_extended_attribute_by_index(0)?;
+        assert_eq!(
+            extended_attribute.get_name(),
+            &ByteString::from("security.selinux")
+        );
+
+        let result: Result<ExtExtendedAttribute, ErrorTrace> =
+            ext_file_entry.get_extended_attribute_by_index(99);
+        assert!(result.is_err());
 
         Ok(())
     }
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut ext_file_entry: ExtFileEntry =
@@ -705,7 +806,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut ext_file_entry: ExtFileEntry =
@@ -716,12 +817,16 @@ mod tests {
         let name: Option<&ByteString> = sub_file_entry.get_name();
         assert_eq!(name, Some(ByteString::from("TestFile2")).as_ref());
 
+        let result: Result<ExtFileEntry, ErrorTrace> =
+            ext_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
         Ok(())
     }
 
     #[test]
     fn test_get_sub_file_entry_by_name() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut ext_file_entry: ExtFileEntry =
@@ -740,7 +845,7 @@ mod tests {
 
     #[test]
     fn test_is_directory() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -762,7 +867,7 @@ mod tests {
 
     #[test]
     fn test_is_root_directory() -> Result<(), ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_file_system()?;
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/");
         let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -782,5 +887,6 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for read_attributes_block
     // TODO: add tests for read_sub_directory_entries
 }

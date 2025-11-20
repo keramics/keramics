@@ -12,6 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterEncoding;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
 
@@ -44,6 +45,9 @@ pub struct ExtAttributesEntry {
 
     /// Value data size.
     pub value_data_size: u32,
+
+    /// Value data.
+    pub value_data: Vec<u8>,
 }
 
 impl ExtAttributesEntry {
@@ -55,6 +59,7 @@ impl ExtAttributesEntry {
             value_data_offset: 0,
             value_data_inode_number: 0,
             value_data_size: 0,
+            value_data: Vec::new(),
         }
     }
 
@@ -75,7 +80,11 @@ impl ExtAttributesEntry {
     }
 
     /// Reads the attributes entry name from a buffer.
-    pub fn read_name(&self, data: &[u8]) -> Result<ByteString, ErrorTrace> {
+    pub fn read_name(
+        &self,
+        data: &[u8],
+        encoding: &CharacterEncoding,
+    ) -> Result<ByteString, ErrorTrace> {
         let data_end_offset: usize = self.name_size as usize;
 
         if data.len() < data_end_offset {
@@ -99,7 +108,8 @@ impl ExtAttributesEntry {
                 )));
             }
         };
-        let mut name: ByteString = ByteString::from(name_prefix);
+        let mut name: ByteString = ByteString::new_with_encoding(encoding);
+        name.read_data(name_prefix.as_bytes());
         name.read_data(&data[0..data_end_offset]);
 
         Ok(name)
@@ -149,7 +159,7 @@ mod tests {
         let mut test_struct = ExtAttributesEntry::new();
         test_struct.read_data(&test_data)?;
 
-        let name: ByteString = test_struct.read_name(&test_data[16..])?;
+        let name: ByteString = test_struct.read_name(&test_data[16..], &CharacterEncoding::Utf8)?;
 
         assert_eq!(name.to_string(), "user.myxattr");
 

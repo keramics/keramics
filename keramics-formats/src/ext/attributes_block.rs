@@ -11,24 +11,36 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
+use std::collections::BTreeMap;
+use std::io::SeekFrom;
+
 use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
-use super::attribute::ExtAttribute;
+use super::attributes_block_header::ExtAttributesBlockHeader;
 use super::attributes_entry::ExtAttributesEntry;
 
 /// Extended File System (ext) attributes block.
 pub struct ExtAttributesBlock {
     /// Mediator.
     mediator: MediatorReference,
+
+    /// Base offset.
+    base_offset: usize,
+
+    /// Character encoding.
+    encoding: CharacterEncoding,
 }
 
 impl ExtAttributesBlock {
     /// Creates a new attributes block.
-    pub fn new() -> Self {
+    pub fn new(base_offset: usize, encoding: &CharacterEncoding) -> Self {
         Self {
             mediator: Mediator::current(),
+            base_offset,
+            encoding: encoding.clone(),
         }
     }
 
@@ -38,7 +50,7 @@ impl ExtAttributesBlock {
         data: &[u8],
         data_offset: usize,
         data_size: usize,
-        entries: &mut Vec<ExtAttribute>,
+        entries: &mut BTreeMap<ByteString, ExtAttributesEntry>,
     ) -> Result<(), ErrorTrace> {
         let mut entry_data_offset: usize = data_offset;
 
@@ -76,10 +88,8 @@ impl ExtAttributesBlock {
             }
             entry_data_offset = data_end_offset;
 
-            let attribute: ExtAttribute = ExtAttribute::new();
-            // TODO: fill attribute
-
-            let name: ByteString = match entry.read_name(&data[entry_data_offset..]) {
+            let name: ByteString = match entry.read_name(&data[entry_data_offset..], &self.encoding)
+            {
                 Ok(name) => name,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read attribute name");
@@ -92,11 +102,37 @@ impl ExtAttributesBlock {
             }
             entry_data_offset += entry.name_size as usize;
 
+            if entry.value_data_inode_number == 0 {
+                let value_data_offset: usize =
+                    self.base_offset + (entry.value_data_offset as usize);
+
+                if value_data_offset < entry_data_offset || value_data_offset >= data_size {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid value data offset value out of bounds"
+                    ));
+                }
+                let value_data_end_offset: usize =
+                    value_data_offset + (entry.value_data_size as usize);
+
+                if value_data_end_offset > data_size {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid value data size value out of bounds"
+                    ));
+                }
+                if self.mediator.debug_output {
+                    self.mediator
+                        .debug_print(String::from("    attribute_value_data:\n"));
+                    self.mediator
+                        .debug_print_data(&data[value_data_offset..value_data_end_offset], true);
+                }
+                entry.value_data = Vec::from(&data[value_data_offset..value_data_end_offset]);
+            }
+            entries.insert(name, entry);
+
             let mut alignment_padding_size: usize = entry_data_offset % 4;
             if alignment_padding_size != 0 {
                 alignment_padding_size = 4 - alignment_padding_size;
             }
-            // TODO: debug print padding data.
             if self.mediator.debug_output {
                 self.mediator.debug_print(format!(
                 "ExtAttributesBlock: alignment padding data of size: {} at offset: {} (0x{:08x})\n",
@@ -109,12 +145,60 @@ impl ExtAttributesBlock {
                     true,
                 );
             }
-
-            // TODO: read inline value data.
-
-            entries.push(attribute);
-
             entry_data_offset += alignment_padding_size;
+        }
+        Ok(())
+    }
+
+    /// Reads the attributes block from a specific position in a data stream.
+    pub fn read_at_position(
+        &mut self,
+        data_stream: &DataStreamReference,
+        position: SeekFrom,
+        data_size: usize,
+        entries: &mut BTreeMap<ByteString, ExtAttributesEntry>,
+    ) -> Result<(), ErrorTrace> {
+        if data_size < 32 || data_size > 65536 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported attributes block data size: {} value out of bounds",
+                data_size
+            )));
+        }
+        let mut data: Vec<u8> = vec![0; data_size];
+
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "ExtAttributesBlock data of size: {} at offset: {} (0x{:08x})\n",
+                data.len(),
+                offset,
+                offset
+            ));
+            self.mediator.debug_print_data(&data, true);
+        }
+        let mut header: ExtAttributesBlockHeader = ExtAttributesBlockHeader::new();
+
+        if self.mediator.debug_output {
+            self.mediator
+                .debug_print(ExtAttributesBlockHeader::debug_read_data(&data[0..32]));
+        }
+        match header.read_data(&data[0..32]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to read attributes block header"
+                );
+                return Err(error);
+            }
+        }
+        match self.read_entries(&data, 32, data_size, entries) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read extended attributes");
+                return Err(error);
+            }
         }
         Ok(())
     }
@@ -123,6 +207,8 @@ impl ExtAttributesBlock {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use keramics_core::open_fake_data_stream;
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -204,13 +290,30 @@ mod tests {
     }
 
     #[test]
-    fn test_read_data() -> Result<(), ErrorTrace> {
+    fn test_read_entries() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let test_struct = ExtAttributesBlock::new();
+        let test_struct = ExtAttributesBlock::new(0, &CharacterEncoding::Utf8);
 
-        let mut entries: Vec<ExtAttribute> = Vec::new();
+        let mut entries: BTreeMap<ByteString, ExtAttributesEntry> = BTreeMap::new();
         test_struct.read_entries(&test_data, 32, 1024, &mut entries)?;
+
+        assert_eq!(entries.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = ExtAttributesBlock::new(0, &CharacterEncoding::Utf8);
+
+        let mut entries: BTreeMap<ByteString, ExtAttributesEntry> = BTreeMap::new();
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 1024, &mut entries)?;
+
+        assert_eq!(entries.len(), 1);
 
         Ok(())
     }

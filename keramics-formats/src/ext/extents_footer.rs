@@ -17,7 +17,10 @@ use keramics_types::bytes_to_u32_le;
 
 #[derive(LayoutMap)]
 #[layout_map(
-    structure(byte_order = "little", field(name = "checksum", data_type = "u32"),),
+    structure(
+        byte_order = "little",
+        field(name = "checksum", data_type = "u32", format = "hex"),
+    ),
     method(name = "debug_read_data")
 )]
 /// Extended File System (ext) extents footer.
