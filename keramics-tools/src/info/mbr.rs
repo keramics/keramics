@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::mbr::{MbrPartition, MbrVolumeSystem};
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about a Master Boot Record (MBR).
 pub struct MbrInfo {}
@@ -170,15 +170,10 @@ impl MbrInfo {
                 "    Offset\t\t\t\t\t: {} (0x{:08x})",
                 mbr_partition.offset, mbr_partition.offset
             );
-            if mbr_partition.size < 1024 {
-                println!("    Size\t\t\t\t\t: {} bytes", mbr_partition.size);
-            } else {
-                let size_string: String = format_as_bytesize(mbr_partition.size, 1024);
-                println!(
-                    "    Size\t\t\t\t\t: {} ({} bytes)",
-                    size_string, mbr_partition.size
-                );
-            }
+            let byte_size: ByteSize = ByteSize::new(mbr_partition.size, 1024);
+
+            println!("    Size\t\t\t\t\t: {}\n", byte_size);
+
             println!("    Flags\t\t\t\t\t: 0x{:02x}", mbr_partition.flags);
         }
         println!("");

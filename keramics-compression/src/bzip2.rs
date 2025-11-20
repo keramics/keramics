@@ -524,10 +524,10 @@ impl Bzip2Context {
         number_of_symbols: usize,
     ) -> Result<(), ErrorTrace> {
         let mut code_size: u32 = bitstream.get_value(5);
-        let mut code_size_array: [u8; 258] = [0; 258];
+        let mut code_sizes: [u8; 258] = [0; 258];
         let mut largest_code_size: u32 = code_size;
 
-        for symbol_index in 0..number_of_symbols {
+        for code_size_entry in code_sizes.iter_mut().take(number_of_symbols) {
             while code_size < 20 {
                 let value_32bit: u32 = bitstream.get_value(1);
                 if value_32bit == 0 {
@@ -546,7 +546,7 @@ impl Bzip2Context {
                     code_size
                 )));
             }
-            code_size_array[symbol_index] = code_size as u8;
+            *code_size_entry = code_size as u8;
 
             largest_code_size = max(code_size, largest_code_size);
         }
@@ -558,9 +558,8 @@ impl Bzip2Context {
         }
         let mut check_value: u32 = 1 << largest_code_size;
 
-        for symbol_index in 0..number_of_symbols {
-            code_size = code_size_array[symbol_index] as u32;
-            check_value -= 1 << (largest_code_size - code_size);
+        for code_size in code_sizes.iter().take(number_of_symbols) {
+            check_value -= 1 << (largest_code_size - (*code_size as u32));
         }
         if check_value != 0 {
             return Err(keramics_core::error_trace_new!(format!(
@@ -568,7 +567,7 @@ impl Bzip2Context {
                 check_value
             )));
         }
-        huffman_tree.build(&code_size_array[0..number_of_symbols])
+        huffman_tree.build(&code_sizes[0..number_of_symbols])
     }
 
     /// Reads the selectors from a bitstream.
@@ -698,26 +697,25 @@ impl Bzip2Context {
         uncompressed_data_size: usize,
     ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
-        let mut distribution_value: usize = 0;
         let mut distributions: [usize; 256] = [0; 256];
         let mut last_byte_value: u8 = 0;
         let mut number_of_last_byte_values: u8 = 0;
         let mut permutations: [usize; BZIP2_BLOCK_SIZE] = [0; BZIP2_BLOCK_SIZE];
 
-        for block_data_offset in 0..block_data_size {
-            let byte_value: u8 = block_data[block_data_offset];
-            distributions[byte_value as usize] += 1;
+        for byte_value in block_data.iter().take(block_data_size) {
+            distributions[*byte_value as usize] += 1;
         }
-        for byte_value in 0..256 {
-            let number_of_values: usize = distributions[byte_value as usize];
-            distributions[byte_value] = distribution_value;
+        let mut distribution_value: usize = 0;
+
+        for distributions_entry in &mut distributions {
+            let number_of_values: usize = *distributions_entry;
+            *distributions_entry = distribution_value;
             distribution_value += number_of_values;
         }
-        for block_data_offset in 0..block_data_size {
-            let byte_value: u8 = block_data[block_data_offset];
-            distribution_value = distributions[byte_value as usize];
+        for (block_data_offset, byte_value) in block_data.iter().enumerate().take(block_data_size) {
+            distribution_value = distributions[*byte_value as usize];
             permutations[distribution_value] = block_data_offset;
-            distributions[byte_value as usize] += 1;
+            distributions[*byte_value as usize] += 1;
         }
         let mut permutation_value: usize = permutations[origin_pointer as usize];
 

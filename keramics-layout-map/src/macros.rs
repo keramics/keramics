@@ -269,7 +269,7 @@ struct StructureOptions {
 impl StructureOptions {
     /// Determines if the options are empty.
     pub fn is_empty(&self) -> bool {
-        self.byte_order.is_empty() && (self.fields.len() == 0 || self.members.len() == 0)
+        self.byte_order.is_empty() && (self.fields.is_empty() || self.members.is_empty())
     }
 
     /// Parses the byte order.

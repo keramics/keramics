@@ -64,8 +64,8 @@ impl HuffmanTree {
         // Determine the code size frequencies.
         self.code_size_counts.fill(0);
 
-        for symbol in 0..number_of_code_sizes {
-            let code_size: usize = code_sizes[symbol] as usize;
+        for code_size_entry in code_sizes.iter() {
+            let code_size: usize = *code_size_entry as usize;
 
             if code_size > self.largest_code_size {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -112,8 +112,8 @@ impl HuffmanTree {
             symbol_offsets.push(symbol_offset);
         }
         // Fill the symbols sorted by code size.
-        for symbol in 0..number_of_code_sizes {
-            let code_size: usize = code_sizes[symbol] as usize;
+        for (symbol, code_size_entry) in code_sizes.iter().enumerate() {
+            let code_size: usize = *code_size_entry as usize;
 
             if code_size > 0 {
                 let code_offset: isize = symbol_offsets[code_size];

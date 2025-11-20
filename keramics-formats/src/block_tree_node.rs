@@ -62,7 +62,7 @@ impl<T> BlockTreeNode<T> {
         value: Arc<T>,
     ) -> Result<(), InsertError> {
         if self.node_type == BlockTreeNodeType::Branch {
-            if self.sub_nodes.len() == 0 {
+            if self.sub_nodes.is_empty() {
                 self.sub_nodes = (0..elements_per_node).map(|_| None).collect();
             }
             let number_of_sub_nodex: u64 = size.div_ceil(self.element_size);
@@ -88,7 +88,7 @@ impl<T> BlockTreeNode<T> {
                     self.sub_nodes[sub_node_index as usize] = Some(sub_node);
                 }
                 let sub_node: &mut BlockTreeNode<T> =
-                    &mut self.sub_nodes[sub_node_index as usize].as_mut().unwrap();
+                    self.sub_nodes[sub_node_index as usize].as_mut().unwrap();
                 sub_node.insert_value(
                     elements_per_node,
                     leaf_value_size,
@@ -99,13 +99,13 @@ impl<T> BlockTreeNode<T> {
                 sub_node_offset += self.element_size;
             }
         } else {
-            if size % self.element_size != 0 {
+            if !size.is_multiple_of(self.element_size) {
                 return Err(InsertError::new(format!(
                     "Size: {} not a multitude of node element size: {}",
                     size, self.element_size
                 )));
             }
-            if self.values.len() == 0 {
+            if self.values.is_empty() {
                 self.values = (0..elements_per_node).map(|_| None).collect();
             }
             let number_of_values: u64 = size / self.element_size;

@@ -21,7 +21,7 @@ use keramics_formats::ewf::{EwfHeaderValueType, EwfImage, EwfMediaType};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_types::Uuid;
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about an Expert Witness Compression Format (EWF) image.
 struct EwfImageInfo {
@@ -131,21 +131,10 @@ impl fmt::Display for EwfImageInfo {
             "        Number of sectors\t\t\t: {}\n",
             self.number_of_sectors
         )?;
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
 
-        if self.media_size < 1024 {
-            write!(
-                formatter,
-                "        Media size\t\t\t\t: {} bytes\n",
-                self.media_size
-            )?;
-        } else {
-            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
-            write!(
-                formatter,
-                "        Media size\t\t\t\t: {} ({} bytes)\n",
-                media_size_string, self.media_size
-            )?;
-        }
+        write!(formatter, "        Media size\t\t\t\t: {}\n", byte_size)?;
+
         if self.md5_hash != [0; 16] {
             let hash_string: String = format_as_string(&self.md5_hash);
             write!(formatter, "        MD5\t\t\t\t\t: {}\n", hash_string)?;

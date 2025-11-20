@@ -245,9 +245,8 @@ impl LzxContext {
             match block_type {
                 1 | 2 => {
                     let aligned_offsets_huffman_tree: Option<HuffmanTree> = if block_type == 2 {
-                        for code_size_index in 0..8 {
-                            let code_size: u32 = bitstream.get_value(3);
-                            aligned_offsets_code_sizes[code_size_index] = code_size as u8;
+                        for code_size_entry in &mut aligned_offsets_code_sizes {
+                            *code_size_entry = bitstream.get_value(3) as u8;
                         }
                         if self.mediator.debug_output {
                             self.mediator
@@ -448,23 +447,18 @@ impl LzxContext {
                     }
                     distance = bitstream.get_value(number_of_bits as usize);
 
-                    match aligned_offsets_huffman_tree {
-                        Some(huffman_tree) => {
-                            if distance_slot >= 8 {
-                                let aligned_offset: u16 = huffman_tree.decode_symbol(bitstream)?;
+                    if let Some(huffman_tree) = aligned_offsets_huffman_tree
+                        && distance_slot >= 8
+                    {
+                        let aligned_offset: u16 = huffman_tree.decode_symbol(bitstream)?;
 
-                                if self.mediator.debug_output {
-                                    self.mediator.debug_print(format!(
-                                        "    aligned_offset: {}\n",
-                                        aligned_offset
-                                    ));
-                                }
-                                distance <<= 3;
-                                distance |= aligned_offset as u32;
-                            }
+                        if self.mediator.debug_output {
+                            self.mediator
+                                .debug_print(format!("    aligned_offset: {}\n", aligned_offset));
                         }
-                        None => {}
-                    };
+                        distance <<= 3;
+                        distance |= aligned_offset as u32;
+                    }
                     distance =
                         ((distance as i32) + LZX_COMPRESSION_OFFSET_BASE[distance_slot]) as u32;
 
@@ -527,9 +521,8 @@ impl LzxContext {
     ) -> Result<(), ErrorTrace> {
         let mut pre_code_sizes: [u8; 20] = [0; 20];
 
-        for code_size_index in 0..20 {
-            let code_size: u32 = bitstream.get_value(4);
-            pre_code_sizes[code_size_index] = code_size as u8;
+        for code_size_entry in &mut pre_code_sizes {
+            *code_size_entry = bitstream.get_value(4) as u8;
         }
         if self.mediator.debug_output {
             self.mediator

@@ -923,7 +923,10 @@ impl LzfseContext {
             self.mediator.debug_print(String::from("    values: [\n"));
         }
         let mut data_offset: usize = 42;
-        for frequency_table_index in 0..360 {
+
+        for (frequency_table_index, frequency_table_entry) in
+            frequency_table.iter_mut().enumerate().take(360)
+        {
             let frequency_value: u16 = bytes_to_u16_le!(compressed_data, data_offset);
             data_offset += 2;
 
@@ -938,7 +941,7 @@ impl LzfseContext {
                     self.mediator.debug_print(format!(", {}", frequency_value));
                 }
             }
-            frequency_table[frequency_table_index] = frequency_value;
+            *frequency_table_entry = frequency_value;
         }
         if self.mediator.debug_output {
             self.mediator.debug_print(String::from("    ],\n"));
@@ -1006,7 +1009,10 @@ impl LzfseContext {
             // TODO: use bitstream to read compressed data
             let mut number_of_bits: usize = 0;
             let mut value_32bit: u32 = 0;
-            for frequency_table_index in 0..360 {
+
+            for (frequency_table_index, frequency_table_entry) in
+                frequency_table.iter_mut().enumerate().take(360)
+            {
                 while number_of_bits <= 24 && data_offset < data_end_offset {
                     value_32bit |= (compressed_data[data_offset] as u32) << number_of_bits;
                     data_offset += 1;
@@ -1032,7 +1038,7 @@ impl LzfseContext {
                         self.mediator.debug_print(format!(", {}", frequency_value));
                     }
                 }
-                frequency_table[frequency_table_index] = frequency_value;
+                *frequency_table_entry = frequency_value;
 
                 value_32bit >>= frequency_value_size;
                 number_of_bits -= frequency_value_size as usize;
@@ -1069,12 +1075,13 @@ impl LzfseContext {
         let mut literal_states: [u16; 4] = [0; 4];
         literal_states.copy_from_slice(&decoder.literal_states);
 
-        let number_of_bits: i32 = -1 * decoder.literal_bits;
+        let number_of_bits: i32 = -decoder.literal_bits;
         let _ = bitstream.get_value(number_of_bits as usize);
 
         for literal_index in (0..decoder.number_of_literals).step_by(4) {
-            for literal_states_index in 0..4 {
-                let literal_state: u16 = literal_states[literal_states_index];
+            for (literal_states_index, literal_state_entry) in literal_states.iter_mut().enumerate()
+            {
+                let literal_state: u16 = *literal_state_entry;
 
                 // TODO: refactor to decoder.get_literal?
                 if literal_state > LZFSE_NUMBER_OF_LITERAL_STATES as u16 {
@@ -1110,7 +1117,7 @@ impl LzfseContext {
                     ));
                 }
                 literal_values[literal_values_index] = decoder_entry.symbol;
-                literal_states[literal_states_index] = literal_state as u16;
+                *literal_state_entry = literal_state as u16;
             }
         }
         if self.mediator.debug_output {
@@ -1145,7 +1152,7 @@ impl LzfseContext {
         let mut m_value_state: i32 = decoder.m_value_state as i32;
         let mut d_value_state: i32 = decoder.d_value_state as i32;
 
-        let number_of_bits: i32 = -1 * decoder.lmd_values_bits;
+        let number_of_bits: i32 = -decoder.lmd_values_bits;
         let _ = bitstream.get_value(number_of_bits as usize);
 
         for _ in 0..decoder.number_of_lmd_values {

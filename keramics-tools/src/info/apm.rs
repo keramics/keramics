@@ -11,59 +11,175 @@
  * under the License.
  */
 
+use std::fmt;
+
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::apm::{ApmPartition, ApmVolumeSystem};
+use keramics_types::ByteString;
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
+
+/// Apple Partition Map (APM) parition information.
+struct ApmPartitionInfo {
+    /// The partition index.
+    pub index: usize,
+
+    /// The partition type identifier.
+    pub type_identifier: ByteString,
+
+    /// The name.
+    pub name: ByteString,
+
+    /// The offset of the partition relative to start of the volume system.
+    pub offset: u64,
+
+    /// The size of the partition.
+    pub size: u64,
+
+    /// The status flags.
+    pub status_flags: u32,
+}
+
+impl ApmPartitionInfo {
+    /// Creates new partition information.
+    fn new() -> Self {
+        Self {
+            index: 0,
+            type_identifier: ByteString::new(),
+            name: ByteString::new(),
+            offset: 0,
+            size: 0,
+            status_flags: 0,
+        }
+    }
+}
+
+impl fmt::Display for ApmPartitionInfo {
+    /// Formats partition information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "Partition: {}\n", self.index + 1)?;
+
+        write!(
+            formatter,
+            "    Type identifier\t\t\t\t: {}\n",
+            self.type_identifier
+        )?;
+        if !self.name.is_empty() {
+            write!(formatter, "    Name\t\t\t\t\t: {}\n", self.name)?;
+        }
+        write!(
+            formatter,
+            "    Offset\t\t\t\t\t: {} (0x{:08x})\n",
+            self.offset, self.offset
+        )?;
+        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+
+        write!(formatter, "    Size\t\t\t\t\t: {}\n", byte_size)?;
+
+        let flags_info: ApmPartitionStatusFlagsInfo =
+            ApmPartitionStatusFlagsInfo::new(self.status_flags);
+
+        write!(
+            formatter,
+            "    Status flags\t\t\t\t: 0x{:08x}\n{}",
+            self.status_flags, flags_info
+        )?;
+        write!(formatter, "\n")
+    }
+}
+
+/// Apple Partition Map (APM) partition status flags information.
+struct ApmPartitionStatusFlagsInfo {
+    /// Flags.
+    flags: u32,
+}
+
+impl ApmPartitionStatusFlagsInfo {
+    /// Creates new partition status flags information.
+    fn new(flags: u32) -> Self {
+        Self { flags }
+    }
+}
+
+impl fmt::Display for ApmPartitionStatusFlagsInfo {
+    /// Formats partition status flags information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        if self.flags & 0x00000001 != 0 {
+            write!(formatter, "        0x00000001: Is valid\n")?;
+        }
+        if self.flags & 0x00000002 != 0 {
+            write!(formatter, "        0x00000002: Is allocated\n")?;
+        }
+        if self.flags & 0x00000004 != 0 {
+            write!(formatter, "        0x00000004: Is in use\n")?;
+        }
+        if self.flags & 0x00000008 != 0 {
+            write!(formatter, "        0x00000008: Contains boot information\n")?;
+        }
+        if self.flags & 0x00000010 != 0 {
+            write!(formatter, "        0x00000010: Is readable\n")?;
+        }
+        if self.flags & 0x00000020 != 0 {
+            write!(formatter, "        0x00000020: Is writeable\n")?;
+        }
+        if self.flags & 0x00000040 != 0 {
+            write!(
+                formatter,
+                "        0x00000040: Boot code is position independent\n"
+            )?;
+        }
+
+        if self.flags & 0x00000100 != 0 {
+            write!(
+                formatter,
+                "        0x00000100: Contains a chain-compatible driver\n"
+            )?;
+        }
+        if self.flags & 0x00000200 != 0 {
+            write!(formatter, "        0x00000200: Contains a real driver\n")?;
+        }
+        if self.flags & 0x00000400 != 0 {
+            write!(formatter, "        0x00000400: Contains a chain driver\n")?;
+        }
+
+        if self.flags & 0x40000000 != 0 {
+            write!(
+                formatter,
+                "        0x40000000: Automatic mount at startup\n"
+            )?;
+        }
+        if self.flags & 0x80000000 != 0 {
+            write!(formatter, "        0x80000000: Is startup partition\n")?;
+        }
+        Ok(())
+    }
+}
 
 /// Information about an Apple Partition Map (APM).
 pub struct ApmInfo {}
 
 impl ApmInfo {
-    /// Prints the partition status flags.
-    fn print_partition_status_flags(flags: u32) {
-        if flags & 0x00000001 != 0 {
-            println!("        0x00000001: Is valid");
-        }
-        if flags & 0x00000002 != 0 {
-            println!("        0x00000002: Is allocated");
-        }
-        if flags & 0x00000004 != 0 {
-            println!("        0x00000004: Is in use");
-        }
-        if flags & 0x00000008 != 0 {
-            println!("        0x00000008: Contains boot information");
-        }
-        if flags & 0x00000010 != 0 {
-            println!("        0x00000010: Is readable");
-        }
-        if flags & 0x00000020 != 0 {
-            println!("        0x00000020: Is writeable");
-        }
-        if flags & 0x00000040 != 0 {
-            println!("        0x00000040: Boot code is position independent");
-        }
+    /// Retrieves the partition information.
+    fn get_partition_information(
+        partition_index: usize,
+        apm_partition: &ApmPartition,
+    ) -> ApmPartitionInfo {
+        let mut partition_information: ApmPartitionInfo = ApmPartitionInfo::new();
 
-        if flags & 0x00000100 != 0 {
-            println!("        0x00000100: Contains a chain-compatible driver");
-        }
-        if flags & 0x00000200 != 0 {
-            println!("        0x00000200: Contains a real driver");
-        }
-        if flags & 0x00000400 != 0 {
-            println!("        0x00000400: Contains a chain driver");
-        }
+        partition_information.index = partition_index;
+        partition_information.type_identifier = apm_partition.type_identifier.clone();
+        partition_information.name = apm_partition.name.clone();
+        partition_information.offset = apm_partition.offset;
+        partition_information.size = apm_partition.size;
+        partition_information.status_flags = apm_partition.status_flags;
 
-        if flags & 0x40000000 != 0 {
-            println!("        0x40000000: Automatic mount at startup");
-        }
-        if flags & 0x80000000 != 0 {
-            println!("        0x80000000: Is startup partition");
-        }
+        partition_information
     }
 
-    /// Prints information about a volume system.
-    pub fn print_volume_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    /// Opens a volume system.
+    pub fn open_volume_system(
+        data_stream: &DataStreamReference,
+    ) -> Result<ApmVolumeSystem, ErrorTrace> {
         let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
         match apm_volume_system.read_data_stream(data_stream) {
@@ -73,7 +189,20 @@ impl ApmInfo {
                 return Err(error);
             }
         };
+        Ok(apm_volume_system)
+    }
+
+    /// Prints information about a volume system.
+    pub fn print_volume_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let apm_volume_system: ApmVolumeSystem = match Self::open_volume_system(data_stream) {
+            Ok(apm_volume_system) => apm_volume_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open volume system");
+                return Err(error);
+            }
+        };
         println!("Apple Partition Map (APM) information:");
+
         println!(
             "    Bytes per sector\t\t\t\t: {} bytes",
             apm_volume_system.bytes_per_sector
@@ -81,9 +210,9 @@ impl ApmInfo {
         let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
         println!("    Number of partitions\t\t\t: {}", number_of_partitions);
 
-        for partition_index in 0..number_of_partitions {
-            println!("");
+        println!("");
 
+        for partition_index in 0..number_of_partitions {
             let apm_partition: ApmPartition =
                 match apm_volume_system.get_partition_by_index(partition_index) {
                     Ok(partition) => partition,
@@ -95,35 +224,11 @@ impl ApmInfo {
                         return Err(error);
                     }
                 };
-            println!("Partition: {}", partition_index + 1);
-            println!(
-                "    Type identifier\t\t\t\t: {}",
-                apm_partition.type_identifier
-            );
-            if !apm_partition.name.is_empty() {
-                println!("    Name\t\t\t\t\t: {}", apm_partition.name);
-            }
-            println!(
-                "    Offset\t\t\t\t\t: {} (0x{:08x})",
-                apm_partition.offset, apm_partition.offset
-            );
-            if apm_partition.size < 1024 {
-                println!("    Size\t\t\t\t\t: {}", apm_partition.size);
-            } else {
-                let size_string: String = format_as_bytesize(apm_partition.size, 1024);
-                println!(
-                    "    Size\t\t\t\t\t: {} ({} bytes)",
-                    size_string, apm_partition.size
-                );
-            }
-            println!(
-                "    Status flags\t\t\t\t: 0x{:08x}",
-                apm_partition.status_flags
-            );
-            Self::print_partition_status_flags(apm_partition.status_flags);
-        }
-        println!("");
+            let partition_info: ApmPartitionInfo =
+                Self::get_partition_information(partition_index, &apm_partition);
 
+            print!("{}", partition_info);
+        }
         Ok(())
     }
 }
@@ -132,6 +237,57 @@ impl ApmInfo {
 mod tests {
     use super::*;
 
-    // TODO: add tests for print_partition_status_flags
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    #[test]
+    fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
+
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let test_struct: ApmPartitionInfo = ApmInfo::get_partition_information(0, &apm_partition);
+
+        let string: String = test_struct.to_string();
+        let expected_string: &str = concat!(
+            "Partition: 1\n",
+            "    Type identifier\t\t\t\t: Apple_HFS\n",
+            "    Name\t\t\t\t\t: disk image\n",
+            "    Offset\t\t\t\t\t: 32768 (0x00008000)\n",
+            "    Size\t\t\t\t\t: 4.0 MiB (4153344 bytes)\n",
+            "    Status flags\t\t\t\t: 0x40000033\n",
+            "        0x00000001: Is valid\n",
+            "        0x00000002: Is allocated\n",
+            "        0x00000010: Is readable\n",
+            "        0x00000020: Is writeable\n",
+            "        0x40000000: Automatic mount at startup\n",
+            "\n"
+        );
+        assert_eq!(string, expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_partition_status_flags_fmt() -> Result<(), ErrorTrace> {
+        let test_struct: ApmPartitionStatusFlagsInfo = ApmPartitionStatusFlagsInfo::new(0x40000033);
+
+        let string: String = test_struct.to_string();
+        let expected_string: &str = concat!(
+            "        0x00000001: Is valid\n",
+            "        0x00000002: Is allocated\n",
+            "        0x00000010: Is readable\n",
+            "        0x00000020: Is writeable\n",
+            "        0x40000000: Automatic mount at startup\n",
+        );
+        assert_eq!(string, expected_string);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_partition_information
+    // TODO: add tests for open_volume_system
     // TODO: add tests for print_volume_system
 }

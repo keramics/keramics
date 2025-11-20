@@ -14,7 +14,7 @@
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about a GUID Partition Table (GPT).
 pub struct GptInfo {}
@@ -67,15 +67,9 @@ impl GptInfo {
                 "    Offset\t\t\t\t\t: {} (0x{:08x})",
                 gpt_partition.offset, gpt_partition.offset
             );
-            if gpt_partition.size < 1024 {
-                println!("    Size\t\t\t\t\t: {} bytes", gpt_partition.size);
-            } else {
-                let size_string: String = format_as_bytesize(gpt_partition.size, 1024);
-                println!(
-                    "    Size\t\t\t\t\t: {} ({} bytes)",
-                    size_string, gpt_partition.size
-                );
-            }
+            let byte_size: ByteSize = ByteSize::new(gpt_partition.size, 1024);
+
+            println!("    Size\t\t\t\t\t: {}\n", byte_size);
         }
         println!("");
 

@@ -16,7 +16,7 @@ use std::fmt;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::sparseimage::SparseImageFile;
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about a Mac OS sparse image (.sparseimage) file.
 struct SparseImageFileInfo {
@@ -46,20 +46,10 @@ impl fmt::Display for SparseImageFileInfo {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "Sparse image (.sparseimage) information:\n")?;
 
-        if self.media_size < 1024 {
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} bytes\n",
-                self.media_size
-            )?;
-        } else {
-            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
-                media_size_string, self.media_size
-            )?;
-        }
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+
+        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
+
         write!(
             formatter,
             "    Bytes per sector\t\t\t\t: {} bytes\n",
@@ -72,12 +62,9 @@ impl fmt::Display for SparseImageFileInfo {
                 self.block_size,
             )?;
         } else {
-            let band_size_string: String = format_as_bytesize(self.block_size as u64, 1024);
-            write!(
-                formatter,
-                "    Band size\t\t\t\t\t: {} ({} bytes)\n",
-                band_size_string, self.block_size,
-            )?;
+            let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+
+            write!(formatter, "    Band size\t\t\t\t\t: {}\n", byte_size)?;
         }
         write!(formatter, "\n")
     }
@@ -138,7 +125,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     #[test]
-    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let sparseimage_file: SparseImageFile = SparseImageInfo::open_file(&data_stream)?;

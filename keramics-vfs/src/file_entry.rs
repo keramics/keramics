@@ -26,6 +26,7 @@ use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
 use super::enums::VfsFileType;
 use super::ewf::EwfFileEntry;
+use super::extended_attribute::VfsExtendedAttribute;
 use super::fake::FakeFileEntry;
 use super::gpt::GptFileEntry;
 use super::iterators::VfsFileEntriesIterator;
@@ -781,71 +782,162 @@ impl VfsFileEntry {
         Ok(result)
     }
 
+    /// Retrieves the number of extended attributes.
+    pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => Ok(0),
+            VfsFileEntry::Ext(ext_file_entry) => {
+                match ext_file_entry.get_number_of_extended_attributes() {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve ext number of extended attributes"
+                        );
+                        Err(error)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Retrieves a specific extended attribute.
+    pub fn get_extended_attribute_by_index(
+        &mut self,
+        extended_attribute_index: usize,
+    ) -> Result<VfsExtendedAttribute, ErrorTrace> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => Err(keramics_core::error_trace_new!(format!(
+                "Missing extended attribute: {}",
+                extended_attribute_index
+            ))),
+            VfsFileEntry::Ext(ext_file_entry) => {
+                match ext_file_entry.get_extended_attribute_by_index(extended_attribute_index) {
+                    Ok(ext_extended_attribute) => {
+                        Ok(VfsExtendedAttribute::Ext(ext_extended_attribute))
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve ext extended attribute: {}",
+                                extended_attribute_index
+                            )
+                        );
+                        Err(error)
+                    }
+                }
+            }
+        }
+    }
+
+    // TODO: add get extended_attribute_by_name
+    // TODO: add get extended_attributes iterator
+
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        let number_of_sub_file_entries: usize = match self {
-            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_number_of_sub_file_entries(),
+        match self {
+            VfsFileEntry::Apm(apm_file_entry) => {
+                Ok(apm_file_entry.get_number_of_sub_file_entries())
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 match ext_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
+                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             "Unable to retrieve number of ext sub file entries"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
-            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Ewf(ewf_file_entry) => {
+                Ok(ewf_file_entry.get_number_of_sub_file_entries())
+            }
             VfsFileEntry::Fake(_) => todo!(),
             VfsFileEntry::Fat(fat_file_entry) => {
                 match fat_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
+                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             "Unable to retrieve number of FAT sub file entries"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
-            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Gpt(gpt_file_entry) => {
+                Ok(gpt_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Mbr(mbr_file_entry) => {
+                Ok(mbr_file_entry.get_number_of_sub_file_entries())
+            }
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 match ntfs_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
+                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             "Unable to retrieve number of NTFS sub file entries"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
             VfsFileEntry::Os(os_file_entry) => {
                 match os_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
+                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
                             "Unable to retrieve number of OS sub file entries"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
             }
-            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::SparseImage(sparseimage_file_entry) => {
-                sparseimage_file_entry.get_number_of_sub_file_entries()
+            VfsFileEntry::Qcow(qcow_file_entry) => {
+                Ok(qcow_file_entry.get_number_of_sub_file_entries())
             }
-            VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_number_of_sub_file_entries(),
-        };
-        Ok(number_of_sub_file_entries)
+            VfsFileEntry::SparseImage(sparseimage_file_entry) => {
+                Ok(sparseimage_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Udif(udif_file_entry) => {
+                Ok(udif_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Vhd(vhd_file_entry) => {
+                Ok(vhd_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Vhdx(vhdx_file_entry) => {
+                Ok(vhdx_file_entry.get_number_of_sub_file_entries())
+            }
+        }
     }
 
     /// Retrieves a specific sub file entry.
@@ -1305,6 +1397,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_apm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_apm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_apm() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
 
@@ -1544,6 +1658,35 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let extended_attribute: VfsExtendedAttribute =
+            vfs_file_entry.get_extended_attribute_by_index(0)?;
+        assert_eq!(
+            extended_attribute.get_name(),
+            VfsString::ByteString(ByteString::from("security.selinux"))
+        );
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_ext() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
@@ -1760,6 +1903,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
 
@@ -1941,6 +2106,8 @@ mod tests {
 
     // TODO: add test_get_data_stream_with_fake
 
+    // TODO: add tests for test_get_number_of_extended_attributes_with_fake
+    // TODO: add tests for test_get_extended_attribute_by_index_with_fake
     // TODO: add tests for test_get_number_of_sub_file_entries_with_fake
     // TODO: add tests for test_get_sub_file_entry_by_index_with_fake
 
@@ -2132,6 +2299,28 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -2355,6 +2544,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_gpt() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_gpt() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_gpt() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
 
@@ -2563,6 +2774,28 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_mbr() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_mbr() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -2792,6 +3025,28 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -3040,6 +3295,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_os() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
@@ -3249,6 +3526,28 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_qcow() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_qcow() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -3470,6 +3769,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_sparseimage() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_sparseimage() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_sparseimage() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
 
@@ -3681,6 +4002,28 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_udif() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_udif() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }
@@ -3899,6 +4242,28 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_extended_attributes_with_vhd() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_vhd() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_vhd() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
 
@@ -4107,6 +4472,28 @@ mod tests {
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_vhdx() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_vhdx() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
 
         Ok(())
     }

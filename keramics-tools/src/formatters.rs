@@ -11,28 +11,65 @@
  * under the License.
  */
 
-const UNITS: [&str; 9] = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"];
+use std::fmt;
 
-/// Formats an integer as bytes size.
-pub fn format_as_bytesize(value: u64, base: u64) -> String {
-    let mut factor: u64 = 1;
-    let mut next_factor: u64 = base;
-    let mut units_index: usize = 0;
+pub struct ByteSize {
+    /// The value.
+    pub value: u64,
 
-    while next_factor <= value {
-        factor = next_factor;
-        next_factor *= base;
-        units_index += 1;
+    /// The base.
+    pub base: u64,
+}
+
+impl ByteSize {
+    const UNITS: [&'static str; 9] = ["", "K", "M", "G", "T", "P", "E", "Z", "Y"];
+
+    /// Creates a new byte size.
+    pub fn new(value: u64, base: u64) -> Self {
+        Self { value, base }
     }
-    if units_index > 0 {
-        let float_value: f64 = value as f64 / factor as f64;
-        let mut base_string: &str = "B";
-        if base == 1024 {
-            base_string = "iB";
+
+    /// Retrieves a human readable byte size.
+    fn get_human_readable(&self) -> String {
+        let mut factor: u64 = 1;
+        let mut next_factor: u64 = self.base;
+        let mut units_index: usize = 0;
+
+        while next_factor <= self.value {
+            factor = next_factor;
+            next_factor *= self.base;
+            units_index += 1;
         }
-        return format!("{:.1} {}{}", float_value, UNITS[units_index], base_string);
+        if units_index == 0 {
+            format!("{} B", self.value)
+        } else {
+            let float_value: f64 = (self.value as f64) / (factor as f64);
+
+            let mut base_string: &'static str = "B";
+
+            if self.base == 1024 {
+                base_string = "iB";
+            }
+            format!(
+                "{:.1} {}{}",
+                float_value,
+                Self::UNITS[units_index],
+                base_string
+            )
+        }
     }
-    return format!("{} B", value);
+}
+
+impl fmt::Display for ByteSize {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.value < 1024 {
+            write!(formatter, "{} bytes", self.value)
+        } else {
+            let human_readable: String = self.get_human_readable();
+
+            write!(formatter, "{} ({} bytes)", human_readable, self.value)
+        }
+    }
 }
 
 #[cfg(test)]
@@ -40,20 +77,48 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_as_bytesize() {
-        let string: String = format_as_bytesize(512, 1024);
+    fn test_get_human_readable() {
+        let byte_size: ByteSize = ByteSize::new(512, 1024);
+        let string: String = byte_size.get_human_readable();
         assert_eq!(string, "512 B");
 
-        let string: String = format_as_bytesize(1024, 1024);
+        let byte_size: ByteSize = ByteSize::new(1024, 1024);
+        let string: String = byte_size.get_human_readable();
         assert_eq!(string, "1.0 KiB");
 
-        let string: String = format_as_bytesize(2097152, 1024);
+        let byte_size: ByteSize = ByteSize::new(2097152, 1024);
+        let string: String = byte_size.get_human_readable();
         assert_eq!(string, "2.0 MiB");
 
-        let string: String = format_as_bytesize(2097152, 1000);
+        let byte_size: ByteSize = ByteSize::new(2097152, 1000);
+        let string: String = byte_size.get_human_readable();
         assert_eq!(string, "2.1 MB");
 
-        let string: String = format_as_bytesize(3221225472, 1024);
+        let byte_size: ByteSize = ByteSize::new(3221225472, 1024);
+        let string: String = byte_size.get_human_readable();
         assert_eq!(string, "3.0 GiB");
+    }
+
+    #[test]
+    fn test_to_string() {
+        let byte_size: ByteSize = ByteSize::new(512, 1024);
+        let string: String = byte_size.to_string();
+        assert_eq!(string, "512 bytes");
+
+        let byte_size: ByteSize = ByteSize::new(1024, 1024);
+        let string: String = byte_size.to_string();
+        assert_eq!(string, "1.0 KiB (1024 bytes)");
+
+        let byte_size: ByteSize = ByteSize::new(2097152, 1024);
+        let string: String = byte_size.to_string();
+        assert_eq!(string, "2.0 MiB (2097152 bytes)");
+
+        let byte_size: ByteSize = ByteSize::new(2097152, 1000);
+        let string: String = byte_size.to_string();
+        assert_eq!(string, "2.1 MB (2097152 bytes)");
+
+        let byte_size: ByteSize = ByteSize::new(3221225472, 1024);
+        let string: String = byte_size.to_string();
+        assert_eq!(string, "3.0 GiB (3221225472 bytes)");
     }
 }

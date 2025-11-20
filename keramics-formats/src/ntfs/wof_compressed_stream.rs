@@ -125,7 +125,7 @@ impl NtfsWofCompressedStream {
 
     /// Reads media data based on the compressed blocks.
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.size > 0 && self.block_offsets.len() == 0 {
+        if self.size > 0 && self.block_offsets.is_empty() {
             match self.read_compressed_block_offsets() {
                 Ok(_) => {}
                 Err(mut error) => {

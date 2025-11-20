@@ -21,7 +21,7 @@ use keramics_formats::ntfs::{
     NtfsAttribute, NtfsAttributeListEntry, NtfsDataFork, NtfsFileEntry, NtfsFileSystem,
 };
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about a New Technologies File System (NTFS).
 pub struct NtfsInfo {}
@@ -304,16 +304,10 @@ impl NtfsInfo {
                     Some(name) => println!("    Attribute name\t\t\t\t: {}", name),
                     None => {}
                 };
-                if mft_attribute.data_size < 1024 {
-                    println!("    Data size\t\t\t\t\t: {} bytes", mft_attribute.data_size);
-                } else {
-                    let data_size_string: String =
-                        format_as_bytesize(mft_attribute.data_size, 1024);
-                    println!(
-                        "    Data size\t\t\t\t\t: {} ({} bytes)",
-                        data_size_string, mft_attribute.data_size
-                    );
-                }
+                let byte_size: ByteSize = ByteSize::new(mft_attribute.data_size, 1024);
+
+                println!("    Data size\t\t\t\t\t: {}\n", byte_size);
+
                 if attribute_type == NTFS_ATTRIBUTE_TYPE_DATA {
                     println!(
                         "    Data flags\t\t\t\t\t: 0x{:04x}",

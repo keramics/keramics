@@ -43,7 +43,7 @@ impl PathComponent {
                     None => return Ok(None),
                 }
             }
-            PathComponent::String(string) => Ok(Self::extension_from_string(string)),
+            PathComponent::String(string) => Ok(Self::extension_from_string(string.as_str())),
             PathComponent::Root => Ok(None),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::extension_from_ucs2_string(ucs2_string))
@@ -94,9 +94,9 @@ impl PathComponent {
         Ok(path_component)
     }
 
-    /// Retrieves the extension from a [`&String`] if available.
+    /// Retrieves the extension from a [`&str`] if available.
     #[inline(always)]
-    fn extension_from_string(string: &String) -> Option<PathComponent> {
+    fn extension_from_string(string: &str) -> Option<PathComponent> {
         if string.is_empty() {
             return None;
         }
@@ -148,7 +148,7 @@ impl PathComponent {
                     None => return Ok(None),
                 }
             }
-            PathComponent::String(string) => Ok(Self::file_stem_from_string(string)),
+            PathComponent::String(string) => Ok(Self::file_stem_from_string(string.as_str())),
             PathComponent::Root => Ok(None),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::file_stem_from_ucs2_string(ucs2_string))
@@ -199,9 +199,9 @@ impl PathComponent {
         Ok(Some(path_component))
     }
 
-    /// Retrieves the file stem from a [`&String`] if available.
+    /// Retrieves the file stem from a [`&str`] if available.
     #[inline(always)]
-    fn file_stem_from_string(string: &String) -> Option<PathComponent> {
+    fn file_stem_from_string(string: &str) -> Option<PathComponent> {
         if string.is_empty() {
             return None;
         }
@@ -212,7 +212,7 @@ impl PathComponent {
 
                 Some(PathComponent::String(string[0..string_size].to_string()))
             }
-            None => Some(PathComponent::String(string.clone())),
+            None => Some(PathComponent::String(string.to_string())),
         }
     }
 

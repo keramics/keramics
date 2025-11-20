@@ -18,7 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::qcow::{QcowCompressionMethod, QcowEncryptionMethod, QcowFile};
 use keramics_types::ByteString;
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about a QEMU Copy-On-Write (QCOW) file.
 struct QcowFileInfo {
@@ -61,21 +61,10 @@ impl fmt::Display for QcowFileInfo {
             "    Format version\t\t\t\t: {}\n",
             self.format_version
         )?;
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
 
-        if self.media_size < 1024 {
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} bytes\n",
-                self.media_size
-            )?;
-        } else {
-            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
-                media_size_string, self.media_size
-            )?;
-        }
+        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
+
         let compression_methods = HashMap::<QcowCompressionMethod, &'static str>::from([
             (QcowCompressionMethod::Unknown, "Unknown"),
             (QcowCompressionMethod::Zlib, "zlib"),
@@ -174,7 +163,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     #[test]
-    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let qcow_file: QcowFile = QcowInfo::open_file(&data_stream)?;

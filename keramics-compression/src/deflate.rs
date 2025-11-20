@@ -332,16 +332,17 @@ impl DeflateContext {
 
             mediator.debug_print(string_parts.join(""));
         }
-        for sequence_index in 0..number_of_code_sizes {
-            let code_size: u32 = bitstream.get_value(3);
-            let code_size_index: usize = DEFLATE_CODE_SIZES_SEQUENCE[sequence_index] as usize;
-
-            code_sizes[code_size_index] = code_size as u8;
+        for code_size_index in DEFLATE_CODE_SIZES_SEQUENCE
+            .iter()
+            .take(number_of_code_sizes)
+        {
+            code_sizes[*code_size_index as usize] = bitstream.get_value(3) as u8;
         }
-        for sequence_index in number_of_code_sizes..19 {
-            let code_size_index: usize = DEFLATE_CODE_SIZES_SEQUENCE[sequence_index] as usize;
-
-            code_sizes[code_size_index] = 0;
+        for code_size_index in DEFLATE_CODE_SIZES_SEQUENCE
+            .iter()
+            .skip(number_of_code_sizes)
+        {
+            code_sizes[*code_size_index as usize] = 0;
         }
         let mut codes_huffman_tree: HuffmanTree = HuffmanTree::new(19, 15);
         codes_huffman_tree.build(&code_sizes[0..19])?;
@@ -409,19 +410,19 @@ impl DeflateContext {
 
     /// Builds fixed (predefined) Huffman trees.
     fn build_fixed_huffman_trees(&mut self) -> Result<(), ErrorTrace> {
-        let mut code_sizes: Vec<u8> = vec![0; 318];
+        let mut code_sizes: [u8; 318] = [0; 318];
 
-        for symbol in 0..318 {
+        for (symbol, code_size_entry) in code_sizes.iter_mut().enumerate() {
             if symbol < 144 {
-                code_sizes[symbol] = 8;
+                *code_size_entry = 8;
             } else if symbol < 256 {
-                code_sizes[symbol] = 9;
+                *code_size_entry = 9;
             } else if symbol < 280 {
-                code_sizes[symbol] = 7;
+                *code_size_entry = 7;
             } else if symbol < 288 {
-                code_sizes[symbol] = 8;
+                *code_size_entry = 8;
             } else {
-                code_sizes[symbol] = 5;
+                *code_size_entry = 5;
             }
         }
         self.fixed_literals_huffman_tree

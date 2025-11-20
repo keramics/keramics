@@ -18,7 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::vhdx::{VhdxDiskType, VhdxFile};
 use keramics_types::{Ucs2String, Uuid};
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about a Virtual Hard Disk (VHDX) file.
 struct VhdxFileInfo {
@@ -80,20 +80,10 @@ impl fmt::Display for VhdxFileInfo {
 
         write!(formatter, "    Disk type\t\t\t\t\t: {}\n", disk_type_string)?;
 
-        if self.media_size < 1024 {
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} bytes\n",
-                self.media_size
-            )?;
-        } else {
-            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
-                media_size_string, self.media_size
-            )?;
-        }
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+
+        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
+
         write!(
             formatter,
             "    Bytes per sector\t\t\t\t: {} bytes\n",
@@ -147,6 +137,7 @@ impl VhdxInfo {
         };
         Ok(vhdx_file)
     }
+
     /// Prints information about a file.
     pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let vhdx_file: VhdxFile = match Self::open_file(data_stream) {
@@ -173,7 +164,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     #[test]
-    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ext2.vhdx");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let vhdx_file: VhdxFile = VhdxInfo::open_file(&data_stream)?;

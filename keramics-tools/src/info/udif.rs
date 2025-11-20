@@ -17,7 +17,7 @@ use std::fmt;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::udif::{UdifCompressionMethod, UdifFile};
 
-use crate::formatters::format_as_bytesize;
+use crate::formatters::ByteSize;
 
 /// Information about an Universal Disk Image Format (UDIF) file.
 struct UdifFileInfo {
@@ -49,21 +49,10 @@ impl fmt::Display for UdifFileInfo {
             formatter,
             "Universal Disk Image Format (UDIF) information:\n"
         )?;
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
 
-        if self.media_size < 1024 {
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} bytes\n",
-                self.media_size
-            )?;
-        } else {
-            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
-            write!(
-                formatter,
-                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
-                media_size_string, self.media_size
-            )?;
-        }
+        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
+
         write!(
             formatter,
             "    Bytes per sector\t\t\t\t: {} bytes\n",
@@ -144,7 +133,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     #[test]
-    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let udif_file: UdifFile = UdifInfo::open_file(&data_stream)?;

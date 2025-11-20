@@ -104,13 +104,13 @@ impl<T> BlockTree<T> {
                 self.data_size
             )));
         }
-        if offset % self.leaf_value_size != 0 {
+        if !offset.is_multiple_of(self.leaf_value_size) {
             return Err(InsertError::new(format!(
                 "Offset: {} not a multitude of leaf value size: {}",
                 offset, self.leaf_value_size
             )));
         }
-        if size % self.leaf_value_size != 0 {
+        if !size.is_multiple_of(self.leaf_value_size) {
             return Err(InsertError::new(format!(
                 "Size: {} not a multitude of leaf value size: {}",
                 size, self.leaf_value_size
@@ -119,7 +119,8 @@ impl<T> BlockTree<T> {
         if self.root_node.is_none() {
             self.create_root_node(size);
         }
-        let root_node: &mut BlockTreeNode<T> = &mut self.root_node.as_mut().unwrap();
+        let root_node: &mut BlockTreeNode<T> = self.root_node.as_mut().unwrap();
+
         root_node.insert_value(
             self.elements_per_node,
             self.leaf_value_size,
