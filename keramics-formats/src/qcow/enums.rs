@@ -11,13 +11,13 @@
  * under the License.
  */
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum QcowCompressionMethod {
     Unknown,
     Zlib,
 }
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum QcowEncryptionMethod {
     AesCbc128,
     Luks,

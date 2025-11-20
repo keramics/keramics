@@ -129,15 +129,15 @@ impl MbrInfo {
         println!("Master Boot Record (MBR) information:");
 
         println!(
-            "    Disk identity\t\t\t: 0x{:x}",
+            "    Disk identity\t\t\t\t: 0x{:x}",
             mbr_volume_system.disk_identity
         );
         println!(
-            "    Bytes per sector\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             mbr_volume_system.bytes_per_sector
         );
         let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
-        println!("    Number of partitions\t\t: {}", number_of_partitions);
+        println!("    Number of partitions\t\t\t: {}", number_of_partitions);
 
         for partition_index in 0..number_of_partitions {
             println!("");
@@ -158,28 +158,28 @@ impl MbrInfo {
             match partition_types.get(&mbr_partition.partition_type) {
                 Some(partition_type_string) => {
                     println!(
-                        "    Type\t\t\t\t: 0x{:02x} ({})",
+                        "    Type\t\t\t\t\t: 0x{:02x} ({})",
                         mbr_partition.partition_type, partition_type_string
                     );
                 }
                 None => {
-                    println!("    Type\t\t\t\t: 0x{:02x}", mbr_partition.partition_type);
+                    println!("    Type\t\t\t\t\t: 0x{:02x}", mbr_partition.partition_type);
                 }
             };
             println!(
-                "    Offset\t\t\t\t: {} (0x{:08x})",
+                "    Offset\t\t\t\t\t: {} (0x{:08x})",
                 mbr_partition.offset, mbr_partition.offset
             );
             if mbr_partition.size < 1024 {
-                println!("    Size\t\t\t\t: {} bytes", mbr_partition.size);
+                println!("    Size\t\t\t\t\t: {} bytes", mbr_partition.size);
             } else {
                 let size_string: String = format_as_bytesize(mbr_partition.size, 1024);
                 println!(
-                    "    Size\t\t\t\t: {} ({} bytes)",
+                    "    Size\t\t\t\t\t: {} ({} bytes)",
                     size_string, mbr_partition.size
                 );
             }
-            println!("    Flags\t\t\t\t: 0x{:02x}", mbr_partition.flags);
+            println!("    Flags\t\t\t\t\t: 0x{:02x}", mbr_partition.flags);
         }
         println!("");
 

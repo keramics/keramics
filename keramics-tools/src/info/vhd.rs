@@ -12,18 +12,121 @@
  */
 
 use std::collections::HashMap;
+use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::vhd::{VhdDiskType, VhdFile};
+use keramics_types::{Ucs2String, Uuid};
 
 use crate::formatters::format_as_bytesize;
+
+/// Information about a Virtual Hard Disk (VHD) file.
+struct VhdFileInfo {
+    /// Disk type.
+    pub disk_type: VhdDiskType,
+
+    /// Media size.
+    pub media_size: u64,
+
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
+    /// Identifier.
+    pub identifier: Uuid,
+
+    /// Parent identifier.
+    pub parent_identifier: Option<Uuid>,
+
+    /// Parent name.
+    pub parent_name: Option<Ucs2String>,
+}
+
+impl VhdFileInfo {
+    /// Creates new file information.
+    fn new() -> Self {
+        Self {
+            disk_type: VhdDiskType::Unknown,
+            media_size: 0,
+            bytes_per_sector: 0,
+            identifier: Uuid::new(),
+            parent_identifier: None,
+            parent_name: None,
+        }
+    }
+}
+
+impl fmt::Display for VhdFileInfo {
+    /// Formats file information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "Virtual Hard Disk (VHD) information:\n")?;
+
+        write!(formatter, "    Format version\t\t\t\t: 1.0\n")?;
+
+        let disk_types = HashMap::<VhdDiskType, &'static str>::from([
+            (VhdDiskType::Differential, "Differential"),
+            (VhdDiskType::Dynamic, "Dynamic"),
+            (VhdDiskType::Fixed, "Fixed"),
+            (VhdDiskType::Unknown, "Unknown"),
+        ]);
+        let disk_type_string: &str = disk_types.get(&self.disk_type).unwrap();
+
+        write!(formatter, "    Disk type\t\t\t\t\t: {}\n", disk_type_string)?;
+
+        if self.media_size < 1024 {
+            write!(
+                formatter,
+                "    Media size\t\t\t\t\t: {} bytes\n",
+                self.media_size
+            )?;
+        } else {
+            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
+            write!(
+                formatter,
+                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
+                media_size_string, self.media_size
+            )?;
+        }
+        write!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {} bytes\n",
+            self.bytes_per_sector
+        )?;
+        write!(formatter, "    Identifier\t\t\t\t\t: {}\n", self.identifier)?;
+
+        if let Some(parent_identifier) = &self.parent_identifier {
+            write!(
+                formatter,
+                "    Parent identifier\t\t\t\t: {}\n",
+                parent_identifier
+            )?;
+        }
+        if let Some(parent_name) = &self.parent_name {
+            write!(formatter, "    Parent name\t\t\t\t\t: {}\n", parent_name)?;
+        }
+        write!(formatter, "\n")
+    }
+}
 
 /// Information about a Virtual Hard Disk (VHD) file.
 pub struct VhdInfo {}
 
 impl VhdInfo {
-    /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    /// Retrieves the file information.
+    fn get_file_information(vhd_file: &VhdFile) -> VhdFileInfo {
+        let mut file_information: VhdFileInfo = VhdFileInfo::new();
+
+        file_information.disk_type = vhd_file.disk_type.clone();
+        file_information.media_size = vhd_file.media_size;
+        file_information.bytes_per_sector = vhd_file.bytes_per_sector;
+        file_information.identifier = vhd_file.identifier.clone();
+        file_information.parent_identifier = vhd_file.parent_identifier.clone();
+        file_information.parent_name = vhd_file.parent_name.clone();
+
+        file_information
+    }
+
+    /// Opens a file.
+    fn open_file(data_stream: &DataStreamReference) -> Result<VhdFile, ErrorTrace> {
         let mut vhd_file: VhdFile = VhdFile::new();
 
         match vhd_file.read_data_stream(data_stream) {
@@ -33,46 +136,21 @@ impl VhdInfo {
                 return Err(error);
             }
         };
-        let disk_types = HashMap::<VhdDiskType, &'static str>::from([
-            (VhdDiskType::Differential, "Differential"),
-            (VhdDiskType::Dynamic, "Dynamic"),
-            (VhdDiskType::Fixed, "Fixed"),
-            (VhdDiskType::Unknown, "Unknown"),
-        ]);
-        let disk_type_string: &str = disk_types.get(&vhd_file.disk_type).unwrap();
+        Ok(vhd_file)
+    }
 
-        println!("Virtual Hard Disk (VHD) information:");
-        println!("    Format version\t\t\t: 1.0");
-        println!("    Disk type\t\t\t\t: {}", disk_type_string);
-
-        if vhd_file.media_size < 1024 {
-            println!("    Media size\t\t\t\t: {} bytes", vhd_file.media_size);
-        } else {
-            let media_size_string: String = format_as_bytesize(vhd_file.media_size, 1024);
-            println!(
-                "    Media size\t\t\t\t: {} ({} bytes)",
-                media_size_string, vhd_file.media_size
-            );
-        }
-        println!(
-            "    Bytes per sector\t\t\t: {} bytes",
-            vhd_file.bytes_per_sector
-        );
-        println!("    Identifier\t\t\t\t: {}", vhd_file.identifier);
-
-        match &vhd_file.parent_identifier {
-            Some(parent_identifier) => {
-                println!("    Parent identifier\t\t\t: {}", parent_identifier);
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let vhd_file: VhdFile = match Self::open_file(data_stream) {
+            Ok(vhd_file) => vhd_file,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                return Err(error);
             }
-            None => {}
-        }
-        match &vhd_file.parent_name {
-            Some(parent_name) => {
-                println!("    Parent name\t\t\t\t: {}", parent_name);
-            }
-            None => {}
-        }
-        println!("");
+        };
+        let file_information: VhdFileInfo = Self::get_file_information(&vhd_file);
+
+        print!("{}", file_information);
 
         Ok(())
     }
@@ -82,5 +160,52 @@ impl VhdInfo {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    #[test]
+    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let vhd_file: VhdFile = VhdInfo::open_file(&data_stream)?;
+        let test_struct: VhdFileInfo = VhdInfo::get_file_information(&vhd_file);
+
+        let string: String = test_struct.to_string();
+        let expected_string: &str = concat!(
+            "Virtual Hard Disk (VHD) information:\n",
+            "    Format version\t\t\t\t: 1.0\n",
+            "    Disk type\t\t\t\t\t: Dynamic\n",
+            "    Media size\t\t\t\t\t: 4.0 MiB (4212736 bytes)\n",
+            "    Bytes per sector\t\t\t\t: 512 bytes\n",
+            "    Identifier\t\t\t\t\t: 4f75d18f-d5ef-438e-b326-d60da6c9ed67\n",
+            "\n"
+        );
+        assert_eq!(string, expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/vhd/ext2.vhd");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let vhd_file: VhdFile = VhdInfo::open_file(&data_stream)?;
+        let test_struct: VhdFileInfo = VhdInfo::get_file_information(&vhd_file);
+
+        assert_eq!(test_struct.disk_type, VhdDiskType::Dynamic);
+        assert_eq!(test_struct.media_size, 4212736);
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(
+            test_struct.identifier.to_string(),
+            "4f75d18f-d5ef-438e-b326-d60da6c9ed67"
+        );
+        assert_eq!(test_struct.parent_identifier, None);
+        assert_eq!(test_struct.parent_name, None);
+
+        Ok(())
+    }
+
+    // TODO: add tests for open_file
     // TODO: add tests for print_file
 }

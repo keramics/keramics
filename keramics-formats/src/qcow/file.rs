@@ -609,20 +609,30 @@ mod tests {
     fn get_file() -> Result<QcowFile, ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
     }
 
-    // TODO: add tests for get_backing_file_name
+    #[test]
+    fn test_get_backing_file_name() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file()?;
+
+        let backing_file_name: Option<&ByteString> = file.get_backing_file_name();
+        assert_eq!(backing_file_name, None);
+
+        Ok(())
+    }
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -635,7 +645,8 @@ mod tests {
     fn test_read_file_header() -> Result<(), ErrorTrace> {
         let mut file: QcowFile = QcowFile::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_file_header(&data_stream)?;
 

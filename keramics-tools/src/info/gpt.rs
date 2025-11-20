@@ -33,15 +33,15 @@ impl GptInfo {
         };
         println!("GUID Partition Table (GPT) information:");
         println!(
-            "    Disk identifier\t\t\t: {}",
+            "    Disk identifier\t\t\t\t: {}",
             gpt_volume_system.disk_identifier
         );
         println!(
-            "    Bytes per sector\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             gpt_volume_system.bytes_per_sector
         );
         let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
-        println!("    Number of partitions\t\t: {}", number_of_partitions);
+        println!("    Number of partitions\t\t\t: {}", number_of_partitions);
 
         for partition_index in 0..number_of_partitions {
             println!("");
@@ -58,21 +58,21 @@ impl GptInfo {
                     }
                 };
             println!("Partition: {}", partition_index + 1);
-            println!("    Identifier\t\t\t\t: {}", gpt_partition.identifier);
+            println!("    Identifier\t\t\t\t\t: {}", gpt_partition.identifier);
             println!(
-                "    Type identifier\t\t\t: {}",
+                "    Type identifier\t\t\t\t: {}",
                 gpt_partition.type_identifier
             );
             println!(
-                "    Offset\t\t\t\t: {} (0x{:08x})",
+                "    Offset\t\t\t\t\t: {} (0x{:08x})",
                 gpt_partition.offset, gpt_partition.offset
             );
             if gpt_partition.size < 1024 {
-                println!("    Size\t\t\t\t: {} bytes", gpt_partition.size);
+                println!("    Size\t\t\t\t\t: {} bytes", gpt_partition.size);
             } else {
                 let size_string: String = format_as_bytesize(gpt_partition.size, 1024);
                 println!(
-                    "    Size\t\t\t\t: {} ({} bytes)",
+                    "    Size\t\t\t\t\t: {} ({} bytes)",
                     size_string, gpt_partition.size
                 );
             }

@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::fmt;
+
 use keramics_datetime::PosixTime32;
 use keramics_types::{ByteString, Utf16String};
 
@@ -35,13 +37,17 @@ impl EwfHeaderValue {
             elements: values_16bit.to_vec(),
         })
     }
+}
 
-    /// Converts the `EwfHeaderValue` to `String`.
-    pub fn to_string(&self) -> String {
+impl fmt::Display for EwfHeaderValue {
+    /// Formats the header value for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            EwfHeaderValue::Byte(byte_string) => byte_string.to_string(),
-            EwfHeaderValue::PosixTime(posix_time32) => posix_time32.to_iso8601_string(),
-            EwfHeaderValue::Utf16(utf16_string) => utf16_string.to_string(),
+            EwfHeaderValue::Byte(byte_string) => byte_string.fmt(formatter),
+            EwfHeaderValue::PosixTime(posix_time32) => {
+                write!(formatter, "{}", posix_time32.to_iso8601_string())
+            }
+            EwfHeaderValue::Utf16(utf16_string) => utf16_string.fmt(formatter),
         }
     }
 }

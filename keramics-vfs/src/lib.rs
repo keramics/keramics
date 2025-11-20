@@ -14,6 +14,7 @@
 mod context;
 mod data_fork;
 mod enums;
+mod extended_attribute;
 mod file_entry;
 mod file_resolver;
 mod file_system;
@@ -44,6 +45,7 @@ mod scanner;
 pub use context::VfsContext;
 pub use data_fork::VfsDataFork;
 pub use enums::*;
+pub use extended_attribute::VfsExtendedAttribute;
 pub use file_entry::VfsFileEntry;
 pub use file_resolver::{VfsFileResolver, new_vfs_file_resolver};
 pub use file_system::VfsFileSystem;

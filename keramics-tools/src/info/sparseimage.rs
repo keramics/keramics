@@ -11,58 +11,119 @@
  * under the License.
  */
 
+use std::fmt;
+
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::sparseimage::SparseImageFile;
 
 use crate::formatters::format_as_bytesize;
 
 /// Information about a Mac OS sparse image (.sparseimage) file.
+struct SparseImageFileInfo {
+    /// Media size.
+    pub media_size: u64,
+
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
+    /// Block size.
+    pub block_size: u32,
+}
+
+impl SparseImageFileInfo {
+    /// Creates new file information.
+    fn new() -> Self {
+        Self {
+            media_size: 0,
+            bytes_per_sector: 0,
+            block_size: 0,
+        }
+    }
+}
+
+impl fmt::Display for SparseImageFileInfo {
+    /// Formats file information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "Sparse image (.sparseimage) information:\n")?;
+
+        if self.media_size < 1024 {
+            write!(
+                formatter,
+                "    Media size\t\t\t\t\t: {} bytes\n",
+                self.media_size
+            )?;
+        } else {
+            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
+            write!(
+                formatter,
+                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
+                media_size_string, self.media_size
+            )?;
+        }
+        write!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {} bytes\n",
+            self.bytes_per_sector
+        )?;
+        if self.block_size < 1024 {
+            write!(
+                formatter,
+                "    Band size\t\t\t\t\t: {} bytes\n",
+                self.block_size,
+            )?;
+        } else {
+            let band_size_string: String = format_as_bytesize(self.block_size as u64, 1024);
+            write!(
+                formatter,
+                "    Band size\t\t\t\t\t: {} ({} bytes)\n",
+                band_size_string, self.block_size,
+            )?;
+        }
+        write!(formatter, "\n")
+    }
+}
+
+/// Information about a Mac OS sparse image (.sparseimage) file.
 pub struct SparseImageInfo {}
 
 impl SparseImageInfo {
-    /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    /// Retrieves the file information.
+    fn get_file_information(sparseimage_file: &SparseImageFile) -> SparseImageFileInfo {
+        let mut file_information: SparseImageFileInfo = SparseImageFileInfo::new();
+
+        file_information.media_size = sparseimage_file.media_size;
+        file_information.bytes_per_sector = sparseimage_file.bytes_per_sector;
+        file_information.block_size = sparseimage_file.block_size;
+
+        file_information
+    }
+
+    /// Opens a file.
+    fn open_file(data_stream: &DataStreamReference) -> Result<SparseImageFile, ErrorTrace> {
         let mut sparseimage_file: SparseImageFile = SparseImageFile::new();
 
         match sparseimage_file.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open sparse image file");
+                keramics_core::error_trace_add_frame!(error, "Unable to open sparseimage file");
                 return Err(error);
             }
         };
-        println!("Sparse image (.sparseimage) information:");
+        Ok(sparseimage_file)
+    }
 
-        if sparseimage_file.media_size < 1024 {
-            println!(
-                "    Media size\t\t\t\t: {} bytes",
-                sparseimage_file.media_size
-            );
-        } else {
-            let media_size_string: String = format_as_bytesize(sparseimage_file.media_size, 1024);
-            println!(
-                "    Media size\t\t\t\t: {} ({} bytes)",
-                media_size_string, sparseimage_file.media_size
-            );
-        }
-        println!(
-            "    Bytes per sector\t\t\t: {} bytes",
-            sparseimage_file.bytes_per_sector
-        );
-        if sparseimage_file.block_size < 1024 {
-            println!(
-                "    Band size\t\t\t\t: {} bytes",
-                sparseimage_file.block_size,
-            );
-        } else {
-            let band_size_string: String =
-                format_as_bytesize(sparseimage_file.block_size as u64, 1024);
-            println!(
-                "    Band size\t\t\t\t: {} ({} bytes)",
-                band_size_string, sparseimage_file.block_size,
-            );
-        }
-        println!("");
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let sparseimage_file: SparseImageFile = match Self::open_file(data_stream) {
+            Ok(sparseimage_file) => sparseimage_file,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                return Err(error);
+            }
+        };
+        let file_information: SparseImageFileInfo = Self::get_file_information(&sparseimage_file);
+
+        print!("{}", file_information);
 
         Ok(())
     }
@@ -72,5 +133,46 @@ impl SparseImageInfo {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    #[test]
+    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let sparseimage_file: SparseImageFile = SparseImageInfo::open_file(&data_stream)?;
+        let test_struct: SparseImageFileInfo =
+            SparseImageInfo::get_file_information(&sparseimage_file);
+
+        let string: String = test_struct.to_string();
+        let expected_string: &str = concat!(
+            "Sparse image (.sparseimage) information:\n",
+            "    Media size\t\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
+            "    Bytes per sector\t\t\t\t: 512 bytes\n",
+            "    Band size\t\t\t\t\t: 1.0 MiB (1048576 bytes)\n",
+            "\n"
+        );
+        assert_eq!(string, expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus.sparseimage");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let sparseimage_file: SparseImageFile = SparseImageInfo::open_file(&data_stream)?;
+        let test_struct: SparseImageFileInfo =
+            SparseImageInfo::get_file_information(&sparseimage_file);
+
+        assert_eq!(test_struct.media_size, 4194304);
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.block_size, 1048576);
+
+        Ok(())
+    }
+
+    // TODO: add tests for open_image
     // TODO: add tests for print_image
 }

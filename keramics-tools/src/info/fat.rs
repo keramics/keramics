@@ -73,38 +73,38 @@ impl FatInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut FatFileEntry) -> Result<(), ErrorTrace> {
-        println!("    Identifier\t\t\t\t: 0x{:08x}", file_entry.identifier);
+        println!("    Identifier\t\t\t\t\t: 0x{:08x}", file_entry.identifier);
 
         match file_entry.get_name() {
-            Some(name) => println!("    Name\t\t\t\t: {}", name),
+            Some(name) => println!("    Name\t\t\t\t\t: {}", name),
             None => {}
         };
-        println!("    Size\t\t\t\t: {}", file_entry.get_size());
+        println!("    Size\t\t\t\t\t: {}", file_entry.get_size());
 
         match file_entry.get_modification_time() {
             Some(date_time) => {
                 let date_time_string: String = FatInfo::get_date_time_string(date_time)?;
-                println!("    Modification time\t\t\t: {}", date_time_string);
+                println!("    Modification time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_access_time() {
             Some(date_time) => {
                 let date_time_string: String = FatInfo::get_date_time_string(date_time)?;
-                println!("    Access time\t\t\t\t: {}", date_time_string);
+                println!("    Access time\t\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_creation_time() {
             Some(date_time) => {
                 let date_time_string: String = FatInfo::get_date_time_string(date_time)?;
-                println!("    Creation time\t\t\t: {}", date_time_string);
+                println!("    Creation time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         let file_attribute_flags: u8 = file_entry.get_file_attribute_flags();
         println!(
-            "    File attribute flags\t\t: 0x{:02x}",
+            "    File attribute flags\t\t\t: 0x{:02x}",
             file_attribute_flags
         );
         let flags_strings: Vec<String> =
@@ -199,7 +199,7 @@ impl FatInfo {
         }
         println!("File Allocation Table (FAT) file entry information:");
 
-        println!("    Path\t\t\t\t: {}", path);
+        println!("    Path\t\t\t\t\t: {}", path);
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
@@ -326,13 +326,13 @@ impl FatInfo {
             FatFormat::Fat16 => 16,
             FatFormat::Fat32 => 32,
         };
-        println!("    Format version\t\t\t: FAT-{}", format_version);
+        println!("    Format version\t\t\t\t: FAT-{}", format_version);
 
         let volume_label: String = match fat_file_system.get_volume_label() {
             Some(volume_label) => volume_label.to_string(),
             None => String::new(),
         };
-        println!("    Volume label\t\t\t: {}", volume_label);
+        println!("    Volume label\t\t\t\t: {}", volume_label);
 
         println!("");
 

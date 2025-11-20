@@ -11,7 +11,7 @@
  * under the License.
  */
 
-#[derive(Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum UdifCompressionMethod {
     Adc,
     Bzip2,

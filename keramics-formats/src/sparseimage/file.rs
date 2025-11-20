@@ -328,8 +328,8 @@ mod tests {
     fn get_file() -> Result<SparseImageFile, ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
-        let path_buf: PathBuf =
-            PathBuf::from(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -340,8 +340,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
-        let path_buf: PathBuf =
-            PathBuf::from(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
@@ -356,8 +356,8 @@ mod tests {
     fn test_read_header_block() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
-        let path_buf: PathBuf =
-            PathBuf::from(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_header_block(&data_stream)?;
 

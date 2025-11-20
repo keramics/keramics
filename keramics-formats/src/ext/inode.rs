@@ -17,6 +17,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
+use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
 use super::attributes_entry::ExtAttributesEntry;
@@ -183,7 +184,12 @@ impl ExtInode {
     }
 
     /// Reads the inode from a buffer.
-    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> Result<(), ErrorTrace> {
+    pub fn read_data(
+        &mut self,
+        format_version: u8,
+        data: &[u8],
+        encoding: &CharacterEncoding,
+    ) -> Result<(), ErrorTrace> {
         match format_version {
             4 => {
                 Ext4Inode::read_data(self, data)?;
@@ -196,7 +202,7 @@ impl ExtInode {
             }
         }
         if data.len() > 128 {
-            Ext4InodeExtension::read_data(self, &data[128..])?;
+            Ext4InodeExtension::read_data(self, &data[128..], encoding)?;
         }
         Ok(())
     }
@@ -339,7 +345,7 @@ mod tests {
         let mut test_struct = ExtInode::new();
 
         let test_data: Vec<u8> = get_test_data_ext2();
-        test_struct.read_data(2, &test_data)?;
+        test_struct.read_data(2, &test_data, &CharacterEncoding::Utf8)?;
 
         assert_eq!(test_struct.file_mode, 0o100644);
         assert_eq!(test_struct.owner_identifier, 1000);
@@ -375,7 +381,7 @@ mod tests {
         let mut test_struct = ExtInode::new();
 
         let test_data: Vec<u8> = get_test_data_ext3();
-        test_struct.read_data(3, &test_data)?;
+        test_struct.read_data(3, &test_data, &CharacterEncoding::Utf8)?;
 
         assert_eq!(test_struct.file_mode, 0o100664);
         assert_eq!(test_struct.owner_identifier, 1000);
@@ -411,7 +417,7 @@ mod tests {
         let mut test_struct = ExtInode::new();
 
         let test_data: Vec<u8> = get_test_data_ext4();
-        test_struct.read_data(4, &test_data)?;
+        test_struct.read_data(4, &test_data, &CharacterEncoding::Utf8)?;
 
         assert_eq!(test_struct.file_mode, 0o100644);
         assert_eq!(test_struct.owner_identifier, 1000);

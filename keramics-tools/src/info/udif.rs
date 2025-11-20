@@ -12,6 +12,7 @@
  */
 
 use std::collections::HashMap;
+use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::udif::{UdifCompressionMethod, UdifFile};
@@ -19,11 +20,92 @@ use keramics_formats::udif::{UdifCompressionMethod, UdifFile};
 use crate::formatters::format_as_bytesize;
 
 /// Information about an Universal Disk Image Format (UDIF) file.
+struct UdifFileInfo {
+    /// Media size.
+    pub media_size: u64,
+
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
+    /// Compression method.
+    pub compression_method: UdifCompressionMethod,
+}
+
+impl UdifFileInfo {
+    /// Creates new file information.
+    fn new() -> Self {
+        Self {
+            media_size: 0,
+            bytes_per_sector: 0,
+            compression_method: UdifCompressionMethod::None,
+        }
+    }
+}
+
+impl fmt::Display for UdifFileInfo {
+    /// Formats file information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            formatter,
+            "Universal Disk Image Format (UDIF) information:\n"
+        )?;
+
+        if self.media_size < 1024 {
+            write!(
+                formatter,
+                "    Media size\t\t\t\t\t: {} bytes\n",
+                self.media_size
+            )?;
+        } else {
+            let media_size_string: String = format_as_bytesize(self.media_size, 1024);
+            write!(
+                formatter,
+                "    Media size\t\t\t\t\t: {} ({} bytes)\n",
+                media_size_string, self.media_size
+            )?;
+        }
+        write!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {} bytes\n",
+            self.bytes_per_sector
+        )?;
+        let compression_methods = HashMap::<UdifCompressionMethod, &'static str>::from([
+            (UdifCompressionMethod::Adc, "ADC"),
+            (UdifCompressionMethod::Bzip2, "bzip2"),
+            (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
+            (UdifCompressionMethod::Lzma, "LZMA"),
+            (UdifCompressionMethod::None, "Uncompressed"),
+            (UdifCompressionMethod::Zlib, "zlib"),
+        ]);
+        let compression_method_string: &str =
+            compression_methods.get(&self.compression_method).unwrap();
+
+        write!(
+            formatter,
+            "    Compression method\t\t\t\t: {}\n",
+            compression_method_string
+        )?;
+        write!(formatter, "\n")
+    }
+}
+
+/// Information about an Universal Disk Image Format (UDIF) file.
 pub struct UdifInfo {}
 
 impl UdifInfo {
-    /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    /// Retrieves the file information.
+    fn get_file_information(udif_file: &UdifFile) -> UdifFileInfo {
+        let mut file_information: UdifFileInfo = UdifFileInfo::new();
+
+        file_information.media_size = udif_file.media_size;
+        file_information.bytes_per_sector = udif_file.bytes_per_sector;
+        file_information.compression_method = udif_file.compression_method.clone();
+
+        file_information
+    }
+
+    /// Opens a file.
+    fn open_file(data_stream: &DataStreamReference) -> Result<UdifFile, ErrorTrace> {
         let mut udif_file: UdifFile = UdifFile::new();
 
         match udif_file.read_data_stream(data_stream) {
@@ -33,40 +115,21 @@ impl UdifInfo {
                 return Err(error);
             }
         };
-        let compression_methods = HashMap::<UdifCompressionMethod, &'static str>::from([
-            (UdifCompressionMethod::Adc, "ADC"),
-            (UdifCompressionMethod::Bzip2, "bzip2"),
-            (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
-            (UdifCompressionMethod::Lzma, "LZMA"),
-            (UdifCompressionMethod::None, "Uncompressed"),
-            (UdifCompressionMethod::Zlib, "zlib"),
-        ]);
+        Ok(udif_file)
+    }
 
-        let compression_method_string: &str = compression_methods
-            .get(&udif_file.compression_method)
-            .unwrap();
+    /// Prints information about a file.
+    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let udif_file: UdifFile = match Self::open_file(data_stream) {
+            Ok(udif_file) => udif_file,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                return Err(error);
+            }
+        };
+        let file_information: UdifFileInfo = Self::get_file_information(&udif_file);
 
-        println!("Universal Disk Image Format (UDIF) information:");
-
-        if udif_file.media_size < 1024 {
-            println!("    Media size\t\t\t\t: {} bytes", udif_file.media_size);
-        } else {
-            let media_size_string: String = format_as_bytesize(udif_file.media_size, 1024);
-            println!(
-                "    Media size\t\t\t\t: {} ({} bytes)",
-                media_size_string, udif_file.media_size
-            );
-        }
-        println!(
-            "    Bytes per sector\t\t\t: {} bytes",
-            udif_file.bytes_per_sector
-        );
-        println!(
-            "    Compression method\t\t\t: {}",
-            compression_method_string
-        );
-
-        println!("");
+        print!("{}", file_information);
 
         Ok(())
     }
@@ -76,5 +139,44 @@ impl UdifInfo {
 mod tests {
     use super::*;
 
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    #[test]
+    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let udif_file: UdifFile = UdifInfo::open_file(&data_stream)?;
+        let test_struct: UdifFileInfo = UdifInfo::get_file_information(&udif_file);
+
+        let string: String = test_struct.to_string();
+        let expected_string: &str = concat!(
+            "Universal Disk Image Format (UDIF) information:\n",
+            "    Media size\t\t\t\t\t: 1.9 MiB (1964032 bytes)\n",
+            "    Bytes per sector\t\t\t\t: 512 bytes\n",
+            "    Compression method\t\t\t\t: zlib\n",
+            "\n"
+        );
+        assert_eq!(string, expected_string);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let udif_file: UdifFile = UdifInfo::open_file(&data_stream)?;
+        let test_struct: UdifFileInfo = UdifInfo::get_file_information(&udif_file);
+
+        assert_eq!(test_struct.media_size, 1964032);
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.compression_method, UdifCompressionMethod::Zlib);
+
+        Ok(())
+    }
+
+    // TODO: add tests for open_file
     // TODO: add tests for print_file
 }

@@ -56,7 +56,11 @@ impl Ext4InodeExtension {
     }
 
     /// Reads the inode exension from a buffer.
-    pub fn read_data(inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
+    pub fn read_data(
+        inode: &mut ExtInode,
+        data: &[u8],
+        encoding: &CharacterEncoding,
+    ) -> Result<(), ErrorTrace> {
         let extra_size: u16 = bytes_to_u16_le!(data, 0);
 
         if extra_size >= 4 {
@@ -117,7 +121,7 @@ impl Ext4InodeExtension {
         if data_end_offset < data_size {
             if data[data_offset..data_end_offset] == EXT_ATTRIBUTES_HEADER_SIGNATURE {
                 let attributes_block: ExtAttributesBlock =
-                    ExtAttributesBlock::new(data_end_offset, &CharacterEncoding::Utf8);
+                    ExtAttributesBlock::new(data_end_offset, encoding);
 
                 match attributes_block.read_entries(
                     data,

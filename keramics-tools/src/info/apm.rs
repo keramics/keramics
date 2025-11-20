@@ -75,11 +75,11 @@ impl ApmInfo {
         };
         println!("Apple Partition Map (APM) information:");
         println!(
-            "    Bytes per sector\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             apm_volume_system.bytes_per_sector
         );
         let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
-        println!("    Number of partitions\t\t: {}", number_of_partitions);
+        println!("    Number of partitions\t\t\t: {}", number_of_partitions);
 
         for partition_index in 0..number_of_partitions {
             println!("");
@@ -97,27 +97,27 @@ impl ApmInfo {
                 };
             println!("Partition: {}", partition_index + 1);
             println!(
-                "    Type identifier\t\t\t: {}",
+                "    Type identifier\t\t\t\t: {}",
                 apm_partition.type_identifier
             );
             if !apm_partition.name.is_empty() {
-                println!("    Name\t\t\t\t: {}", apm_partition.name);
+                println!("    Name\t\t\t\t\t: {}", apm_partition.name);
             }
             println!(
-                "    Offset\t\t\t\t: {} (0x{:08x})",
+                "    Offset\t\t\t\t\t: {} (0x{:08x})",
                 apm_partition.offset, apm_partition.offset
             );
             if apm_partition.size < 1024 {
-                println!("    Size\t\t\t\t: {}", apm_partition.size);
+                println!("    Size\t\t\t\t\t: {}", apm_partition.size);
             } else {
                 let size_string: String = format_as_bytesize(apm_partition.size, 1024);
                 println!(
-                    "    Size\t\t\t\t: {} ({} bytes)",
+                    "    Size\t\t\t\t\t: {} ({} bytes)",
                     size_string, apm_partition.size
                 );
             }
             println!(
-                "    Status flags\t\t\t: 0x{:08x}",
+                "    Status flags\t\t\t\t: 0x{:08x}",
                 apm_partition.status_flags
             );
             Self::print_partition_status_flags(apm_partition.status_flags);

@@ -210,14 +210,14 @@ impl NtfsInfo {
         match attribute {
             NtfsAttribute::AttributeList { attribute_list } => {
                 let number_of_entries: usize = attribute_list.entries.len();
-                println!("    Number of entries\t\t\t: {}", number_of_entries);
+                println!("    Number of entries\t\t\t\t: {}", number_of_entries);
 
                 for entry_index in 0..number_of_entries {
                     let entry: &NtfsAttributeListEntry = &attribute_list.entries[entry_index];
                     match attribute_types.get(&entry.attribute_type) {
                         Some(attribute_type_string) => {
                             println!(
-                                "    Entry: {}\t\t\t\t: {} (0x{:08x}) with file reference: {}-{}",
+                                "    Entry: {}\t\t\t\t\t: {} (0x{:08x}) with file reference: {}-{}",
                                 entry_index + 1,
                                 attribute_type_string,
                                 entry.attribute_type,
@@ -227,7 +227,7 @@ impl NtfsInfo {
                         }
                         None => {
                             println!(
-                                "    Entry: {}\t\t\t\t: 0x{:08x} with file reference: {}-{}",
+                                "    Entry: {}\t\t\t\t\t: 0x{:08x} with file reference: {}-{}",
                                 entry_index + 1,
                                 entry.attribute_type,
                                 entry.file_reference & 0x0000ffffffffffff,
@@ -249,39 +249,39 @@ impl NtfsInfo {
                 ]);
                 match name_spaces.get(&file_name.name_space) {
                     Some(name_space_string) => println!(
-                        "    Name space\t\t\t\t: {} ({})",
+                        "    Name space\t\t\t\t\t: {} ({})",
                         name_space_string, file_name.name_space
                     ),
-                    None => println!("    Name space\t\t\t\t: {}", file_name.name_space),
+                    None => println!("    Name space\t\t\t\t\t: {}", file_name.name_space),
                 };
-                println!("    Name\t\t\t\t: {}", file_name.name);
+                println!("    Name\t\t\t\t\t: {}", file_name.name);
 
                 if file_name.parent_file_reference == 0 {
-                    println!("    Parent file reference\t\t: Not set (0)");
+                    println!("    Parent file reference\t\t\t: Not set (0)");
                 } else {
                     println!(
-                        "    Parent file reference\t\t: {}-{}",
+                        "    Parent file reference\t\t\t: {}-{}",
                         file_name.parent_file_reference & 0x0000ffffffffffff,
                         file_name.parent_file_reference >> 48
                     );
                 }
                 let date_time_string: String =
                     Self::get_date_time_string(&file_name.creation_time)?;
-                println!("    Creation time\t\t\t: {}", date_time_string);
+                println!("    Creation time\t\t\t\t: {}", date_time_string);
 
                 let date_time_string: String =
                     Self::get_date_time_string(&file_name.modification_time)?;
-                println!("    Modification time\t\t\t: {}", date_time_string);
+                println!("    Modification time\t\t\t\t: {}", date_time_string);
 
                 let date_time_string: String = Self::get_date_time_string(&file_name.access_time)?;
-                println!("    Access time\t\t\t\t: {}", date_time_string);
+                println!("    Access time\t\t\t\t\t: {}", date_time_string);
 
                 let date_time_string: String =
                     Self::get_date_time_string(&file_name.entry_modification_time)?;
-                println!("    Entry modification time\t\t: {}", date_time_string);
+                println!("    Entry modification time\t\t\t: {}", date_time_string);
 
                 println!(
-                    "    File attribute flags\t\t: 0x{:08x}",
+                    "    File attribute flags\t\t\t: 0x{:08x}",
                     file_name.file_attribute_flags
                 );
                 let flags_strings: Vec<String> =
@@ -301,21 +301,24 @@ impl NtfsInfo {
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
             NtfsAttribute::Generic { mft_attribute } => {
                 match &mft_attribute.name {
-                    Some(name) => println!("    Attribute name\t\t\t: {}", name),
+                    Some(name) => println!("    Attribute name\t\t\t\t: {}", name),
                     None => {}
                 };
                 if mft_attribute.data_size < 1024 {
-                    println!("    Data size\t\t\t\t: {} bytes", mft_attribute.data_size);
+                    println!("    Data size\t\t\t\t\t: {} bytes", mft_attribute.data_size);
                 } else {
                     let data_size_string: String =
                         format_as_bytesize(mft_attribute.data_size, 1024);
                     println!(
-                        "    Data size\t\t\t\t: {} ({} bytes)",
+                        "    Data size\t\t\t\t\t: {} ({} bytes)",
                         data_size_string, mft_attribute.data_size
                     );
                 }
                 if attribute_type == NTFS_ATTRIBUTE_TYPE_DATA {
-                    println!("    Data flags\t\t\t\t: 0x{:04x}", mft_attribute.data_flags);
+                    println!(
+                        "    Data flags\t\t\t\t\t: 0x{:04x}",
+                        mft_attribute.data_flags
+                    );
                 }
                 if mft_attribute.data_cluster_groups.len() > 0 {
                     let string_parts: Vec<String> = mft_attribute
@@ -325,7 +328,7 @@ impl NtfsInfo {
                             format!("{}-{}", cluster_group.first_vcn, cluster_group.last_vcn)
                         })
                         .collect::<Vec<String>>();
-                    println!("    VCNs\t\t\t\t: [{}]", string_parts.join(", "));
+                    println!("    VCNs\t\t\t\t\t: [{}]", string_parts.join(", "));
                 }
                 println!("");
             }
@@ -334,7 +337,7 @@ impl NtfsInfo {
             // TODO: add support for $PROPERTY_SET
             NtfsAttribute::ReparsePoint { reparse_point } => {
                 let reparse_tag: u32 = reparse_point.get_reparse_tag();
-                println!("    Reparse tag\t\t\t\t: 0x{:08x}", reparse_tag);
+                println!("    Reparse tag\t\t\t\t\t: 0x{:08x}", reparse_tag);
                 // TODO: print tag name
 
                 println!("");
@@ -345,22 +348,22 @@ impl NtfsInfo {
             } => {
                 let date_time_string: String =
                     Self::get_date_time_string(&standard_information.creation_time)?;
-                println!("    Creation time\t\t\t: {}", date_time_string);
+                println!("    Creation time\t\t\t\t: {}", date_time_string);
 
                 let date_time_string: String =
                     Self::get_date_time_string(&standard_information.modification_time)?;
-                println!("    Modification time\t\t\t: {}", date_time_string);
+                println!("    Modification time\t\t\t\t: {}", date_time_string);
 
                 let date_time_string: String =
                     Self::get_date_time_string(&standard_information.access_time)?;
-                println!("    Access time\t\t\t\t: {}", date_time_string);
+                println!("    Access time\t\t\t\t\t: {}", date_time_string);
 
                 let date_time_string: String =
                     Self::get_date_time_string(&standard_information.entry_modification_time)?;
-                println!("    Entry modification time\t\t: {}", date_time_string);
+                println!("    Entry modification time\t\t\t: {}", date_time_string);
 
                 println!(
-                    "    File attribute flags\t\t: 0x{:08x}",
+                    "    File attribute flags\t\t\t: 0x{:08x}",
                     standard_information.file_attribute_flags
                 );
                 let flags_strings: Vec<String> = Self::get_file_attribute_flags_strings(
@@ -380,18 +383,18 @@ impl NtfsInfo {
             }
             NtfsAttribute::VolumeInformation { volume_information } => {
                 println!(
-                    "    Format version\t\t\t: {}.{}",
+                    "    Format version\t\t\t\t: {}.{}",
                     volume_information.major_format_version,
                     volume_information.minor_format_version
                 );
                 println!(
-                    "    Volume flags\t\t\t: 0x{:04x}",
+                    "    Volume flags\t\t\t\t: 0x{:04x}",
                     volume_information.volume_flags
                 );
                 println!("");
             }
             NtfsAttribute::VolumeName { volume_name } => {
-                println!("    Volume name\t\t\t\t: {}", volume_name);
+                println!("    Volume name\t\t\t\t\t: {}", volume_name);
                 println!("");
             }
         }
@@ -404,47 +407,47 @@ impl NtfsInfo {
         // from the values in the MFT entry.
         let file_reference: u64 = file_entry.get_file_reference();
         println!(
-            "    File reference\t\t\t: {}-{}",
+            "    File reference\t\t\t\t: {}-{}",
             file_reference & 0x0000ffffffffffff,
             file_reference >> 48,
         );
         match file_entry.get_name() {
-            Some(name) => println!("    Name\t\t\t\t: {}", name),
+            Some(name) => println!("    Name\t\t\t\t\t: {}", name),
             None => {}
         };
-        println!("    Size\t\t\t\t: {} bytes", file_entry.get_size());
+        println!("    Size\t\t\t\t\t: {} bytes", file_entry.get_size());
 
         match file_entry.get_creation_time() {
             Some(date_time) => {
                 let date_time_string: String = Self::get_date_time_string(date_time)?;
-                println!("    Creation time\t\t\t: {}", date_time_string);
+                println!("    Creation time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_modification_time() {
             Some(date_time) => {
                 let date_time_string: String = Self::get_date_time_string(date_time)?;
-                println!("    Modification time\t\t\t: {}", date_time_string);
+                println!("    Modification time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_access_time() {
             Some(date_time) => {
                 let date_time_string: String = Self::get_date_time_string(date_time)?;
-                println!("    Access time\t\t\t\t: {}", date_time_string);
+                println!("    Access time\t\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_change_time() {
             Some(date_time) => {
                 let date_time_string: String = Self::get_date_time_string(date_time)?;
-                println!("    Entry modification time\t\t: {}", date_time_string);
+                println!("    Entry modification time\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         let file_attribute_flags: u32 = file_entry.get_file_attribute_flags();
         println!(
-            "    File attribute flags\t\t: 0x{:08x}",
+            "    File attribute flags\t\t\t: 0x{:08x}",
             file_attribute_flags
         );
         let flags_strings: Vec<String> =
@@ -506,24 +509,24 @@ impl NtfsInfo {
         if file_entry.is_empty() {
             println!("    Is empty");
         } else {
-            println!("    Is allocated\t\t\t: {}", file_entry.is_allocated());
+            println!("    Is allocated\t\t\t\t: {}", file_entry.is_allocated());
 
             println!(
-                "    File reference\t\t\t: {}-{}",
+                "    File reference\t\t\t\t: {}-{}",
                 file_entry.mft_entry_number, file_entry.sequence_number
             );
             let base_record_file_reference: u64 = file_entry.get_base_record_file_reference();
             if base_record_file_reference == 0 {
-                println!("    Base record file reference\t\t: Not set (0)");
+                println!("    Base record file reference\t\t\t: Not set (0)");
             } else {
                 println!(
-                    "    Base record file reference\t\t: {}-{}",
+                    "    Base record file reference\t\t\t: {}-{}",
                     base_record_file_reference & 0x0000ffffffffffff,
                     base_record_file_reference >> 48,
                 );
             }
             println!(
-                "    Journal sequence number\t\t: {}",
+                "    Journal sequence number\t\t\t: {}",
                 file_entry.get_journal_sequence_number()
             );
 
@@ -592,7 +595,7 @@ impl NtfsInfo {
         }
         println!("New Technologies File System (NTFS) file entry information:");
 
-        println!("    Path\t\t\t\t: {}", path);
+        println!("    Path\t\t\t\t\t: {}", path);
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
@@ -623,7 +626,7 @@ impl NtfsInfo {
         match ntfs_file_system.get_format_version() {
             Some((major_version, minor_version)) => {
                 println!(
-                    "    Format version\t\t\t: {}.{}",
+                    "    Format version\t\t\t\t: {}.{}",
                     major_version, minor_version
                 );
             }
@@ -631,17 +634,17 @@ impl NtfsInfo {
         }
         match ntfs_file_system.get_volume_label() {
             Some(volume_label) => {
-                println!("    Volume label\t\t\t: {}", volume_label);
+                println!("    Volume label\t\t\t\t: {}", volume_label);
             }
             None => {}
         }
         println!(
-            "    Volume serial number\t\t: 0x{:x}",
+            "    Volume serial number\t\t\t: 0x{:x}",
             ntfs_file_system.volume_serial_number,
         );
         match ntfs_file_system.get_volume_flags() {
             Some(volume_flags) => {
-                println!("    Volume flags\t\t\t: 0x{:04x}", volume_flags);
+                println!("    Volume flags\t\t\t\t: 0x{:04x}", volume_flags);
                 let flags_strings: Vec<String> =
                     NtfsInfo::get_ntfs_volume_flags_strings(volume_flags);
                 println!(
@@ -656,19 +659,19 @@ impl NtfsInfo {
             None => {}
         }
         println!(
-            "    Bytes per sector\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             ntfs_file_system.bytes_per_sector
         );
         println!(
-            "    Cluster block size\t\t\t: {} bytes",
+            "    Cluster block size\t\t\t\t: {} bytes",
             ntfs_file_system.cluster_block_size
         );
         println!(
-            "    MFT entry size\t\t\t: {} bytes",
+            "    MFT entry size\t\t\t\t: {} bytes",
             ntfs_file_system.mft_entry_size
         );
         println!(
-            "    Index entry size\t\t\t: {} bytes",
+            "    Index entry size\t\t\t\t: {} bytes",
             ntfs_file_system.index_entry_size
         );
         println!("");

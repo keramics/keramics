@@ -243,63 +243,66 @@ impl ExtInfo {
 
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut ExtFileEntry) -> Result<(), ErrorTrace> {
-        println!("    Inode number\t\t\t: {}", file_entry.get_inode_number());
+        println!(
+            "    Inode number\t\t\t\t: {}",
+            file_entry.get_inode_number()
+        );
 
         match file_entry.get_name() {
-            Some(name) => println!("    Name\t\t\t\t: {}", name),
+            Some(name) => println!("    Name\t\t\t\t\t: {}", name),
             None => {}
         };
-        println!("    Size\t\t\t\t: {}", file_entry.get_size());
+        println!("    Size\t\t\t\t\t: {}", file_entry.get_size());
 
         match file_entry.get_modification_time() {
             Some(date_time) => {
                 let date_time_string: String = ExtInfo::get_date_time_string(date_time)?;
-                println!("    Modification time\t\t\t: {}", date_time_string);
+                println!("    Modification time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_access_time() {
             Some(date_time) => {
                 let date_time_string: String = ExtInfo::get_date_time_string(date_time)?;
-                println!("    Access time\t\t\t\t: {}", date_time_string);
+                println!("    Access time\t\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_change_time() {
             Some(date_time) => {
                 let date_time_string: String = ExtInfo::get_date_time_string(date_time)?;
-                println!("    Inode change time\t\t\t: {}", date_time_string);
+                println!("    Inode change time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         match file_entry.get_creation_time() {
             Some(date_time) => {
                 let date_time_string: String = ExtInfo::get_date_time_string(date_time)?;
-                println!("    Creation time\t\t\t: {}", date_time_string);
+                println!("    Creation time\t\t\t\t: {}", date_time_string);
             }
             None => {}
         };
         let date_time: &DateTime = file_entry.get_deletion_time();
         let date_time_string: String = ExtInfo::get_date_time_string(date_time)?;
-        println!("    Deletion time\t\t\t: {}", date_time_string);
+        println!("    Deletion time\t\t\t\t: {}", date_time_string);
 
         println!(
-            "    Number of links\t\t\t: {}",
+            "    Number of links\t\t\t\t: {}",
             file_entry.get_number_of_links()
         );
         println!(
-            "    Owner identifier\t\t\t: {}",
+            "    Owner identifier\t\t\t\t: {}",
             file_entry.get_owner_identifier()
         );
         println!(
-            "    Group identifier\t\t\t: {}",
+            "    Group identifier\t\t\t\t: {}",
             file_entry.get_group_identifier()
         );
         let file_mode: u16 = file_entry.get_file_mode();
         let file_mode_string: String = Self::get_file_mode_string(file_mode);
 
         println!(
-            "    File mode\t\t\t\t: {} (0o{:0o})",
+            "    File mode\t\t\t\t\t: {} (0o{:0o})",
             file_mode_string, file_mode
         );
         let result: Option<u16> = match file_entry.get_device_identifier() {
@@ -315,7 +318,7 @@ impl ExtInfo {
         match result {
             Some(device_identifier) => {
                 println!(
-                    "    Device number\t\t\t: {},{}",
+                    "    Device number\t\t\t\t: {},{}",
                     device_identifier >> 8,
                     device_identifier & 0x00ff
                 );
@@ -334,7 +337,7 @@ impl ExtInfo {
         };
         match result {
             Some(symbolic_link_target) => {
-                println!("    Symbolic link target\t\t: {}", symbolic_link_target);
+                println!("    Symbolic link target\t\t\t: {}", symbolic_link_target);
             }
             None => {}
         };
@@ -366,7 +369,7 @@ impl ExtInfo {
                 };
                 let attribute_name: &ByteString = attribute.get_name();
                 println!(
-                    "        Attribute {}\t\t\t: {}",
+                    "        Attribute {}\t\t\t\t: {}",
                     attribute_index + 1,
                     attribute_name
                 );
@@ -478,7 +481,7 @@ impl ExtInfo {
         }
         println!("Extended File System (ext) file entry information:");
 
-        println!("    Path\t\t\t\t: {}", path);
+        println!("    Path\t\t\t\t\t: {}", path);
 
         match Self::print_file_entry(file_entry.as_mut().unwrap()) {
             Ok(_) => {}
@@ -520,35 +523,35 @@ impl ExtInfo {
         println!("Extended File System (ext) information:");
 
         let format_version: u8 = ext_file_system.get_format_version();
-        println!("    Format version\t\t\t: ext{}", format_version);
+        println!("    Format version\t\t\t\t: ext{}", format_version);
 
         let volume_label: String = match ext_file_system.get_volume_label() {
             Some(volume_label) => volume_label.to_string(),
             None => String::new(),
         };
-        println!("    Volume label\t\t\t: {}", volume_label);
+        println!("    Volume label\t\t\t\t: {}", volume_label);
 
         let feature_flags: u32 = ext_file_system.get_compatible_feature_flags();
-        println!("    Compatible features\t\t\t: 0x{:08x}", feature_flags);
+        println!("    Compatible features\t\t\t\t: 0x{:08x}", feature_flags);
         Self::print_compatible_feature_flags(feature_flags);
 
         let feature_flags: u32 = ext_file_system.get_incompatible_feature_flags();
-        println!("    Incompatible features\t\t: 0x{:08x}", feature_flags);
+        println!("    Incompatible features\t\t\t: 0x{:08x}", feature_flags);
         Self::print_incompatible_feature_flags(feature_flags);
 
         let feature_flags: u32 = ext_file_system.get_read_only_compatible_feature_flags();
         println!(
-            "    Read-only compatible features\t: 0x{:08x}",
+            "    Read-only compatible features\t\t: 0x{:08x}",
             feature_flags
         );
         Self::print_read_only_compatible_feature_flags(feature_flags);
 
         println!(
-            "    Number of inodes\t\t\t: {}",
+            "    Number of inodes\t\t\t\t: {}",
             ext_file_system.number_of_inodes
         );
         println!(
-            "    Last mount path\t\t\t: {}",
+            "    Last mount path\t\t\t\t: {}",
             ext_file_system.last_mount_path
         );
         let date_time_string: String = match ext_file_system.last_mount_time {
@@ -560,7 +563,7 @@ impl ExtInfo {
                 ));
             }
         };
-        println!("    Last mount time\t\t\t: {}", date_time_string);
+        println!("    Last mount time\t\t\t\t: {}", date_time_string);
         let date_time_string: String = match ext_file_system.last_written_time {
             DateTime::NotSet => String::from("Not set (0)"),
             DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
@@ -570,7 +573,7 @@ impl ExtInfo {
                 ));
             }
         };
-        println!("    Last written time\t\t\t: {}", date_time_string);
+        println!("    Last written time\t\t\t\t: {}", date_time_string);
         println!("");
 
         Ok(())

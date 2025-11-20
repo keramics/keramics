@@ -261,10 +261,11 @@ impl ExtFileEntry {
                     );
                     Arc::new(RwLock::new(data_stream))
                 } else {
-                    let inode: ExtInode = match self
-                        .inode_table
-                        .get_inode(&self.data_stream, attribute_entry.value_data_inode_number)
-                    {
+                    let inode: ExtInode = match self.inode_table.get_inode(
+                        &self.data_stream,
+                        attribute_entry.value_data_inode_number,
+                        &self.sub_directory_entries.encoding,
+                    ) {
                         Ok(inode) => inode,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -339,10 +340,11 @@ impl ExtFileEntry {
             .get_entry_by_index(sub_file_entry_index)
         {
             Some((name, directory_entry)) => {
-                let inode: ExtInode = match self
-                    .inode_table
-                    .get_inode(&self.data_stream, directory_entry.inode_number)
-                {
+                let inode: ExtInode = match self.inode_table.get_inode(
+                    &self.data_stream,
+                    directory_entry.inode_number,
+                    &self.sub_directory_entries.encoding,
+                ) {
                     Ok(inode) => inode,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -392,10 +394,11 @@ impl ExtFileEntry {
             .get_entry_by_name(sub_file_entry_name)
         {
             Ok(Some((name, directory_entry))) => {
-                let inode: ExtInode = match self
-                    .inode_table
-                    .get_inode(&self.data_stream, directory_entry.inode_number)
-                {
+                let inode: ExtInode = match self.inode_table.get_inode(
+                    &self.data_stream,
+                    directory_entry.inode_number,
+                    &self.sub_directory_entries.encoding,
+                ) {
                     Ok(inode) => inode,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(

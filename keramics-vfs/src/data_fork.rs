@@ -58,10 +58,11 @@ mod tests {
 
     // Tests with ext.
 
-    fn get_ext_file_system() -> Result<ExtFileSystem, ErrorTrace> {
+    fn get_ext_file_system(path_string: &str) -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -69,7 +70,7 @@ mod tests {
     }
 
     fn get_ext_file_entry(path_string: &str) -> Result<ExtFileEntry, ErrorTrace> {
-        let ext_file_system: ExtFileSystem = get_ext_file_system()?;
+        let ext_file_system: ExtFileSystem = get_ext_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from(path_string);
         match ext_file_system.get_file_entry_by_path(&path)? {
@@ -88,7 +89,7 @@ mod tests {
         let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
 
-        vfs_data_fork.get_data_stream()?;
+        let _ = vfs_data_fork.get_data_stream()?;
 
         Ok(())
     }
@@ -108,10 +109,11 @@ mod tests {
 
     // Tests with NTFS.
 
-    fn get_ntfs_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
+    fn get_ntfs_file_system(path_string: &str) -> Result<NtfsFileSystem, ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -119,7 +121,7 @@ mod tests {
     }
 
     fn get_ntfs_file_entry(path_string: &str) -> Result<NtfsFileEntry, ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_ntfs_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_ntfs_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from(path_string);
         match ntfs_file_system.get_file_entry_by_path(&path)? {
@@ -138,7 +140,7 @@ mod tests {
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
         let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
 
-        vfs_data_fork.get_data_stream()?;
+        let _ = vfs_data_fork.get_data_stream()?;
 
         // TODO: add test with ADS
 
