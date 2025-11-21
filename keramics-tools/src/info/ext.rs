@@ -120,8 +120,12 @@ impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.date_time {
             DateTime::NotSet => write!(formatter, "Not set (0)"),
-            DateTime::PosixTime32(posix_time32) => write!(formatter, "{}", posix_time32.to_iso8601_string()),
-            DateTime::PosixTime64Ns(posix_time64ns) => write!(formatter, "{}", posix_time64ns.to_iso8601_string()),
+            DateTime::PosixTime32(posix_time32) => {
+                write!(formatter, "{}", posix_time32.to_iso8601_string())
+            }
+            DateTime::PosixTime64Ns(posix_time64ns) => {
+                write!(formatter, "{}", posix_time64ns.to_iso8601_string())
+            }
             _ => return write!(formatter, "Unsupported date time"),
         }
     }
@@ -253,11 +257,7 @@ impl fmt::Display for ExtFileEntryInfo {
         )?;
         let file_mode_info: ExtFileModeInfo = ExtFileModeInfo::new(self.file_mode);
 
-        writeln!(
-            formatter,
-            "    File mode\t\t\t\t\t: {}",
-            file_mode_info
-        )?;
+        writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
         if let Some(device_identifier) = &self.device_identifier {
             writeln!(
                 formatter,
