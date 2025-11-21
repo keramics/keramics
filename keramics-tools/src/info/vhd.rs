@@ -129,7 +129,7 @@ impl VhdInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open VHD file");
                 return Err(error);
             }
-        };
+        }
         Ok(vhd_file)
     }
 

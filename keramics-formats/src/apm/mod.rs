@@ -14,6 +14,7 @@
 mod constants;
 mod partition;
 mod partition_map_entry;
+mod partitions;
 mod volume_system;
 
 pub use partition::ApmPartition;

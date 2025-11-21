@@ -15,6 +15,7 @@ mod constants;
 mod partition;
 mod partition_entry;
 mod partition_table_header;
+mod partitions;
 mod volume_system;
 
 pub use partition::GptPartition;

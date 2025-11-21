@@ -217,7 +217,7 @@ impl MbrInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open MBR volume system");
                 return Err(error);
             }
-        };
+        }
         Ok(mbr_volume_system)
     }
 
@@ -245,18 +245,17 @@ impl MbrInfo {
 
         println!("");
 
-        for partition_index in 0..number_of_partitions {
-            let mbr_partition: MbrPartition =
-                match mbr_volume_system.get_partition_by_index(partition_index) {
-                    Ok(partition) => partition,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to retrieve MBR partition: {}", partition_index)
-                        );
-                        return Err(error);
-                    }
-                };
+        for (partition_index, result) in mbr_volume_system.partitions().enumerate() {
+            let mbr_partition: MbrPartition = match result {
+                Ok(mbr_partition) => mbr_partition,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve partition: {}", partition_index)
+                    );
+                    return Err(error);
+                }
+            };
             let partition_info: MbrPartitionInfo =
                 Self::get_partition_information(partition_index, &mbr_partition);
 

@@ -22,6 +22,7 @@ mod directory_entries;
 mod directory_entry;
 mod directory_tree;
 mod extended_attribute;
+mod extended_attributes;
 mod extent_descriptor;
 mod extent_index;
 mod extents_footer;

@@ -106,7 +106,7 @@ impl GptInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open GPT volume system");
                 return Err(error);
             }
-        };
+        }
         Ok(gpt_volume_system)
     }
 
@@ -134,18 +134,17 @@ impl GptInfo {
 
         println!("");
 
-        for partition_index in 0..number_of_partitions {
-            let gpt_partition: GptPartition =
-                match gpt_volume_system.get_partition_by_index(partition_index) {
-                    Ok(partition) => partition,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to retrieve GPT partition: {}", partition_index)
-                        );
-                        return Err(error);
-                    }
-                };
+        for (partition_index, result) in gpt_volume_system.partitions().enumerate() {
+            let gpt_partition: GptPartition = match result {
+                Ok(gpt_partition) => gpt_partition,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve partition: {}", partition_index)
+                    );
+                    return Err(error);
+                }
+            };
             let partition_info: GptPartitionInfo =
                 Self::get_partition_information(partition_index, &gpt_partition);
 

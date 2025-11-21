@@ -76,16 +76,21 @@ impl Ext3Inode {
         if inode.flags & EXT_INODE_FLAG_IS_EXTENDED_ATTRIBUTE_INODE == 0 {
             inode.access_timestamp = bytes_to_i32_le!(data, 8);
             if inode.access_timestamp > 0 {
-                inode.access_time = DateTime::PosixTime32(PosixTime32::new(inode.access_timestamp));
+                inode.access_time = Some(DateTime::PosixTime32(PosixTime32::new(
+                    inode.access_timestamp,
+                )));
             }
             inode.change_timestamp = bytes_to_i32_le!(data, 12);
             if inode.change_timestamp > 0 {
-                inode.change_time = DateTime::PosixTime32(PosixTime32::new(inode.change_timestamp));
+                inode.change_time = Some(DateTime::PosixTime32(PosixTime32::new(
+                    inode.change_timestamp,
+                )));
             }
             inode.modification_timestamp = bytes_to_i32_le!(data, 16);
             if inode.modification_timestamp > 0 {
-                inode.modification_time =
-                    DateTime::PosixTime32(PosixTime32::new(inode.modification_timestamp));
+                inode.modification_time = Some(DateTime::PosixTime32(PosixTime32::new(
+                    inode.modification_timestamp,
+                )));
             }
         }
         let timestamp: i32 = bytes_to_i32_le!(data, 20);
@@ -138,17 +143,17 @@ mod tests {
         assert_eq!(test_struct.access_timestamp, 1597862888);
         assert_eq!(
             test_struct.access_time,
-            DateTime::PosixTime32(PosixTime32::new(1597862888))
+            Some(DateTime::PosixTime32(PosixTime32::new(1597862888)))
         );
         assert_eq!(test_struct.change_timestamp, 1597862888);
         assert_eq!(
             test_struct.change_time,
-            DateTime::PosixTime32(PosixTime32::new(1597862888))
+            Some(DateTime::PosixTime32(PosixTime32::new(1597862888)))
         );
         assert_eq!(test_struct.modification_timestamp, 1597862888);
         assert_eq!(
             test_struct.modification_time,
-            DateTime::PosixTime32(PosixTime32::new(1597862888))
+            Some(DateTime::PosixTime32(PosixTime32::new(1597862888)))
         );
         assert_eq!(test_struct.deletion_time, DateTime::NotSet);
         assert_eq!(test_struct.number_of_links, 1);

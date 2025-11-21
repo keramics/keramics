@@ -21,8 +21,7 @@ use keramics_types::Uuid;
 use super::partition::GptPartition;
 use super::partition_entry::GptPartitionEntry;
 use super::partition_table_header::GptPartitionTableHeader;
-
-const SUPPORTED_BYTES_PER_SECTOR: [u16; 2] = [512, 4096];
+use super::partitions::GptPartitionsIterator;
 
 /// GUID Partition Table (GPT) volume system.
 pub struct GptVolumeSystem {
@@ -44,6 +43,8 @@ pub struct GptVolumeSystem {
 }
 
 impl GptVolumeSystem {
+    const SUPPORTED_BYTES_PER_SECTOR: [u16; 2] = [512, 4096];
+
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
@@ -110,6 +111,11 @@ impl GptVolumeSystem {
 
     // TODO: add get_partition_index_by_identifier
 
+    /// Retrieves a partitions iterator.
+    pub fn partitions(&self) -> GptPartitionsIterator<'_> {
+        GptPartitionsIterator::new(self, self.partition_entries.len())
+    }
+
     /// Reads the volume system from a data stream.
     pub fn read_data_stream(
         &mut self,
@@ -148,7 +154,7 @@ impl GptVolumeSystem {
                 }
             }
         } else {
-            for bytes_per_sector in SUPPORTED_BYTES_PER_SECTOR.iter() {
+            for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                 match partition_table_header
                     .read_at_position(data_stream, SeekFrom::Start(*bytes_per_sector as u64))
                 {
@@ -285,7 +291,7 @@ impl GptVolumeSystem {
 
     /// Sets the number of bytes per sector.
     pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> Result<(), ErrorTrace> {
-        if !SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
+        if !Self::SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported bytes per sector: {}",
                 bytes_per_sector
@@ -338,6 +344,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for partitions
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

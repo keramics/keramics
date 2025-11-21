@@ -20,8 +20,7 @@ use super::extended_boot_record::MbrExtendedBootRecord;
 use super::master_boot_record::MbrMasterBootRecord;
 use super::partition::MbrPartition;
 use super::partition_entry::MbrPartitionEntry;
-
-const SUPPORTED_BYTES_PER_SECTOR: [u16; 4] = [512, 1024, 2048, 4096];
+use super::partitions::MbrPartitionsIterator;
 
 /// Master Boot Record (MBR) volume system.
 pub struct MbrVolumeSystem {
@@ -42,6 +41,8 @@ pub struct MbrVolumeSystem {
 }
 
 impl MbrVolumeSystem {
+    const SUPPORTED_BYTES_PER_SECTOR: [u16; 4] = [512, 1024, 2048, 4096];
+
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
@@ -112,6 +113,11 @@ impl MbrVolumeSystem {
         }
     }
 
+    /// Retrieves a partitions iterator.
+    pub fn partitions(&self) -> MbrPartitionsIterator<'_> {
+        MbrPartitionsIterator::new(self, self.partition_entries.len())
+    }
+
     /// Reads the volume system from a data stream.
     pub fn read_data_stream(
         &mut self,
@@ -148,7 +154,7 @@ impl MbrVolumeSystem {
                 if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
                     let mut boot_signature: [u8; 2] = [0; 2];
 
-                    for bytes_per_sector in SUPPORTED_BYTES_PER_SECTOR.iter() {
+                    for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                         let offset: u64 =
                             partition_entry.start_address_lba as u64 * *bytes_per_sector as u64;
 
@@ -215,7 +221,7 @@ impl MbrVolumeSystem {
                     let end_address_lba: u64 = (last_partition_entry.start_address_lba as u64)
                         + (last_partition_entry.number_of_sectors as u64);
 
-                    for bytes_per_sector in SUPPORTED_BYTES_PER_SECTOR.iter() {
+                    for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                         if end_address_lba > data_stream_size / (*bytes_per_sector as u64) {
                             break;
                         }
@@ -299,7 +305,7 @@ impl MbrVolumeSystem {
 
     /// Sets the number of bytes per sector.
     pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> Result<(), ErrorTrace> {
-        if !SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
+        if !Self::SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported bytes per sector: {}",
                 bytes_per_sector
@@ -351,6 +357,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for partitions
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

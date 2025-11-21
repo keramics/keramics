@@ -95,7 +95,7 @@ impl SparseImageInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open sparseimage file");
                 return Err(error);
             }
-        };
+        }
         Ok(sparseimage_file)
     }
 

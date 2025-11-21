@@ -74,8 +74,9 @@ impl Ext4InodeExtension {
                     Self::get_extra_precision_timestamp(inode.change_timestamp, extra_precision);
 
                 if timestamp > 0 {
-                    inode.change_time =
-                        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction));
+                    inode.change_time = Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                        timestamp, fraction,
+                    )));
                 }
             }
             if extra_size >= 12 {
@@ -86,8 +87,9 @@ impl Ext4InodeExtension {
                 );
 
                 if timestamp > 0 {
-                    inode.modification_time =
-                        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction));
+                    inode.modification_time = Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                        timestamp, fraction,
+                    )));
                 }
             }
             if extra_size >= 16 {
@@ -96,8 +98,9 @@ impl Ext4InodeExtension {
                     Self::get_extra_precision_timestamp(inode.access_timestamp, extra_precision);
 
                 if timestamp > 0 {
-                    inode.access_time =
-                        DateTime::PosixTime64Ns(PosixTime64Ns::new(timestamp, fraction));
+                    inode.access_time = Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
+                        timestamp, fraction,
+                    )));
                 }
             }
         }

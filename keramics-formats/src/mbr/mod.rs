@@ -16,6 +16,7 @@ mod extended_boot_record;
 mod master_boot_record;
 mod partition;
 mod partition_entry;
+mod partitions;
 mod volume_system;
 
 pub use partition::MbrPartition;

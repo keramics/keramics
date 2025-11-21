@@ -140,7 +140,7 @@ impl QcowInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open QCOW file");
                 return Err(error);
             }
-        };
+        }
         Ok(qcow_file)
     }
 

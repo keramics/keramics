@@ -71,6 +71,22 @@ impl FatInfo {
         flags_strings
     }
 
+    /// Opens a file system.
+    pub fn open_file_system(
+        data_stream: &DataStreamReference,
+    ) -> Result<FatFileSystem, ErrorTrace> {
+        let mut fat_file_system: FatFileSystem = FatFileSystem::new();
+
+        match fat_file_system.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file system");
+                return Err(error);
+            }
+        }
+        Ok(fat_file_system)
+    }
+
     /// Prints information about a file entry.
     fn print_file_entry(file_entry: &mut FatFileEntry) -> Result<(), ErrorTrace> {
         println!("    Identifier\t\t\t\t\t: 0x{:08x}", file_entry.identifier);
@@ -128,15 +144,13 @@ impl FatInfo {
         data_stream: &DataStreamReference,
         fat_entry_identifier: u64,
     ) -> Result<(), ErrorTrace> {
-        let mut fat_file_system = FatFileSystem::new();
-
-        match fat_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
+            Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
-        }
+        };
         if fat_entry_identifier > u32::MAX as u64 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported identifier: {} value out of bounds",
@@ -177,15 +191,13 @@ impl FatInfo {
         data_stream: &DataStreamReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let mut fat_file_system = FatFileSystem::new();
-
-        match fat_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
+            Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
-        }
+        };
         let mut file_entry: Option<FatFileEntry> =
             match fat_file_system.get_file_entry_by_path(path) {
                 Ok(file_entry) => file_entry,
@@ -211,17 +223,44 @@ impl FatInfo {
         Ok(())
     }
 
-    /// Prints the file system hierarchy.
-    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let mut fat_file_system = FatFileSystem::new();
-
-        match fat_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+    /// Prints information about the file system.
+    pub fn print_file_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
+            Ok(fat_file_system) => fat_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
-        }
+        };
+        println!("File Allocation Table (FAT) information:");
+
+        let format_version: u8 = match &fat_file_system.format {
+            FatFormat::Fat12 => 12,
+            FatFormat::Fat16 => 16,
+            FatFormat::Fat32 => 32,
+        };
+        println!("    Format version\t\t\t\t: FAT-{}", format_version);
+
+        let volume_label: String = match fat_file_system.get_volume_label() {
+            Some(volume_label) => volume_label.to_string(),
+            None => String::new(),
+        };
+        println!("    Volume label\t\t\t\t: {}", volume_label);
+
+        println!("");
+
+        Ok(())
+    }
+
+    /// Prints the file system hierarchy.
+    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let fat_file_system: FatFileSystem = match Self::open_file_system(data_stream) {
+            Ok(fat_file_system) => fat_file_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
+                return Err(error);
+            }
+        };
         println!("File Allocation Table (FAT) hierarchy:");
 
         let mut file_entry: FatFileEntry = match fat_file_system.get_root_directory() {
@@ -307,37 +346,6 @@ impl FatInfo {
         }
         Ok(())
     }
-
-    /// Prints information about the file system.
-    pub fn print_file_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let mut fat_file_system = FatFileSystem::new();
-
-        match fat_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open FAT file file system");
-                return Err(error);
-            }
-        }
-        println!("File Allocation Table (FAT) information:");
-
-        let format_version: u8 = match &fat_file_system.format {
-            FatFormat::Fat12 => 12,
-            FatFormat::Fat16 => 16,
-            FatFormat::Fat32 => 32,
-        };
-        println!("    Format version\t\t\t\t: FAT-{}", format_version);
-
-        let volume_label: String = match fat_file_system.get_volume_label() {
-            Some(volume_label) => volume_label.to_string(),
-            None => String::new(),
-        };
-        println!("    Volume label\t\t\t\t: {}", volume_label);
-
-        println!("");
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]
@@ -345,10 +353,11 @@ mod tests {
     use super::*;
 
     // TODO: add tests for get_date_time_string
+    // TODO: add tests for open_file_system
     // TODO: add tests for print_file_entry
     // TODO: add tests for print_file_entry_by_identifier
     // TODO: add tests for print_file_entry_by_path
+    // TODO: add tests for print_file_system
     // TODO: add tests for print_hierarchy
     // TODO: add tests for print_hierarchy_file_entry
-    // TODO: add tests for print_volume_system
 }

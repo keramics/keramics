@@ -76,14 +76,14 @@ impl fmt::Display for ApmPartitionInfo {
 
         writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
-        let flags_info: ApmPartitionStatusFlagsInfo =
-            ApmPartitionStatusFlagsInfo::new(self.status_flags);
-
         writeln!(
             formatter,
             "    Status flags\t\t\t\t: 0x{:08x}",
             self.status_flags
         )?;
+        let flags_info: ApmPartitionStatusFlagsInfo =
+            ApmPartitionStatusFlagsInfo::new(self.status_flags);
+
         flags_info.fmt(formatter)?;
 
         writeln!(formatter)
@@ -154,6 +154,44 @@ impl fmt::Display for ApmPartitionStatusFlagsInfo {
     }
 }
 
+/// Apple Partition Map (APM) volume system information.
+struct ApmVolumeSystemInfo {
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
+    /// Number of partitions.
+    pub number_of_partitions: usize,
+}
+
+impl ApmVolumeSystemInfo {
+    /// Creates new volume system information.
+    fn new() -> Self {
+        Self {
+            bytes_per_sector: 0,
+            number_of_partitions: 0,
+        }
+    }
+}
+
+impl fmt::Display for ApmVolumeSystemInfo {
+    /// Formats volume system information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "Apple Partition Map (APM) information:")?;
+
+        writeln!(
+            formatter,
+            "    Bytes per sector\t\t\t\t: {} bytes",
+            self.bytes_per_sector
+        )?;
+        writeln!(
+            formatter,
+            "    Number of partitions\t\t\t: {}",
+            self.number_of_partitions
+        )?;
+        writeln!(formatter)
+    }
+}
+
 /// Information about an Apple Partition Map (APM).
 pub struct ApmInfo {}
 
@@ -175,6 +213,17 @@ impl ApmInfo {
         partition_information
     }
 
+    /// Retrieves the volume system information.
+    fn get_volume_system_information(apm_volume_system: &ApmVolumeSystem) -> ApmVolumeSystemInfo {
+        let mut volume_system_information: ApmVolumeSystemInfo = ApmVolumeSystemInfo::new();
+
+        volume_system_information.bytes_per_sector = apm_volume_system.bytes_per_sector;
+        volume_system_information.number_of_partitions =
+            apm_volume_system.get_number_of_partitions();
+
+        volume_system_information
+    }
+
     /// Opens a volume system.
     pub fn open_volume_system(
         data_stream: &DataStreamReference,
@@ -187,7 +236,7 @@ impl ApmInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open APM volume system");
                 return Err(error);
             }
-        };
+        }
         Ok(apm_volume_system)
     }
 
@@ -200,29 +249,22 @@ impl ApmInfo {
                 return Err(error);
             }
         };
-        println!("Apple Partition Map (APM) information:");
+        let volume_system_info: ApmVolumeSystemInfo =
+            Self::get_volume_system_information(&apm_volume_system);
 
-        println!(
-            "    Bytes per sector\t\t\t\t: {} bytes",
-            apm_volume_system.bytes_per_sector
-        );
-        let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
-        println!("    Number of partitions\t\t\t: {}", number_of_partitions);
+        print!("{}", volume_system_info);
 
-        println!("");
-
-        for partition_index in 0..number_of_partitions {
-            let apm_partition: ApmPartition =
-                match apm_volume_system.get_partition_by_index(partition_index) {
-                    Ok(partition) => partition,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to retrieve APM partition: {}", partition_index)
-                        );
-                        return Err(error);
-                    }
-                };
+        for (partition_index, result) in apm_volume_system.partitions().enumerate() {
+            let apm_partition: ApmPartition = match result {
+                Ok(apm_partition) => apm_partition,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve partition: {}", partition_index)
+                    );
+                    return Err(error);
+                }
+            };
             let partition_info: ApmPartitionInfo =
                 Self::get_partition_information(partition_index, &apm_partition);
 
@@ -271,15 +313,22 @@ mod tests {
 
     #[test]
     fn test_partition_status_flags_fmt() -> Result<(), ErrorTrace> {
-        let test_struct: ApmPartitionStatusFlagsInfo = ApmPartitionStatusFlagsInfo::new(0x40000033);
+        let test_struct: ApmPartitionStatusFlagsInfo = ApmPartitionStatusFlagsInfo::new(0xc000077f);
 
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "        0x00000001: Is valid\n",
             "        0x00000002: Is allocated\n",
+            "        0x00000004: Is in use\n",
+            "        0x00000008: Contains boot information\n",
             "        0x00000010: Is readable\n",
             "        0x00000020: Is writeable\n",
+            "        0x00000040: Boot code is position independent\n",
+            "        0x00000100: Contains a chain-compatible driver\n",
+            "        0x00000200: Contains a real driver\n",
+            "        0x00000400: Contains a chain driver\n",
             "        0x40000000: Automatic mount at startup\n",
+            "        0x80000000: Is startup partition\n",
         );
         assert_eq!(string, expected_string);
 
@@ -301,6 +350,20 @@ mod tests {
         assert_eq!(test_struct.offset, 32768);
         assert_eq!(test_struct.size, 4153344);
         assert_eq!(test_struct.status_flags, 0x40000033);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_volume_system_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
+        let test_struct: ApmVolumeSystemInfo =
+            ApmInfo::get_volume_system_information(&apm_volume_system);
+
+        assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.number_of_partitions, 2);
 
         Ok(())
     }

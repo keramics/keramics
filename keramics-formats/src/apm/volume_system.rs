@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use super::constants::*;
 use super::partition::ApmPartition;
 use super::partition_map_entry::ApmPartitionMapEntry;
+use super::partitions::ApmPartitionsIterator;
 
 /// Apple Partition Map (APM) volume system.
 pub struct ApmVolumeSystem {
@@ -90,6 +91,11 @@ impl ApmVolumeSystem {
                 )));
             }
         }
+    }
+
+    /// Retrieves a partitions iterator.
+    pub fn partitions(&self) -> ApmPartitionsIterator<'_> {
+        ApmPartitionsIterator::new(self, self.partition_map_entries.len())
     }
 
     /// Reads the volume system from a data stream.
@@ -200,6 +206,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for partitions
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

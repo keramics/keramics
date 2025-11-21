@@ -105,7 +105,7 @@ impl UdifInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
                 return Err(error);
             }
-        };
+        }
         Ok(udif_file)
     }
 

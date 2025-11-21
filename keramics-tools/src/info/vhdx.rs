@@ -138,7 +138,7 @@ impl VhdxInfo {
                 keramics_core::error_trace_add_frame!(error, "Unable to open VHDX file");
                 return Err(error);
             }
-        };
+        }
         Ok(vhdx_file)
     }
 

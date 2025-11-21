@@ -167,6 +167,22 @@ impl NtfsInfo {
         flags_strings
     }
 
+    /// Opens a file system.
+    pub fn open_file_system(
+        data_stream: &DataStreamReference,
+    ) -> Result<NtfsFileSystem, ErrorTrace> {
+        let mut ntfs_file_system: NtfsFileSystem = NtfsFileSystem::new();
+
+        match ntfs_file_system.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open NTFS file system");
+                return Err(error);
+            }
+        }
+        Ok(ntfs_file_system)
+    }
+
     /// Prints information about an attribute.
     fn print_attribute(attribute: &NtfsAttribute) -> Result<(), ErrorTrace> {
         let attribute_types = HashMap::<u32, &'static str>::from([
@@ -466,18 +482,13 @@ impl NtfsInfo {
         data_stream: &DataStreamReference,
         ntfs_entry_identifier: u64,
     ) -> Result<(), ErrorTrace> {
-        let mut ntfs_file_system = NtfsFileSystem::new();
-
-        match ntfs_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
+            Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to open NTFS file file system"
-                );
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
-        }
+        };
         if ntfs_entry_identifier > u32::MAX as u64 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported identifier: {} value out of bounds",
@@ -564,15 +575,10 @@ impl NtfsInfo {
         data_stream: &DataStreamReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let mut ntfs_file_system = NtfsFileSystem::new();
-
-        match ntfs_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
+            Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to open NTFS file file system"
-                );
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
         };
@@ -603,18 +609,13 @@ impl NtfsInfo {
 
     /// Prints information about the file system.
     pub fn print_file_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let mut ntfs_file_system = NtfsFileSystem::new();
-
-        match ntfs_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
+            Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to open NTFS file file system"
-                );
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
-        }
+        };
         println!("New Technologies File System (NTFS) information:");
 
         match ntfs_file_system.get_format_version() {
@@ -675,15 +676,10 @@ impl NtfsInfo {
 
     /// Prints the file system hierarchy.
     pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let mut ntfs_file_system = NtfsFileSystem::new();
-
-        match ntfs_file_system.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let ntfs_file_system: NtfsFileSystem = match Self::open_file_system(data_stream) {
+            Ok(ntfs_file_system) => ntfs_file_system,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to open NTFS file file system"
-                );
+                keramics_core::error_trace_add_frame!(error, "Unable to open file file system");
                 return Err(error);
             }
         };
@@ -850,6 +846,7 @@ mod tests {
         assert_eq!(flags_strings, ["0x0001: Is dirty (VOLUME_IS_DIRTY)"],);
     }
 
+    // TODO: add tests for open_file_system
     // TODO: add tests for print_attribute
     // TODO: add tests for print_file_entry
     // TODO: add tests for print_file_entry_by_identifier

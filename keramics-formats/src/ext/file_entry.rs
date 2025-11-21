@@ -25,6 +25,7 @@ use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
 use super::extended_attribute::ExtExtendedAttribute;
+use super::extended_attributes::ExtExtendedAttributesIterator;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 
@@ -79,12 +80,12 @@ impl ExtFileEntry {
 
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
-        Some(&self.inode.access_time)
+        self.inode.access_time.as_ref()
     }
 
     /// Retrieves the change time.
     pub fn get_change_time(&self) -> Option<&DateTime> {
-        Some(&self.inode.change_time)
+        self.inode.change_time.as_ref()
     }
 
     /// Retrieves the creation time.
@@ -131,7 +132,7 @@ impl ExtFileEntry {
 
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
-        Some(&self.inode.modification_time)
+        self.inode.modification_time.as_ref()
     }
 
     /// Retrieves the name.
@@ -299,7 +300,11 @@ impl ExtFileEntry {
     }
 
     // TODO: add get extended_attribute_by_name
-    // TODO: add get extended_attributes iterator
+
+    /// Retrieves an extended attributes iterator.
+    pub fn extended_attributes(&mut self) -> ExtExtendedAttributesIterator<'_> {
+        ExtExtendedAttributesIterator::new(self)
+    }
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
