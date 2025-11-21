@@ -156,6 +156,9 @@ hdiutil attach ${IMAGE_FILE}.dmg
 
 create_file_entries "/Volumes/hfsplus_test"
 
+# Sleep to prevent "resource busy" warning.
+sleep 1
+
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse image with a HFS+ file system
@@ -173,6 +176,9 @@ hdiutil attach ${IMAGE_FILE}.sparseimage
 
 create_file_entries "/Volumes/hfsplus_test"
 
+# Sleep to prevent "resource busy" warning.
+sleep 1
+
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse bundle with a HFS+ file system
@@ -189,6 +195,9 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplu
 hdiutil attach ${IMAGE_FILE}.sparsebundle
 
 create_file_entries "/Volumes/hfsplus_test"
+
+# Sleep to prevent "resource busy" warning.
+sleep 1
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
@@ -246,6 +255,9 @@ mkdir -p test_data/udif
 rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
+
+# Sleep to prevent "resource busy" warning.
+sleep 1
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
