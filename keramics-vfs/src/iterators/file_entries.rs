@@ -49,7 +49,9 @@ impl<'a> Iterator for VfsFileEntriesIterator<'a> {
         let item: Self::Item = self
             .file_entry
             .get_sub_file_entry_by_index(self.sub_file_entry_index);
+
         self.sub_file_entry_index += 1;
+
         Some(item)
     }
 }

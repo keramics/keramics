@@ -13,58 +13,57 @@
 
 use keramics_core::ErrorTrace;
 
-use super::extended_attribute::ExtExtendedAttribute;
 use super::file_entry::ExtFileEntry;
 
-/// Extended File System (ext) extended attributes iterator.
-pub struct ExtExtendedAttributesIterator<'a> {
+/// Extended File System (ext) file entries iterator.
+pub struct ExtFileEntriesIterator<'a> {
     /// File entry.
     file_entry: &'a mut ExtFileEntry,
 
-    /// Number of extended attributes.
-    number_of_extended_attributes: usize,
+    /// Number of sub file entries.
+    number_of_sub_file_entries: usize,
 
-    /// Partititon index.
-    extended_attribute_index: usize,
+    /// Sub file entry index.
+    sub_file_entry_index: usize,
 
     /// Value to indicate whether the iterator is initialized.
     is_initialized: bool,
 }
 
-impl<'a> ExtExtendedAttributesIterator<'a> {
+impl<'a> ExtFileEntriesIterator<'a> {
     /// Creates a new iterator.
     pub fn new(file_entry: &'a mut ExtFileEntry) -> Self {
         Self {
             file_entry,
-            number_of_extended_attributes: 0,
-            extended_attribute_index: 0,
+            number_of_sub_file_entries: 0,
+            sub_file_entry_index: 0,
             is_initialized: false,
         }
     }
 }
 
-impl<'a> Iterator for ExtExtendedAttributesIterator<'a> {
-    type Item = Result<ExtExtendedAttribute, ErrorTrace>;
+impl<'a> Iterator for ExtFileEntriesIterator<'a> {
+    type Item = Result<ExtFileEntry, ErrorTrace>;
 
     /// Retrieves the next file entry.
     fn next(&mut self) -> Option<Self::Item> {
         if !self.is_initialized {
-            match self.file_entry.get_number_of_extended_attributes() {
-                Ok(number_of_extended_attributes) => {
-                    self.number_of_extended_attributes = number_of_extended_attributes;
+            match self.file_entry.get_number_of_sub_file_entries() {
+                Ok(number_of_sub_file_entries) => {
+                    self.number_of_sub_file_entries = number_of_sub_file_entries;
                 }
                 Err(error) => return Some(Err(error)),
             }
             self.is_initialized = true;
         }
-        if self.extended_attribute_index >= self.number_of_extended_attributes {
+        if self.sub_file_entry_index >= self.number_of_sub_file_entries {
             return None;
         }
         let item: Self::Item = self
             .file_entry
-            .get_extended_attribute_by_index(self.extended_attribute_index);
+            .get_sub_file_entry_by_index(self.sub_file_entry_index);
 
-        self.extended_attribute_index += 1;
+        self.sub_file_entry_index += 1;
 
         Some(item)
     }

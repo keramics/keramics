@@ -102,6 +102,31 @@ impl fmt::Display for ExtCompatibleFeatureFlagsInfo {
     }
 }
 
+/// Extended File System (ext) date and time information.
+struct ExtDateTimeInfo<'a> {
+    /// Flags.
+    date_time: &'a DateTime,
+}
+
+impl<'a> ExtDateTimeInfo<'a> {
+    /// Creates new date and time information.
+    fn new(date_time: &'a DateTime) -> Self {
+        Self { date_time }
+    }
+}
+
+impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
+    /// Formats partition date and time information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self.date_time {
+            DateTime::NotSet => write!(formatter, "Not set (0)"),
+            DateTime::PosixTime32(posix_time32) => write!(formatter, "{}", posix_time32.to_iso8601_string()),
+            DateTime::PosixTime64Ns(posix_time64ns) => write!(formatter, "{}", posix_time64ns.to_iso8601_string()),
+            _ => return write!(formatter, "Unsupported date time"),
+        }
+    }
+}
+
 /// Extended File System (ext) compatible file entry information.
 struct ExtFileEntryInfo {
     /// The inode number.
@@ -167,6 +192,102 @@ impl ExtFileEntryInfo {
             symbolic_link_target: None,
         }
     }
+}
+
+impl fmt::Display for ExtFileEntryInfo {
+    /// Formats file entry information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "    Inode number\t\t\t\t: {}", self.inode_number)?;
+
+        if let Some(name) = &self.name {
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
+        };
+        writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
+
+        if let Some(date_time) = &self.modification_time {
+            let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
+
+            writeln!(
+                formatter,
+                "    Modification time\t\t\t\t: {}",
+                date_time_info
+            )?;
+        }
+        if let Some(date_time) = &self.access_time {
+            let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
+
+            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_info)?;
+        }
+        if let Some(date_time) = &self.change_time {
+            let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
+
+            writeln!(
+                formatter,
+                "    Inode change time\t\t\t\t: {}",
+                date_time_info
+            )?;
+        }
+        if let Some(date_time) = &self.creation_time {
+            let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
+
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
+        }
+        let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.deletion_time);
+
+        writeln!(formatter, "    Deletion time\t\t\t\t: {}", date_time_info)?;
+
+        writeln!(
+            formatter,
+            "    Number of links\t\t\t\t: {}",
+            self.number_of_links
+        )?;
+        writeln!(
+            formatter,
+            "    Owner identifier\t\t\t\t: {}",
+            self.owner_identifier
+        )?;
+        writeln!(
+            formatter,
+            "    Group identifier\t\t\t\t: {}",
+            self.group_identifier
+        )?;
+        let file_mode_info: ExtFileModeInfo = ExtFileModeInfo::new(self.file_mode);
+
+        writeln!(
+            formatter,
+            "    File mode\t\t\t\t\t: {}",
+            file_mode_info
+        )?;
+        if let Some(device_identifier) = &self.device_identifier {
+            writeln!(
+                formatter,
+                "    Device number\t\t\t\t: {},{}",
+                device_identifier >> 8,
+                device_identifier & 0x00ff
+            )?;
+        }
+        if let Some(symbolic_link_target) = &self.symbolic_link_target {
+            writeln!(
+                formatter,
+                "    Symbolic link target\t\t\t: {}",
+                symbolic_link_target
+            )?;
+        }
+        writeln!(formatter)
+    }
+}
+
+/// Extended File System (ext) file mode information.
+struct ExtFileModeInfo {
+    /// Flags.
+    file_mode: u16,
+}
+
+impl ExtFileModeInfo {
+    /// Creates new file mode information.
+    fn new(file_mode: u16) -> Self {
+        Self { file_mode }
+    }
 
     /// Retrieves a file mode string representation.
     fn get_file_mode_string(file_mode: u16) -> String {
@@ -210,97 +331,14 @@ impl ExtFileEntryInfo {
         };
         string_parts.join("")
     }
-
-    /// Retrieves the string representation of a date and time value.
-    fn get_date_time_string(date_time: &DateTime) -> String {
-        match date_time {
-            DateTime::NotSet => String::from("Not set (0)"),
-            DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
-            DateTime::PosixTime64Ns(posix_time64ns) => posix_time64ns.to_iso8601_string(),
-            _ => return String::from("Unsupported date time"),
-        }
-    }
 }
 
-impl fmt::Display for ExtFileEntryInfo {
-    /// Formats file entry information for display.
+impl fmt::Display for ExtFileModeInfo {
+    /// Formats partition file mode information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "    Inode number\t\t\t\t: {}", self.inode_number)?;
-        if let Some(name) = &self.name {
-            writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
-        };
-        writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
+        let string: String = Self::get_file_mode_string(self.file_mode);
 
-        if let Some(date_time) = &self.modification_time {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-            writeln!(
-                formatter,
-                "    Modification time\t\t\t\t: {}",
-                date_time_string
-            )?;
-        }
-        if let Some(date_time) = &self.access_time {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-            writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
-        }
-        if let Some(date_time) = &self.change_time {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-            writeln!(
-                formatter,
-                "    Inode change time\t\t\t\t: {}",
-                date_time_string
-            )?;
-        }
-        if let Some(date_time) = &self.creation_time {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
-        }
-        let date_time_string: String = Self::get_date_time_string(&self.deletion_time);
-        writeln!(formatter, "    Deletion time\t\t\t\t: {}", date_time_string)?;
-
-        writeln!(
-            formatter,
-            "    Number of links\t\t\t\t: {}",
-            self.number_of_links
-        )?;
-        writeln!(
-            formatter,
-            "    Owner identifier\t\t\t\t: {}",
-            self.owner_identifier
-        )?;
-        writeln!(
-            formatter,
-            "    Group identifier\t\t\t\t: {}",
-            self.group_identifier
-        )?;
-        // TODO: convert to formatter.
-        let file_mode_string: String = Self::get_file_mode_string(self.file_mode);
-
-        writeln!(
-            formatter,
-            "    File mode\t\t\t\t\t: {} (0o{:0o})",
-            file_mode_string, self.file_mode
-        )?;
-        if let Some(device_identifier) = &self.device_identifier {
-            writeln!(
-                formatter,
-                "    Device number\t\t\t\t: {},{}",
-                device_identifier >> 8,
-                device_identifier & 0x00ff
-            )?;
-        }
-        if let Some(symbolic_link_target) = &self.symbolic_link_target {
-            writeln!(
-                formatter,
-                "    Symbolic link target\t\t\t: {}",
-                symbolic_link_target
-            )?;
-        }
-        writeln!(formatter)
+        write!(formatter, "{} (0o{:0o})", string, self.file_mode)
     }
 }
 
@@ -895,31 +933,20 @@ impl ExtInfo {
         };
         println!("{}", path);
 
-        let number_of_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
-            Ok(number_of_file_entries) => number_of_file_entries,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve number of sub file entries"
-                );
-                return Err(error);
-            }
-        };
-        for sub_file_entry_index in 0..number_of_file_entries {
-            let mut sub_file_entry: ExtFileEntry =
-                match file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => sub_file_entry,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
+        for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
+            let mut sub_file_entry: ExtFileEntry = match result {
+                Ok(ext_file_entry) => ext_file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            };
             match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -951,7 +978,7 @@ mod tests {
     use keramics_datetime::{PosixTime32, PosixTime64Ns};
 
     #[test]
-    fn test_compatible_feature_status_flags_fmt() -> Result<(), ErrorTrace> {
+    fn test_compatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtCompatibleFeatureFlagsInfo =
             ExtCompatibleFeatureFlagsInfo::new(0x00000038);
 
@@ -964,6 +991,25 @@ mod tests {
         assert_eq!(string, expected_string);
 
         Ok(())
+    }
+
+    #[test]
+    fn test_date_time_information_fmt() {
+        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(1281643591));
+        let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2010-08-12T20:06:31");
+
+        let date_time: DateTime =
+            DateTime::PosixTime64Ns(PosixTime64Ns::new(1281643591, 987654321));
+        let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "2010-08-12T20:06:31.987654321");
+
+        let date_time: DateTime = DateTime::NotSet;
+        let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "Not set (0)");
     }
 
     #[test]
@@ -1000,47 +1046,38 @@ mod tests {
     }
 
     #[test]
-    fn test_get_date_time_string() {
-        let date_time: DateTime = DateTime::PosixTime32(PosixTime32::new(1281643591));
-        let timestamp: String = ExtFileEntryInfo::get_date_time_string(&date_time);
-        assert_eq!(timestamp, "2010-08-12T20:06:31");
-
-        let date_time: DateTime =
-            DateTime::PosixTime64Ns(PosixTime64Ns::new(1281643591, 987654321));
-        let timestamp: String = ExtFileEntryInfo::get_date_time_string(&date_time);
-        assert_eq!(timestamp, "2010-08-12T20:06:31.987654321");
-
-        let date_time: DateTime = DateTime::NotSet;
-        let timestamp: String = ExtFileEntryInfo::get_date_time_string(&date_time);
-        assert_eq!(timestamp, "Not set (0)");
-    }
-
-    #[test]
     fn test_get_file_mode_string() {
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0x1000);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0x1000);
         assert_eq!(string, "p---------");
 
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0x2000);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0x2000);
         assert_eq!(string, "c---------");
 
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0x4000);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0x4000);
         assert_eq!(string, "d---------");
 
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0x6000);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0x6000);
         assert_eq!(string, "b---------");
 
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0xa000);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0xa000);
         assert_eq!(string, "l---------");
 
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0xc000);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0xc000);
         assert_eq!(string, "s---------");
 
-        let string: String = ExtFileEntryInfo::get_file_mode_string(0x81ff);
+        let string: String = ExtFileModeInfo::get_file_mode_string(0x81ff);
         assert_eq!(string, "-rwxrwxrwx");
     }
 
     #[test]
-    fn test_incompatible_feature_status_flags_fmt() -> Result<(), ErrorTrace> {
+    fn test_file_mode_information_fmt() {
+        let test_struct: ExtFileModeInfo = ExtFileModeInfo::new(0x81a4);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "-rw-r--r-- (0o100644)");
+    }
+
+    #[test]
+    fn test_incompatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtIncompatibleFeatureFlagsInfo =
             ExtIncompatibleFeatureFlagsInfo::new(0x00000002);
 
@@ -1054,7 +1091,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_only_compatible_feature_status_flags_fmt() -> Result<(), ErrorTrace> {
+    fn test_read_only_compatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtReadOnlyCompatibleFeatureFlagsInfo =
             ExtReadOnlyCompatibleFeatureFlagsInfo::new(0x00000003);
 

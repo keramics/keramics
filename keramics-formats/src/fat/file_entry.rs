@@ -23,6 +23,7 @@ use super::block_stream::FatBlockStream;
 use super::constants::*;
 use super::directory_entries::FatDirectoryEntries;
 use super::directory_entry::FatDirectoryEntry;
+use super::file_entries::FatFileEntriesIterator;
 use super::string::FatString;
 
 /// File Allocation Table (FAT) file entry.
@@ -195,7 +196,10 @@ impl FatFileEntry {
         }
     }
 
-    // TODO: add get_sub_file_entries iterator
+    /// Retrieves a sub file entries iterator.
+    pub fn sub_file_entries(&mut self) -> FatFileEntriesIterator<'_> {
+        FatFileEntriesIterator::new(self)
+    }
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(
@@ -292,10 +296,11 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file_system() -> Result<FatFileSystem, ErrorTrace> {
+    fn get_file_system(path_string: &str) -> Result<FatFileSystem, ErrorTrace> {
         let mut file_system: FatFileSystem = FatFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -304,7 +309,7 @@ mod tests {
 
     #[test]
     fn test_get_access_time() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -318,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -336,7 +341,7 @@ mod tests {
 
     #[test]
     fn test_get_file_attribute_flags() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -349,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -366,7 +371,7 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -379,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -391,7 +396,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -410,7 +415,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut fat_file_entry: FatFileEntry =
@@ -431,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut fat_file_entry: FatFileEntry =
@@ -453,8 +458,30 @@ mod tests {
     // TODO: add tests for get_sub_file_entry_by_name
 
     #[test]
+    fn test_sub_file_entries() -> Result<(), ErrorTrace> {
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut fat_file_entry: FatFileEntry =
+            fat_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let mut sub_file_entries_iterator: FatFileEntriesIterator =
+            fat_file_entry.sub_file_entries();
+
+        let result: Option<Result<FatFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<FatFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(8).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_is_directory() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -476,7 +503,7 @@ mod tests {
 
     #[test]
     fn test_is_root_directory() -> Result<(), ErrorTrace> {
-        let fat_file_system: FatFileSystem = get_file_system()?;
+        let fat_file_system: FatFileSystem = get_file_system("fat/fat12.raw")?;
 
         let path: Path = Path::from("/");
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();

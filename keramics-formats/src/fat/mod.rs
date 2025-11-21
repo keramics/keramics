@@ -22,6 +22,7 @@ mod directory_entries;
 mod directory_entry;
 mod directory_entry_type;
 mod enums;
+mod file_entries;
 mod file_entry;
 mod file_system;
 mod long_name_directory_entry;

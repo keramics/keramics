@@ -26,6 +26,7 @@ use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
 use super::extended_attribute::ExtExtendedAttribute;
 use super::extended_attributes::ExtExtendedAttributesIterator;
+use super::file_entries::ExtFileEntriesIterator;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
 
@@ -375,7 +376,10 @@ impl ExtFileEntry {
         }
     }
 
-    // TODO: add get_sub_file_entries iterator
+    /// Retrieves a sub file entries iterator.
+    pub fn sub_file_entries(&mut self) -> ExtFileEntriesIterator<'_> {
+        ExtFileEntriesIterator::new(self)
+    }
 
     /// Retrieves a specific sub file entry.
     pub fn get_sub_file_entry_by_name(
@@ -792,6 +796,29 @@ mod tests {
     }
 
     #[test]
+    fn test_extended_attributes() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext4.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let mut extended_attributes_iterator: ExtExtendedAttributesIterator =
+            ext_file_entry.extended_attributes();
+
+        let result: Option<Result<ExtExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<ExtExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
@@ -846,6 +873,28 @@ mod tests {
 
         let name: PathComponent = PathComponent::ByteString(ByteString::from("bogus"));
         let result: Option<ExtFileEntry> = ext_file_entry.get_sub_file_entry_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext4.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let mut sub_file_entries_iterator: ExtFileEntriesIterator =
+            ext_file_entry.sub_file_entries();
+
+        let result: Option<Result<ExtFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<ExtFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(9).next();
         assert!(result.is_none());
 
         Ok(())

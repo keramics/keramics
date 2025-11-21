@@ -50,7 +50,9 @@ impl<'a> Iterator for MbrPartitionsIterator<'a> {
         let item: Self::Item = self
             .volume_system
             .get_partition_by_index(self.partition_index);
+
         self.partition_index += 1;
+
         Some(item)
     }
 }

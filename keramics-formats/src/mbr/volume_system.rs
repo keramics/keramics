@@ -358,7 +358,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for partitions
+    #[test]
+    fn test_partitions() -> Result<(), ErrorTrace> {
+        let volume_system: MbrVolumeSystem = get_volume_system()?;
+
+        let mut partitions_iterator: MbrPartitionsIterator = volume_system.partitions();
+
+        let result: Option<Result<MbrPartition, ErrorTrace>> = partitions_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<MbrPartition, ErrorTrace>> = partitions_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

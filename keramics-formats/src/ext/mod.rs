@@ -29,6 +29,7 @@ mod extents_footer;
 mod extents_header;
 mod extents_tree;
 mod features;
+mod file_entries;
 mod file_entry;
 mod file_system;
 mod group_descriptor;

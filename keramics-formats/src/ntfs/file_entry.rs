@@ -27,6 +27,7 @@ use super::data_fork::NtfsDataFork;
 use super::directory_entries::NtfsDirectoryEntries;
 use super::directory_entry::NtfsDirectoryEntry;
 use super::directory_index::NtfsDirectoryIndex;
+use super::file_entries::NtfsFileEntriesIterator;
 use super::file_name::NtfsFileName;
 use super::master_file_table::NtfsMasterFileTable;
 use super::mft_attribute::NtfsMftAttribute;
@@ -487,6 +488,76 @@ impl NtfsFileEntry {
         Ok(file_entry)
     }
 
+    /// Retrieves a specific sub file entry.
+    pub fn get_sub_file_entry_by_name(
+        &mut self,
+        sub_file_entry_name: &PathComponent,
+    ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
+        if !self.has_sub_directory_entries {
+            return Ok(None);
+        }
+        if !self.directory_index.is_initialized {
+            match self.directory_index.initialize(&self.mft_attributes) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to initialize directory index"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        match self
+            .directory_index
+            .get_directory_entry_by_name(&self.data_stream, sub_file_entry_name)
+        {
+            Ok(Some(directory_entry)) => {
+                let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
+                let mft_entry: NtfsMftEntry =
+                    match self.mft.get_entry(&self.data_stream, mft_entry_number) {
+                        Ok(mft_entry) => mft_entry,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve MFT entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                let name: &Ucs2String = directory_entry.get_name();
+
+                let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
+                    &self.data_stream,
+                    &self.mft,
+                    &self.directory_index.case_folding_mappings,
+                    mft_entry_number,
+                    mft_entry,
+                    Some(name.clone()),
+                    Some(directory_entry),
+                );
+                match file_entry.read_attributes() {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                        return Err(error);
+                    }
+                }
+                Ok(Some(file_entry))
+            }
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
+                return Err(error);
+            }
+        }
+    }
+
+    /// Retrieves a sub file entries iterator.
+    pub fn sub_file_entries(&mut self) -> NtfsFileEntriesIterator<'_> {
+        NtfsFileEntriesIterator::new(self)
+    }
+
     /// Reads the attributes.
     pub(super) fn read_attributes(&mut self) -> Result<(), ErrorTrace> {
         match self.mft_entry.read_attributes(&mut self.mft_attributes) {
@@ -568,71 +639,6 @@ impl NtfsFileEntry {
         self.has_sub_directory_entries = self.mft_attributes.has_attribute_group(&i30_index_name);
 
         Ok(())
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_name(
-        &mut self,
-        sub_file_entry_name: &PathComponent,
-    ) -> Result<Option<NtfsFileEntry>, ErrorTrace> {
-        if !self.has_sub_directory_entries {
-            return Ok(None);
-        }
-        if !self.directory_index.is_initialized {
-            match self.directory_index.initialize(&self.mft_attributes) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to initialize directory index"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        match self
-            .directory_index
-            .get_directory_entry_by_name(&self.data_stream, sub_file_entry_name)
-        {
-            Ok(Some(directory_entry)) => {
-                let mft_entry_number: u64 = directory_entry.file_reference & 0x0000ffffffffffff;
-                let mft_entry: NtfsMftEntry =
-                    match self.mft.get_entry(&self.data_stream, mft_entry_number) {
-                        Ok(mft_entry) => mft_entry,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve MFT entry"
-                            );
-                            return Err(error);
-                        }
-                    };
-                let name: &Ucs2String = directory_entry.get_name();
-
-                let mut file_entry: NtfsFileEntry = NtfsFileEntry::new(
-                    &self.data_stream,
-                    &self.mft,
-                    &self.directory_index.case_folding_mappings,
-                    mft_entry_number,
-                    mft_entry,
-                    Some(name.clone()),
-                    Some(directory_entry),
-                );
-                match file_entry.read_attributes() {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                        return Err(error);
-                    }
-                }
-                Ok(Some(file_entry))
-            }
-            Ok(None) => Ok(None),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve directory entry");
-                return Err(error);
-            }
-        }
     }
 
     /// Determines if the file entry has sub directory entries.
@@ -734,10 +740,11 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
+    fn get_file_system(path_string: &str) -> Result<NtfsFileSystem, ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -746,7 +753,7 @@ mod tests {
 
     #[test]
     fn test_get_access_time() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -765,7 +772,7 @@ mod tests {
 
     #[test]
     fn test_get_change_time() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -782,7 +789,7 @@ mod tests {
 
     #[test]
     fn test_get_creation_time() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -799,7 +806,7 @@ mod tests {
 
     #[test]
     fn test_get_file_attribute_flags() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -813,7 +820,7 @@ mod tests {
 
     #[test]
     fn test_get_journal_sequence_number() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -827,7 +834,7 @@ mod tests {
 
     #[test]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -844,7 +851,7 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -858,7 +865,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -871,7 +878,7 @@ mod tests {
 
     #[test]
     fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -888,7 +895,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -909,7 +916,7 @@ mod tests {
 
     #[test]
     fn test_test_get_data_stream_by_name() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -935,7 +942,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_data_forks() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -958,7 +965,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_attributes() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -974,7 +981,7 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut ntfs_file_entry: NtfsFileEntry =
@@ -995,7 +1002,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut ntfs_file_entry: NtfsFileEntry =
@@ -1011,7 +1018,7 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_name() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1");
         let mut ntfs_file_entry: NtfsFileEntry =
@@ -1029,8 +1036,30 @@ mod tests {
     }
 
     #[test]
+    fn test_sub_file_entries() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let mut sub_file_entries_iterator: NtfsFileEntriesIterator =
+            ntfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<NtfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<NtfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(2).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_is_allocated() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1043,7 +1072,7 @@ mod tests {
 
     #[test]
     fn test_is_bad() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1058,7 +1087,7 @@ mod tests {
 
     #[test]
     fn test_is_directory() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1083,7 +1112,7 @@ mod tests {
 
     #[test]
     fn test_is_empty() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1098,7 +1127,7 @@ mod tests {
 
     #[test]
     fn test_is_junction() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1113,7 +1142,7 @@ mod tests {
 
     #[test]
     fn test_is_root_directory() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/");
         let ntfs_file_entry: NtfsFileEntry =
@@ -1138,7 +1167,7 @@ mod tests {
 
     #[test]
     fn test_is_symbolic_link() -> Result<(), ErrorTrace> {
-        let ntfs_file_system: NtfsFileSystem = get_file_system()?;
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
         let ntfs_file_entry: NtfsFileEntry =

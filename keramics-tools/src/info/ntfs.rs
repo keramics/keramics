@@ -719,31 +719,20 @@ impl NtfsInfo {
                 return Err(error);
             }
         }
-        let number_of_file_entries: usize = match file_entry.get_number_of_sub_file_entries() {
-            Ok(number_of_file_entries) => number_of_file_entries,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve number of sub file entries"
-                );
-                return Err(error);
-            }
-        };
-        for sub_file_entry_index in 0..number_of_file_entries {
-            let mut sub_file_entry: NtfsFileEntry =
-                match file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => sub_file_entry,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
+        for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
+            let mut sub_file_entry: NtfsFileEntry = match result {
+                Ok(ntfs_file_entry) => ntfs_file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            };
             match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components) {
                 Ok(_) => {}
                 Err(mut error) => {
