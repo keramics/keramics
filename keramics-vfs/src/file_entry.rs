@@ -541,7 +541,7 @@ impl VfsFileEntry {
     pub fn get_data_fork_by_index(
         &self,
         data_fork_index: usize,
-    ) -> Result<VfsDataFork<'_>, ErrorTrace> {
+    ) -> Result<VfsDataFork, ErrorTrace> {
         let data_fork: VfsDataFork = match self {
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 let ntfs_data_fork: NtfsDataFork =

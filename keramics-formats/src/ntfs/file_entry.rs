@@ -207,11 +207,20 @@ impl NtfsFileEntry {
                 self.mft_entry.base_record_file_reference >> 48,
             )));
         }
-        self.mft_attributes.get_data_stream_by_name(
+        match self.mft_attributes.get_data_stream_by_name(
             &None,
             &self.data_stream,
             self.mft.cluster_block_size,
-        )
+        ) {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve nameless data stream"
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves a data stream with the specified name.
@@ -226,11 +235,17 @@ impl NtfsFileEntry {
                 self.mft_entry.base_record_file_reference >> 48,
             )));
         }
-        self.mft_attributes.get_data_stream_by_name(
+        match self.mft_attributes.get_data_stream_by_name(
             name,
             &self.data_stream,
             self.mft.cluster_block_size,
-        )
+        ) {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves the number of data forks.
@@ -242,24 +257,44 @@ impl NtfsFileEntry {
     pub fn get_data_fork_by_index(
         &self,
         data_fork_index: usize,
-    ) -> Result<NtfsDataFork<'_>, ErrorTrace> {
-        match self
+    ) -> Result<NtfsDataFork, ErrorTrace> {
+        let data_attribute: &NtfsMftAttribute = match self
             .mft_attributes
             .get_data_attribute_by_index(data_fork_index)
         {
-            Some(data_attribute) => Ok(NtfsDataFork::new(
-                &self.data_stream,
-                self.mft.cluster_block_size,
-                self.mft_entry.base_record_file_reference,
-                &self.mft_attributes,
-                data_attribute,
-            )),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Missing data attribute: {}",
-                data_fork_index
-            ))),
-        }
+            Some(data_attribute) => data_attribute,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing data attribute: {}",
+                    data_fork_index
+                )));
+            }
+        };
+        let data_stream: DataStreamReference = match self.mft_attributes.get_data_stream_by_name(
+            &data_attribute.name,
+            &self.data_stream,
+            self.mft.cluster_block_size,
+        ) {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing data stream for data attribute: {}",
+                    data_fork_index
+                )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        };
+        Ok(NtfsDataFork::new(
+            data_attribute.name.as_ref(),
+            data_stream,
+            self.mft_entry.base_record_file_reference,
+        ))
     }
+
+    // TODO: add get data fork by name.
 
     /// Retrieves the number of attributes.
     pub fn get_number_of_attributes(&self) -> usize {

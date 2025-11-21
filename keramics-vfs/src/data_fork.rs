@@ -17,16 +17,16 @@ use keramics_formats::ntfs::NtfsDataFork;
 use super::string::VfsString;
 
 /// Virtual File System (VFS) data fork.
-pub enum VfsDataFork<'a> {
+pub enum VfsDataFork {
     DataStream(DataStreamReference),
-    Ntfs(NtfsDataFork<'a>),
+    Ntfs(NtfsDataFork),
 }
 
-impl<'a> VfsDataFork<'a> {
+impl VfsDataFork {
     /// Retrieves the data stream.
-    pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
+    pub fn get_data_stream(&self) -> Result<&DataStreamReference, ErrorTrace> {
         match self {
-            VfsDataFork::DataStream(data_stream) => Ok(data_stream.clone()),
+            VfsDataFork::DataStream(data_stream) => Ok(data_stream),
             VfsDataFork::Ntfs(data_fork) => data_fork.get_data_stream(),
         }
     }

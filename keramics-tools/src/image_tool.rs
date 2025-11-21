@@ -870,7 +870,7 @@ impl ImageTool {
                 Some(name) => format!(":{}", self.display_path.escape_string(&name)),
                 None => continue,
             };
-            let data_stream: DataStreamReference = match data_fork.get_data_stream() {
+            let data_stream: &DataStreamReference = match data_fork.get_data_stream() {
                 Ok(data_stream) => data_stream,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

@@ -96,7 +96,7 @@ impl HashTool {
 
     /// Calculates a digest hash from a data fork.
     fn calculate_hash_from_data_fork(&self, data_fork: &VfsDataFork) -> Result<String, ErrorTrace> {
-        let data_stream: DataStreamReference = match data_fork.get_data_stream() {
+        let data_stream: &DataStreamReference = match data_fork.get_data_stream() {
             Ok(data_stream) => data_stream,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

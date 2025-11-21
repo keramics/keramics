@@ -16,7 +16,7 @@ use keramics_types::ByteString;
 
 /// Extended File System (ext) extended attribute.
 pub struct ExtExtendedAttribute {
-    /// Name.
+    /// The name.
     name: ByteString,
 
     /// The data stream.

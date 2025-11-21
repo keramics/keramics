@@ -14,47 +14,34 @@
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Ucs2String;
 
-use super::mft_attribute::NtfsMftAttribute;
-use super::mft_attributes::NtfsMftAttributes;
-
 /// New Technologies File System (NTFS) data fork.
-pub struct NtfsDataFork<'a> {
+pub struct NtfsDataFork {
+    /// The name.
+    name: Option<Ucs2String>,
+
     /// The data stream.
     data_stream: DataStreamReference,
 
-    /// Cluster block size.
-    cluster_block_size: u32,
-
     /// Base record file reference.
     base_record_file_reference: u64,
-
-    /// The MFT attributes.
-    mft_attributes: &'a NtfsMftAttributes,
-
-    /// The $DATA attribute.
-    data_attribute: &'a NtfsMftAttribute,
 }
 
-impl<'a> NtfsDataFork<'a> {
+impl NtfsDataFork {
     /// Creates a new data fork.
     pub fn new(
-        data_stream: &DataStreamReference,
-        cluster_block_size: u32,
+        name: Option<&Ucs2String>,
+        data_stream: DataStreamReference,
         base_record_file_reference: u64,
-        mft_attributes: &'a NtfsMftAttributes,
-        data_attribute: &'a NtfsMftAttribute,
     ) -> Self {
         Self {
-            data_stream: data_stream.clone(),
-            cluster_block_size,
+            name: name.cloned(),
+            data_stream,
             base_record_file_reference,
-            mft_attributes,
-            data_attribute,
         }
     }
 
     /// Retrieves the data stream.
-    pub fn get_data_stream(&self) -> Result<DataStreamReference, ErrorTrace> {
+    pub fn get_data_stream(&self) -> Result<&DataStreamReference, ErrorTrace> {
         if self.base_record_file_reference != 0 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported MFT entry with base record file reference: {}-{}",
@@ -62,29 +49,12 @@ impl<'a> NtfsDataFork<'a> {
                 self.base_record_file_reference >> 48,
             )));
         }
-        let result: Option<DataStreamReference> = match self.mft_attributes.get_data_stream_by_name(
-            &self.data_attribute.name,
-            &self.data_stream,
-            self.cluster_block_size,
-        ) {
-            Ok(result) => result,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve data stream from MFT attributes"
-                );
-                return Err(error);
-            }
-        };
-        match result {
-            Some(data_stream) => Ok(data_stream),
-            None => Err(keramics_core::error_trace_new!("Missing data stream")),
-        }
+        Ok(&self.data_stream)
     }
 
     /// Retrieves the name from the directory entry $DATA attribute.
     pub fn get_name(&self) -> Option<&Ucs2String> {
-        self.data_attribute.name.as_ref()
+        self.name.as_ref()
     }
 }
 
