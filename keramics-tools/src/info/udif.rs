@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -32,6 +31,15 @@ struct UdifFileInfo {
 }
 
 impl UdifFileInfo {
+    const COMPRESSION_METHODS: &[(UdifCompressionMethod, &'static str); 6] = &[
+        (UdifCompressionMethod::Adc, "ADC"),
+        (UdifCompressionMethod::Bzip2, "bzip2"),
+        (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
+        (UdifCompressionMethod::Lzma, "LZMA"),
+        (UdifCompressionMethod::None, "Uncompressed"),
+        (UdifCompressionMethod::Zlib, "zlib"),
+    ];
+
     /// Creates new file information.
     fn new() -> Self {
         Self {
@@ -40,41 +48,35 @@ impl UdifFileInfo {
             compression_method: UdifCompressionMethod::None,
         }
     }
+
+    /// Retrieves the compression method as a string.
+    pub fn get_compression_method_string(&self) -> &str {
+        Self::COMPRESSION_METHODS
+            .binary_search_by(|(key, _)| key.cmp(&self.compression_method))
+            .map_or_else(|_| "Unknown", |index| Self::COMPRESSION_METHODS[index].1)
+    }
 }
 
 impl fmt::Display for UdifFileInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            formatter,
-            "Universal Disk Image Format (UDIF) information:\n"
-        )?;
+        writeln!(formatter, "Universal Disk Image Format (UDIF) information:")?;
+
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
 
-        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
-
-        write!(
+        writeln!(
             formatter,
-            "    Bytes per sector\t\t\t\t: {} bytes\n",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             self.bytes_per_sector
         )?;
-        let compression_methods = HashMap::<UdifCompressionMethod, &'static str>::from([
-            (UdifCompressionMethod::Adc, "ADC"),
-            (UdifCompressionMethod::Bzip2, "bzip2"),
-            (UdifCompressionMethod::Lzfse, "LZFSE/LZVN"),
-            (UdifCompressionMethod::Lzma, "LZMA"),
-            (UdifCompressionMethod::None, "Uncompressed"),
-            (UdifCompressionMethod::Zlib, "zlib"),
-        ]);
-        let compression_method_string: &str =
-            compression_methods.get(&self.compression_method).unwrap();
-
-        write!(
+        let compression_method_string: &str = self.get_compression_method_string();
+        writeln!(
             formatter,
-            "    Compression method\t\t\t\t: {}\n",
+            "    Compression method\t\t\t\t: {}",
             compression_method_string
         )?;
-        write!(formatter, "\n")
+        writeln!(formatter)
     }
 }
 

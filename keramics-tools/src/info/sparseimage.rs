@@ -44,29 +44,29 @@ impl SparseImageFileInfo {
 impl fmt::Display for SparseImageFileInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Sparse image (.sparseimage) information:\n")?;
+        writeln!(formatter, "Sparse image (.sparseimage) information:")?;
 
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
 
-        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
+        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
 
-        write!(
+        writeln!(
             formatter,
-            "    Bytes per sector\t\t\t\t: {} bytes\n",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             self.bytes_per_sector
         )?;
         if self.block_size < 1024 {
-            write!(
+            writeln!(
                 formatter,
-                "    Band size\t\t\t\t\t: {} bytes\n",
+                "    Band size\t\t\t\t\t: {} bytes",
                 self.block_size,
             )?;
         } else {
             let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
 
-            write!(formatter, "    Band size\t\t\t\t\t: {}\n", byte_size)?;
+            writeln!(formatter, "    Band size\t\t\t\t\t: {}", byte_size)?;
         }
-        write!(formatter, "\n")
+        writeln!(formatter)
     }
 }
 

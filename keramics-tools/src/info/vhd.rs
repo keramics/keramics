@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -42,6 +41,12 @@ struct VhdFileInfo {
 }
 
 impl VhdFileInfo {
+    const DISK_TYPES: &[(VhdDiskType, &'static str); 3] = &[
+        (VhdDiskType::Differential, "Differential"),
+        (VhdDiskType::Dynamic, "Dynamic"),
+        (VhdDiskType::Fixed, "Fixed"),
+    ];
+
     /// Creates new file information.
     fn new() -> Self {
         Self {
@@ -53,47 +58,46 @@ impl VhdFileInfo {
             parent_name: None,
         }
     }
+
+    /// Retrieves the disk type as a string.
+    pub fn get_disk_type_string(&self) -> &str {
+        Self::DISK_TYPES
+            .binary_search_by(|(key, _)| key.cmp(&self.disk_type))
+            .map_or_else(|_| "Unknown", |index| Self::DISK_TYPES[index].1)
+    }
 }
 
 impl fmt::Display for VhdFileInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Virtual Hard Disk (VHD) information:\n")?;
+        writeln!(formatter, "Virtual Hard Disk (VHD) information:")?;
 
-        write!(formatter, "    Format version\t\t\t\t: 1.0\n")?;
+        writeln!(formatter, "    Format version\t\t\t\t: 1.0")?;
 
-        let disk_types = HashMap::<VhdDiskType, &'static str>::from([
-            (VhdDiskType::Differential, "Differential"),
-            (VhdDiskType::Dynamic, "Dynamic"),
-            (VhdDiskType::Fixed, "Fixed"),
-            (VhdDiskType::Unknown, "Unknown"),
-        ]);
-        let disk_type_string: &str = disk_types.get(&self.disk_type).unwrap();
-
-        write!(formatter, "    Disk type\t\t\t\t\t: {}\n", disk_type_string)?;
+        let disk_type_string: &str = self.get_disk_type_string();
+        writeln!(formatter, "    Disk type\t\t\t\t\t: {}", disk_type_string)?;
 
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
 
-        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
-
-        write!(
+        writeln!(
             formatter,
-            "    Bytes per sector\t\t\t\t: {} bytes\n",
+            "    Bytes per sector\t\t\t\t: {} bytes",
             self.bytes_per_sector
         )?;
-        write!(formatter, "    Identifier\t\t\t\t\t: {}\n", self.identifier)?;
+        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
 
         if let Some(parent_identifier) = &self.parent_identifier {
-            write!(
+            writeln!(
                 formatter,
-                "    Parent identifier\t\t\t\t: {}\n",
+                "    Parent identifier\t\t\t\t: {}",
                 parent_identifier
             )?;
         }
         if let Some(parent_name) = &self.parent_name {
-            write!(formatter, "    Parent name\t\t\t\t\t: {}\n", parent_name)?;
+            writeln!(formatter, "    Parent name\t\t\t\t\t: {}", parent_name)?;
         }
-        write!(formatter, "\n")
+        writeln!(formatter)
     }
 }
 

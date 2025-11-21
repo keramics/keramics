@@ -45,7 +45,7 @@ impl FatDirectoryEntry {
     /// Retrieves the lookup name.
     pub fn get_lookup_name(&self, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Ucs2String {
         match &self.long_name {
-            Some(long_name) => Ucs2String::new_with_case_folding(long_name, case_folding_mappings),
+            Some(long_name) => long_name.new_with_case_folding(case_folding_mappings),
             None => Ucs2String {
                 elements: self
                     .short_name

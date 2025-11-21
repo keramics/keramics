@@ -13,7 +13,8 @@
 
 use std::fmt;
 
-use super::errors::ParseError;
+use keramics_core::ErrorTrace;
+
 use super::{bytes_to_u16_be, bytes_to_u16_le, bytes_to_u32_be, bytes_to_u32_le};
 
 /// Universally unique identifier (UUID).
@@ -32,7 +33,7 @@ impl Uuid {
         Self::default()
     }
 
-    /// Reads a big-endian UUID from a byte sequence.
+    /// Creates a new UUID from a big-endian byte sequence.
     pub fn from_be_bytes(data: &[u8]) -> Self {
         let part5_upper: u16 = bytes_to_u16_be!(data, 10);
         let part5_lower: u32 = bytes_to_u32_be!(data, 12);
@@ -45,10 +46,11 @@ impl Uuid {
         }
     }
 
-    /// Reads a little-endian UUID from a byte sequence.
+    /// Creates a new UUID from a little-endian byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
         let part5_upper: u16 = bytes_to_u16_be!(data, 10);
         let part5_lower: u32 = bytes_to_u32_be!(data, 12);
+
         Self {
             part1: bytes_to_u32_le!(data, 0),
             part2: bytes_to_u16_le!(data, 4),
@@ -56,6 +58,78 @@ impl Uuid {
             part4: bytes_to_u16_be!(data, 8),
             part5: ((part5_upper as u64) << 32) | (part5_lower as u64),
         }
+    }
+
+    /// Creates a new UUID from a string.
+    pub fn from_string(mut string: &str) -> Result<Self, ErrorTrace> {
+        let mut string_length: usize = string.len();
+
+        if string.starts_with("{") && string.ends_with("}") {
+            string = &string[1..string_length - 1];
+            string_length -= 2;
+        }
+        if string_length != 36 {
+            return Err(keramics_core::error_trace_new!("Unsupported string length"));
+        }
+        if &string[8..9] != "-"
+            || &string[13..14] != "-"
+            || &string[18..19] != "-"
+            || &string[23..24] != "-"
+        {
+            return Err(keramics_core::error_trace_new!("Unsupported string"));
+        }
+        let part1: u32 = match u32::from_str_radix(&string[0..8], 16) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to parse part1: {}",
+                    &string[0..8]
+                )));
+            }
+        };
+        let part2: u16 = match u16::from_str_radix(&string[9..13], 16) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to parse part2: {}",
+                    &string[9..13]
+                )));
+            }
+        };
+        let part3: u16 = match u16::from_str_radix(&string[14..18], 16) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to parse part3: {}",
+                    &string[14..18]
+                )));
+            }
+        };
+        let part4: u16 = match u16::from_str_radix(&string[19..23], 16) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to parse part4: {}",
+                    &string[19..24]
+                )));
+            }
+        };
+        let part5: u64 = match u64::from_str_radix(&string[24..36], 16) {
+            Ok(value) => value,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to parse part5: {}",
+                    &string[24..36]
+                )));
+            }
+        };
+        Ok(Self {
+            part1,
+            part2,
+            part3,
+            part4,
+            part5,
+        })
     }
 
     /// Determines if the UUID is the Max (or Omni) UUID (ffffffff-ffff-ffff-ffff-ffffffffffff)
@@ -70,72 +144,6 @@ impl Uuid {
     /// Determines if the UUID is the Nil UUID (00000000-0000-0000-0000-000000000000)
     pub fn is_nil(&self) -> bool {
         self.part1 == 0 && self.part2 == 0 && self.part3 == 0 && self.part4 == 0 && self.part5 == 0
-    }
-
-    /// Reads an UUID from a string.
-    pub fn from_string(&mut self, mut string: &str) -> Result<(), ParseError> {
-        let mut string_length: usize = string.len();
-
-        if string.starts_with("{") && string.ends_with("}") {
-            string = &string[1..string_length - 1];
-            string_length -= 2;
-        }
-        if string_length != 36 {
-            return Err(ParseError::new(String::from("Unsupported string length")));
-        }
-        if &string[8..9] != "-"
-            || &string[13..14] != "-"
-            || &string[18..19] != "-"
-            || &string[23..24] != "-"
-        {
-            return Err(ParseError::new(String::from("Unsupported string")));
-        }
-        self.part1 = match u32::from_str_radix(&string[0..8], 16) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(ParseError::new(format!(
-                    "Unable to parse part1: {}",
-                    &string[0..8]
-                )));
-            }
-        };
-        self.part2 = match u16::from_str_radix(&string[9..13], 16) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(ParseError::new(format!(
-                    "Unable to parse part2: {}",
-                    &string[9..13]
-                )));
-            }
-        };
-        self.part3 = match u16::from_str_radix(&string[14..18], 16) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(ParseError::new(format!(
-                    "Unable to parse part3: {}",
-                    &string[14..18]
-                )));
-            }
-        };
-        self.part4 = match u16::from_str_radix(&string[19..23], 16) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(ParseError::new(format!(
-                    "Unable to parse part4: {}",
-                    &string[19..24]
-                )));
-            }
-        };
-        self.part5 = match u64::from_str_radix(&string[24..36], 16) {
-            Ok(value) => value,
-            Err(_) => {
-                return Err(ParseError::new(format!(
-                    "Unable to parse part5: {}",
-                    &string[24..36]
-                )));
-            }
-        };
-        Ok(())
     }
 }
 
@@ -162,11 +170,16 @@ mod tests {
         ];
 
         let uuid: Uuid = Uuid::from_be_bytes(&test_data);
-        assert_eq!(uuid.part1, 0xb61f53ca);
-        assert_eq!(uuid.part2, 0xa786);
-        assert_eq!(uuid.part3, 0x4528);
-        assert_eq!(uuid.part4, 0x90e2);
-        assert_eq!(uuid.part5, 0x55ba791a1c4c);
+        assert_eq!(
+            uuid,
+            Uuid {
+                part1: 0xb61f53ca,
+                part2: 0xa786,
+                part3: 0x4528,
+                part4: 0x90e2,
+                part5: 0x55ba791a1c4c,
+            }
+        );
     }
 
     #[test]
@@ -177,32 +190,55 @@ mod tests {
         ];
 
         let uuid: Uuid = Uuid::from_le_bytes(&test_data);
-        assert_eq!(uuid.part1, 0xb61f53ca);
-        assert_eq!(uuid.part2, 0xa786);
-        assert_eq!(uuid.part3, 0x4528);
-        assert_eq!(uuid.part4, 0x90e2);
-        assert_eq!(uuid.part5, 0x55ba791a1c4c);
+        assert_eq!(
+            uuid,
+            Uuid {
+                part1: 0xb61f53ca,
+                part2: 0xa786,
+                part3: 0x4528,
+                part4: 0x90e2,
+                part5: 0x55ba791a1c4c,
+            }
+        );
+    }
+
+    #[test]
+    fn test_from_string() -> Result<(), ErrorTrace> {
+        let uuid: Uuid = Uuid::from_string("{b61f53ca-a786-4528-90e2-55ba791a1c4c}")?;
+        assert_eq!(
+            uuid,
+            Uuid {
+                part1: 0xb61f53ca,
+                part2: 0xa786,
+                part3: 0x4528,
+                part4: 0x90e2,
+                part5: 0x55ba791a1c4c,
+            }
+        );
+        Ok(())
     }
 
     #[test]
     fn test_is_max() {
-        let test_data: [u8; 16] = [
-            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-            0xff, 0xff,
-        ];
-
-        let uuid: Uuid = Uuid::from_le_bytes(&test_data);
+        let uuid: Uuid = Uuid {
+            part1: 0xffffffff,
+            part2: 0xffff,
+            part3: 0xffff,
+            part4: 0xffff,
+            part5: 0xffffffffffff,
+        };
         assert_eq!(uuid.is_max(), true);
     }
 
     #[test]
     fn test_is_not_max() {
-        let test_data: [u8; 16] = [
-            0xca, 0x53, 0x1f, 0xb6, 0x86, 0xa7, 0x28, 0x45, 0x90, 0xe2, 0x55, 0xba, 0x79, 0x1a,
-            0x1c, 0x4c,
-        ];
-
-        let uuid: Uuid = Uuid::from_le_bytes(&test_data);
+        let uuid: Uuid = Uuid {
+            part1: 0xb61f53ca,
+            part2: 0xa786,
+            part3: 0x4528,
+            part4: 0x90e2,
+            part5: 0x55ba791a1c4c,
+        };
         assert_eq!(uuid.is_max(), false);
     }
 
@@ -214,37 +250,26 @@ mod tests {
 
     #[test]
     fn test_is_not_nil() {
-        let test_data: [u8; 16] = [
-            0xca, 0x53, 0x1f, 0xb6, 0x86, 0xa7, 0x28, 0x45, 0x90, 0xe2, 0x55, 0xba, 0x79, 0x1a,
-            0x1c, 0x4c,
-        ];
-
-        let uuid: Uuid = Uuid::from_le_bytes(&test_data);
+        let uuid: Uuid = Uuid {
+            part1: 0xb61f53ca,
+            part2: 0xa786,
+            part3: 0x4528,
+            part4: 0x90e2,
+            part5: 0x55ba791a1c4c,
+        };
         assert_eq!(uuid.is_nil(), false);
     }
 
     #[test]
-    fn test_from_string() -> Result<(), ParseError> {
-        let mut uuid: Uuid = Uuid::new();
-        uuid.from_string("{b61f53ca-a786-4528-90e2-55ba791a1c4c}")?;
-
-        assert_eq!(uuid.part1, 0xb61f53ca);
-        assert_eq!(uuid.part2, 0xa786);
-        assert_eq!(uuid.part3, 0x4528);
-        assert_eq!(uuid.part4, 0x90e2);
-        assert_eq!(uuid.part5, 0x55ba791a1c4c);
-
-        Ok(())
-    }
-
-    #[test]
     fn test_to_string() {
-        let test_data: [u8; 16] = [
-            0xca, 0x53, 0x1f, 0xb6, 0x86, 0xa7, 0x28, 0x45, 0x90, 0xe2, 0x55, 0xba, 0x79, 0x1a,
-            0x1c, 0x4c,
-        ];
+        let uuid: Uuid = Uuid {
+            part1: 0xb61f53ca,
+            part2: 0xa786,
+            part3: 0x4528,
+            part4: 0x90e2,
+            part5: 0x55ba791a1c4c,
+        };
 
-        let uuid: Uuid = Uuid::from_le_bytes(&test_data);
         let uuid_string: String = uuid.to_string();
         assert_eq!(uuid_string, "b61f53ca-a786-4528-90e2-55ba791a1c4c");
     }

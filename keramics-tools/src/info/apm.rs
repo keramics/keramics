@@ -57,34 +57,36 @@ impl ApmPartitionInfo {
 impl fmt::Display for ApmPartitionInfo {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "Partition: {}\n", self.index + 1)?;
+        writeln!(formatter, "Partition: {}", self.index + 1)?;
 
-        write!(
+        writeln!(
             formatter,
-            "    Type identifier\t\t\t\t: {}\n",
+            "    Type identifier\t\t\t\t: {}",
             self.type_identifier
         )?;
         if !self.name.is_empty() {
-            write!(formatter, "    Name\t\t\t\t\t: {}\n", self.name)?;
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", self.name)?;
         }
-        write!(
+        writeln!(
             formatter,
-            "    Offset\t\t\t\t\t: {} (0x{:08x})\n",
+            "    Offset\t\t\t\t\t: {} (0x{:08x})",
             self.offset, self.offset
         )?;
         let byte_size: ByteSize = ByteSize::new(self.size, 1024);
 
-        write!(formatter, "    Size\t\t\t\t\t: {}\n", byte_size)?;
+        writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         let flags_info: ApmPartitionStatusFlagsInfo =
             ApmPartitionStatusFlagsInfo::new(self.status_flags);
 
-        write!(
+        writeln!(
             formatter,
-            "    Status flags\t\t\t\t: 0x{:08x}\n{}",
-            self.status_flags, flags_info
+            "    Status flags\t\t\t\t: 0x{:08x}",
+            self.status_flags
         )?;
-        write!(formatter, "\n")
+        flags_info.fmt(formatter)?;
+
+        writeln!(formatter)
     }
 }
 
@@ -105,51 +107,48 @@ impl fmt::Display for ApmPartitionStatusFlagsInfo {
     /// Formats partition status flags information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if self.flags & 0x00000001 != 0 {
-            write!(formatter, "        0x00000001: Is valid\n")?;
+            writeln!(formatter, "        0x00000001: Is valid")?;
         }
         if self.flags & 0x00000002 != 0 {
-            write!(formatter, "        0x00000002: Is allocated\n")?;
+            writeln!(formatter, "        0x00000002: Is allocated")?;
         }
         if self.flags & 0x00000004 != 0 {
-            write!(formatter, "        0x00000004: Is in use\n")?;
+            writeln!(formatter, "        0x00000004: Is in use")?;
         }
         if self.flags & 0x00000008 != 0 {
-            write!(formatter, "        0x00000008: Contains boot information\n")?;
+            writeln!(formatter, "        0x00000008: Contains boot information")?;
         }
         if self.flags & 0x00000010 != 0 {
-            write!(formatter, "        0x00000010: Is readable\n")?;
+            writeln!(formatter, "        0x00000010: Is readable")?;
         }
         if self.flags & 0x00000020 != 0 {
-            write!(formatter, "        0x00000020: Is writeable\n")?;
+            writeln!(formatter, "        0x00000020: Is writeable")?;
         }
         if self.flags & 0x00000040 != 0 {
-            write!(
+            writeln!(
                 formatter,
-                "        0x00000040: Boot code is position independent\n"
+                "        0x00000040: Boot code is position independent"
             )?;
         }
 
         if self.flags & 0x00000100 != 0 {
-            write!(
+            writeln!(
                 formatter,
-                "        0x00000100: Contains a chain-compatible driver\n"
+                "        0x00000100: Contains a chain-compatible driver"
             )?;
         }
         if self.flags & 0x00000200 != 0 {
-            write!(formatter, "        0x00000200: Contains a real driver\n")?;
+            writeln!(formatter, "        0x00000200: Contains a real driver")?;
         }
         if self.flags & 0x00000400 != 0 {
-            write!(formatter, "        0x00000400: Contains a chain driver\n")?;
+            writeln!(formatter, "        0x00000400: Contains a chain driver")?;
         }
 
         if self.flags & 0x40000000 != 0 {
-            write!(
-                formatter,
-                "        0x40000000: Automatic mount at startup\n"
-            )?;
+            writeln!(formatter, "        0x40000000: Automatic mount at startup")?;
         }
         if self.flags & 0x80000000 != 0 {
-            write!(formatter, "        0x80000000: Is startup partition\n")?;
+            writeln!(formatter, "        0x80000000: Is startup partition")?;
         }
         Ok(())
     }
@@ -287,7 +286,25 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_partition_information
+    #[test]
+    fn test_get_partition_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let apm_volume_system: ApmVolumeSystem = ApmInfo::open_volume_system(&data_stream)?;
+
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let test_struct: ApmPartitionInfo = ApmInfo::get_partition_information(0, &apm_partition);
+
+        assert_eq!(test_struct.index, 0);
+        assert_eq!(test_struct.type_identifier, ByteString::from("Apple_HFS"));
+        assert_eq!(test_struct.name, ByteString::from("disk image"));
+        assert_eq!(test_struct.offset, 32768);
+        assert_eq!(test_struct.size, 4153344);
+        assert_eq!(test_struct.status_flags, 0x40000033);
+
+        Ok(())
+    }
+
     // TODO: add tests for open_volume_system
     // TODO: add tests for print_volume_system
 }

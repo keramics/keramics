@@ -289,8 +289,9 @@ impl NtfsDirectoryIndex {
                     }
                 };
             let result: Ordering = if self.use_case_folding {
-                let case_folded_name: Ucs2String =
-                    Ucs2String::new_with_case_folding(&file_name.name, &self.case_folding_mappings);
+                let case_folded_name: Ucs2String = file_name
+                    .name
+                    .new_with_case_folding(&self.case_folding_mappings);
 
                 // TODO: add a compare_with_case_folding
                 case_folded_name.compare(name)

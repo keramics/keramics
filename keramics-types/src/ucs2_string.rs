@@ -33,8 +33,8 @@ impl Ucs2String {
     }
 
     /// Creates a new UCS-2 string with case folding applied.
-    pub fn new_with_case_folding(source: &Ucs2String, mappings: &HashMap<u16, u16>) -> Self {
-        let elements: Vec<u16> = source
+    pub fn new_with_case_folding(&self, mappings: &HashMap<u16, u16>) -> Self {
+        let elements: Vec<u16> = self
             .elements
             .iter()
             .map(|element| match mappings.get(element) {
@@ -72,6 +72,28 @@ impl Ucs2String {
                 break;
             }
             elements.push(value_16bit);
+        }
+        Self { elements }
+    }
+
+    /// Creates a new UCS-2 string from a string with case folding applied.
+    pub fn from_string_with_case_folding(string: &str, mappings: &HashMap<u16, u16>) -> Self {
+        let mut elements: Vec<u16> = Vec::new();
+
+        for character in string.chars() {
+            let mut code_point: u32 = character as u32;
+
+            if code_point > 0xffff {
+                code_point -= 0x10000;
+                elements.push(0xd800 + (code_point >> 10) as u16);
+                elements.push(0xdc00 + (code_point & 0x03ff) as u16);
+            } else {
+                let folded_code_point: u16 = match mappings.get(&(code_point as u16)) {
+                    Some(folded_code_point) => *folded_code_point,
+                    None => code_point as u16,
+                };
+                elements.push(folded_code_point);
+            }
         }
         Self { elements }
     }
@@ -209,7 +231,28 @@ impl fmt::Display for Ucs2String {
 mod tests {
     use super::*;
 
-    // TODO: add tests for new_with_case_folding
+    use crate::constants::UCS2_CASE_MAPPINGS;
+
+    #[test]
+    fn test_new_with_case_folding() {
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
+
+        let case_folding_mappings: HashMap<u16, u16> = UCS2_CASE_MAPPINGS
+            .into_iter()
+            .collect::<HashMap<u16, u16>>();
+
+        let test_string: Ucs2String = ucs2_string.new_with_case_folding(&case_folding_mappings);
+
+        assert_eq!(
+            test_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0053, 0x0054, 0x0052, 0x0049,
+                    0x004e, 0x0047,
+                ],
+            }
+        );
+    }
 
     #[test]
     fn test_from_be_bytes() {
@@ -219,11 +262,15 @@ mod tests {
         ];
         let ucs2_string: Ucs2String = Ucs2String::from_be_bytes(&test_data);
 
-        let expected_elements: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067,
-        ];
-        assert_eq!(&ucs2_string.elements, &expected_elements);
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
     }
 
     #[test]
@@ -234,11 +281,35 @@ mod tests {
         ];
         let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
 
-        let expected_elements: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067,
-        ];
-        assert_eq!(&ucs2_string.elements, &expected_elements);
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_from_string_with_case_folding() {
+        let case_folding_mappings: HashMap<u16, u16> = UCS2_CASE_MAPPINGS
+            .into_iter()
+            .collect::<HashMap<u16, u16>>();
+
+        let ucs2_string: Ucs2String =
+            Ucs2String::from_string_with_case_folding("UCS-2 string", &case_folding_mappings);
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0053, 0x0054, 0x0052, 0x0049,
+                    0x004e, 0x0047,
+                ],
+            }
+        );
     }
 
     #[test]
@@ -246,11 +317,7 @@ mod tests {
         let ucs2_string: Ucs2String = Ucs2String::new();
         assert!(ucs2_string.is_empty());
 
-        let test_data: [u8; 28] = [
-            0x00, 0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73,
-            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00,
-        ];
-        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
         assert!(!ucs2_string.is_empty());
     }
 
@@ -259,16 +326,81 @@ mod tests {
         let ucs2_string: Ucs2String = Ucs2String::new();
         assert_eq!(ucs2_string.len(), 0);
 
-        let test_data: [u8; 28] = [
-            0x00, 0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73,
-            0x00, 0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x00, 0x00, 0x00,
-        ];
-        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
         assert_eq!(ucs2_string.len(), 12);
     }
 
     // TODO: add tests for read_data_be
     // TODO: add tests for read_data_le
+
+    #[test]
+    fn test_from_u16_slice() {
+        let test_data: [u16; 14] = [
+            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
+            0x0067, 0x0000, 0x0000,
+        ];
+        let ucs2_string: Ucs2String = Ucs2String::from(test_data.as_slice());
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_from_str() {
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_from_string() {
+        let test_string: String = String::from("UCS-2 string");
+        let ucs2_string: Ucs2String = Ucs2String::from(&test_string);
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_eq_u16_slice() {
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
+
+        let test_array: [u16; 12] = [
+            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
+            0x0067,
+        ];
+        assert!(ucs2_string.eq(&test_array.as_slice()));
+    }
+
+    #[test]
+    fn test_eq_str() {
+        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
+
+        assert!(ucs2_string.eq("UCS-2 string"));
+        assert!(ucs2_string.eq(&"UCS-2 string"));
+    }
 
     #[test]
     fn test_compare() {
@@ -294,58 +426,25 @@ mod tests {
     }
 
     #[test]
-    fn test_from_slice() {
-        let test_data: [u16; 14] = [
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067, 0x0000, 0x0000,
-        ];
-        let ucs2_string: Ucs2String = Ucs2String::from(test_data.as_slice());
-
-        let expected_elements: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067,
-        ];
-        assert_eq!(ucs2_string.elements, expected_elements);
-    }
-
-    #[test]
-    fn test_from_str() {
-        let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
-
-        let expected_elements: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067,
-        ];
-        assert_eq!(ucs2_string.elements, expected_elements);
-    }
-
-    #[test]
-    fn test_from_string() {
-        let test_string: String = String::from("UCS-2 string");
-        let ucs2_string: Ucs2String = Ucs2String::from(&test_string);
-
-        let expected_elements: Vec<u16> = vec![
-            0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e,
-            0x0067,
-        ];
-        assert_eq!(ucs2_string.elements, expected_elements);
-    }
-
-    #[test]
     fn test_to_string() {
-        let test_data: [u8; 24] = [
-            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x32, 0x00, 0x20, 0x00, 0x73, 0x00,
-            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
-        ];
-        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
+        let ucs2_string: Ucs2String = Ucs2String {
+            elements: vec![
+                0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                0x006e, 0x0067,
+            ],
+        };
 
-        assert_eq!(ucs2_string.to_string(), String::from("UCS-2 string"));
-        let test_data: [u8; 24] = [
-            0x55, 0x00, 0x43, 0x00, 0x53, 0x00, 0x2d, 0x00, 0x00, 0xd8, 0x20, 0x00, 0x73, 0x00,
-            0x74, 0x00, 0x72, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00,
-        ];
+        let string: String = ucs2_string.to_string();
+        assert_eq!(string, "UCS-2 string");
 
-        let ucs2_string: Ucs2String = Ucs2String::from_le_bytes(&test_data);
-        assert_eq!(ucs2_string.to_string(), String::from("UCS-\\{d800} string"));
+        let ucs2_string: Ucs2String = Ucs2String {
+            elements: vec![
+                0x0055, 0x0043, 0x0053, 0x002d, 0xd800, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                0x006e, 0x0067,
+            ],
+        };
+
+        let string: String = ucs2_string.to_string();
+        assert_eq!(string, "UCS-\\{d800} string");
     }
 }

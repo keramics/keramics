@@ -13,14 +13,12 @@
 
 mod byte_string;
 pub mod constants;
-mod errors;
 pub mod macros;
 mod ucs2_string;
 mod utf16_string;
 mod uuid;
 
 pub use byte_string::ByteString;
-pub use errors::ParseError;
 pub use ucs2_string::Ucs2String;
 pub use utf16_string::Utf16String;
 pub use uuid::Uuid;

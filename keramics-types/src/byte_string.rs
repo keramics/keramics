@@ -45,6 +45,29 @@ impl ByteString {
         }
     }
 
+    /// Creates a new byte string from a string with a specified character encoding.
+    pub fn from_string_with_encoding(
+        string: &str,
+        encoding: &CharacterEncoding,
+    ) -> Result<Self, ErrorTrace> {
+        if *encoding == CharacterEncoding::Utf8 {
+            Ok(ByteString::from(string))
+        } else {
+            let code_points: Vec<u32> = string.chars().map(|character| character as u32).collect();
+
+            let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
+
+            match byte_string.extend_from_codepoints(&code_points) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to encode byte string");
+                    return Err(error);
+                }
+            }
+            Ok(byte_string)
+        }
+    }
+
     /// Decodes the byte string.
     pub fn decode(&self) -> Result<Vec<u32>, ErrorTrace> {
         let mut code_points: Vec<u32> = Vec::new();
@@ -107,7 +130,7 @@ impl ByteString {
     }
 
     /// Extends the byte string from code points.
-    fn extend_from_codepoints(&mut self, code_points: &[u32]) -> Result<(), ErrorTrace> {
+    pub fn extend_from_codepoints(&mut self, code_points: &[u32]) -> Result<(), ErrorTrace> {
         for result in new_character_encoder(&self.encoding, code_points) {
             match result {
                 Ok(slice) => self.elements.extend_from_slice(&slice),
@@ -233,20 +256,133 @@ impl fmt::Display for ByteString {
 mod tests {
     use super::*;
 
-    // TODO: add test for extend
+    #[test]
+    fn test_from_string_with_encoding() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString =
+            ByteString::from_string_with_encoding("ASCII string", &CharacterEncoding::Utf8)?;
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+
+        let byte_string: ByteString =
+            ByteString::from_string_with_encoding("ASCII string", &CharacterEncoding::Iso8859_1)?;
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_decode() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString = ByteString::from("ASCII string");
+
+        let code_points: Vec<u32> = byte_string.decode()?;
+        assert_eq!(
+            code_points,
+            vec![
+                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+            ]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_encode() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString = ByteString::from("ASCII string");
+
+        let test_byte_string: ByteString = byte_string.encode(&CharacterEncoding::Iso8859_1)?;
+        assert_eq!(
+            test_byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_extend() -> Result<(), ErrorTrace> {
+        let mut byte_string: ByteString = ByteString::from("ASCII");
+
+        byte_string.extend(&ByteString::from(" string"))?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+
+        let mut byte_string: ByteString =
+            ByteString::from_string_with_encoding("ASCII", &CharacterEncoding::Iso8859_1)?;
+
+        byte_string.extend(&ByteString::from(" string"))?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_extend_from_codepoints() -> Result<(), ErrorTrace> {
+        let mut byte_string: ByteString =
+            ByteString::from_string_with_encoding("ASCII", &CharacterEncoding::Iso8859_1)?;
+
+        byte_string.extend_from_codepoints(&[0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67])?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_character_decoder() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString =
+            ByteString::from_string_with_encoding("ASCII", &CharacterEncoding::Iso8859_1)?;
+
+        let _ = byte_string.get_character_decoder();
+
+        Ok(())
+    }
 
     #[test]
     fn test_is_empty() {
         let byte_string: ByteString = ByteString::new();
-        assert!(byte_string.is_empty());
+        assert_eq!(byte_string.is_empty(), true);
 
-        let byte_string: ByteString = ByteString {
-            encoding: CharacterEncoding::Utf8,
-            elements: vec![
-                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-            ],
-        };
-        assert!(!byte_string.is_empty());
+        let byte_string: ByteString = ByteString::from("ASCII string");
+        assert_eq!(byte_string.is_empty(), false);
     }
 
     #[test]
@@ -254,25 +390,34 @@ mod tests {
         let byte_string: ByteString = ByteString::new();
         assert_eq!(byte_string.len(), 0);
 
-        let byte_string: ByteString = ByteString {
-            encoding: CharacterEncoding::Utf8,
-            elements: vec![
-                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-            ],
-        };
+        let byte_string: ByteString = ByteString::from("ASCII string");
         assert_eq!(byte_string.len(), 12);
     }
 
     #[test]
     fn test_read_data() {
         let mut byte_string: ByteString = ByteString::new();
-        assert_eq!(byte_string.len(), 0);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![],
+            }
+        );
 
         let test_data: [u8; 14] = [
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
         ];
         byte_string.read_data(&test_data);
-        assert_eq!(byte_string.len(), 12);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67
+                ],
+            }
+        );
     }
 
     #[test]
@@ -282,20 +427,30 @@ mod tests {
         ];
         let byte_string: ByteString = ByteString::from(test_data.as_slice());
 
-        let expected_elements: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-        ];
-        assert_eq!(byte_string.elements, expected_elements);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
     }
 
     #[test]
     fn test_from_str() {
         let byte_string: ByteString = ByteString::from("ASCII string");
 
-        let expected_elements: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-        ];
-        assert_eq!(byte_string.elements, expected_elements);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
     }
 
     #[test]
@@ -303,37 +458,45 @@ mod tests {
         let test_string: String = String::from("ASCII string");
         let byte_string: ByteString = ByteString::from(&test_string);
 
-        let expected_elements: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-        ];
-        assert_eq!(byte_string.elements, expected_elements);
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
     }
 
     #[test]
     fn test_eq_u8_slice() {
-        let test_vector: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
-        ];
-        let byte_string: ByteString = ByteString::from(test_vector.as_slice());
+        let byte_string: ByteString = ByteString::from("ASCII string");
 
-        let expected_elements: Vec<u8> = vec![
+        let test_array: [u8; 12] = [
             0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
         ];
-        assert!(byte_string.eq(&expected_elements.as_slice()));
+        assert!(byte_string.eq(&test_array.as_slice()));
     }
 
     #[test]
     fn test_eq_str() {
-        let test_vector: Vec<u8> = vec![
-            0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67, 0x00, 0x00,
-        ];
-        let byte_string: ByteString = ByteString::from(test_vector.as_slice());
+        let byte_string: ByteString = ByteString::from("ASCII string");
 
-        let expected_str: &str = "ASCII string";
-
-        assert!(byte_string.eq(expected_str));
-        assert!(byte_string.eq(&expected_str));
+        assert!(byte_string.eq("ASCII string"));
+        assert!(byte_string.eq(&"ASCII string"));
     }
 
-    // TODO: add test for to_string
+    #[test]
+    fn test_to_string() {
+        let byte_string: ByteString = ByteString {
+            encoding: CharacterEncoding::Iso8859_1,
+            elements: vec![
+                0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+            ],
+        };
+
+        let string: String = byte_string.to_string();
+        assert_eq!(string, "ASCII string");
+    }
 }

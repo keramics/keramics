@@ -519,17 +519,17 @@ impl VhdxFile {
                     Some(ucs2_string) => {
                         // TODO: improve handling of invalid string.
                         let uuid_string: String = ucs2_string.to_string();
-                        let mut parent_identifier: Uuid = Uuid::new();
 
-                        match parent_identifier.from_string(uuid_string.as_str()) {
-                            Ok(_) => {}
+                        let parent_identifier: Uuid = match Uuid::from_string(uuid_string.as_str())
+                        {
+                            Ok(uuid) => uuid,
                             Err(error) => {
                                 return Err(keramics_core::error_trace_new_with_error!(
                                     "Unable to parse parent identifier",
                                     error
                                 ));
                             }
-                        }
+                        };
                         self.parent_identifier = Some(parent_identifier);
                     }
                     None => {}

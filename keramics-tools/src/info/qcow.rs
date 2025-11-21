@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -39,6 +38,15 @@ struct QcowFileInfo {
 }
 
 impl QcowFileInfo {
+    const COMPRESSION_METHODS: &[(QcowCompressionMethod, &'static str); 1] =
+        &[(QcowCompressionMethod::Zlib, "zlib")];
+
+    const ENCRYPTION_METHODS: &[(QcowEncryptionMethod, &'static str); 3] = &[
+        (QcowEncryptionMethod::AesCbc128, "AES-CBC 128-bit"),
+        (QcowEncryptionMethod::Luks, "Linux Unified Key Setup (LUKS)"),
+        (QcowEncryptionMethod::None, "None"),
+    ];
+
     /// Creates new file information.
     fn new() -> Self {
         Self {
@@ -49,60 +57,59 @@ impl QcowFileInfo {
             backing_file_name: None,
         }
     }
+
+    /// Retrieves the compression method as a string.
+    pub fn get_compression_method_string(&self) -> &str {
+        Self::COMPRESSION_METHODS
+            .binary_search_by(|(key, _)| key.cmp(&self.compression_method))
+            .map_or_else(|_| "Unknown", |index| Self::COMPRESSION_METHODS[index].1)
+    }
+
+    /// Retrieves the encryption method as a string.
+    pub fn get_encryption_method_string(&self) -> &str {
+        Self::ENCRYPTION_METHODS
+            .binary_search_by(|(key, _)| key.cmp(&self.encryption_method))
+            .map_or_else(|_| "Unknown", |index| Self::ENCRYPTION_METHODS[index].1)
+    }
 }
 
 impl fmt::Display for QcowFileInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "QEMU Copy-On-Write (QCOW) information:\n")?;
+        writeln!(formatter, "QEMU Copy-On-Write (QCOW) information:")?;
 
-        write!(
+        writeln!(
             formatter,
-            "    Format version\t\t\t\t: {}\n",
+            "    Format version\t\t\t\t: {}",
             self.format_version
         )?;
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
 
-        write!(formatter, "    Media size\t\t\t\t\t: {}\n", byte_size)?;
-
-        let compression_methods = HashMap::<QcowCompressionMethod, &'static str>::from([
-            (QcowCompressionMethod::Unknown, "Unknown"),
-            (QcowCompressionMethod::Zlib, "zlib"),
-        ]);
-        let compression_method_string: &str =
-            compression_methods.get(&self.compression_method).unwrap();
-
-        write!(
+        let compression_method_string: &str = self.get_compression_method_string();
+        writeln!(
             formatter,
-            "    Compression method\t\t\t\t: {}\n",
+            "    Compression method\t\t\t\t: {}",
             compression_method_string
         )?;
-        let encryption_methods = HashMap::<QcowEncryptionMethod, &'static str>::from([
-            (QcowEncryptionMethod::AesCbc128, "AES-CBC 128-bit"),
-            (QcowEncryptionMethod::Luks, "Linux Unified Key Setup (LUKS)"),
-            (QcowEncryptionMethod::None, "None"),
-            (QcowEncryptionMethod::Unknown, "Unknown"),
-        ]);
-        let encryption_method_string: &str =
-            encryption_methods.get(&self.encryption_method).unwrap();
-
-        write!(
+        let encryption_method_string: &str = self.get_encryption_method_string();
+        writeln!(
             formatter,
-            "    Encryption method\t\t\t\t: {}\n",
+            "    Encryption method\t\t\t\t: {}",
             encryption_method_string
         )?;
 
         if let Some(backing_file_name) = &self.backing_file_name {
-            write!(
+            writeln!(
                 formatter,
-                "    Backing file name\t\t\t\t: {}\n",
+                "    Backing file name\t\t\t\t: {}",
                 backing_file_name
             )?;
         }
         // TODO: print feature flags.
         // TODO: print snapshot information.
 
-        write!(formatter, "\n")
+        writeln!(formatter)
     }
 }
 

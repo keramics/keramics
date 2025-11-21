@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -57,6 +56,13 @@ struct EwfImageInfo {
 }
 
 impl EwfImageInfo {
+    const MEDIA_TYPES: &[(EwfMediaType, &'static str); 4] = &[
+        (EwfMediaType::FixedDisk, "fixed disk"),
+        (EwfMediaType::LogicalEvidence, "logical evidence"),
+        (EwfMediaType::OpticalDisk, "optical disk (CD/DVD/BD)"),
+        (EwfMediaType::RemoveableDisk, "removable disk"),
+    ];
+
     /// Create new image information.
     pub fn new() -> Self {
         Self {
@@ -72,85 +78,81 @@ impl EwfImageInfo {
             header_values: Vec::new(),
         }
     }
+
+    /// Retrieves the media type as a string.
+    pub fn get_media_type_string(&self) -> &str {
+        Self::MEDIA_TYPES
+            .binary_search_by(|(key, _)| key.cmp(&self.media_type))
+            .map_or_else(|_| "Unknown", |index| Self::MEDIA_TYPES[index].1)
+    }
 }
 
 impl fmt::Display for EwfImageInfo {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(
+        writeln!(
             formatter,
-            "Expert Witness Compression Format (EWF) information:\n"
+            "Expert Witness Compression Format (EWF) information:"
         )?;
 
         // TODO: print file format
         if !self.set_identifier.is_nil() {
-            write!(
+            writeln!(
                 formatter,
-                "    Set identifier\t\t\t\t: {}\n",
+                "    Set identifier\t\t\t\t: {}",
                 self.set_identifier
             )?;
         }
-        write!(
+        writeln!(
             formatter,
-            "    Sectors per chunk\t\t\t\t: {}\n",
+            "    Sectors per chunk\t\t\t\t: {}",
             self.sectors_per_chunk
         )?;
-        write!(
+        writeln!(
             formatter,
-            "    Error granularity\t\t\t\t: {} sectors\n",
+            "    Error granularity\t\t\t\t: {} sectors",
             self.error_granularity
         )?;
         // TODO: print compression method
 
-        write!(formatter, "")?;
-
-        write!(formatter, "    Media information:\n")?;
-
-        let media_types = HashMap::<EwfMediaType, &'static str>::from([
-            (EwfMediaType::FixedDisk, "fixed disk"),
-            (EwfMediaType::LogicalEvidence, "logical evidence"),
-            (EwfMediaType::OpticalDisk, "optical disk (CD/DVD/BD)"),
-            (EwfMediaType::RemoveableDisk, "removable disk"),
-            (EwfMediaType::Unknown, "Unknown"),
-        ]);
-        let media_type_string: &str = media_types.get(&self.media_type).unwrap();
+        writeln!(formatter, "    Media information:")?;
 
         // TODO: print media type (combine with is physical)
-        write!(
+        let media_type_string: &str = self.get_media_type_string();
+        writeln!(
             formatter,
-            "        Media type\t\t\t\t: {}\n",
+            "        Media type\t\t\t\t: {}",
             media_type_string,
         )?;
-        write!(
+        writeln!(
             formatter,
-            "        Bytes per sector\t\t\t: {}\n",
+            "        Bytes per sector\t\t\t: {}",
             self.bytes_per_sector
         )?;
-        write!(
+        writeln!(
             formatter,
-            "        Number of sectors\t\t\t: {}\n",
+            "        Number of sectors\t\t\t: {}",
             self.number_of_sectors
         )?;
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
-
-        write!(formatter, "        Media size\t\t\t\t: {}\n", byte_size)?;
+        writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         if self.md5_hash != [0; 16] {
             let hash_string: String = format_as_string(&self.md5_hash);
-            write!(formatter, "        MD5\t\t\t\t\t: {}\n", hash_string)?;
+            writeln!(formatter, "        MD5\t\t\t\t\t: {}", hash_string)?;
         }
         if self.sha1_hash != [0; 20] {
             let hash_string: String = format_as_string(&self.sha1_hash);
-            write!(formatter, "        SHA1\t\t\t\t\t: {}\n", hash_string)?;
+            writeln!(formatter, "        SHA1\t\t\t\t\t: {}", hash_string)?;
         }
-        write!(formatter, "\n")?;
+        writeln!(formatter)?;
 
-        write!(formatter, "    Case information:\n")?;
+        writeln!(formatter, "    Case information:")?;
 
         for (description, value) in &self.header_values {
-            write!(
+            writeln!(
                 formatter,
-                "        {}{}: {}\n",
+                "        {}{}: {}",
                 description,
                 "\t".repeat((40 - description.len()).div_ceil(8)),
                 value,
@@ -161,7 +163,7 @@ impl fmt::Display for EwfImageInfo {
         // TODO: print optical disk session information
         // TODO: print error information
 
-        write!(formatter, "\n")
+        writeln!(formatter)
     }
 }
 

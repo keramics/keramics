@@ -33,7 +33,7 @@ pub enum EwfHeaderValueType {
 }
 
 /// Media type.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum EwfMediaType {
     FixedDisk,
     LogicalEvidence,

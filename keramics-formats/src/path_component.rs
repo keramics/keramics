@@ -13,8 +13,8 @@
 
 use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
+use std::fmt;
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 use keramics_encodings::{CharacterDecoder, CharacterEncoding};
@@ -38,13 +38,14 @@ impl PathComponent {
             PathComponent::ByteString(byte_string) => Self::extension_from_byte_string(byte_string),
             PathComponent::OsString(os_string) => {
                 let path_buf: PathBuf = PathBuf::from(os_string);
+
                 match path_buf.extension() {
                     Some(os_str) => Ok(Some(PathComponent::from(os_str))),
-                    None => return Ok(None),
+                    None => Ok(None),
                 }
             }
-            PathComponent::String(string) => Ok(Self::extension_from_string(string.as_str())),
             PathComponent::Root => Ok(None),
+            PathComponent::String(string) => Ok(Self::extension_from_string(string.as_str())),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::extension_from_ucs2_string(ucs2_string))
             }
@@ -66,7 +67,7 @@ impl PathComponent {
                 return Err(error);
             }
         };
-        let path_component: Option<PathComponent> = match code_points[1..]
+        match code_points[1..]
             .iter()
             .rev()
             .position(|value| *value == 0x0000002e)
@@ -87,11 +88,10 @@ impl PathComponent {
                         }
                     }
                 }
-                Some(PathComponent::String(extension_string))
+                Ok(Some(PathComponent::String(extension_string)))
             }
-            None => None,
-        };
-        Ok(path_component)
+            None => Ok(None),
+        }
     }
 
     /// Retrieves the extension from a [`&str`] if available.
@@ -143,13 +143,14 @@ impl PathComponent {
             PathComponent::ByteString(byte_string) => Self::file_stem_from_byte_string(byte_string),
             PathComponent::OsString(os_string) => {
                 let path_buf: PathBuf = PathBuf::from(os_string);
+
                 match path_buf.file_stem() {
                     Some(os_str) => Ok(Some(PathComponent::from(os_str))),
-                    None => return Ok(None),
+                    None => Ok(None),
                 }
             }
-            PathComponent::String(string) => Ok(Self::file_stem_from_string(string.as_str())),
             PathComponent::Root => Ok(None),
+            PathComponent::String(string) => Ok(Self::file_stem_from_string(string.as_str())),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::file_stem_from_ucs2_string(ucs2_string))
             }
@@ -171,7 +172,7 @@ impl PathComponent {
                 return Err(error);
             }
         };
-        let path_component: PathComponent = match code_points[1..]
+        match code_points[1..]
             .iter()
             .rev()
             .position(|value| *value == 0x0000002e)
@@ -192,11 +193,10 @@ impl PathComponent {
                         }
                     }
                 }
-                PathComponent::String(string)
+                Ok(Some(PathComponent::String(string)))
             }
-            None => PathComponent::ByteString(byte_string.clone()),
-        };
-        Ok(Some(path_component))
+            None => Ok(Some(PathComponent::ByteString(byte_string.clone()))),
+        }
     }
 
     /// Retrieves the file stem from a [`&str`] if available.
@@ -244,38 +244,52 @@ impl PathComponent {
         match self {
             PathComponent::ByteString(byte_string) => byte_string.is_empty(),
             PathComponent::OsString(os_string) => os_string.is_empty(),
-            PathComponent::String(string) => string.is_empty(),
             PathComponent::Root => true,
+            PathComponent::String(string) => string.is_empty(),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
         }
     }
 
     /// Converts the path component to a `ByteString` with a specific encoding.
     pub fn to_byte_string(&self, encoding: &CharacterEncoding) -> Result<ByteString, ErrorTrace> {
-        let byte_string: ByteString = match self {
+        match self {
             PathComponent::ByteString(byte_string) => match byte_string.encode(encoding) {
-                Ok(encoded_byte_string) => encoded_byte_string,
+                Ok(encoded_byte_string) => Ok(encoded_byte_string),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to encode byte string");
-                    return Err(error);
+                    Err(error)
                 }
             },
-            PathComponent::OsString(os_string) => todo!(),
-            PathComponent::String(string) => ByteString::from(string),
-            PathComponent::Root => ByteString::new(),
-            PathComponent::Ucs2String(ucs2_string) => todo!(),
-        };
-        Ok(byte_string)
-    }
+            PathComponent::OsString(os_string) => {
+                let string: String = os_string.display().to_string();
 
-    /// Converts the path component to a `String`.
-    pub fn to_string(&self) -> String {
-        match self {
-            PathComponent::ByteString(byte_string) => byte_string.to_string(),
-            PathComponent::OsString(os_string) => todo!(),
-            PathComponent::String(string) => string.clone(),
-            PathComponent::Root => String::new(),
-            PathComponent::Ucs2String(ucs2_string) => ucs2_string.to_string(),
+                ByteString::from_string_with_encoding(string.as_str(), encoding)
+            }
+            PathComponent::Root => Ok(ByteString::new_with_encoding(encoding)),
+            PathComponent::String(string) => {
+                ByteString::from_string_with_encoding(string, encoding)
+            }
+            PathComponent::Ucs2String(ucs2_string) => {
+                let code_points: Vec<u32> = ucs2_string
+                    .elements
+                    .iter()
+                    .map(|element| *element as u32)
+                    .collect();
+
+                let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
+
+                match byte_string.extend_from_codepoints(&code_points) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to encode byte string"
+                        );
+                        return Err(error);
+                    }
+                }
+                Ok(byte_string)
+            }
         }
     }
 
@@ -315,9 +329,13 @@ impl PathComponent {
                 }
                 ucs2_string
             }
-            PathComponent::OsString(os_string) => todo!(),
-            PathComponent::String(string) => Ucs2String::from(string),
+            PathComponent::OsString(os_string) => {
+                let string: String = os_string.display().to_string();
+
+                Ucs2String::from(string.as_str())
+            }
             PathComponent::Root => Ucs2String::new(),
+            PathComponent::String(string) => Ucs2String::from(string),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.clone(),
         };
         Ok(ucs2_string)
@@ -326,7 +344,7 @@ impl PathComponent {
     /// Converts the path component to a `Ucs2String` with case folding applied.
     pub fn to_ucs2_string_with_case_folding(
         &self,
-        case_folding_mappings: &Arc<HashMap<u16, u16>>,
+        case_folding_mappings: &HashMap<u16, u16>,
     ) -> Result<Ucs2String, ErrorTrace> {
         let ucs2_string: Ucs2String = match &self {
             PathComponent::ByteString(byte_string) => {
@@ -362,35 +380,17 @@ impl PathComponent {
                 }
                 ucs2_string
             }
-            PathComponent::OsString(os_string) => todo!(),
-            PathComponent::String(string) => {
-                let mut ucs2_string: Ucs2String = Ucs2String::new();
+            PathComponent::OsString(os_string) => {
+                let string: String = os_string.display().to_string();
 
-                for character in string.chars() {
-                    let mut code_point: u32 = character as u32;
-
-                    if code_point > 0xffff {
-                        code_point -= 0x10000;
-                        ucs2_string
-                            .elements
-                            .push(0xd800 + (code_point >> 10) as u16);
-                        ucs2_string
-                            .elements
-                            .push(0xdc00 + (code_point & 0x03ff) as u16);
-                    } else {
-                        let folded_code_point: u16 =
-                            match case_folding_mappings.get(&(code_point as u16)) {
-                                Some(folded_code_point) => *folded_code_point,
-                                None => code_point as u16,
-                            };
-                        ucs2_string.elements.push(folded_code_point);
-                    }
-                }
-                ucs2_string
+                Ucs2String::from_string_with_case_folding(string.as_str(), case_folding_mappings)
             }
             PathComponent::Root => Ucs2String::new(),
+            PathComponent::String(string) => {
+                Ucs2String::from_string_with_case_folding(string.as_str(), case_folding_mappings)
+            }
             PathComponent::Ucs2String(ucs2_string) => {
-                Ucs2String::new_with_case_folding(ucs2_string, case_folding_mappings)
+                ucs2_string.new_with_case_folding(case_folding_mappings)
             }
         };
         Ok(ucs2_string)
@@ -433,9 +433,22 @@ impl PartialEq<&str> for PathComponent {
         match self {
             PathComponent::ByteString(byte_string) => ByteString::eq(byte_string, other),
             PathComponent::OsString(os_string) => OsString::eq(os_string, other),
-            PathComponent::String(string) => String::eq(string, other),
             PathComponent::Root => other.is_empty(),
+            PathComponent::String(string) => String::eq(string, other),
             PathComponent::Ucs2String(ucs2_string) => Ucs2String::eq(ucs2_string, other),
+        }
+    }
+}
+
+impl fmt::Display for PathComponent {
+    /// Formats the path for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            PathComponent::ByteString(byte_string) => byte_string.fmt(formatter),
+            PathComponent::OsString(os_string) => write!(formatter, "{}", os_string.display()),
+            PathComponent::Root => write!(formatter, ""),
+            PathComponent::String(string) => string.fmt(formatter),
+            PathComponent::Ucs2String(ucs2_string) => ucs2_string.fmt(formatter),
         }
     }
 }
@@ -443,6 +456,8 @@ impl PartialEq<&str> for PathComponent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use keramics_types::constants::UCS2_CASE_MAPPINGS;
 
     #[test]
     fn test_extension_with_byte_string() -> Result<(), ErrorTrace> {
@@ -461,6 +476,36 @@ mod tests {
         let path_component: PathComponent = PathComponent::ByteString(ByteString::from("file.txt"));
         let result: Option<PathComponent> = path_component.extension()?;
         assert_eq!(result, Some(PathComponent::from("txt")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extension_with_os_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::OsString(OsString::from(""));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("file"));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from(".file"));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("file.txt"));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, Some(PathComponent::OsString(OsString::from("txt"))));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extension_with_root() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::Root;
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
 
         Ok(())
     }
@@ -537,6 +582,45 @@ mod tests {
     }
 
     #[test]
+    fn test_file_stem_with_os_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::OsString(OsString::from(""));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("file"));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::OsString(OsString::from("file")))
+        );
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from(".file"));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::OsString(OsString::from(".file")))
+        );
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("file.txt"));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::OsString(OsString::from("file")))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_file_stem_with_root() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::Root;
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_file_stem_with_string() -> Result<(), ErrorTrace> {
         let path_component: PathComponent = PathComponent::from("");
         let result: Option<PathComponent> = path_component.file_stem()?;
@@ -587,6 +671,181 @@ mod tests {
     }
 
     #[test]
+    fn test_is_empty() {
+        let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
+        assert_eq!(path_component.is_empty(), false);
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("test"));
+        assert_eq!(path_component.is_empty(), false);
+
+        let path_component: PathComponent = PathComponent::Root;
+        assert_eq!(path_component.is_empty(), true);
+
+        let path_component: PathComponent = PathComponent::from("test");
+        assert_eq!(path_component.is_empty(), false);
+
+        let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
+        assert_eq!(path_component.is_empty(), false);
+    }
+
+    #[test]
+    fn test_to_byte_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
+        let byte_string: ByteString =
+            path_component.to_byte_string(&CharacterEncoding::Iso8859_1)?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("test"));
+        let byte_string: ByteString =
+            path_component.to_byte_string(&CharacterEncoding::Iso8859_1)?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::Root;
+        let byte_string: ByteString =
+            path_component.to_byte_string(&CharacterEncoding::Iso8859_1)?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::from("test");
+        let byte_string: ByteString =
+            path_component.to_byte_string(&CharacterEncoding::Iso8859_1)?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
+        let byte_string: ByteString =
+            path_component.to_byte_string(&CharacterEncoding::Iso8859_1)?;
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_to_ucs2_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string()?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("test"));
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string()?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::Root;
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string()?;
+        assert_eq!(ucs2_string, Ucs2String { elements: vec![] });
+
+        let path_component: PathComponent = PathComponent::from("test");
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string()?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string()?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x74, 0x65, 0x73, 0x74]
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_to_ucs2_string_with_case_folding() -> Result<(), ErrorTrace> {
+        let case_folding_mappings: HashMap<u16, u16> = UCS2_CASE_MAPPINGS
+            .into_iter()
+            .collect::<HashMap<u16, u16>>();
+
+        let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
+        let ucs2_string: Ucs2String =
+            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x54, 0x45, 0x53, 0x54]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("test"));
+        let ucs2_string: Ucs2String =
+            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x54, 0x45, 0x53, 0x54]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::Root;
+        let ucs2_string: Ucs2String =
+            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        assert_eq!(ucs2_string, Ucs2String { elements: vec![] });
+
+        let path_component: PathComponent = PathComponent::from("test");
+        let ucs2_string: Ucs2String =
+            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x54, 0x45, 0x53, 0x54]
+            }
+        );
+
+        let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
+        let ucs2_string: Ucs2String =
+            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![0x54, 0x45, 0x53, 0x54]
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_from_os_str() {
         let os_str: &OsStr = OsStr::new("test");
         let path_component: PathComponent = PathComponent::from(os_str);
@@ -616,9 +875,27 @@ mod tests {
     // TODO: test eq &str
 
     #[test]
-    fn test_to_string() {
-        let path_component: PathComponent = PathComponent::from("test");
+    fn test_to_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
+        let string: String = path_component.to_string();
+        assert_eq!(string, "test");
 
-        assert_eq!(path_component.to_string(), String::from("test"));
+        let path_component: PathComponent = PathComponent::OsString(OsString::from("test"));
+        let string: String = path_component.to_string();
+        assert_eq!(string, "test");
+
+        let path_component: PathComponent = PathComponent::Root;
+        let string: String = path_component.to_string();
+        assert_eq!(string, "");
+
+        let path_component: PathComponent = PathComponent::from("test");
+        let string: String = path_component.to_string();
+        assert_eq!(string, "test");
+
+        let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
+        let string: String = path_component.to_string();
+        assert_eq!(string, "test");
+
+        Ok(())
     }
 }
