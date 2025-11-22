@@ -779,6 +779,8 @@ pub enum PyVfsType {
     Ewf,
     #[pyo3(name = "FAKE")]
     Fake,
+    #[pyo3(name = "FAT")]
+    Fat,
     #[pyo3(name = "GPT")]
     Gpt,
     #[pyo3(name = "MBR")]
@@ -787,6 +789,10 @@ pub enum PyVfsType {
     Os,
     #[pyo3(name = "QCOW")]
     Qcow,
+    #[pyo3(name = "SPARSE_IMAGE")]
+    SparseImage,
+    #[pyo3(name = "UDIF")]
+    Udif,
     #[pyo3(name = "VHD")]
     Vhd,
     #[pyo3(name = "VHDX")]
@@ -802,10 +808,13 @@ impl From<&PyVfsType> for VfsType {
             PyVfsType::Ext => VfsType::Ext,
             PyVfsType::Ewf => VfsType::Ewf,
             PyVfsType::Fake => VfsType::Fake,
+            PyVfsType::Fat => VfsType::Fat,
             PyVfsType::Gpt => VfsType::Gpt,
             PyVfsType::Mbr => VfsType::Mbr,
             PyVfsType::Os => VfsType::Os,
             PyVfsType::Qcow => VfsType::Qcow,
+            PyVfsType::SparseImage => VfsType::SparseImage,
+            PyVfsType::Udif => VfsType::Udif,
             PyVfsType::Vhd => VfsType::Vhd,
             PyVfsType::Vhdx => VfsType::Vhdx,
         }
