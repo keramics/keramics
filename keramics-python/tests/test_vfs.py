@@ -103,8 +103,8 @@ class TestDataStream(TestClass):
         ext_location = qcow_location.new_with_layer_from_string(vfs.VfsType.EXT, path)
 
         file_entry = resolver.get_file_entry_by_location(ext_location)
-        # TODO: replace by get_extended_attribute_by__name
-        return file_entry.get_extended_attribute_by_index(0)
+        name = vfs.VfsPathComponent.from_string("security.selinux")
+        return file_entry.get_extended_attribute_by_name(name)
 
     def test_getters(self):
         extended_attribute = self.get_extended_attribute("/testdir1/testfile1")
@@ -175,6 +175,20 @@ class TestFileEntry(TestClass):
 
         with pytest.raises(RuntimeError):
             _ = file_entry.get_extended_attribute_by_index(99)
+
+    def test_get_extended_attribute_by_name(self):
+        file_entry = self.get_file_entry("/testdir1/testfile1")
+
+        assert file_entry is not None
+
+        name = vfs.VfsPathComponent.from_string("security.selinux")
+        extended_attribute = file_entry.get_extended_attribute_by_name(name)
+        assert extended_attribute is not None
+        assert extended_attribute.name.to_string() == "security.selinux"
+
+        name = vfs.VfsPathComponent.from_string("bogus")
+        extended_attribute = file_entry.get_extended_attribute_by_name(name)
+        assert extended_attribute is None
 
     def test_get_number_of_sub_file_entries(self):
         file_entry = self.get_file_entry("/testdir1")

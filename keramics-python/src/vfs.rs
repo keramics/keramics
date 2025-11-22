@@ -375,6 +375,30 @@ impl PyVfsFileEntry {
         }
     }
 
+    pub fn get_extended_attribute_by_name(
+        mut self_ref: PyRefMut<'_, Self>,
+        name: &PyVfsPathComponent,
+    ) -> PyResult<Option<PyVfsExtendedAttribute>> {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
+            Some(file_entry) => file_entry,
+            None => {
+                return Err(PyErr::new::<PyRuntimeError, &str>(
+                    "Unable to obtain mutable reference to file entry",
+                ));
+            }
+        };
+        match vfs_file_entry.get_extended_attribute_by_name(&name.path_component) {
+            Ok(Some(extended_attribute)) => Ok(Some(PyVfsExtendedAttribute {
+                extended_attribute: Arc::new(extended_attribute),
+            })),
+            Ok(None) => Ok(None),
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve extended attribute with error:\n{}",
+                error
+            ))),
+        }
+    }
+
     pub fn get_number_of_sub_file_entries(mut self_ref: PyRefMut<'_, Self>) -> PyResult<usize> {
         let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
             Some(file_entry) => file_entry,

@@ -829,50 +829,44 @@ impl VfsFileEntry {
         }
     }
 
-    /* TODO
-
-        /// Retrieves a specific extended attribute.
-        pub fn get_extended_attribute_by_name(
-            &mut self,
-            extended_attribute_name: PathComponent,
-        ) -> Result<VfsExtendedAttribute, ErrorTrace> {
-            match self {
-                VfsFileEntry::Apm(_)
-                | VfsFileEntry::Ewf(_)
-                | VfsFileEntry::Fake(_)
-                | VfsFileEntry::Fat(_)
-                | VfsFileEntry::Gpt(_)
-                | VfsFileEntry::Mbr(_)
-                | VfsFileEntry::Ntfs(_)
-                | VfsFileEntry::Os(_)
-                | VfsFileEntry::Qcow(_)
-                | VfsFileEntry::SparseImage(_)
-                | VfsFileEntry::Udif(_)
-                | VfsFileEntry::Vhd(_)
-                | VfsFileEntry::Vhdx(_) => Err(keramics_core::error_trace_new!(
-                    "Missing extended attribute"
-                )),
-                VfsFileEntry::Ext(ext_file_entry) => {
-                    match ext_file_entry.get_extended_attribute_by_index(extended_attribute_index) {
-                        Ok(ext_extended_attribute) => {
-                            Ok(VfsExtendedAttribute::Ext(ext_extended_attribute))
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve ext extended attribute: {}",
-                                    extended_attribute_index
-                                )
-                            );
-                            Err(error)
-                        }
+    /// Retrieves a specific extended attribute.
+    pub fn get_extended_attribute_by_name(
+        &mut self,
+        extended_attribute_name: &PathComponent,
+    ) -> Result<Option<VfsExtendedAttribute>, ErrorTrace> {
+        match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Ntfs(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => Err(keramics_core::error_trace_new!(
+                "Missing extended attribute"
+            )),
+            VfsFileEntry::Ext(ext_file_entry) => {
+                match ext_file_entry.get_extended_attribute_by_name(extended_attribute_name) {
+                    Ok(Some(ext_extended_attribute)) => {
+                        Ok(Some(VfsExtendedAttribute::Ext(ext_extended_attribute)))
+                    }
+                    Ok(None) => Ok(None),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve ext extended attribute"
+                        );
+                        Err(error)
                     }
                 }
             }
         }
-
-    */
+    }
 
     // TODO: add get extended_attributes iterator
 
@@ -1445,6 +1439,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_apm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_apm() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
 
@@ -1738,6 +1744,27 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let name: PathComponent = PathComponent::from("security.selinux");
+        let extended_attribute: VfsExtendedAttribute = vfs_file_entry
+            .get_extended_attribute_by_name(&name)?
+            .unwrap();
+        assert_eq!(
+            extended_attribute.get_name(),
+            PathComponent::ByteString(ByteString::from("security.selinux"))
+        );
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_ext() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
@@ -1997,6 +2024,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
 
@@ -2184,6 +2223,7 @@ mod tests {
 
     // TODO: add tests for test_get_number_of_extended_attributes_with_fake
     // TODO: add tests for test_get_extended_attribute_by_index_with_fake
+    // TODO: add tests for test_get_extended_attribute_by_name_with_fake
     // TODO: add tests for test_get_number_of_sub_file_entries_with_fake
     // TODO: add tests for test_get_sub_file_entry_by_index_with_fake
 
@@ -2419,6 +2459,18 @@ mod tests {
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
         assert!(result.is_err());
 
         Ok(())
@@ -2686,6 +2738,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_gpt() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_gpt() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
 
@@ -2936,6 +3000,18 @@ mod tests {
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_mbr() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
         assert!(result.is_err());
 
         Ok(())
@@ -3217,6 +3293,18 @@ mod tests {
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
         assert!(result.is_err());
 
         Ok(())
@@ -3509,6 +3597,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_os() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
@@ -3760,6 +3860,18 @@ mod tests {
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_qcow() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
         assert!(result.is_err());
 
         Ok(())
@@ -4026,6 +4138,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_sparseimage() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_sparseimage() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
 
@@ -4276,6 +4400,18 @@ mod tests {
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_udif() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
         assert!(result.is_err());
 
         Ok(())
@@ -4538,6 +4674,18 @@ mod tests {
     }
 
     #[test]
+    fn test_get_extended_attribute_by_name_with_vhd() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_sub_file_entries_with_vhd() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
 
@@ -4788,6 +4936,18 @@ mod tests {
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_vhdx() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_name(&name);
         assert!(result.is_err());
 
         Ok(())

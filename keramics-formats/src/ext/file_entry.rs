@@ -317,7 +317,7 @@ impl ExtFileEntry {
     /// Retrieves a specific extended attribute.
     pub fn get_extended_attribute_by_name(
         &mut self,
-        extended_attribute_name: &ByteString,
+        extended_attribute_name: &PathComponent,
     ) -> Result<Option<ExtExtendedAttribute>, ErrorTrace> {
         if !self.attributes_block_is_read {
             match self.read_attributes_block() {
@@ -329,10 +329,13 @@ impl ExtFileEntry {
             }
         }
         let lookup_name: ByteString =
-            match extended_attribute_name.encode(&self.sub_directory_entries.encoding) {
+            match extended_attribute_name.to_byte_string(&self.sub_directory_entries.encoding) {
                 Ok(byte_string) => byte_string,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to encode name");
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to convert path component to byte string"
+                    );
                     return Err(error);
                 }
             };
@@ -856,7 +859,7 @@ mod tests {
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let name: ByteString = ByteString::from("security.selinux");
+        let name: PathComponent = PathComponent::from("security.selinux");
         let extended_attribute: ExtExtendedAttribute = ext_file_entry
             .get_extended_attribute_by_name(&name)?
             .unwrap();
@@ -865,7 +868,7 @@ mod tests {
             &ByteString::from("security.selinux")
         );
 
-        let name: ByteString = ByteString::from("bogus");
+        let name: PathComponent = PathComponent::from("bogus");
         let result: Option<ExtExtendedAttribute> =
             ext_file_entry.get_extended_attribute_by_name(&name)?;
         assert!(result.is_none());
