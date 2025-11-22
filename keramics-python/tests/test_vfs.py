@@ -89,6 +89,30 @@ class TestDataStream(TestClass):
             _ = data_stream.seek(0, whence=99)
 
 
+class TestDataStream(TestClass):
+    def get_extended_attribute(self, path):
+        resolver = vfs.VfsResolver()
+
+        os_path_string = self.get_test_data_path("qcow/ext2.qcow2")
+        os_location = vfs.VfsLocation.new_base_from_string(
+            vfs.VfsType.OS, os_path_string
+        )
+        qcow_location = os_location.new_with_layer_from_string(
+            vfs.VfsType.QCOW, "/qcow1"
+        )
+        ext_location = qcow_location.new_with_layer_from_string(vfs.VfsType.EXT, path)
+
+        file_entry = resolver.get_file_entry_by_location(ext_location)
+        # TODO: replace by get_extended_attribute_by__name
+        return file_entry.get_extended_attribute_by_index(0)
+
+    def test_getters(self):
+        extended_attribute = self.get_extended_attribute("/testdir1/testfile1")
+
+        assert extended_attribute is not None
+        assert extended_attribute.name.to_string() == "security.selinux"
+
+
 class TestFileEntry(TestClass):
     def get_file_entry(self, path):
         resolver = vfs.VfsResolver()

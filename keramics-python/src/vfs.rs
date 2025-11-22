@@ -45,6 +45,18 @@ impl PyVfsDataFork {
             None => Ok(None),
         }
     }
+
+    pub fn get_data_stream(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsDataStream>> {
+        match self_ref.data_fork.get_data_stream() {
+            Ok(data_stream) => Ok(Some(PyVfsDataStream {
+                data_stream: data_stream.clone(),
+            })),
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve data stream with error:\n{}",
+                error
+            ))),
+        }
+    }
 }
 
 #[pyclass]
@@ -166,6 +178,14 @@ impl PyVfsExtendedAttribute {
         Ok(PyVfsString {
             string: Arc::new(self_ref.extended_attribute.get_name()),
         })
+    }
+
+    pub fn get_data_stream(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsDataStream>> {
+        let data_stream: &DataStreamReference = self_ref.extended_attribute.get_data_stream();
+
+        Ok(Some(PyVfsDataStream {
+            data_stream: data_stream.clone(),
+        }))
     }
 }
 
