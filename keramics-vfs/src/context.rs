@@ -15,13 +15,12 @@ use std::collections::HashMap;
 use std::sync::Weak;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::Path;
+use keramics_formats::{Path, PathComponent};
 
 use super::enums::VfsType;
 use super::file_entry::VfsFileEntry;
 use super::file_system::VfsFileSystem;
 use super::location::{VfsLocation, new_os_vfs_location};
-use super::string::VfsString;
 use super::types::VfsFileSystemReference;
 
 /// Virtual File System (VFS) context.
@@ -46,7 +45,7 @@ impl VfsContext {
     pub fn get_data_stream_by_location_and_name(
         &mut self,
         vfs_location: &VfsLocation,
-        name: Option<&VfsString>,
+        name: Option<&PathComponent>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let file_system: VfsFileSystemReference = match self.open_file_system(vfs_location) {
             Ok(file_system) => file_system,
@@ -56,7 +55,14 @@ impl VfsContext {
             }
         };
         let path: &Path = vfs_location.get_path();
-        file_system.get_data_stream_by_path_and_name(path, name)
+
+        match file_system.get_data_stream_by_path_and_name(path, name) {
+            Ok(data_stream) => Ok(data_stream),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        }
     }
 
     /// Retrieves a file entry with the specified location.
@@ -72,7 +78,14 @@ impl VfsContext {
             }
         };
         let path: &Path = vfs_location.get_path();
-        file_system.get_file_entry_by_path(path)
+
+        match file_system.get_file_entry_by_path(path) {
+            Ok(file_entry) => Ok(file_entry),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
+            }
+        }
     }
 
     /// Opens a file system.

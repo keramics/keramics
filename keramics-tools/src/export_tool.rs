@@ -18,10 +18,10 @@ use clap::{Args, Parser, Subcommand};
 
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::Path;
+use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner,
-    VfsString, new_os_vfs_location,
+    new_os_vfs_location,
 };
 
 mod writer;
@@ -82,7 +82,7 @@ impl ExportTool {
         data_stream_writer: &mut DataStreamWriter,
         vfs_scan_node: &VfsScanNode,
         path: &Path,
-        name: Option<&VfsString>,
+        name: Option<&PathComponent>,
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             let vfs_resolver: VfsResolverReference = VfsResolver::current();
@@ -192,8 +192,8 @@ fn main() -> ExitCode {
 
     match arguments.command {
         Commands::Path(command_arguments) => {
-            let name: Option<VfsString> = match command_arguments.name {
-                Some(ref name) => Some(VfsString::from(name)),
+            let name: Option<PathComponent> = match command_arguments.name {
+                Some(ref name) => Some(PathComponent::from(name)),
                 None => None,
             };
             let path: Path = Path::from(&command_arguments.path);

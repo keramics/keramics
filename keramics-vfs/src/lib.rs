@@ -21,7 +21,6 @@ mod file_resolver;
 mod file_system;
 mod location;
 mod path;
-mod string;
 mod types;
 
 // Format specific back-ends.
@@ -53,7 +52,6 @@ pub use finder::VfsFinder;
 pub use location::{VfsLocation, new_os_vfs_location};
 pub use resolver::VfsResolver;
 pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
-pub use string::VfsString;
 pub use types::*;
 
 #[cfg(test)]

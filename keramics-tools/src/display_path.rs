@@ -15,9 +15,8 @@ use std::collections::HashMap;
 
 use keramics_core::ErrorTrace;
 use keramics_encodings::CharacterDecoder;
-use keramics_vfs::{
-    VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference, VfsString, VfsType,
-};
+use keramics_formats::PathComponent;
+use keramics_vfs::{VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference, VfsType};
 
 use crate::enums::DisplayPathType;
 
@@ -43,25 +42,10 @@ impl DisplayPath {
         }
     }
 
-    /// Escapes unprintable characters in a string.
-    fn internal_escape_string(&self, string: &str) -> String {
-        let mut string_parts: Vec<String> = Vec::new();
-
-        for character_value in string.chars() {
-            let safe_character: String = match self.translation_table.get(&(character_value as u32))
-            {
-                Some(escaped_character) => escaped_character.clone(),
-                None => character_value.to_string(),
-            };
-            string_parts.push(safe_character);
-        }
-        string_parts.join("")
-    }
-
-    /// Escapes unprintable characters in a VFS string.
-    pub fn escape_string(&self, vfs_string: &VfsString) -> String {
-        match vfs_string {
-            VfsString::ByteString(byte_string) => {
+    /// Escapes unprintable characters in a path component.
+    pub fn escape_path_component(&self, path_component: &PathComponent) -> String {
+        match path_component {
+            PathComponent::ByteString(byte_string) => {
                 let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
 
                 let mut string_parts: Vec<String> = Vec::new();
@@ -90,10 +74,10 @@ impl DisplayPath {
                 }
                 string_parts.join("")
             }
-            VfsString::Empty => String::new(),
-            VfsString::OsString(_) => todo!(),
-            VfsString::String(string) => self.internal_escape_string(string),
-            VfsString::Ucs2String(ucs2_string) => ucs2_string
+            PathComponent::OsString(_) => todo!(),
+            PathComponent::Root => String::new(),
+            PathComponent::String(string) => self.escape_string(string),
+            PathComponent::Ucs2String(ucs2_string) => ucs2_string
                 .elements
                 .iter()
                 .map(|element| match char::from_u32(*element as u32) {
@@ -108,6 +92,21 @@ impl DisplayPath {
                 .collect::<Vec<String>>()
                 .join(""),
         }
+    }
+
+    /// Escapes unprintable characters in a string.
+    fn escape_string(&self, string: &str) -> String {
+        let mut string_parts: Vec<String> = Vec::new();
+
+        for character_value in string.chars() {
+            let safe_character: String = match self.translation_table.get(&(character_value as u32))
+            {
+                Some(escaped_character) => escaped_character.clone(),
+                None => character_value.to_string(),
+            };
+            string_parts.push(safe_character);
+        }
+        string_parts.join("")
     }
 
     /// Retrieves a character translation table.
@@ -227,13 +226,13 @@ impl DisplayPath {
     }
 
     /// Joins the path components into a path string.
-    pub fn join_path_components(&self, path_components: &[VfsString]) -> String {
+    pub fn join_path_components(&self, path_components: &[PathComponent]) -> String {
         if path_components.len() == 1 && path_components[0].is_empty() {
             return String::from("/");
         } else {
             path_components
                 .iter()
-                .map(|component| self.escape_string(component))
+                .map(|component| self.escape_path_component(component))
                 .collect::<Vec<String>>()
                 .join("/")
         }
@@ -254,47 +253,47 @@ mod tests {
     use keramics_vfs::new_os_vfs_location;
 
     #[test]
-    fn test_internal_escape_string() {
+    fn test_escape_path_component() {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
-        let test_string: String = String::from("test");
-        let escaped_string: String = display_path.internal_escape_string(&test_string);
+        let test_path_component: PathComponent = PathComponent::from("test");
+        let escaped_string: String = display_path.escape_path_component(&test_path_component);
         assert_eq!(escaped_string, "test");
 
-        let test_string: String = String::from("test/");
-        let escaped_string: String = display_path.internal_escape_string(&test_string);
-        assert_eq!(escaped_string, "test\\/");
-
-        let test_string: String = String::from("test:");
-        let escaped_string: String = display_path.internal_escape_string(&test_string);
-        assert_eq!(escaped_string, "test\\:");
-
-        let test_string: String = String::from("test\\");
-        let escaped_string: String = display_path.internal_escape_string(&test_string);
-        assert_eq!(escaped_string, "test\\\\");
-
-        let test_string: String = String::from("test\u{0019}");
-        let escaped_string: String = display_path.internal_escape_string(&test_string);
-        assert_eq!(escaped_string, "test\\x19");
-
-        let test_string: String = String::from("test\u{fdd0}");
-        let escaped_string: String = display_path.internal_escape_string(&test_string);
-        assert_eq!(escaped_string, "test\\U0000fdd0");
+        let test_path_component: PathComponent = PathComponent::from(Ucs2String {
+            elements: vec![0x0074, 0x0065, 0x0073, 0x0074, 0xd800],
+        });
+        let escaped_string: String = display_path.escape_path_component(&test_path_component);
+        assert_eq!(escaped_string, "test\\U0000d800");
     }
 
     #[test]
     fn test_escape_string() {
         let display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
-        let test_string: VfsString = VfsString::from("test");
+        let test_string: String = String::from("test");
         let escaped_string: String = display_path.escape_string(&test_string);
         assert_eq!(escaped_string, "test");
 
-        let test_string: VfsString = VfsString::from(Ucs2String {
-            elements: vec![0x0074, 0x0065, 0x0073, 0x0074, 0xd800],
-        });
+        let test_string: String = String::from("test/");
         let escaped_string: String = display_path.escape_string(&test_string);
-        assert_eq!(escaped_string, "test\\U0000d800");
+        assert_eq!(escaped_string, "test\\/");
+
+        let test_string: String = String::from("test:");
+        let escaped_string: String = display_path.escape_string(&test_string);
+        assert_eq!(escaped_string, "test\\:");
+
+        let test_string: String = String::from("test\\");
+        let escaped_string: String = display_path.escape_string(&test_string);
+        assert_eq!(escaped_string, "test\\\\");
+
+        let test_string: String = String::from("test\u{0019}");
+        let escaped_string: String = display_path.escape_string(&test_string);
+        assert_eq!(escaped_string, "test\\x19");
+
+        let test_string: String = String::from("test\u{fdd0}");
+        let escaped_string: String = display_path.escape_string(&test_string);
+        assert_eq!(escaped_string, "test\\U0000fdd0");
     }
 
     #[test]

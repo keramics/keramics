@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::mbr::{MbrPartition, MbrVolumeSystem};
 
 use crate::enums::VfsFileType;
@@ -57,10 +58,12 @@ impl MbrFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            MbrFileEntry::Partition { index, .. } => Some(format!("mbr{}", index + 1)),
-            MbrFileEntry::Root { .. } => None,
+            MbrFileEntry::Partition { index, .. } => {
+                PathComponent::from(format!("mbr{}", index + 1))
+            }
+            MbrFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -165,8 +168,8 @@ mod tests {
             volume_system: mbr_volume_system.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
         let partition_size: u64 = mbr_partition.size;
@@ -176,8 +179,8 @@ mod tests {
             size: partition_size,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("mbr1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("mbr1"));
 
         Ok(())
     }
@@ -241,7 +244,9 @@ mod tests {
         };
 
         let sub_file_entry: MbrFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("mbr1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("mbr1"));
 
         let result: Result<MbrFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());

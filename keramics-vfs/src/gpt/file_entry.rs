@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
 use keramics_types::Uuid;
 
@@ -69,10 +70,12 @@ impl GptFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            GptFileEntry::Partition { index, .. } => Some(format!("gpt{}", index + 1)),
-            GptFileEntry::Root { .. } => None,
+            GptFileEntry::Partition { index, .. } => {
+                PathComponent::from(format!("gpt{}", index + 1))
+            }
+            GptFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -178,8 +181,8 @@ mod tests {
             volume_system: gpt_volume_system.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
         let partition_size: u64 = gpt_partition.size;
@@ -189,8 +192,8 @@ mod tests {
             size: partition_size,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("gpt1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("gpt1"));
 
         Ok(())
     }
@@ -254,7 +257,9 @@ mod tests {
         };
 
         let sub_file_entry: GptFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("gpt1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("gpt1"));
 
         let result: Result<GptFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());

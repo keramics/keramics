@@ -16,13 +16,14 @@ use std::time::SystemTime;
 
 use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
+use keramics_formats::PathComponent;
 
 use crate::enums::VfsFileType;
 
 /// Fake (or virtual) file entry.
 pub struct FakeFileEntry {
     /// Name.
-    name: Option<String>,
+    name: PathComponent,
 
     /// File type.
     file_type: VfsFileType,
@@ -47,32 +48,12 @@ pub struct FakeFileEntry {
 }
 
 impl FakeFileEntry {
-    /// Creates a new file entry.
-    #[deprecated(
-        since = "0.0.1",
-        note = "please use `new_directory` or `new_file` instead"
-    )]
-    pub fn new(name: &str) -> Self {
-        let current_time: SystemTime = SystemTime::now();
-
-        Self {
-            name: Some(name.to_string()),
-            data_stream: None,
-            file_type: VfsFileType::File,
-            access_time: Some(DateTime::FakeTime(current_time.clone())),
-            change_time: Some(DateTime::FakeTime(current_time.clone())),
-            creation_time: Some(DateTime::FakeTime(current_time.clone())),
-            modification_time: Some(DateTime::FakeTime(current_time)),
-            size: 0,
-        }
-    }
-
     /// Creates a new directory.
     pub fn new_directory(name: &str) -> Self {
         let current_time: SystemTime = SystemTime::now();
 
         Self {
-            name: Some(name.to_string()),
+            name: PathComponent::from(name),
             data_stream: None,
             file_type: VfsFileType::Directory,
             access_time: Some(DateTime::FakeTime(current_time.clone())),
@@ -90,7 +71,7 @@ impl FakeFileEntry {
         let current_time: SystemTime = SystemTime::now();
 
         Self {
-            name: Some(name.to_string()),
+            name: PathComponent::from(name),
             data_stream: Some(Arc::new(RwLock::new(data_stream))),
             file_type: VfsFileType::File,
             access_time: Some(DateTime::FakeTime(current_time.clone())),
@@ -106,7 +87,7 @@ impl FakeFileEntry {
         let current_time: SystemTime = SystemTime::now();
 
         Self {
-            name: None,
+            name: PathComponent::Root,
             data_stream: None,
             file_type: VfsFileType::Directory,
             access_time: Some(DateTime::FakeTime(current_time.clone())),
@@ -156,8 +137,8 @@ impl FakeFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<&String> {
-        self.name.as_ref()
+    pub fn get_name(&self) -> &PathComponent {
+        &self.name
     }
 
     /// Retrieves the size.
@@ -167,7 +148,7 @@ impl FakeFileEntry {
 
     /// Determines if the file entry is the root file entry.
     pub fn is_root_file_entry(&self) -> bool {
-        todo!()
+        self.name == PathComponent::Root
     }
 }
 
@@ -286,8 +267,8 @@ mod tests {
     fn test_get_name() -> Result<(), ErrorTrace> {
         let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
-        let name: Option<&String> = fake_file_entry.get_name();
-        assert_eq!(name, Some(String::from("file.txt")).as_ref());
+        let name: &PathComponent = fake_file_entry.get_name();
+        assert_eq!(name, &PathComponent::from("file.txt"));
 
         Ok(())
     }

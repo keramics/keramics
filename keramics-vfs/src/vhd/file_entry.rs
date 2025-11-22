@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 
 use crate::enums::VfsFileType;
@@ -57,10 +58,10 @@ impl VhdFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            VhdFileEntry::Layer { index, .. } => Some(format!("vhd{}", index + 1)),
-            VhdFileEntry::Root { .. } => None,
+            VhdFileEntry::Layer { index, .. } => PathComponent::from(format!("vhd{}", index + 1)),
+            VhdFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -178,8 +179,8 @@ mod tests {
             image: test_image.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let vhd_layer: VhdImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = VhdFileEntry::Layer {
@@ -188,8 +189,8 @@ mod tests {
             size: 4194304,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("vhd1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("vhd1"));
 
         Ok(())
     }
@@ -257,7 +258,9 @@ mod tests {
         };
 
         let sub_file_entry: VhdFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("vhd1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("vhd1"));
 
         let result: Result<VhdFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());

@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::udif::UdifFile;
 
 use crate::enums::VfsFileType;
@@ -54,10 +55,10 @@ impl UdifFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            UdifFileEntry::Layer { .. } => Some(String::from("udif1")),
-            UdifFileEntry::Root { .. } => None,
+            UdifFileEntry::Layer { .. } => PathComponent::from("udif1"),
+            UdifFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -168,16 +169,16 @@ mod tests {
             file: test_file.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let file_entry = UdifFileEntry::Layer {
             file: test_file.clone(),
             size: media_size,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("udif1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("udif1"));
 
         Ok(())
     }
@@ -242,7 +243,9 @@ mod tests {
         };
 
         let sub_file_entry: UdifFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("udif1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("udif1"));
 
         let result: Result<UdifFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());

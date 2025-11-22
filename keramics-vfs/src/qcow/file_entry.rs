@@ -14,6 +14,7 @@
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 
 use crate::enums::VfsFileType;
@@ -57,10 +58,10 @@ impl QcowFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            QcowFileEntry::Layer { index, .. } => Some(format!("qcow{}", index + 1)),
-            QcowFileEntry::Root { .. } => None,
+            QcowFileEntry::Layer { index, .. } => PathComponent::from(format!("qcow{}", index + 1)),
+            QcowFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -178,8 +179,8 @@ mod tests {
             image: test_image.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
@@ -188,8 +189,8 @@ mod tests {
             size: 4194304,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("qcow1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("qcow1"));
 
         Ok(())
     }
@@ -257,7 +258,9 @@ mod tests {
         };
 
         let sub_file_entry: QcowFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("qcow1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("qcow1"));
 
         let result: Result<QcowFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());

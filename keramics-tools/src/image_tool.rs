@@ -38,7 +38,7 @@ use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsLocation,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, VfsType,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsType,
     new_os_vfs_location,
 };
 
@@ -682,7 +682,7 @@ impl ImageTool {
         &self,
         file_entry: &mut VfsFileEntry,
         file_system_display_path: &String,
-        path_components: &[VfsString],
+        path_components: &[PathComponent],
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
         let md5: String = if !calculate_md5 {
@@ -866,8 +866,12 @@ impl ImageTool {
                     return Err(error);
                 }
             };
-            let data_fork_name: String = match data_fork.get_name() {
-                Some(name) => format!(":{}", self.display_path.escape_string(&name)),
+            let data_fork_name: String = match &data_fork.get_name() {
+                Some(name) => {
+                    let escaped_name: String = self.display_path.escape_path_component(name);
+
+                    format!(":{}", escaped_name)
+                }
                 None => continue,
             };
             let data_stream: &DataStreamReference = match data_fork.get_data_stream() {

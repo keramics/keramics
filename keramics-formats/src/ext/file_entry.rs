@@ -21,6 +21,7 @@ use keramics_types::{ByteString, bytes_to_u16_le};
 use crate::path_component::PathComponent;
 
 use super::attributes_block::ExtAttributesBlock;
+use super::attributes_entry::ExtAttributesEntry;
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
@@ -238,6 +239,45 @@ impl ExtFileEntry {
         Ok(self.inode.attributes.len())
     }
 
+    /// Retrieves the data stream of an extended attribute.
+    fn get_extended_attribute_data_stream(
+        &self,
+        attributes_entry: &ExtAttributesEntry,
+    ) -> Result<DataStreamReference, ErrorTrace> {
+        if attributes_entry.value_data_inode_number == 0 {
+            let data_stream: FakeDataStream = FakeDataStream::new(
+                &attributes_entry.value_data,
+                attributes_entry.value_data_size as u64,
+            );
+            Ok(Arc::new(RwLock::new(data_stream)))
+        } else {
+            let inode: ExtInode = match self.inode_table.get_inode(
+                &self.data_stream,
+                attributes_entry.value_data_inode_number,
+                &self.sub_directory_entries.encoding,
+            ) {
+                Ok(inode) => inode,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve inode: {}",
+                            attributes_entry.value_data_inode_number
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+            match inode.get_data_stream(&self.data_stream, self.inode_table.block_size) {
+                Ok(data_stream) => Ok(data_stream),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    Err(error)
+                }
+            }
+        }
+    }
+
     /// Retrieves a specific extended attribute.
     pub fn get_extended_attribute_by_index(
         &mut self,
@@ -253,34 +293,9 @@ impl ExtFileEntry {
             }
         }
         match self.inode.attributes.iter().nth(extended_attribute_index) {
-            Some((name, attribute_entry)) => {
-                let data_stream: DataStreamReference = if attribute_entry.value_data_inode_number
-                    == 0
-                {
-                    let data_stream: FakeDataStream = FakeDataStream::new(
-                        &attribute_entry.value_data,
-                        attribute_entry.value_data_size as u64,
-                    );
-                    Arc::new(RwLock::new(data_stream))
-                } else {
-                    let inode: ExtInode = match self.inode_table.get_inode(
-                        &self.data_stream,
-                        attribute_entry.value_data_inode_number,
-                        &self.sub_directory_entries.encoding,
-                    ) {
-                        Ok(inode) => inode,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to retrieve inode: {}",
-                                    attribute_entry.value_data_inode_number
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                    match inode.get_data_stream(&self.data_stream, self.inode_table.block_size) {
+            Some((name, attributes_entry)) => {
+                let data_stream: DataStreamReference =
+                    match self.get_extended_attribute_data_stream(attributes_entry) {
                         Ok(data_stream) => data_stream,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -289,8 +304,7 @@ impl ExtFileEntry {
                             );
                             return Err(error);
                         }
-                    }
-                };
+                    };
                 Ok(ExtExtendedAttribute::new(name, data_stream))
             }
             None => Err(keramics_core::error_trace_new!(format!(
@@ -300,7 +314,46 @@ impl ExtFileEntry {
         }
     }
 
-    // TODO: add get extended_attribute_by_name
+    /// Retrieves a specific extended attribute.
+    pub fn get_extended_attribute_by_name(
+        &mut self,
+        extended_attribute_name: &ByteString,
+    ) -> Result<Option<ExtExtendedAttribute>, ErrorTrace> {
+        if !self.attributes_block_is_read {
+            match self.read_attributes_block() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes block");
+                    return Err(error);
+                }
+            }
+        }
+        let lookup_name: ByteString =
+            match extended_attribute_name.encode(&self.sub_directory_entries.encoding) {
+                Ok(byte_string) => byte_string,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to encode name");
+                    return Err(error);
+                }
+            };
+        match self.inode.attributes.get_key_value(&lookup_name) {
+            Some((name, attributes_entry)) => {
+                let data_stream: DataStreamReference =
+                    match self.get_extended_attribute_data_stream(attributes_entry) {
+                        Ok(data_stream) => data_stream,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve data stream"
+                            );
+                            return Err(error);
+                        }
+                    };
+                Ok(Some(ExtExtendedAttribute::new(name, data_stream)))
+            }
+            None => Ok(None),
+        }
+    }
 
     /// Retrieves an extended attributes iterator.
     pub fn extended_attributes(&mut self) -> ExtExtendedAttributesIterator<'_> {
@@ -791,6 +844,31 @@ mod tests {
         let result: Result<ExtExtendedAttribute, ErrorTrace> =
             ext_file_entry.get_extended_attribute_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name() -> Result<(), ErrorTrace> {
+        let ext_file_system: ExtFileSystem = get_file_system("ext/ext4.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let name: ByteString = ByteString::from("security.selinux");
+        let extended_attribute: ExtExtendedAttribute = ext_file_entry
+            .get_extended_attribute_by_name(&name)?
+            .unwrap();
+        assert_eq!(
+            extended_attribute.get_name(),
+            &ByteString::from("security.selinux")
+        );
+
+        let name: ByteString = ByteString::from("bogus");
+        let result: Option<ExtExtendedAttribute> =
+            ext_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }

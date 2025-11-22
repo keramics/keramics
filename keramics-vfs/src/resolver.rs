@@ -14,11 +14,11 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 
 use super::context::VfsContext;
 use super::file_entry::VfsFileEntry;
 use super::location::VfsLocation;
-use super::string::VfsString;
 use super::types::{VfsFileSystemReference, VfsResolverReference};
 
 /// Virtual File System (VFS) resolver.
@@ -44,7 +44,7 @@ impl VfsResolver {
     pub fn get_data_stream_by_location_and_name(
         &self,
         vfs_location: &VfsLocation,
-        name: Option<&VfsString>,
+        name: Option<&PathComponent>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.context.write() {
             Ok(mut context) => context.get_data_stream_by_location_and_name(vfs_location, name),

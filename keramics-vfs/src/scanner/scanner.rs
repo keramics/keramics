@@ -165,20 +165,19 @@ impl VfsScanner {
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsType>, ErrorTrace> {
         let path: &Path = vfs_location.get_path();
-        let data_stream: DataStreamReference =
-            match file_system.get_data_stream_by_path_and_name(path, None) {
-                Ok(Some(data_stream)) => data_stream,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing data stream: {}",
-                        vfs_location.to_string()
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                    return Err(error);
-                }
-            };
+        let data_stream: DataStreamReference = match file_system.get_data_stream_by_path(path) {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing data stream: {}",
+                    vfs_location.to_string()
+                )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        };
         match vfs_location.get_type() {
             VfsType::Apm { .. } | VfsType::Gpt { .. } | VfsType::Mbr { .. } => {
                 self.scan_for_file_system_format(&data_stream)

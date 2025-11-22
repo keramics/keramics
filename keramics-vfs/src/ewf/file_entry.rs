@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::ewf::EwfImage;
 
 use crate::enums::VfsFileType;
@@ -54,10 +55,10 @@ impl EwfFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            EwfFileEntry::Layer { .. } => Some(String::from("ewf1")),
-            EwfFileEntry::Root { .. } => None,
+            EwfFileEntry::Layer { .. } => PathComponent::from("ewf1"),
+            EwfFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -169,16 +170,16 @@ mod tests {
             image: test_image.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let file_entry = EwfFileEntry::Layer {
             image: test_image.clone(),
             size: media_size,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("ewf1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("ewf1"));
 
         Ok(())
     }
@@ -243,7 +244,9 @@ mod tests {
         };
 
         let sub_file_entry: EwfFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("ewf1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("ewf1"));
 
         let result: Result<EwfFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());

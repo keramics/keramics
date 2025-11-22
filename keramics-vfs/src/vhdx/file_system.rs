@@ -212,6 +212,8 @@ impl VhdxFileSystem {
 mod tests {
     use super::*;
 
+    use keramics_formats::PathComponent;
+
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
     use crate::location::new_os_vfs_location;
@@ -271,8 +273,8 @@ mod tests {
 
         let vhdx_file_entry: VhdxFileEntry = result.unwrap();
 
-        let name: Option<String> = vhdx_file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = vhdx_file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
@@ -283,8 +285,8 @@ mod tests {
 
         let vhdx_file_entry: VhdxFileEntry = result.unwrap();
 
-        let name: Option<String> = vhdx_file_entry.get_name();
-        assert_eq!(name, Some(String::from("vhdx1")));
+        let name: PathComponent = vhdx_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("vhdx1"));
 
         let file_type: VfsFileType = vhdx_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);

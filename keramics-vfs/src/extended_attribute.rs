@@ -12,9 +12,8 @@
  */
 
 use keramics_core::DataStreamReference;
+use keramics_formats::PathComponent;
 use keramics_formats::ext::ExtExtendedAttribute;
-
-use super::string::VfsString;
 
 /// Virtual File System (VFS) extended attribute.
 pub enum VfsExtendedAttribute {
@@ -32,10 +31,10 @@ impl VfsExtendedAttribute {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> VfsString {
+    pub fn get_name(&self) -> PathComponent {
         match self {
             VfsExtendedAttribute::Ext(ext_extended_attribute) => {
-                VfsString::from(ext_extended_attribute.get_name())
+                PathComponent::from(ext_extended_attribute.get_name())
             }
         }
     }
@@ -103,12 +102,11 @@ mod tests {
         let vfs_extended_attribute: VfsExtendedAttribute =
             VfsExtendedAttribute::Ext(ext_extended_attribute);
 
-        let name: VfsString = vfs_extended_attribute.get_name();
+        let name: PathComponent = vfs_extended_attribute.get_name();
         assert_eq!(
             name,
-            VfsString::ByteString(ByteString::from("security.selinux"))
+            PathComponent::ByteString(ByteString::from("security.selinux"))
         );
-
         Ok(())
     }
 }

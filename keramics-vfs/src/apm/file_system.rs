@@ -174,17 +174,16 @@ impl ApmFileSystem {
         file_system: &VfsFileSystemReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference =
-            match file_system.get_data_stream_by_path_and_name(path, None) {
-                Ok(Some(data_stream)) => data_stream,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!("Missing data stream"));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                    return Err(error);
-                }
-            };
+        let data_stream: DataStreamReference = match file_system.get_data_stream_by_path(path) {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        };
         match volume_system.read_data_stream(&data_stream) {
             Ok(()) => {}
             Err(mut error) => {
@@ -202,6 +201,8 @@ impl ApmFileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use keramics_formats::PathComponent;
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
@@ -262,20 +263,17 @@ mod tests {
 
         let apm_file_entry: ApmFileEntry = result.unwrap();
 
-        let name: Option<String> = apm_file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = apm_file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let file_type: VfsFileType = apm_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
         let path: Path = Path::from("/apm1");
-        let result: Option<ApmFileEntry> = apm_file_system.get_file_entry_by_path(&path)?;
-        assert!(result.is_some());
+        let apm_file_entry: ApmFileEntry = apm_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let apm_file_entry: ApmFileEntry = result.unwrap();
-
-        let name: Option<String> = apm_file_entry.get_name();
-        assert_eq!(name, Some(String::from("apm1")));
+        let name: PathComponent = apm_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("apm1"));
 
         let file_type: VfsFileType = apm_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);

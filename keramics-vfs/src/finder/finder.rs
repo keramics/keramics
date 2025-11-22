@@ -12,10 +12,10 @@
  */
 
 use keramics_core::ErrorTrace;
+use keramics_formats::PathComponent;
 
 use crate::file_entry::VfsFileEntry;
 use crate::file_system::VfsFileSystem;
-use crate::string::VfsString;
 
 /// Virtual File System (VFS) finder state.
 struct VfsFinderState {
@@ -46,7 +46,7 @@ pub struct VfsFinder<'a> {
     file_system: &'a VfsFileSystem,
 
     /// Path components.
-    pub path_components: Vec<VfsString>,
+    pub path_components: Vec<PathComponent>,
 
     /// Finder states.
     states: Vec<VfsFinderState>,
@@ -70,7 +70,7 @@ impl<'a> VfsFinder<'a> {
 }
 
 impl<'a> Iterator for VfsFinder<'a> {
-    type Item = Result<(VfsFileEntry, Vec<VfsString>), ErrorTrace>;
+    type Item = Result<(VfsFileEntry, Vec<PathComponent>), ErrorTrace>;
 
     /// Retrieves the next file entry.
     fn next(&mut self) -> Option<Self::Item> {
@@ -87,8 +87,12 @@ impl<'a> Iterator for VfsFinder<'a> {
                             };
                         match file_entry.get_name() {
                             Some(name) => self.path_components.push(name),
-                            None => self.path_components.push(VfsString::Empty),
-                        };
+                            None => {
+                                return Some(Err(keramics_core::error_trace_new!(
+                                    "Missing name for root file entry"
+                                )));
+                            }
+                        }
                         self.states
                             .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
                     }
@@ -99,7 +103,7 @@ impl<'a> Iterator for VfsFinder<'a> {
         }
         while let Some(mut state) = self.states.pop() {
             if state.sub_file_entry_index >= state.number_of_sub_file_entries {
-                let path_components: Vec<VfsString> = self.path_components.clone();
+                let path_components: Vec<PathComponent> = self.path_components.clone();
 
                 self.path_components.pop();
 
@@ -123,7 +127,11 @@ impl<'a> Iterator for VfsFinder<'a> {
                         };
                     match file_entry.get_name() {
                         Some(name) => self.path_components.push(name),
-                        None => self.path_components.push(VfsString::Empty),
+                        None => {
+                            return Some(Err(keramics_core::error_trace_new!(
+                                "Missing name for file entry"
+                            )));
+                        }
                     }
                     self.states
                         .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
@@ -144,4 +152,9 @@ impl<'a> Iterator for VfsFinder<'a> {
     }
 }
 
-// TODO: add tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests
+}

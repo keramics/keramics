@@ -98,12 +98,11 @@ mod tests {
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
         // TODO: change to not retrieve data fork from file entry.
-        let ntfs_file_entry: NtfsFileEntry = get_file_entry("/testdir1/testfile1")?;
+        let ntfs_file_entry: NtfsFileEntry = get_file_entry("/$UpCase")?;
+
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
 
-        data_fork.get_data_stream()?;
-
-        // TODO: add test with ADS
+        let _ = data_fork.get_data_stream()?;
 
         Ok(())
     }
@@ -111,13 +110,17 @@ mod tests {
     #[test]
     fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
         // TODO: change to not retrieve data fork from file entry.
-        let ntfs_file_entry: NtfsFileEntry = get_file_entry("/testdir1/testfile1")?;
+        let ntfs_file_entry: NtfsFileEntry = get_file_entry("/$UpCase")?;
+
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
 
         let name: Option<&Ucs2String> = data_fork.get_name();
         assert_eq!(name, None);
 
-        // TODO: add test with ADS
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(1)?;
+
+        let name: Option<&Ucs2String> = data_fork.get_name();
+        assert_eq!(name, Some(Ucs2String::from("$Info")).as_ref());
 
         Ok(())
     }

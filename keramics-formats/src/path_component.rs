@@ -397,6 +397,27 @@ impl PathComponent {
     }
 }
 
+impl From<ByteString> for PathComponent {
+    /// Converts a [`ByteString`] into a [`PathComponent`]
+    fn from(byte_string: ByteString) -> Self {
+        Self::ByteString(byte_string)
+    }
+}
+
+impl From<&ByteString> for PathComponent {
+    /// Converts a [`&ByteString`] into a [`PathComponent`]
+    fn from(byte_string: &ByteString) -> Self {
+        Self::ByteString(byte_string.clone())
+    }
+}
+
+impl From<OsString> for PathComponent {
+    /// Converts a [`OsString`] into a [`PathComponent`]
+    fn from(os_string: OsString) -> Self {
+        Self::OsString(os_string)
+    }
+}
+
 impl From<&OsStr> for PathComponent {
     /// Converts a [`&OsStr`] into a [`PathComponent`]
     fn from(os_str: &OsStr) -> Self {
@@ -411,10 +432,31 @@ impl From<&str> for PathComponent {
     }
 }
 
+impl From<String> for PathComponent {
+    /// Converts a [`String`] into a [`PathComponent`]
+    fn from(string: String) -> Self {
+        Self::String(string)
+    }
+}
+
 impl From<&String> for PathComponent {
     /// Converts a [`&String`] into a [`PathComponent`]
     fn from(string: &String) -> Self {
         Self::String(string.clone())
+    }
+}
+
+impl From<Ucs2String> for PathComponent {
+    /// Converts a [`Ucs2String`] into a [`PathComponent`]
+    fn from(ucs2_string: Ucs2String) -> Self {
+        Self::Ucs2String(ucs2_string)
+    }
+}
+
+impl From<&Ucs2String> for PathComponent {
+    /// Converts a [`&Ucs2String`] into a [`PathComponent`]
+    fn from(ucs2_string: &Ucs2String) -> Self {
+        Self::Ucs2String(ucs2_string.clone())
     }
 }
 

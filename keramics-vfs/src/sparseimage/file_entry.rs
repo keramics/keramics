@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::sparseimage::SparseImageFile;
 
 use crate::enums::VfsFileType;
@@ -54,10 +55,10 @@ impl SparseImageFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            SparseImageFileEntry::Layer { .. } => Some(String::from("sparseimage1")),
-            SparseImageFileEntry::Root { .. } => None,
+            SparseImageFileEntry::Layer { .. } => PathComponent::from("sparseimage1"),
+            SparseImageFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -169,16 +170,16 @@ mod tests {
             file: test_file.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let file_entry = SparseImageFileEntry::Layer {
             file: test_file.clone(),
             size: media_size,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("sparseimage1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("sparseimage1"));
 
         Ok(())
     }
@@ -244,10 +245,9 @@ mod tests {
         };
 
         let sub_file_entry: SparseImageFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(
-            sub_file_entry.get_name(),
-            Some(String::from("sparseimage1"))
-        );
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("sparseimage1"));
 
         let result: Result<SparseImageFileEntry, ErrorTrace> =
             file_entry.get_sub_file_entry_by_index(99);

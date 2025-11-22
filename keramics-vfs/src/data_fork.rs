@@ -12,9 +12,8 @@
  */
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::ntfs::NtfsDataFork;
-
-use super::string::VfsString;
 
 /// Virtual File System (VFS) data fork.
 pub enum VfsDataFork {
@@ -32,11 +31,11 @@ impl VfsDataFork {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<VfsString> {
+    pub fn get_name(&self) -> Option<PathComponent> {
         match self {
             VfsDataFork::DataStream(_) => None,
             VfsDataFork::Ntfs(data_fork) => match data_fork.get_name() {
-                Some(name) => Some(VfsString::from(name)),
+                Some(name) => Some(PathComponent::from(name)),
                 None => None,
             },
         }
@@ -53,6 +52,7 @@ mod tests {
     use keramics_formats::Path;
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
     use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
+    use keramics_types::Ucs2String;
 
     use crate::tests::get_test_data_path;
 
@@ -101,7 +101,7 @@ mod tests {
         let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
 
-        let name: Option<VfsString> = vfs_data_fork.get_name();
+        let name: Option<PathComponent> = vfs_data_fork.get_name();
         assert_eq!(name, None);
 
         Ok(())
@@ -135,29 +135,31 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
-        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("/$UpCase")?;
 
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
         let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
 
         let _ = vfs_data_fork.get_data_stream()?;
 
-        // TODO: add test with ADS
-
         Ok(())
     }
 
     #[test]
     fn test_get_name_with_ntfs() -> Result<(), ErrorTrace> {
-        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+        let ntfs_file_entry: NtfsFileEntry = get_ntfs_file_entry("/$UpCase")?;
 
         let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
         let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
 
-        let name: Option<VfsString> = vfs_data_fork.get_name();
+        let name: Option<PathComponent> = vfs_data_fork.get_name();
         assert_eq!(name, None);
 
-        // TODO: add test with ADS
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(1)?;
+        let vfs_data_fork: VfsDataFork = VfsDataFork::Ntfs(data_fork);
+
+        let name: Option<PathComponent> = vfs_data_fork.get_name();
+        assert_eq!(name, Some(PathComponent::from(Ucs2String::from("$Info"))));
 
         Ok(())
     }

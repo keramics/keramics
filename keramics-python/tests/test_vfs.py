@@ -426,16 +426,16 @@ class TestPath(TestClass):
 
 
 class TestPathComponent(TestClass):
-    def test_new(self):
-        string = vfs.VfsString.from_string("ext2.qcow2")
-        path_component = vfs.VfsPathComponent.new(string)
-
-        assert path_component is not None
-
     def test_from_string(self):
         path_component = vfs.VfsPathComponent.from_string("ext2.qcow2")
 
         assert path_component is not None
+
+    def test_to_string(self):
+        path_component = vfs.VfsPathComponent.from_string("ext2.qcow2")
+
+        assert path_component is not None
+        assert path_component.to_string() == "ext2.qcow2"
 
 
 class TestResolver(TestClass):
@@ -503,13 +503,6 @@ class TestResolver(TestClass):
         file_system = resolver.open_file_system(ext_location)
 
         assert file_system is not None
-
-
-class TestPathComponent(TestClass):
-    def test_from_string(self):
-        string = vfs.VfsString.from_string("ext2.qcow2")
-
-        assert string is not None
 
 
 class TestType(TestClass):

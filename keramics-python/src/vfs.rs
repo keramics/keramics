@@ -21,7 +21,7 @@ use keramics_core::DataStreamReference;
 use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{
     VfsDataFork, VfsExtendedAttribute, VfsFileEntry, VfsFileSystemReference, VfsFileType,
-    VfsLocation, VfsResolver, VfsResolverReference, VfsString, VfsType,
+    VfsLocation, VfsResolver, VfsResolverReference, VfsType,
 };
 
 use super::datetime::PyDateTime;
@@ -37,10 +37,10 @@ struct PyVfsDataFork {
 #[pymethods]
 impl PyVfsDataFork {
     #[getter]
-    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsString>> {
+    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsPathComponent>> {
         match self_ref.data_fork.get_name() {
-            Some(name) => Ok(Some(PyVfsString {
-                string: Arc::new(name),
+            Some(name) => Ok(Some(PyVfsPathComponent {
+                path_component: Arc::new(name),
             })),
             None => Ok(None),
         }
@@ -174,9 +174,9 @@ struct PyVfsExtendedAttribute {
 #[pymethods]
 impl PyVfsExtendedAttribute {
     #[getter]
-    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<PyVfsString> {
-        Ok(PyVfsString {
-            string: Arc::new(self_ref.extended_attribute.get_name()),
+    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<PyVfsPathComponent> {
+        Ok(PyVfsPathComponent {
+            path_component: Arc::new(self_ref.extended_attribute.get_name()),
         })
     }
 
@@ -277,10 +277,10 @@ impl PyVfsFileEntry {
     }
 
     #[getter]
-    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsString>> {
+    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsPathComponent>> {
         match self_ref.file_entry.get_name() {
-            Some(name) => Ok(Some(PyVfsString {
-                string: Arc::new(name),
+            Some(name) => Ok(Some(PyVfsPathComponent {
+                path_component: Arc::new(name),
             })),
             None => Ok(None),
         }
@@ -515,22 +515,22 @@ impl PyVfsLocation {
     }
 
     pub fn new_with_layer_from_string(
-        &self,
+        self_ref: PyRef<'_, Self>,
         path_type: &PyVfsType,
         path_string: &str,
     ) -> PyResult<Self> {
         let vfs_type: VfsType = VfsType::from(path_type);
         let vfs_path: Path = Path::from(path_string);
-        let vfs_location: VfsLocation = self.location.new_with_layer(&vfs_type, vfs_path);
+        let vfs_location: VfsLocation = self_ref.location.new_with_layer(&vfs_type, vfs_path);
 
         Ok(Self {
             location: Arc::new(vfs_location),
         })
     }
 
-    pub fn new_with_parent(&self, path: &PyVfsPath) -> PyResult<Self> {
+    pub fn new_with_parent(self_ref: PyRef<'_, Self>, path: &PyVfsPath) -> PyResult<Self> {
         let vfs_path: Path = path.path.as_ref().clone();
-        let vfs_location: VfsLocation = self.location.new_with_parent(vfs_path);
+        let vfs_location: VfsLocation = self_ref.location.new_with_parent(vfs_path);
 
         Ok(Self {
             location: Arc::new(vfs_location),
@@ -538,8 +538,8 @@ impl PyVfsLocation {
     }
 
     #[getter]
-    pub fn get_parent(&self) -> PyResult<Option<Self>> {
-        match self.location.as_ref() {
+    pub fn get_parent(self_ref: PyRef<'_, Self>) -> PyResult<Option<Self>> {
+        match self_ref.location.as_ref() {
             VfsLocation::Base { .. } => Ok(None),
             VfsLocation::Layer { parent, .. } => Ok(Some(Self {
                 location: parent.clone(),
@@ -548,8 +548,8 @@ impl PyVfsLocation {
     }
 
     #[getter]
-    pub fn get_path(&self) -> PyResult<PyVfsPath> {
-        let vfs_path: &Path = self.location.get_path();
+    pub fn get_path(self_ref: PyRef<'_, Self>) -> PyResult<PyVfsPath> {
+        let vfs_path: &Path = self_ref.location.get_path();
 
         Ok(PyVfsPath {
             path: Arc::new(vfs_path.clone()),
@@ -558,8 +558,8 @@ impl PyVfsLocation {
 
     // TODO: add support for get_type
 
-    pub fn to_string(&self) -> String {
-        self.location.to_string()
+    pub fn to_string(self_ref: PyRef<'_, Self>) -> String {
+        self_ref.location.to_string()
     }
 }
 
@@ -582,8 +582,8 @@ impl PyVfsPath {
         })
     }
 
-    pub fn new_with_join(&self, path: &PyVfsPath) -> PyResult<Self> {
-        let vfs_path: Path = self.path.new_with_join(&path.path);
+    pub fn new_with_join(self_ref: PyRef<'_, Self>, path: &PyVfsPath) -> PyResult<Self> {
+        let vfs_path: Path = self_ref.path.new_with_join(&path.path);
 
         Ok(Self {
             path: Arc::new(vfs_path),
@@ -591,7 +591,7 @@ impl PyVfsPath {
     }
 
     pub fn new_with_join_path_components(
-        &self,
+        self_ref: PyRef<'_, Self>,
         path_components: Vec<PyVfsPathComponent>,
     ) -> PyResult<Self> {
         let vfs_path_components: &[PathComponent] = &path_components
@@ -599,23 +599,25 @@ impl PyVfsPath {
             .map(|path_component| path_component.path_component.as_ref().clone())
             .collect::<Vec<PathComponent>>();
 
-        let vfs_path: Path = self.path.new_with_join_path_components(vfs_path_components);
+        let vfs_path: Path = self_ref
+            .path
+            .new_with_join_path_components(vfs_path_components);
 
         Ok(Self {
             path: Arc::new(vfs_path),
         })
     }
 
-    pub fn new_with_parent_directory(&self) -> PyResult<Self> {
-        let vfs_path: Path = self.path.new_with_parent_directory();
+    pub fn new_with_parent_directory(self_ref: PyRef<'_, Self>) -> PyResult<Self> {
+        let vfs_path: Path = self_ref.path.new_with_parent_directory();
 
         Ok(Self {
             path: Arc::new(vfs_path),
         })
     }
 
-    pub fn get_file_name(&self) -> PyResult<Option<PyVfsPathComponent>> {
-        match self.path.file_name() {
+    pub fn get_file_name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsPathComponent>> {
+        match self_ref.path.file_name() {
             Some(path_component) => Ok(Some(PyVfsPathComponent {
                 path_component: Arc::new(path_component.clone()),
             })),
@@ -623,16 +625,16 @@ impl PyVfsPath {
         }
     }
 
-    pub fn is_relative(&self) -> PyResult<bool> {
-        Ok(self.path.is_relative())
+    pub fn is_relative(self_ref: PyRef<'_, Self>) -> PyResult<bool> {
+        Ok(self_ref.path.is_relative())
     }
 
-    pub fn is_root(&self) -> PyResult<bool> {
-        Ok(self.path.is_root())
+    pub fn is_root(self_ref: PyRef<'_, Self>) -> PyResult<bool> {
+        Ok(self_ref.path.is_root())
     }
 
-    pub fn to_string(&self) -> String {
-        self.path.to_string()
+    pub fn to_string(self_ref: PyRef<'_, Self>) -> String {
+        self_ref.path.to_string()
     }
 }
 
@@ -646,18 +648,15 @@ struct PyVfsPathComponent {
 
 #[pymethods]
 impl PyVfsPathComponent {
-    #[new]
-    pub fn new(string: &PyVfsString) -> PyResult<Self> {
-        Ok(Self {
-            path_component: Arc::new(string.string.to_path_component()),
-        })
-    }
-
     #[staticmethod]
     pub fn from_string(string: &str) -> PyResult<Self> {
         Ok(Self {
             path_component: Arc::new(PathComponent::from(string)),
         })
+    }
+
+    pub fn to_string(self_ref: PyRef<'_, Self>) -> String {
+        self_ref.path_component.to_string()
     }
 }
 
@@ -679,15 +678,15 @@ impl PyVfsResolver {
     }
 
     pub fn get_data_stream_by_location_and_name(
-        &self,
+        self_ref: PyRef<'_, Self>,
         location: &PyVfsLocation,
-        name: Option<&PyVfsString>,
+        name: Option<&PyVfsPathComponent>,
     ) -> PyResult<Option<PyVfsDataStream>> {
-        let vfs_name: Option<&VfsString> = match name {
-            Some(name) => Some(&name.string),
+        let vfs_name: Option<&PathComponent> = match name {
+            Some(name) => Some(&name.path_component),
             None => None,
         };
-        match self
+        match self_ref
             .resolver
             .get_data_stream_by_location_and_name(location.location.as_ref(), vfs_name)
         {
@@ -701,10 +700,10 @@ impl PyVfsResolver {
     }
 
     pub fn get_file_entry_by_location(
-        &self,
+        self_ref: PyRef<'_, Self>,
         location: &PyVfsLocation,
     ) -> PyResult<Option<PyVfsFileEntry>> {
-        match self
+        match self_ref
             .resolver
             .get_file_entry_by_location(location.location.as_ref())
         {
@@ -719,36 +718,20 @@ impl PyVfsResolver {
         }
     }
 
-    pub fn open_file_system(&self, location: &PyVfsLocation) -> PyResult<PyVfsFileSystem> {
-        match self.resolver.open_file_system(location.location.as_ref()) {
+    pub fn open_file_system(
+        self_ref: PyRef<'_, Self>,
+        location: &PyVfsLocation,
+    ) -> PyResult<PyVfsFileSystem> {
+        match self_ref
+            .resolver
+            .open_file_system(location.location.as_ref())
+        {
             Ok(file_system) => Ok(PyVfsFileSystem { file_system }),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to open file system with error:\n{}",
                 error
             ))),
         }
-    }
-}
-
-#[pyclass]
-#[pyo3(name = "VfsString")]
-#[derive(Clone)]
-struct PyVfsString {
-    /// String.
-    string: Arc<VfsString>,
-}
-
-#[pymethods]
-impl PyVfsString {
-    #[staticmethod]
-    pub fn from_string(string: &str) -> PyResult<Self> {
-        Ok(Self {
-            string: Arc::new(VfsString::from(string)),
-        })
-    }
-
-    pub fn to_string(&self) -> String {
-        self.string.to_string()
     }
 }
 
@@ -809,7 +792,6 @@ pub fn vfs(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyVfsPath>()?;
     module.add_class::<PyVfsPathComponent>()?;
     module.add_class::<PyVfsResolver>()?;
-    module.add_class::<PyVfsString>()?;
     module.add_class::<PyVfsType>()?;
 
     Ok(())

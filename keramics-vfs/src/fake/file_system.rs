@@ -42,18 +42,15 @@ impl FakeFileSystem {
         path: Path,
         file_entry: FakeFileEntry,
     ) -> Result<(), ErrorTrace> {
-        let file_entry_path: Path = match file_entry.get_name() {
-            Some(file_name) => {
-                if file_name.is_empty() {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unable to create file entry path - missing file name"
-                    ));
-                }
-                let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
+        let file_name: &PathComponent = file_entry.get_name();
+
+        let file_entry_path: Path = match file_name {
+            PathComponent::Root => path,
+            _ => {
+                let path_components: [PathComponent; 1] = [file_name.clone()];
 
                 path.new_with_join_path_components(&path_components)
             }
-            None => path,
         };
         match self.paths.insert(file_entry_path, Arc::new(file_entry)) {
             Some(_) => {
@@ -155,8 +152,8 @@ mod tests {
 
         let fake_file_entry: Arc<FakeFileEntry> = result.unwrap();
 
-        let name: Option<&String> = fake_file_entry.get_name();
-        assert!(name.is_none());
+        let name: &PathComponent = fake_file_entry.get_name();
+        assert_eq!(name, &PathComponent::Root);
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
@@ -167,8 +164,8 @@ mod tests {
 
         let fake_file_entry: Arc<FakeFileEntry> = result.unwrap();
 
-        let name: Option<&String> = fake_file_entry.get_name();
-        assert_eq!(name, Some(String::from("file.txt")).as_ref());
+        let name: &PathComponent = fake_file_entry.get_name();
+        assert_eq!(name, &PathComponent::from("file.txt"));
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);

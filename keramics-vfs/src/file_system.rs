@@ -14,10 +14,10 @@
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::Path;
 use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
 use keramics_formats::fat::{FatFileEntry, FatFileSystem};
 use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
+use keramics_formats::{Path, PathComponent};
 
 use super::apm::{ApmFileEntry, ApmFileSystem};
 use super::enums::VfsType;
@@ -30,7 +30,6 @@ use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::{OsFileEntry, OsFileSystem};
 use super::qcow::{QcowFileEntry, QcowFileSystem};
 use super::sparseimage::{SparseImageFileEntry, SparseImageFileSystem};
-use super::string::VfsString;
 use super::types::VfsFileSystemReference;
 use super::udif::{UdifFileEntry, UdifFileSystem};
 use super::vhd::{VhdFileEntry, VhdFileSystem};
@@ -156,12 +155,28 @@ impl VfsFileSystem {
         }
     }
 
+    /// Retrieves a data stream with the specified path.
+    #[inline(always)]
+    pub(crate) fn get_data_stream_by_path(
+        &self,
+        path: &Path,
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        match self.get_file_entry_by_path(path) {
+            Ok(Some(file_entry)) => file_entry.get_data_stream(),
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                Err(error)
+            }
+        }
+    }
+
     /// Retrieves a data stream with the specified path and name.
     #[inline(always)]
     pub fn get_data_stream_by_path_and_name(
         &self,
         path: &Path,
-        name: Option<&VfsString>,
+        name: Option<&PathComponent>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.get_file_entry_by_path(path) {
             // TODO: replace by get_data_fork_by_name

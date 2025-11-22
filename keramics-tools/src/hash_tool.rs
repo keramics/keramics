@@ -20,13 +20,14 @@ use clap::Parser;
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_formats::PathComponent;
 use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
-    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsString, new_os_vfs_location,
+    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, new_os_vfs_location,
 };
 
 mod display_path;
@@ -164,7 +165,7 @@ impl HashTool {
         &self,
         file_entry: &VfsFileEntry,
         file_system_display_path: &String,
-        path_components: &[VfsString],
+        path_components: &[PathComponent],
     ) -> Result<(), ErrorTrace> {
         let display_path: String = self.display_path.join_path_components(path_components);
 
@@ -195,11 +196,12 @@ impl HashTool {
                     return Err(error);
                 }
             };
-            let name: Option<VfsString> = data_fork.get_name();
+            let name: Option<PathComponent> = data_fork.get_name();
 
             let display_path_and_name: String = match name.as_ref() {
                 Some(name) => {
-                    let escaped_name: String = self.display_path.escape_string(name);
+                    let escaped_name: String = self.display_path.escape_path_component(name);
+
                     format!("{}:{}", display_path, escaped_name)
                 }
                 None => display_path.clone(),
@@ -210,8 +212,8 @@ impl HashTool {
             // }
             // TODO: create skip list
             let hash_string: String = if path_components.len() > 1
-                && path_components[1] == VfsString::from(Ucs2String::from("$BadClus"))
-                && name == Some(VfsString::from(Ucs2String::from("$Bad")))
+                && path_components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
+                && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
             {
                 String::from("N/A (skipped)")
             } else {

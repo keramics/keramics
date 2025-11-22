@@ -14,6 +14,7 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::PathComponent;
 use keramics_formats::apm::{ApmPartition, ApmVolumeSystem};
 
 use crate::enums::VfsFileType;
@@ -57,10 +58,12 @@ impl ApmFileEntry {
     }
 
     /// Retrieves the name.
-    pub fn get_name(&self) -> Option<String> {
+    pub fn get_name(&self) -> PathComponent {
         match self {
-            ApmFileEntry::Partition { index, .. } => Some(format!("apm{}", index + 1)),
-            ApmFileEntry::Root { .. } => None,
+            ApmFileEntry::Partition { index, .. } => {
+                PathComponent::from(format!("apm{}", index + 1))
+            }
+            ApmFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
@@ -165,8 +168,8 @@ mod tests {
             volume_system: apm_volume_system.clone(),
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert!(name.is_none());
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::Root);
 
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
         let partition_size: u64 = apm_partition.size;
@@ -176,8 +179,8 @@ mod tests {
             size: partition_size,
         };
 
-        let name: Option<String> = file_entry.get_name();
-        assert_eq!(name, Some(String::from("apm1")));
+        let name: PathComponent = file_entry.get_name();
+        assert_eq!(name, PathComponent::from("apm1"));
 
         Ok(())
     }
@@ -241,7 +244,9 @@ mod tests {
         };
 
         let sub_file_entry: ApmFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
-        assert_eq!(sub_file_entry.get_name(), Some(String::from("apm1")));
+
+        let name: PathComponent = sub_file_entry.get_name();
+        assert_eq!(name, PathComponent::from("apm1"));
 
         let result: Result<ApmFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
