@@ -737,11 +737,7 @@ impl VfsFileEntry {
                 },
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                let ntfs_name: Option<Ucs2String> = match name {
-                    Some(path_component) => Some(path_component.to_ucs2_string()?),
-                    None => None,
-                };
-                match ntfs_file_entry.get_data_stream_by_name(&ntfs_name) {
+                match ntfs_file_entry.get_data_stream_by_name(name) {
                     Ok(result) => result,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
