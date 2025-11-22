@@ -375,6 +375,11 @@ impl OsFileEntry {
 
         Ok(true)
     }
+
+    /// Determines if the file entry is the root file entry.
+    pub fn is_root_file_entry(&self) -> bool {
+        self.path.has_root() && self.path.parent().is_none()
+    }
 }
 
 #[cfg(test)]
@@ -652,6 +657,15 @@ mod tests {
 
         assert_eq!(result, true);
         assert_eq!(file_entry.file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
+        let file_entry: OsFileEntry = get_os_file_entry("directory")?;
+
+        assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())
     }

@@ -18,7 +18,7 @@ use keramics_datetime::DateTime;
 use keramics_formats::ext::ExtFileEntry;
 use keramics_formats::ext::constants::*;
 use keramics_formats::fat::{FatFileEntry, FatString};
-use keramics_formats::ntfs::{NtfsDataFork, NtfsFileEntry};
+use keramics_formats::ntfs::NtfsFileEntry;
 use keramics_formats::{Path, PathComponent};
 use keramics_types::Ucs2String;
 
@@ -27,6 +27,7 @@ use super::data_fork::VfsDataFork;
 use super::enums::VfsFileType;
 use super::ewf::EwfFileEntry;
 use super::extended_attribute::VfsExtendedAttribute;
+use super::extended_attributes::VfsExtendedAttributesIterator;
 use super::fake::FakeFileEntry;
 use super::file_entries::VfsFileEntriesIterator;
 use super::gpt::GptFileEntry;
@@ -516,193 +517,74 @@ impl VfsFileEntry {
         &self,
         data_fork_index: usize,
     ) -> Result<VfsDataFork, ErrorTrace> {
-        let data_fork: VfsDataFork = match self {
-            VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                let ntfs_data_fork: NtfsDataFork =
-                    match ntfs_file_entry.get_data_fork_by_index(data_fork_index) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to retrieve NTFS data stream"
-                            );
-                            return Err(error);
-                        }
-                    };
-                VfsDataFork::Ntfs(ntfs_data_fork)
-            }
-            _ => {
+        let result: Result<Option<VfsDataFork>, ErrorTrace> = match self {
+            VfsFileEntry::Apm(_)
+            | VfsFileEntry::Ext(_)
+            | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Fake(_)
+            | VfsFileEntry::Fat(_)
+            | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Mbr(_)
+            | VfsFileEntry::Os(_)
+            | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::Udif(_)
+            | VfsFileEntry::Vhd(_)
+            | VfsFileEntry::Vhdx(_) => {
                 if data_fork_index != 0 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid data fork index: {}",
                         data_fork_index
                     )));
                 }
-                match self.get_data_stream() {
-                    Ok(Some(data_stream)) => VfsDataFork::DataStream(data_stream),
-                    Ok(None) => {
-                        return Err(keramics_core::error_trace_new!("Missing data stream"));
-                    }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve data stream"
-                        );
-                        return Err(error);
-                    }
+                match self.get_data_stream()? {
+                    Some(data_stream) => Ok(Some(VfsDataFork::DataStream(data_stream))),
+                    None => Ok(None),
                 }
             }
+            VfsFileEntry::Ntfs(ntfs_file_entry) => Ok(Some(VfsDataFork::Ntfs(
+                ntfs_file_entry.get_data_fork_by_index(data_fork_index)?,
+            ))),
         };
-        Ok(data_fork)
+        match result {
+            Ok(Some(data_stream)) => Ok(data_stream),
+            Ok(None) => Err(keramics_core::error_trace_new!("Missing data stream")),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                Err(error)
+            }
+        }
     }
+
+    // TODO: add get_data_fork_by_name
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        let result: Option<DataStreamReference> = match self {
-            VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve APM data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve ext data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve EWF data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Fake(fake_file_entry) => match fake_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve fake data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Fat(fat_file_entry) => match fat_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve FAT data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve GPT data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve MBR data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve NTFS data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve OS data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Qcow(qcow_file_entry) => match qcow_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve QCOW data stream"
-                    );
-                    return Err(error);
-                }
-            },
+        let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
+            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream(),
+            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_data_stream(),
+            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_data_stream(),
+            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_data_stream(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_data_stream(),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream(),
+            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_data_stream(),
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
-                match sparseimage_file_entry.get_data_stream() {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve sparseimage data stream"
-                        );
-                        return Err(error);
-                    }
-                }
+                sparseimage_file_entry.get_data_stream()
             }
-            VfsFileEntry::Udif(udif_file_entry) => match udif_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve UDIF data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Vhd(vhd_file_entry) => match vhd_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve VHD data stream"
-                    );
-                    return Err(error);
-                }
-            },
-            VfsFileEntry::Vhdx(vhdx_file_entry) => match vhdx_file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve VHDX data stream"
-                    );
-                    return Err(error);
-                }
-            },
+            VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_data_stream(),
+            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_data_stream(),
+            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_data_stream(),
         };
-        Ok(result)
+        match result {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        }
     }
 
     /// Retrieves a data stream with the specified name.
@@ -710,7 +592,7 @@ impl VfsFileEntry {
         &self,
         name: Option<&PathComponent>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        let result: Option<DataStreamReference> = match self {
+        let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ext(_)
             | VfsFileEntry::Ewf(_)
@@ -724,37 +606,23 @@ impl VfsFileEntry {
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => match name {
-                Some(_) => None,
-                None => match self.get_data_stream() {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve data stream"
-                        );
-                        return Err(error);
-                    }
-                },
+                Some(_) => Ok(None),
+                None => self.get_data_stream(),
             },
-            VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                match ntfs_file_entry.get_data_stream_by_name(name) {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve NTFS data stream"
-                        );
-                        return Err(error);
-                    }
-                }
-            }
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_data_stream_by_name(name),
         };
-        Ok(result)
+        match result {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves the number of extended attributes.
     pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
-        match self {
+        let result: Result<usize, ErrorTrace> = match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
@@ -768,17 +636,16 @@ impl VfsFileEntry {
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => Ok(0),
-            VfsFileEntry::Ext(ext_file_entry) => {
-                match ext_file_entry.get_number_of_extended_attributes() {
-                    Ok(result) => Ok(result),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve ext number of extended attributes"
-                        );
-                        Err(error)
-                    }
-                }
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_extended_attributes(),
+        };
+        match result {
+            Ok(number_of_extended_attributes) => Ok(number_of_extended_attributes),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of extended attributes"
+                );
+                Err(error)
             }
         }
     }
@@ -788,7 +655,7 @@ impl VfsFileEntry {
         &mut self,
         extended_attribute_index: usize,
     ) -> Result<VfsExtendedAttribute, ErrorTrace> {
-        match self {
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
@@ -801,26 +668,26 @@ impl VfsFileEntry {
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Err(keramics_core::error_trace_new!(format!(
+            | VfsFileEntry::Vhdx(_) => Ok(None),
+            VfsFileEntry::Ext(ext_file_entry) => Ok(Some(VfsExtendedAttribute::Ext(
+                ext_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
+        };
+        match result {
+            Ok(Some(extended_attribute)) => Ok(extended_attribute),
+            Ok(None) => Err(keramics_core::error_trace_new!(format!(
                 "Missing extended attribute: {}",
                 extended_attribute_index
             ))),
-            VfsFileEntry::Ext(ext_file_entry) => {
-                match ext_file_entry.get_extended_attribute_by_index(extended_attribute_index) {
-                    Ok(ext_extended_attribute) => {
-                        Ok(VfsExtendedAttribute::Ext(ext_extended_attribute))
-                    }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve ext extended attribute: {}",
-                                extended_attribute_index
-                            )
-                        );
-                        Err(error)
-                    }
-                }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve extended attribute: {}",
+                        extended_attribute_index
+                    )
+                );
+                Err(error)
             }
         }
     }
@@ -830,7 +697,7 @@ impl VfsFileEntry {
         &mut self,
         extended_attribute_name: &PathComponent,
     ) -> Result<Option<VfsExtendedAttribute>, ErrorTrace> {
-        match self {
+        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
@@ -843,93 +710,55 @@ impl VfsFileEntry {
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Err(keramics_core::error_trace_new!(
-                "Missing extended attribute"
-            )),
+            | VfsFileEntry::Vhdx(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => {
-                match ext_file_entry.get_extended_attribute_by_name(extended_attribute_name) {
-                    Ok(Some(ext_extended_attribute)) => {
+                match ext_file_entry.get_extended_attribute_by_name(extended_attribute_name)? {
+                    Some(ext_extended_attribute) => {
                         Ok(Some(VfsExtendedAttribute::Ext(ext_extended_attribute)))
                     }
-                    Ok(None) => Ok(None),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve ext extended attribute"
-                        );
-                        Err(error)
-                    }
+                    None => Ok(None),
                 }
+            }
+        };
+        match result {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve extended attribute"
+                );
+                Err(error)
             }
         }
     }
 
-    // TODO: add get extended_attributes iterator
+    /// Retrieves an extended attributes iterator.
+    pub fn extended_attributes(&mut self) -> VfsExtendedAttributesIterator<'_> {
+        VfsExtendedAttributesIterator::new(self)
+    }
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        match self {
+        let result: Result<usize, ErrorTrace> = match self {
             VfsFileEntry::Apm(apm_file_entry) => {
                 Ok(apm_file_entry.get_number_of_sub_file_entries())
             }
-            VfsFileEntry::Ext(ext_file_entry) => {
-                match ext_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve number of ext sub file entries"
-                        );
-                        Err(error)
-                    }
-                }
-            }
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Ewf(ewf_file_entry) => {
                 Ok(ewf_file_entry.get_number_of_sub_file_entries())
             }
-            VfsFileEntry::Fake(_) => todo!(),
-            VfsFileEntry::Fat(fat_file_entry) => {
-                match fat_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve number of FAT sub file entries"
-                        );
-                        Err(error)
-                    }
-                }
+            VfsFileEntry::Fake(fake_file_entry) => {
+                Ok(fake_file_entry.get_number_of_sub_file_entries())
             }
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Gpt(gpt_file_entry) => {
                 Ok(gpt_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::Mbr(mbr_file_entry) => {
                 Ok(mbr_file_entry.get_number_of_sub_file_entries())
             }
-            VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                match ntfs_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve number of NTFS sub file entries"
-                        );
-                        Err(error)
-                    }
-                }
-            }
-            VfsFileEntry::Os(os_file_entry) => {
-                match os_file_entry.get_number_of_sub_file_entries() {
-                    Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve number of OS sub file entries"
-                        );
-                        Err(error)
-                    }
-                }
-            }
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Qcow(qcow_file_entry) => {
                 Ok(qcow_file_entry.get_number_of_sub_file_entries())
             }
@@ -945,6 +774,16 @@ impl VfsFileEntry {
             VfsFileEntry::Vhdx(vhdx_file_entry) => {
                 Ok(vhdx_file_entry.get_number_of_sub_file_entries())
             }
+        };
+        match result {
+            Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of sub file entries"
+                );
+                Err(error)
+            }
         }
     }
 
@@ -953,205 +792,63 @@ impl VfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<VfsFileEntry, ErrorTrace> {
-        let sub_file_entry: VfsFileEntry = match self {
-            VfsFileEntry::Apm(apm_file_entry) => {
-                match apm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Apm(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve APM sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Ext(ext_file_entry) => {
-                match ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Ext(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve ext sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Ewf(ewf_file_entry) => {
-                match ewf_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Ewf(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve EWF sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Fake(_) => todo!(),
-            VfsFileEntry::Fat(fat_file_entry) => {
-                match fat_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Fat(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve FAT sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Gpt(gpt_file_entry) => {
-                match gpt_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Gpt(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve GPT sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Mbr(mbr_file_entry) => {
-                match mbr_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Mbr(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve MBR sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Ntfs(ntfs_file_entry) => {
-                match ntfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Ntfs(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve NTFS sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Os(os_file_entry) => {
-                match os_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Os(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve OS sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Qcow(qcow_file_entry) => {
-                match qcow_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Qcow(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve QCOW sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::SparseImage(sparseimage_file_entry) => {
-                match sparseimage_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::SparseImage(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve sparseimage sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Udif(udif_file_entry) => {
-                match udif_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Udif(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve UDIF sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Vhd(vhd_file_entry) => {
-                match vhd_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Vhd(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve VHD sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            VfsFileEntry::Vhdx(vhdx_file_entry) => {
-                match vhdx_file_entry.get_sub_file_entry_by_index(sub_file_entry_index) {
-                    Ok(sub_file_entry) => VfsFileEntry::Vhdx(sub_file_entry),
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve VHDX sub file entry: {}",
-                                sub_file_entry_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
+        let result: Result<VfsFileEntry, ErrorTrace> = match self {
+            VfsFileEntry::Apm(apm_file_entry) => Ok(VfsFileEntry::Apm(
+                apm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Ext(ext_file_entry) => Ok(VfsFileEntry::Ext(
+                ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Ewf(ewf_file_entry) => Ok(VfsFileEntry::Ewf(
+                ewf_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Fake(fake_file_entry) => Ok(VfsFileEntry::Fake(
+                fake_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Fat(fat_file_entry) => Ok(VfsFileEntry::Fat(
+                fat_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Gpt(gpt_file_entry) => Ok(VfsFileEntry::Gpt(
+                gpt_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Mbr(mbr_file_entry) => Ok(VfsFileEntry::Mbr(
+                mbr_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => Ok(VfsFileEntry::Ntfs(
+                ntfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Os(os_file_entry) => Ok(VfsFileEntry::Os(
+                os_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Qcow(qcow_file_entry) => Ok(VfsFileEntry::Qcow(
+                qcow_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::SparseImage(sparseimage_file_entry) => Ok(VfsFileEntry::SparseImage(
+                sparseimage_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Udif(udif_file_entry) => Ok(VfsFileEntry::Udif(
+                udif_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Vhd(vhd_file_entry) => Ok(VfsFileEntry::Vhd(
+                vhd_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Vhdx(vhdx_file_entry) => Ok(VfsFileEntry::Vhdx(
+                vhdx_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
         };
-        Ok(sub_file_entry)
+        match result {
+            Ok(sub_file_entry) => Ok(sub_file_entry),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve sub file entry: {}",
+                        sub_file_entry_index
+                    )
+                );
+                Err(error)
+            }
+        }
     }
 
     // TODO: add get sub_file_entry_by_name
@@ -1167,12 +864,12 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
-            VfsFileEntry::Fake(_) => todo!(),
+            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.is_root_file_entry(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.is_root_file_entry(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.is_root_file_entry(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
-            VfsFileEntry::Os(_) => todo!(),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.is_root_file_entry(),
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.is_root_file_entry()
@@ -1439,9 +1136,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -2024,9 +1721,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -2465,9 +2162,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -2738,9 +2435,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3006,9 +2703,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3299,9 +2996,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3597,9 +3294,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3866,9 +3563,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4138,9 +3835,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4406,9 +4103,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4674,9 +4371,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4942,9 +4639,9 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
         let name: PathComponent = PathComponent::from("bogus");
-        let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_name(&name);
-        assert!(result.is_err());
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4984,5 +4681,6 @@ mod tests {
 
     // TODO: add tests for get_number_of_data_forks
 
+    // TODO: add tests for extended_attributes
     // TODO: add tests for sub_file_entries
 }

@@ -323,6 +323,10 @@ impl PyVfsFileEntry {
         }
     }
 
+    // TODO: add get_number_of_data_forks
+    // TODO: add get_data_fork_by_index
+    // TODO: add get_data_fork_by_name
+
     pub fn get_data_stream(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsDataStream>> {
         match self_ref.file_entry.get_data_stream() {
             Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream { data_stream })),
@@ -333,6 +337,8 @@ impl PyVfsFileEntry {
             ))),
         }
     }
+
+    // TODO: add get_data_stream_by_name
 
     pub fn get_number_of_extended_attributes(mut self_ref: PyRefMut<'_, Self>) -> PyResult<usize> {
         let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
@@ -439,6 +445,8 @@ impl PyVfsFileEntry {
             ))),
         }
     }
+
+    // TODO: add get sub_file_entry_by_name
 }
 
 #[pyclass]

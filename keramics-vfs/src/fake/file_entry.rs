@@ -146,6 +146,19 @@ impl FakeFileEntry {
         self.size
     }
 
+    /// Retrieves the number of sub file entries.
+    pub fn get_number_of_sub_file_entries(&self) -> usize {
+        todo!();
+    }
+
+    /// Retrieves a specific sub file entry.
+    pub fn get_sub_file_entry_by_index(
+        &self,
+        sub_file_entry_index: usize,
+    ) -> Result<Arc<FakeFileEntry>, ErrorTrace> {
+        todo!();
+    }
+
     /// Determines if the file entry is the root file entry.
     pub fn is_root_file_entry(&self) -> bool {
         self.name == PathComponent::Root

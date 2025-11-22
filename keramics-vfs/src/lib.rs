@@ -15,6 +15,7 @@ mod context;
 mod data_fork;
 mod enums;
 mod extended_attribute;
+mod extended_attributes;
 mod file_entries;
 mod file_entry;
 mod file_resolver;
