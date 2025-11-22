@@ -129,7 +129,9 @@ impl NtfsDirectoryIndex {
                 index_root_header.index_entry_size
             )));
         }
-        match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION) {
+        match mft_attributes
+            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION)
+        {
             Some(mft_attribute) => {
                 let standard_information: NtfsStandardInformation =
                     match NtfsStandardInformation::from_attribute(mft_attribute) {

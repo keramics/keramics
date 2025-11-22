@@ -305,7 +305,7 @@ impl NtfsFileSystem {
             ));
         }
         let data_attribute: &NtfsMftAttribute =
-            match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+            match mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(data_attribute) => data_attribute,
                 None => {
                     return Err(keramics_core::error_trace_new!("Missing $Data attribute"));
@@ -445,7 +445,8 @@ impl NtfsFileSystem {
                 "Unsupported MFT entry with attribute list"
             ));
         }
-        match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME) {
+        match mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_NAME)
+        {
             Some(mft_attribute) => {
                 if !mft_attribute.is_resident() {
                     return Err(keramics_core::error_trace_new!(
@@ -469,7 +470,9 @@ impl NtfsFileSystem {
             }
             None => {}
         };
-        match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION) {
+        match mft_attributes
+            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION)
+        {
             Some(mft_attribute) => {
                 let volume_information: NtfsVolumeInformation =
                     match NtfsVolumeInformation::from_attribute(mft_attribute) {

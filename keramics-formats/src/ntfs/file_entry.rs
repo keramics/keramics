@@ -181,7 +181,7 @@ impl NtfsFileEntry {
     pub fn get_size(&self) -> u64 {
         match self
             .mft_attributes
-            .get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA)
+            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
         {
             Some(data_attribute) => data_attribute.data_size,
             None => 0,
@@ -951,17 +951,39 @@ mod tests {
         let number_of_data_forks: usize = ntfs_file_entry.get_number_of_data_forks()?;
         assert_eq!(number_of_data_forks, 0);
 
-        let path: Path = Path::from("/testdir1/testfile1");
+        let path: Path = Path::from("/$UpCase");
         let ntfs_file_entry: NtfsFileEntry =
             ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_data_forks: usize = ntfs_file_entry.get_number_of_data_forks()?;
-        assert_eq!(number_of_data_forks, 1);
+        assert_eq!(number_of_data_forks, 2);
 
         Ok(())
     }
 
-    // TODO: add test_get_data_fork_by_index
+    #[test]
+    fn test_get_data_fork_by_index() -> Result<(), ErrorTrace> {
+        let ntfs_file_system: NtfsFileSystem = get_file_system("ntfs/ntfs.raw")?;
+
+        let path: Path = Path::from("/$UpCase");
+        let ntfs_file_entry: NtfsFileEntry =
+            ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(0)?;
+
+        let name: Option<&Ucs2String> = data_fork.get_name();
+        assert_eq!(name, None);
+
+        let data_fork: NtfsDataFork = ntfs_file_entry.get_data_fork_by_index(1)?;
+
+        let name: Option<&Ucs2String> = data_fork.get_name();
+        assert_eq!(name, Some(Ucs2String::from("$Info")).as_ref());
+
+        let result: Result<NtfsDataFork, ErrorTrace> = ntfs_file_entry.get_data_fork_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_number_of_attributes() -> Result<(), ErrorTrace> {

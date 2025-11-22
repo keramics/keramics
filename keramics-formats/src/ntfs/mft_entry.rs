@@ -30,7 +30,7 @@ pub struct NtfsMftEntry {
     mediator: MediatorReference,
 
     /// Data.
-    data: Vec<u8>,
+    pub(super) data: Vec<u8>,
 
     /// Sequence number.
     pub sequence_number: u16,
@@ -112,7 +112,7 @@ impl NtfsMftEntry {
     }
 
     /// Reads the MFT entry from a buffer.
-    fn read_data(&mut self, data: &mut [u8]) -> Result<(), ErrorTrace> {
+    pub(super) fn read_data(&mut self, data: &mut [u8]) -> Result<(), ErrorTrace> {
         if data[0..4] == [0; 4] {
             self.is_empty = true;
 

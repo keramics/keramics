@@ -187,7 +187,7 @@ impl NtfsMasterFileTable {
             }
         }
         let data_attribute: &NtfsMftAttribute =
-            match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+            match mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => mft_attribute,
                 None => {
                     return Err(keramics_core::error_trace_new!(
@@ -275,7 +275,7 @@ impl NtfsMasterFileTable {
                     return Err(error);
                 }
             }
-            match mft_attributes.get_attribute(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
+            match mft_attributes.get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA) {
                 Some(mft_attribute) => {
                     match self.add_cluster_group(&mft_attribute.data_cluster_groups[0]) {
                         Ok(_) => {}
