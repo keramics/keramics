@@ -13,6 +13,7 @@
 
 use std::ffi::OsStr;
 use std::fs::{File, Metadata, read_link, symlink_metadata};
+use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
@@ -247,10 +248,16 @@ impl OsFileEntry {
                 path_buf.push(name);
 
                 match os_file_entry.open(&path_buf) {
-                    Ok(_) => {}
+                    Ok(true) => {}
+                    Ok(false) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing sub file entry: {}",
+                            sub_file_entry_index
+                        )));
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to open sub file entry",
+                            format!("Unable to open sub file entry: {}", sub_file_entry_index),
                             error
                         ));
                     }
@@ -271,9 +278,11 @@ impl OsFileEntry {
 
     /// Opens the file entry.
     #[cfg(unix)]
-    pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
+    pub(crate) fn open(&mut self, path: &PathBuf) -> Result<bool, ErrorTrace> {
+        // Note that symlink_metadata() is used to prevent traversing symbolic links.
         let file_metadata: Metadata = match symlink_metadata(path) {
             Ok(file_metadata) => file_metadata,
+            Err(ref error) if error.kind() == ErrorKind::NotFound => return Ok(false),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to retrieve file metadata",
@@ -324,14 +333,16 @@ impl OsFileEntry {
 
         self.path = path.clone();
 
-        Ok(())
+        Ok(true)
     }
 
     /// Opens the file entry.
     #[cfg(windows)]
-    pub(crate) fn open(&mut self, path: &PathBuf) -> Result<(), ErrorTrace> {
+    pub(crate) fn open(&mut self, path: &PathBuf) -> Result<bool, ErrorTrace> {
+        // Note that symlink_metadata() is used to prevent traversing symbolic links.
         let file_metadata: Metadata = match symlink_metadata(path) {
             Ok(file_metadata) => file_metadata,
+            Err(ref error) if error.kind() == ErrorKind::NotFound => return Ok(false),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to retrieve file metadata",
@@ -362,7 +373,7 @@ impl OsFileEntry {
 
         self.path = path.clone();
 
-        Ok(())
+        Ok(true)
     }
 }
 
@@ -377,8 +388,9 @@ mod tests {
 
         let test_data_path_string: String = get_test_data_path(path_string);
         let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
-        file_entry.open(&path_buf)?;
-
+        if !file_entry.open(&path_buf)? {
+            return Err(keramics_core::error_trace_new!("Missing file entry"));
+        }
         Ok(file_entry)
     }
 
@@ -457,7 +469,7 @@ mod tests {
         let file_entry: OsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let file_type: VfsFileType = file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
+        assert_eq!(file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -636,9 +648,10 @@ mod tests {
 
         let path_string: String = get_test_data_path("directory/file.txt");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        file_entry.open(&path_buf)?;
+        let result: bool = file_entry.open(&path_buf)?;
 
-        assert!(file_entry.file_type == VfsFileType::File);
+        assert_eq!(result, true);
+        assert_eq!(file_entry.file_type, VfsFileType::File);
 
         Ok(())
     }

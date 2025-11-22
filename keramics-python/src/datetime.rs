@@ -112,8 +112,8 @@ struct PyFiletime {
 #[pymethods]
 impl PyFiletime {
     #[getter]
-    pub fn timestamp(&self) -> PyResult<u64> {
-        Ok(self.filetime.timestamp)
+    pub fn timestamp(self_ref: PyRef<'_, Self>) -> PyResult<u64> {
+        Ok(self_ref.filetime.timestamp)
     }
 }
 
@@ -127,8 +127,8 @@ struct PyPosixTime32 {
 #[pymethods]
 impl PyPosixTime32 {
     #[getter]
-    pub fn timestamp(&self) -> PyResult<i32> {
-        Ok(self.posix_time.timestamp)
+    pub fn timestamp(self_ref: PyRef<'_, Self>) -> PyResult<i32> {
+        Ok(self_ref.posix_time.timestamp)
     }
 }
 
@@ -142,13 +142,13 @@ struct PyPosixTime64Ns {
 #[pymethods]
 impl PyPosixTime64Ns {
     #[getter]
-    pub fn fraction(&self) -> PyResult<u32> {
-        Ok(self.posix_time.fraction)
+    pub fn fraction(self_ref: PyRef<'_, Self>) -> PyResult<u32> {
+        Ok(self_ref.posix_time.fraction)
     }
 
     #[getter]
-    pub fn timestamp(&self) -> PyResult<i64> {
-        Ok(self.posix_time.timestamp)
+    pub fn timestamp(self_ref: PyRef<'_, Self>) -> PyResult<i64> {
+        Ok(self_ref.posix_time.timestamp)
     }
 }
 

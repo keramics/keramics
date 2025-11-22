@@ -253,7 +253,7 @@ mod tests {
         assert!(name.is_none());
 
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        assert_eq!(file_type, VfsFileType::Directory);
 
         let path: Path = Path::from("/ewf1");
         let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&path)?;
@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(name, Some(String::from("ewf1")));
 
         let file_type: VfsFileType = ewf_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
+        assert_eq!(file_type, VfsFileType::File);
 
         let path: Path = Path::from("/bogus");
         let result: Option<EwfFileEntry> = ewf_file_system.get_file_entry_by_path(&path)?;

@@ -132,6 +132,26 @@ class TestFileEntry(TestClass):
 
         assert data_stream is not None
 
+    def test_get_number_of_extended_attributes(self):
+        file_entry = self.get_file_entry("/testdir1")
+
+        file_entry = self.get_file_entry("/testdir1/testfile1")
+
+        number_of_extended_attributes = file_entry.get_number_of_extended_attributes()
+        assert number_of_extended_attributes == 1
+
+    def test_get_extended_attribute_by_index(self):
+        file_entry = self.get_file_entry("/testdir1/testfile1")
+
+        assert file_entry is not None
+
+        extended_attribute = file_entry.get_extended_attribute_by_index(0)
+        assert extended_attribute is not None
+        assert extended_attribute.name.to_string() == "security.selinux"
+
+        with pytest.raises(RuntimeError):
+            _ = file_entry.get_extended_attribute_by_index(99)
+
     def test_get_number_of_sub_file_entries(self):
         file_entry = self.get_file_entry("/testdir1")
 
@@ -154,10 +174,55 @@ class TestFileEntry(TestClass):
         assert sub_file_entry is not None
         assert sub_file_entry.name.to_string() == "TestFile2"
 
-        file_entry = self.get_file_entry("/testdir1/testfile1")
-
         with pytest.raises(RuntimeError):
-            _ = file_entry.get_sub_file_entry_by_index(0)
+            _ = file_entry.get_sub_file_entry_by_index(99)
+
+    def test_sub_file_entries(self):
+        class VfsFileEntriesIterator:
+            def __init__(self, file_entry):
+                self._file_entry = file_entry
+                self._sub_file_entry_index = 0
+                self._number_of_sub_file_entries = (
+                    file_entry.get_number_of_sub_file_entries()
+                )
+
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                if self._sub_file_entry_index >= self._number_of_sub_file_entries:
+                    raise StopIteration
+
+                sub_file_entry = self._file_entry.get_sub_file_entry_by_index(
+                    self._sub_file_entry_index
+                )
+                self._sub_file_entry_index += 1
+                return sub_file_entry
+
+        file_entry = self.get_file_entry("/testdir1")
+
+        assert file_entry is not None
+
+        file_names = sorted(
+            [
+                sub_file_entry.name.to_string()
+                for sub_file_entry in VfsFileEntriesIterator(file_entry)
+            ]
+        )
+        assert file_names == sorted(
+            [
+                "blockdev1",
+                "chardev1",
+                "initial_sparse1",
+                "pipe1",
+                "testfile1",
+                "TestFile2",
+                "trailing_sparse1",
+                "uninitialized1",
+                "xattr1",
+                "xattr2",
+            ]
+        )
 
 
 class TestFileSystem(TestClass):

@@ -28,8 +28,8 @@ use super::enums::VfsFileType;
 use super::ewf::EwfFileEntry;
 use super::extended_attribute::VfsExtendedAttribute;
 use super::fake::FakeFileEntry;
+use super::file_entries::VfsFileEntriesIterator;
 use super::gpt::GptFileEntry;
-use super::iterators::VfsFileEntriesIterator;
 use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
 use super::qcow::QcowFileEntry;
@@ -1147,21 +1147,8 @@ impl VfsFileEntry {
     }
 
     /// Retrieves a sub file entries iterator.
-    pub fn sub_file_entries(&mut self) -> Result<VfsFileEntriesIterator<'_>, ErrorTrace> {
-        let number_of_sub_file_entries: usize = match self.get_number_of_sub_file_entries() {
-            Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to determine number of sub file entries"
-                );
-                return Err(error);
-            }
-        };
-        Ok(VfsFileEntriesIterator::new(
-            self,
-            number_of_sub_file_entries,
-        ))
+    pub fn sub_file_entries(&mut self) -> VfsFileEntriesIterator<'_> {
+        VfsFileEntriesIterator::new(self)
     }
 
     /// Determines if the file entry is the root directory.
@@ -1292,11 +1279,13 @@ mod tests {
     fn test_get_file_type_with_apm() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1534,11 +1523,13 @@ mod tests {
     fn test_get_file_type_with_ext() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1798,11 +1789,13 @@ mod tests {
     fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -2018,7 +2011,8 @@ mod tests {
     fn test_get_file_type_with_fake() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_fake_file_entry();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -2195,11 +2189,13 @@ mod tests {
     fn test_get_file_type_with_fat() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -2439,11 +2435,13 @@ mod tests {
     fn test_get_file_type_with_gpt() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -2674,11 +2672,13 @@ mod tests {
     fn test_get_file_type_with_mbr() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -2920,11 +2920,13 @@ mod tests {
     fn test_get_file_type_with_ntfs() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -3165,11 +3167,13 @@ mod tests {
     fn test_get_file_type_with_os() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -3426,11 +3430,13 @@ mod tests {
     fn test_get_file_type_with_qcow() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -3664,12 +3670,14 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let path: Path = Path::from("/sparseimage1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -3902,11 +3910,13 @@ mod tests {
     fn test_get_file_type_with_udif() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -4137,11 +4147,13 @@ mod tests {
     fn test_get_file_type_with_vhd() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -4372,11 +4384,13 @@ mod tests {
     fn test_get_file_type_with_vhdx() -> Result<(), ErrorTrace> {
         let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }

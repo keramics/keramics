@@ -165,7 +165,7 @@ mod tests {
         };
 
         let file_type: VfsFileType = file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        assert_eq!(file_type, VfsFileType::Directory);
 
         Ok(())
     }

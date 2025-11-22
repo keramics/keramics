@@ -266,7 +266,7 @@ mod tests {
         assert!(name.is_none());
 
         let file_type: VfsFileType = gpt_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        assert_eq!(file_type, VfsFileType::Directory);
 
         let path: Path = Path::from("/gpt1");
         let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&path)?;
@@ -278,7 +278,7 @@ mod tests {
         assert_eq!(name, Some(String::from("gpt1")));
 
         let file_type: VfsFileType = gpt_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
+        assert_eq!(file_type, VfsFileType::File);
 
         let path: Path = Path::from("/bogus1");
         let result: Option<GptFileEntry> = gpt_file_system.get_file_entry_by_path(&path)?;

@@ -267,7 +267,7 @@ mod tests {
         let fake_file_entry: FakeFileEntry = get_fake_file_entry();
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
+        assert_eq!(file_type, VfsFileType::File);
 
         Ok(())
     }

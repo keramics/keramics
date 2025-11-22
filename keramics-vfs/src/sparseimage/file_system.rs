@@ -253,7 +253,7 @@ mod tests {
         assert!(name.is_none());
 
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        assert_eq!(file_type, VfsFileType::Directory);
 
         let path: Path = Path::from("/sparseimage1");
         let result: Option<SparseImageFileEntry> =
@@ -266,7 +266,7 @@ mod tests {
         assert_eq!(name, Some(String::from("sparseimage1")));
 
         let file_type: VfsFileType = sparseimage_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
+        assert_eq!(file_type, VfsFileType::File);
 
         let path: Path = Path::from("/bogus1");
         let result: Option<SparseImageFileEntry> =

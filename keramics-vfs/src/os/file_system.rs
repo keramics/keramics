@@ -11,10 +11,12 @@
  * under the License.
  */
 
-use std::path::{MAIN_SEPARATOR_STR, PathBuf};
+use std::fs::symlink_metadata;
+use std::io::ErrorKind;
+use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::{Path, PathComponent};
+use keramics_formats::Path;
 
 use super::file_entry::OsFileEntry;
 
@@ -22,27 +24,21 @@ use super::file_entry::OsFileEntry;
 pub struct OsFileSystem {}
 
 impl OsFileSystem {
-    fn get_path_buf(path: &Path) -> Result<PathBuf, ErrorTrace> {
-        let mut path_buf: PathBuf = PathBuf::new();
-
-        for path_component in path.components.iter() {
-            match path_component {
-                PathComponent::ByteString(_) => todo!(),
-                PathComponent::OsString(os_string) => path_buf.push(os_string),
-                PathComponent::String(string) => path_buf.push(string),
-                PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
-                PathComponent::Ucs2String(ucs2_string) => todo!(),
-            }
-        }
-        Ok(path_buf)
-    }
-
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(path: &Path) -> Result<bool, ErrorTrace> {
-        let path_buf: PathBuf = Self::get_path_buf(path)?;
-
-        match path_buf.try_exists() {
-            Ok(result) => Ok(result),
+        let path_buf: PathBuf = match path.to_path_buf() {
+            Ok(path_buf) => path_buf,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to determine path buffer from path",
+                    error
+                ));
+            }
+        };
+        // Note that symlink_metadata() is used to prevent traversing symbolic links.
+        match symlink_metadata(&path_buf) {
+            Ok(_) => Ok(true),
+            Err(ref error) if error.kind() == ErrorKind::NotFound => Ok(false),
             Err(error) => Err(keramics_core::error_trace_new_with_error!(
                 "Unable to determine if file entry exists",
                 error
@@ -52,26 +48,37 @@ impl OsFileSystem {
 
     /// Retrieves the file entry with the specific location.
     pub fn get_file_entry_by_path(path: &Path) -> Result<Option<OsFileEntry>, ErrorTrace> {
-        let path_buf: PathBuf = Self::get_path_buf(path)?;
-
-        match path_buf.try_exists() {
-            Ok(false) => Ok(None),
-            Ok(true) => {
-                let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-
-                match os_file_entry.open(&path_buf) {
-                    Ok(_) => {}
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to open OS file entry",
-                            error
-                        ));
-                    }
-                }
-                Ok(Some(os_file_entry))
+        let path_buf: PathBuf = match path.to_path_buf() {
+            Ok(path_buf) => path_buf,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to determine path buffer from path",
+                    error
+                ));
             }
+        };
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+        match os_file_entry.open(&path_buf) {
+            Ok(false) => Ok(None),
+            Ok(true) => Ok(Some(os_file_entry)),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file entry");
+                Err(error)
+            }
+        }
+    }
+
+    /// Retrieves the root file entry.
+    pub fn get_root_file_entry() -> Result<OsFileEntry, ErrorTrace> {
+        let mut os_file_entry: OsFileEntry = OsFileEntry::new();
+
+        let path_buf: PathBuf = PathBuf::from("/");
+        match os_file_entry.open(&path_buf) {
+            Ok(true) => Ok(os_file_entry),
+            Ok(false) => Err(keramics_core::error_trace_new!("Missing file entry")),
             Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                "Unable to determine if OS file entry exists",
+                "Unable to open OS root directory",
                 error
             )),
         }
@@ -81,20 +88,6 @@ impl OsFileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use crate::tests::get_test_data_path;
-
-    #[test]
-    fn test_get_path_buf() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("directory/file.txt");
-        let path: Path = Path::from(&path_string);
-
-        let path_buf: PathBuf = OsFileSystem::get_path_buf(&path)?;
-        let expected_path_buf: PathBuf = PathBuf::from(&path_string);
-        assert_eq!(path_buf, expected_path_buf);
-
-        Ok(())
-    }
 
     // TODO: add tests
 }

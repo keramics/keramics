@@ -159,7 +159,7 @@ mod tests {
         assert!(name.is_none());
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        assert_eq!(file_type, VfsFileType::Directory);
 
         let path: Path = Path::from("/fake/file.txt");
         let result: Option<Arc<FakeFileEntry>> = fake_file_system.get_file_entry_by_path(&path)?;
@@ -171,7 +171,7 @@ mod tests {
         assert_eq!(name, Some(String::from("file.txt")).as_ref());
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::File);
+        assert_eq!(file_type, VfsFileType::File);
 
         let path: Path = Path::from("/fake/bogus.txt");
         let result: Option<Arc<FakeFileEntry>> = fake_file_system.get_file_entry_by_path(&path)?;
@@ -187,7 +187,7 @@ mod tests {
         let fake_file_entry: Arc<FakeFileEntry> = fake_file_system.get_root_file_entry()?;
 
         let file_type: VfsFileType = fake_file_entry.get_file_type();
-        assert!(file_type == VfsFileType::Directory);
+        assert_eq!(file_type, VfsFileType::Directory);
 
         Ok(())
     }

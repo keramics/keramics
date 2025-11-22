@@ -20,11 +20,32 @@ use pyo3::prelude::*;
 use keramics_core::DataStreamReference;
 use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{
-    VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsLocation, VfsResolver,
-    VfsResolverReference, VfsString, VfsType,
+    VfsDataFork, VfsExtendedAttribute, VfsFileEntry, VfsFileSystemReference, VfsFileType,
+    VfsLocation, VfsResolver, VfsResolverReference, VfsString, VfsType,
 };
 
 use super::datetime::PyDateTime;
+
+#[pyclass]
+#[pyo3(name = "VfsDataFork")]
+#[derive(Clone)]
+struct PyVfsDataFork {
+    /// Data fork.
+    data_fork: Arc<VfsDataFork>,
+}
+
+#[pymethods]
+impl PyVfsDataFork {
+    #[getter]
+    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsString>> {
+        match self_ref.data_fork.get_name() {
+            Some(name) => Ok(Some(PyVfsString {
+                string: Arc::new(name),
+            })),
+            None => Ok(None),
+        }
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "VfsDataStream")]
@@ -36,8 +57,8 @@ struct PyVfsDataStream {
 
 #[pymethods]
 impl PyVfsDataStream {
-    pub fn get_offset(&self) -> PyResult<u64> {
-        match self.data_stream.write() {
+    pub fn get_offset(self_ref: PyRef<'_, Self>) -> PyResult<u64> {
+        match self_ref.data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_offset() {
                 Ok(offset) => Ok(offset),
                 Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
@@ -52,8 +73,8 @@ impl PyVfsDataStream {
         }
     }
 
-    pub fn get_size(&self) -> PyResult<u64> {
-        match self.data_stream.write() {
+    pub fn get_size(self_ref: PyRef<'_, Self>) -> PyResult<u64> {
+        match self_ref.data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_size() {
                 Ok(size) => Ok(size),
                 Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
@@ -69,10 +90,10 @@ impl PyVfsDataStream {
     }
 
     #[pyo3(signature = (size), text_signature = "(size, /)")]
-    pub fn read(&self, size: u64) -> PyResult<Vec<u8>> {
+    pub fn read(self_ref: PyRef<'_, Self>, size: u64) -> PyResult<Vec<u8>> {
         let mut buffer: Vec<u8> = vec![0; size as usize];
 
-        let read_count: usize = match self.data_stream.write() {
+        let read_count: usize = match self_ref.data_stream.write() {
             Ok(mut data_stream) => match data_stream.read(&mut buffer) {
                 Ok(read_count) => read_count,
                 Err(error) => {
@@ -95,7 +116,7 @@ impl PyVfsDataStream {
     }
 
     #[pyo3(signature = (offset, whence=0), text_signature = "(offset, whence=SEEK_SET, /)")]
-    pub fn seek(&self, offset: i64, whence: i8) -> PyResult<u64> {
+    pub fn seek(self_ref: PyRef<'_, Self>, offset: i64, whence: i8) -> PyResult<u64> {
         let position: SeekFrom = match whence {
             0 => {
                 if offset < 0 {
@@ -114,7 +135,7 @@ impl PyVfsDataStream {
                 )));
             }
         };
-        match self.data_stream.write() {
+        match self_ref.data_stream.write() {
             Ok(mut data_stream) => match data_stream.seek(position) {
                 Ok(offset) => Ok(offset),
                 Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
@@ -131,6 +152,24 @@ impl PyVfsDataStream {
 }
 
 #[pyclass]
+#[pyo3(name = "VfsExtendedAttribute")]
+#[derive(Clone)]
+struct PyVfsExtendedAttribute {
+    /// Extended attribute.
+    extended_attribute: Arc<VfsExtendedAttribute>,
+}
+
+#[pymethods]
+impl PyVfsExtendedAttribute {
+    #[getter]
+    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<PyVfsString> {
+        Ok(PyVfsString {
+            string: Arc::new(self_ref.extended_attribute.get_name()),
+        })
+    }
+}
+
+#[pyclass]
 #[pyo3(name = "VfsFileEntry")]
 #[derive(Clone)]
 struct PyVfsFileEntry {
@@ -141,32 +180,32 @@ struct PyVfsFileEntry {
 #[pymethods]
 impl PyVfsFileEntry {
     #[getter]
-    pub fn access_time(&self) -> PyResult<Option<Py<PyAny>>> {
-        match self.file_entry.get_access_time() {
+    pub fn access_time(self_ref: PyRef<'_, Self>) -> PyResult<Option<Py<PyAny>>> {
+        match self_ref.file_entry.get_access_time() {
             Some(date_time) => Ok(Some(PyDateTime::new(date_time)?)),
             None => Ok(None),
         }
     }
 
     #[getter]
-    pub fn change_time(&self) -> PyResult<Option<Py<PyAny>>> {
-        match self.file_entry.get_change_time() {
+    pub fn change_time(self_ref: PyRef<'_, Self>) -> PyResult<Option<Py<PyAny>>> {
+        match self_ref.file_entry.get_change_time() {
             Some(date_time) => Ok(Some(PyDateTime::new(date_time)?)),
             None => Ok(None),
         }
     }
 
     #[getter]
-    pub fn creation_time(&self) -> PyResult<Option<Py<PyAny>>> {
-        match self.file_entry.get_creation_time() {
+    pub fn creation_time(self_ref: PyRef<'_, Self>) -> PyResult<Option<Py<PyAny>>> {
+        match self_ref.file_entry.get_creation_time() {
             Some(date_time) => Ok(Some(PyDateTime::new(date_time)?)),
             None => Ok(None),
         }
     }
 
     #[getter]
-    pub fn device_identifier(&self) -> PyResult<Option<u64>> {
-        match self.file_entry.get_device_identifier() {
+    pub fn device_identifier(self_ref: PyRef<'_, Self>) -> PyResult<Option<u64>> {
+        match self_ref.file_entry.get_device_identifier() {
             Ok(Some(device_identifier)) => Ok(Some(device_identifier)),
             Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
@@ -179,13 +218,13 @@ impl PyVfsFileEntry {
     // TODO: add deletion time
 
     #[getter]
-    pub fn file_mode(&self) -> PyResult<Option<u32>> {
-        Ok(self.file_entry.get_file_mode())
+    pub fn file_mode(self_ref: PyRef<'_, Self>) -> PyResult<Option<u32>> {
+        Ok(self_ref.file_entry.get_file_mode())
     }
 
     #[getter]
-    pub fn file_type(&self) -> PyResult<Option<PyVfsFileType>> {
-        match self.file_entry.get_file_type() {
+    pub fn file_type(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsFileType>> {
+        match self_ref.file_entry.get_file_type() {
             VfsFileType::BlockDevice => Ok(Some(PyVfsFileType::BlockDevice)),
             VfsFileType::CharacterDevice => Ok(Some(PyVfsFileType::CharacterDevice)),
             VfsFileType::Device => Ok(Some(PyVfsFileType::Device)),
@@ -200,26 +239,26 @@ impl PyVfsFileEntry {
     }
 
     #[getter]
-    pub fn group_identifier(&self) -> PyResult<Option<u32>> {
-        Ok(self.file_entry.get_group_identifier())
+    pub fn group_identifier(self_ref: PyRef<'_, Self>) -> PyResult<Option<u32>> {
+        Ok(self_ref.file_entry.get_group_identifier())
     }
 
     #[getter]
-    pub fn inode_number(&self) -> PyResult<Option<u64>> {
-        Ok(self.file_entry.get_inode_number())
+    pub fn inode_number(self_ref: PyRef<'_, Self>) -> PyResult<Option<u64>> {
+        Ok(self_ref.file_entry.get_inode_number())
     }
 
     #[getter]
-    pub fn modification_time(&self) -> PyResult<Option<Py<PyAny>>> {
-        match self.file_entry.get_modification_time() {
+    pub fn modification_time(self_ref: PyRef<'_, Self>) -> PyResult<Option<Py<PyAny>>> {
+        match self_ref.file_entry.get_modification_time() {
             Some(date_time) => Ok(Some(PyDateTime::new(date_time)?)),
             None => Ok(None),
         }
     }
 
     #[getter]
-    pub fn name(&self) -> PyResult<Option<PyVfsString>> {
-        match self.file_entry.get_name() {
+    pub fn name(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsString>> {
+        match self_ref.file_entry.get_name() {
             Some(name) => Ok(Some(PyVfsString {
                 string: Arc::new(name),
             })),
@@ -228,23 +267,23 @@ impl PyVfsFileEntry {
     }
 
     #[getter]
-    pub fn number_of_links(&self) -> PyResult<Option<u64>> {
-        Ok(self.file_entry.get_number_of_links())
+    pub fn number_of_links(self_ref: PyRef<'_, Self>) -> PyResult<Option<u64>> {
+        Ok(self_ref.file_entry.get_number_of_links())
     }
 
     #[getter]
-    pub fn owner_identifier(&self) -> PyResult<Option<u32>> {
-        Ok(self.file_entry.get_owner_identifier())
+    pub fn owner_identifier(self_ref: PyRef<'_, Self>) -> PyResult<Option<u32>> {
+        Ok(self_ref.file_entry.get_owner_identifier())
     }
 
     #[getter]
-    pub fn size(&self) -> PyResult<u64> {
-        Ok(self.file_entry.get_size())
+    pub fn size(self_ref: PyRef<'_, Self>) -> PyResult<u64> {
+        Ok(self_ref.file_entry.get_size())
     }
 
     #[getter]
-    pub fn symbolic_link_target(&mut self) -> PyResult<Option<PyVfsPath>> {
-        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self.file_entry) {
+    pub fn symbolic_link_target(mut self_ref: PyRefMut<'_, Self>) -> PyResult<Option<PyVfsPath>> {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
             Some(file_entry) => file_entry,
             None => {
                 return Err(PyErr::new::<PyRuntimeError, &str>(
@@ -264,8 +303,8 @@ impl PyVfsFileEntry {
         }
     }
 
-    pub fn get_data_stream(&self) -> PyResult<Option<PyVfsDataStream>> {
-        match self.file_entry.get_data_stream() {
+    pub fn get_data_stream(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsDataStream>> {
+        match self_ref.file_entry.get_data_stream() {
             Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream { data_stream })),
             Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
@@ -275,8 +314,49 @@ impl PyVfsFileEntry {
         }
     }
 
-    pub fn get_number_of_sub_file_entries(&mut self) -> PyResult<usize> {
-        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self.file_entry) {
+    pub fn get_number_of_extended_attributes(mut self_ref: PyRefMut<'_, Self>) -> PyResult<usize> {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
+            Some(file_entry) => file_entry,
+            None => {
+                return Err(PyErr::new::<PyRuntimeError, &str>(
+                    "Unable to obtain mutable reference to file entry",
+                ));
+            }
+        };
+        match vfs_file_entry.get_number_of_extended_attributes() {
+            Ok(number_of_extended_attributes) => Ok(number_of_extended_attributes),
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve number of extended attributes with error:\n{}",
+                error
+            ))),
+        }
+    }
+
+    pub fn get_extended_attribute_by_index(
+        mut self_ref: PyRefMut<'_, Self>,
+        extended_attribute_index: usize,
+    ) -> PyResult<PyVfsExtendedAttribute> {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
+            Some(file_entry) => file_entry,
+            None => {
+                return Err(PyErr::new::<PyRuntimeError, &str>(
+                    "Unable to obtain mutable reference to file entry",
+                ));
+            }
+        };
+        match vfs_file_entry.get_extended_attribute_by_index(extended_attribute_index) {
+            Ok(extended_attribute) => Ok(PyVfsExtendedAttribute {
+                extended_attribute: Arc::new(extended_attribute),
+            }),
+            Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
+                "Unable to retrieve extended attribute: {} with error:\n{}",
+                extended_attribute_index, error
+            ))),
+        }
+    }
+
+    pub fn get_number_of_sub_file_entries(mut self_ref: PyRefMut<'_, Self>) -> PyResult<usize> {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
             Some(file_entry) => file_entry,
             None => {
                 return Err(PyErr::new::<PyRuntimeError, &str>(
@@ -294,10 +374,10 @@ impl PyVfsFileEntry {
     }
 
     pub fn get_sub_file_entry_by_index(
-        &mut self,
+        mut self_ref: PyRefMut<'_, Self>,
         sub_file_entry_index: usize,
     ) -> PyResult<PyVfsFileEntry> {
-        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self.file_entry) {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self_ref.file_entry) {
             Some(file_entry) => file_entry,
             None => {
                 return Err(PyErr::new::<PyRuntimeError, &str>(
@@ -327,8 +407,8 @@ struct PyVfsFileSystem {
 
 #[pymethods]
 impl PyVfsFileSystem {
-    pub fn file_entry_exists(&self, path: PyVfsPath) -> PyResult<bool> {
-        match self.file_system.file_entry_exists(&path.path) {
+    pub fn file_entry_exists(self_ref: PyRef<'_, Self>, path: PyVfsPath) -> PyResult<bool> {
+        match self_ref.file_system.file_entry_exists(&path.path) {
             Ok(result) => Ok(result),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(
                 "Unable to determine if file entry exists with error:\n{}",
@@ -339,8 +419,11 @@ impl PyVfsFileSystem {
 
     // TODO: add get_data_stream_by_path_and_name
 
-    pub fn get_file_entry_by_path(&self, path: PyVfsPath) -> PyResult<Option<PyVfsFileEntry>> {
-        match self.file_system.get_file_entry_by_path(&path.path) {
+    pub fn get_file_entry_by_path(
+        self_ref: PyRef<'_, Self>,
+        path: PyVfsPath,
+    ) -> PyResult<Option<PyVfsFileEntry>> {
+        match self_ref.file_system.get_file_entry_by_path(&path.path) {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
             })),
@@ -352,8 +435,8 @@ impl PyVfsFileSystem {
         }
     }
 
-    pub fn get_root_file_entry(&self) -> PyResult<Option<PyVfsFileEntry>> {
-        match self.file_system.get_root_file_entry() {
+    pub fn get_root_file_entry(self_ref: PyRef<'_, Self>) -> PyResult<Option<PyVfsFileEntry>> {
+        match self_ref.file_system.get_root_file_entry() {
             Ok(Some(file_entry)) => Ok(Some(PyVfsFileEntry {
                 file_entry: Arc::new(file_entry),
             })),
@@ -696,7 +779,9 @@ impl From<&PyVfsType> for VfsType {
 
 #[pymodule]
 pub fn vfs(module: &Bound<'_, PyModule>) -> PyResult<()> {
+    module.add_class::<PyVfsDataFork>()?;
     module.add_class::<PyVfsDataStream>()?;
+    module.add_class::<PyVfsExtendedAttribute>()?;
     module.add_class::<PyVfsFileEntry>()?;
     module.add_class::<PyVfsFileSystem>()?;
     module.add_class::<PyVfsFileType>()?;

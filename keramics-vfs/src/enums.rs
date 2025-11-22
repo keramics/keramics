@@ -11,7 +11,7 @@
  * under the License.
  */
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum VfsFileType {
     BlockDevice,
     CharacterDevice,

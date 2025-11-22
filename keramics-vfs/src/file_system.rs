@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -429,16 +428,14 @@ impl VfsFileSystem {
                 Ok(Some(VfsFileEntry::Apm(apm_file_entry)))
             }
             VfsFileSystem::Ext(ext_file_system) => match ext_file_system.get_root_directory() {
-                Ok(result) => match result {
-                    Some(ext_file_entry) => Ok(Some(VfsFileEntry::Ext(ext_file_entry))),
-                    None => Ok(None),
-                },
+                Ok(Some(ext_file_entry)) => Ok(Some(VfsFileEntry::Ext(ext_file_entry))),
+                Ok(None) => Ok(None),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
                         "Unable to retrieve ext root directory"
                     );
-                    return Err(error);
+                    Err(error)
                 }
             },
             VfsFileSystem::Ewf(ewf_file_system) => {
@@ -453,7 +450,7 @@ impl VfsFileSystem {
                         error,
                         "Unable to retrieve fake root directory"
                     );
-                    return Err(error);
+                    Err(error)
                 }
             },
             VfsFileSystem::Fat(fat_file_system) => match fat_file_system.get_root_directory() {
@@ -463,7 +460,7 @@ impl VfsFileSystem {
                         error,
                         "Unable to retrieve FAT root directory"
                     );
-                    return Err(error);
+                    Err(error)
                 }
             },
             VfsFileSystem::Gpt(gpt_file_system) => {
@@ -476,35 +473,26 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Mbr(mbr_file_entry)))
             }
-            VfsFileSystem::Ntfs(ntfs_file_system) => {
-                let ntfs_file_entry: NtfsFileEntry = match ntfs_file_system.get_root_directory() {
-                    Ok(file_entry) => file_entry,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve NTFS root directory"
-                        );
-                        return Err(error);
-                    }
-                };
-                Ok(Some(VfsFileEntry::Ntfs(ntfs_file_entry)))
-            }
-            VfsFileSystem::Os => {
-                let path_buf: PathBuf = PathBuf::from("/");
-
-                let mut os_file_entry: OsFileEntry = OsFileEntry::new();
-
-                match os_file_entry.open(&path_buf) {
-                    Ok(_) => {}
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to open OS root directory",
-                            error
-                        ));
-                    }
+            VfsFileSystem::Ntfs(ntfs_file_system) => match ntfs_file_system.get_root_directory() {
+                Ok(ntfs_file_entry) => Ok(Some(VfsFileEntry::Ntfs(ntfs_file_entry))),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve NTFS root directory"
+                    );
+                    Err(error)
                 }
-                Ok(Some(VfsFileEntry::Os(os_file_entry)))
-            }
+            },
+            VfsFileSystem::Os => match OsFileSystem::get_root_file_entry() {
+                Ok(os_file_entry) => Ok(Some(VfsFileEntry::Os(os_file_entry))),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve OS root directory"
+                    );
+                    Err(error)
+                }
+            },
             VfsFileSystem::Qcow(qcow_file_system) => {
                 let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry();
 
@@ -834,7 +822,8 @@ mod tests {
         let path: Path = Path::from("/apm2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -846,7 +835,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -897,7 +887,8 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -909,7 +900,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -960,7 +952,8 @@ mod tests {
         let path: Path = Path::from("/ewf1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -972,7 +965,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1015,7 +1009,8 @@ mod tests {
         let path: Path = Path::from("/fake/file.txt");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1039,7 +1034,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1090,7 +1086,8 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1102,7 +1099,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1153,7 +1151,8 @@ mod tests {
         let path: Path = Path::from("/gpt2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1165,7 +1164,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1216,7 +1216,8 @@ mod tests {
         let path: Path = Path::from("/mbr2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1228,7 +1229,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1279,7 +1281,8 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1291,7 +1294,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1357,7 +1361,8 @@ mod tests {
         let path: Path = Path::from("/qcow1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1369,7 +1374,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1420,7 +1426,8 @@ mod tests {
         let path: Path = Path::from("/sparseimage1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1432,7 +1439,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1483,7 +1491,8 @@ mod tests {
         let path: Path = Path::from("/udif1");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1495,7 +1504,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1546,7 +1556,8 @@ mod tests {
         let path: Path = Path::from("/vhd2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1558,7 +1569,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
@@ -1609,7 +1621,8 @@ mod tests {
         let path: Path = Path::from("/vhdx2");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::File);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -1621,7 +1634,8 @@ mod tests {
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert!(vfs_file_entry.get_file_type() == VfsFileType::Directory);
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }
