@@ -22,4 +22,3 @@ classifiers = [
 [tool.maturin]
 module-name = "pykeramics"
 bindings = "pyo3"
-features = ["pyo3/generate-import-lib"]

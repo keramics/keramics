@@ -11,9 +11,6 @@ repository = { workspace = true }
 rust-version = { workspace = true }
 version = { workspace = true }
 
-[features]
-extension-module = ["pyo3/generate-import-lib"]
-
 [lib]
 name = "pykeramics"
 path = "src/lib.rs"
