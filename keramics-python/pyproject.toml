@@ -1,2 +1,25 @@
 [build-system]
-requires = ["setuptools>=41.0.0", "wheel", "setuptools_rust>=1.0.0"]
+requires = ["maturin>=1.0.0,<2.0.0"]
+build-backend = "maturin"
+
+[project]
+name = "pykeramics"
+version = "0.0.1"
+description = "Keramics Python bindings"
+requires-python = ">=3.10"
+authors = [
+    { name = "Joachim Metz", email = "joachim.metz@gmail.com" },
+]
+license = "Apache-2.0"
+readme = "README.md"
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy"
+]
+
+[tool.maturin]
+module-name = "pykeramics"
+bindings = "pyo3"
+features = ["pyo3/generate-import-lib"]

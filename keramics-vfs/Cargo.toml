@@ -1,10 +1,15 @@
 [package]
-authors.workspace = true
-description = "Keramics Virtual File System (VFS)"
-edition.workspace = true
-license.workspace = true
 name = "keramics-vfs"
-version.workspace = true
+description = "Keramics Virtual File System (VFS)"
+authors = { workspace = true }
+categories = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
 
 [lib]
 name = "keramics_vfs"

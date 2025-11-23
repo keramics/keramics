@@ -1,11 +1,15 @@
 [package]
-authors.workspace = true
-description = "Keramics data formats signature scanner"
-edition.workspace = true
-license.workspace = true
 name = "keramics-sigscan"
-repository.workspace = true
-version.workspace = true
+description = "Keramics data formats signature scanner"
+authors = { workspace = true }
+categories = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+version = { workspace = true }
 
 [lib]
 name = "keramics_sigscan"

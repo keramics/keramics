@@ -20,7 +20,11 @@ resolver = "2"
 
 [workspace.package]
 authors = ["Joachim Metz <joachim.metz@gmail.com>"]
+categories = []
 edition = "2024"
+homepage = "https://github.com/keramics/keramics"
+keywords = []
 license = "Apache-2.0"
 repository = "https://github.com/keramics/keramics"
+rust-version = "1.91.0"
 version = "0.0.1"
