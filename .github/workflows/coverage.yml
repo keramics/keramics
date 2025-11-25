@@ -26,9 +26,8 @@ jobs:
         export CARGO_INCREMENTAL=1
         cargo llvm-cov clean --workspace
         cargo build --verbose --all-features
-        (cd keramics-python && maturin build --out .)
         cargo test --verbose
-        (cd keramics-python && PYTHONPATH=. pytest --cov=pykeramics --cov-report=xml)
+        (cd keramics-python && maturin build --out . && PYTHONPATH=. pytest --cov=pykeramics --cov-report=xml)
         cargo llvm-cov report --lcov --output-path coverage.lcov
     - name: Upload code coverage report to Codecov
       uses: codecov/codecov-action@v5
