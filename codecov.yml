@@ -3,12 +3,12 @@ codecov:
 
 coverage:
   precision: 2
-  round: down
   range: 70...100
+  round: down
   status:
-    project:
-    patch:
-    changes:
+    changes: false
+    patch: true
+    project: true
 
 ignore:
 - "tests/"
