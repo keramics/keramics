@@ -7,15 +7,28 @@ env:
 jobs:
   coverage:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+        - python-version: '3.14'
+          toxenv: 'coverage'
     steps:
     - uses: actions/checkout@v4
+    - name: Install Python dependencies
+      run: |
+        sudo add-apt-repository universe
+        sudo add-apt-repository -y ppa:deadsnakes/ppa
+        sudo apt-get update
+        sudo apt-get install -y python${{ matrix.python-version }} python${{ matrix.python-version }}-dev python${{ matrix.python-version }}-venv python3-maturin python3-pip tox
     - name: Install cargo-llvm-cov
       uses: taiki-e/install-action@cargo-llvm-cov
     - name: Generate code coverage report
-      run: cargo llvm-cov --all-features --workspace --lcov --output-path lcov.info
+      run: |
+        cargo llvm-cov --all-features --workspace --lcov --output-path coverage.lcov
+        cd keramics-python && tox -e${{ matrix.toxenv }}
     - name: Upload code coverage report to Codecov
       uses: codecov/codecov-action@v5
       with:
-        files: lcov.info
+        files: coverage.lcov,keramics-python/coverage.xml
         token: ${{ secrets.CODECOV_TOKEN }}
         verbose: true

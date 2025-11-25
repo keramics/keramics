@@ -1,20 +1,20 @@
 [workspace]
 members = [
-    "./docs/mdbook-tables",
-    "./fuzz",
-    "./keramics-checksums",
-    "./keramics-compression",
-    "./keramics-core",
-    "./keramics-datetime",
-    "./keramics-encodings",
-    "./keramics-formats",
-    "./keramics-hashes",
-    "./keramics-layout-map",
-    "./keramics-python",
-    "./keramics-sigscan",
-    "./keramics-tools",
-    "./keramics-types",
-    "./keramics-vfs",
+    "docs/mdbook-tables",
+    "fuzz",
+    "keramics-checksums",
+    "keramics-compression",
+    "keramics-core",
+    "keramics-datetime",
+    "keramics-encodings",
+    "keramics-formats",
+    "keramics-hashes",
+    "keramics-layout-map",
+    "keramics-python",
+    "keramics-sigscan",
+    "keramics-tools",
+    "keramics-types",
+    "keramics-vfs",
 ]
 resolver = "2"
 
@@ -26,5 +26,4 @@ homepage = "https://github.com/keramics/keramics"
 keywords = []
 license = "Apache-2.0"
 repository = "https://github.com/keramics/keramics"
-rust-version = "1.91.0"
 version = "0.0.1"

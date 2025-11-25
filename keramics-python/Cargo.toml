@@ -8,13 +8,12 @@ homepage = { workspace = true }
 keywords = { workspace = true }
 license = { workspace = true }
 repository = { workspace = true }
-rust-version = { workspace = true }
 version = { workspace = true }
 
 [lib]
 name = "pykeramics"
 path = "src/lib.rs"
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [dependencies]
 keramics-core = { version = "0.0.1", path = "../keramics-core" }

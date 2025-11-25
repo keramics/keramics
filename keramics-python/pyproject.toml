@@ -16,7 +16,7 @@ classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy"
+    "Programming Language :: Python :: Implementation :: PyPy",
 ]
 
 [tool.maturin]

@@ -1,5 +1,7 @@
 # Ignore auto-generated files and directories.
 *.sw*
-Cargo.lock
+.coverage
 book
+Cargo.lock
+coverage.xml
 target
