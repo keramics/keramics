@@ -6,7 +6,6 @@ build-backend = "maturin"
 name = "pykeramics"
 version = "0.0.1"
 description = "Keramics Python bindings"
-requires-python = ">=3.10"
 authors = [
     { name = "Joachim Metz", email = "joachim.metz@gmail.com" },
 ]
@@ -18,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
+requires-python = ">=3.10"
 
 [tool.maturin]
 module-name = "pykeramics"

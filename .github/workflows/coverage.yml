@@ -18,8 +18,14 @@ jobs:
       uses: taiki-e/install-action@cargo-llvm-cov
     - name: Generate code coverage report
       run: |
-        cargo llvm-cov --all-features --workspace --lcov --output-path coverage.lcov
+        source <(cargo llvm-cov show-env --export-prefix)
+        export CARGO_TARGET_DIR=$CARGO_LLVM_COV_TARGET_DIR
+        export CARGO_INCREMENTAL=1
+        cargo llvm-cov clean --workspace
+        cargo build --verbose --all-features
+        cargo test --verbose
         cd keramics-python && tox -ecoverage
+        cargo llvm-cov report --lcov --output-path coverage.lcov
     - name: Upload code coverage report to Codecov
       uses: codecov/codecov-action@v5
       with:
