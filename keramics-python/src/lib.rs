@@ -19,6 +19,7 @@ mod datetime;
 mod vfs;
 
 /// Keramics Python module.
+// LCOV_EXCL_START
 #[pymodule]
 fn pykeramics(python: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add("__version__", env!("CARGO_PKG_VERSION"))?;
@@ -32,3 +33,4 @@ fn pykeramics(python: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> 
 
     Ok(())
 }
+// LCOV_EXCL_STOP
