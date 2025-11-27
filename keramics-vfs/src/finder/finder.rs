@@ -85,14 +85,8 @@ impl<'a> Iterator for VfsFinder<'a> {
                                 Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
                                 Err(error) => return Some(Err(error)),
                             };
-                        match file_entry.get_name() {
-                            Some(name) => self.path_components.push(name),
-                            None => {
-                                return Some(Err(keramics_core::error_trace_new!(
-                                    "Missing name for root file entry"
-                                )));
-                            }
-                        }
+                        self.path_components.push(PathComponent::Root);
+
                         self.states
                             .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
                     }
