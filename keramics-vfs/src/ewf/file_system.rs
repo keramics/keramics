@@ -156,6 +156,7 @@ impl EwfFileSystem {
         path: &Path,
     ) -> Result<(), ErrorTrace> {
         let parent_path: Path = path.new_with_parent_directory();
+
         let file_resolver: FileResolverReference =
             match new_vfs_file_resolver(file_system, parent_path) {
                 Ok(file_resolver) => file_resolver,

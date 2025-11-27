@@ -12,6 +12,7 @@
  */
 
 use std::collections::HashSet;
+use std::fmt;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -27,6 +28,7 @@ use keramics_formats::ewf::EwfImage;
 use keramics_formats::ntfs::NtfsAttribute;
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparseimage::SparseImageFile;
+use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
@@ -93,6 +95,71 @@ struct BodyfileCommandArguments {
     volume_path_type: DisplayPathType,
 }
 
+/// File mode information.
+struct FileModeInfo {
+    /// Flags.
+    file_mode: u16,
+}
+
+impl FileModeInfo {
+    /// Creates new file mode information.
+    fn new(file_mode: u16) -> Self {
+        Self { file_mode }
+    }
+
+    /// Retrieves a file mode string representation.
+    fn get_file_mode_string(file_mode: u16) -> String {
+        let mut string_parts: Vec<&str> = vec!["-"; 10];
+
+        if file_mode & 0x0001 != 0 {
+            string_parts[9] = "x";
+        }
+        if file_mode & 0x0002 != 0 {
+            string_parts[8] = "w";
+        }
+        if file_mode & 0x0004 != 0 {
+            string_parts[7] = "r";
+        }
+        if file_mode & 0x0008 != 0 {
+            string_parts[6] = "x";
+        }
+        if file_mode & 0x0010 != 0 {
+            string_parts[5] = "w";
+        }
+        if file_mode & 0x0020 != 0 {
+            string_parts[4] = "r";
+        }
+        if file_mode & 0x0040 != 0 {
+            string_parts[3] = "x";
+        }
+        if file_mode & 0x0080 != 0 {
+            string_parts[2] = "w";
+        }
+        if file_mode & 0x0100 != 0 {
+            string_parts[1] = "r";
+        }
+        string_parts[0] = match file_mode & 0xf000 {
+            0x1000 => "p",
+            0x2000 => "c",
+            0x4000 => "d",
+            0x6000 => "b",
+            0xa000 => "l",
+            0xc000 => "s",
+            _ => "-",
+        };
+        string_parts.join("")
+    }
+}
+
+impl fmt::Display for FileModeInfo {
+    /// Formats partition file mode information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let string: String = Self::get_file_mode_string(self.file_mode);
+
+        write!(formatter, "{} (0o{:0o})", string, self.file_mode)
+    }
+}
+
 /// Storage media image.
 enum StorageMediaImage {
     Ewf {
@@ -103,6 +170,9 @@ enum StorageMediaImage {
     },
     SparseImage {
         sparseimage_file: Arc<RwLock<SparseImageFile>>,
+    },
+    SplitRaw {
+        splitraw_image: Arc<RwLock<SplitRawImage>>,
     },
     Udif {
         udif_file: Arc<RwLock<UdifFile>>,
@@ -147,6 +217,7 @@ impl StorageMediaImage {
             Self::Ewf { ewf_image } => ewf_image.clone(),
             Self::Qcow { qcow_layer, .. } => qcow_layer.clone(),
             Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
+            Self::SplitRaw { splitraw_image } => splitraw_image.clone(),
             Self::Udif { udif_file } => udif_file.clone(),
             Self::Vhd { vhd_layer, .. } => vhd_layer.clone(),
             Self::Vhdx { vhdx_layer, .. } => vhdx_layer.clone(),
@@ -190,33 +261,38 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        let format_identifier: FormatIdentifier =
-            match Self::scan_for_storage_image_formats(&data_stream) {
-                Ok(Some(format_identifier)) => format_identifier,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(
-                        "No known storage media image format signatures found"
-                    ));
+        match Self::scan_for_storage_image_formats(&data_stream) {
+            Ok(Some(format_identifier)) => match format_identifier {
+                FormatIdentifier::Ewf => Self::open_ewf_image(path),
+                FormatIdentifier::Qcow => Self::open_qcow_image(path),
+                FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
+                FormatIdentifier::Udif => Self::open_udif_file(path),
+                FormatIdentifier::Vhd => Self::open_vhd_image(path),
+                FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
+                _ => Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported format: {}",
+                    format_identifier.to_string()
+                ))),
+            },
+            Ok(None) => {
+                match Self::open_splitraw_image(path) {
+                    Ok(storage_media_image) => Ok(storage_media_image),
+                    Err(_) => {
+                        // TODO: scan for known volume and file system formats to detect raw
+                        // storage media image format.
+                        Err(keramics_core::error_trace_new!(
+                            "No known storage media image formats found"
+                        ))
+                    }
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to scan data stream for known storage media image format signatures"
-                    );
-                    return Err(error);
-                }
-            };
-        match &format_identifier {
-            FormatIdentifier::Ewf => Self::open_ewf_image(path),
-            FormatIdentifier::Qcow => Self::open_qcow_image(path),
-            FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
-            FormatIdentifier::Udif => Self::open_udif_file(path),
-            FormatIdentifier::Vhd => Self::open_vhd_image(path),
-            FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
-            _ => Err(keramics_core::error_trace_new!(format!(
-                "Unsupported format: {}",
-                format_identifier.to_string()
-            ))),
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for known storage media image format signatures"
+                );
+                Err(error)
+            }
         }
     }
 
@@ -347,6 +423,51 @@ impl StorageMediaImage {
         }
         Ok(Self::SparseImage {
             sparseimage_file: Arc::new(RwLock::new(sparseimage_file)),
+        })
+    }
+
+    /// Opens a split raw image.
+    fn open_splitraw_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut splitraw_image: SplitRawImage = SplitRawImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match splitraw_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open split raw image");
+                return Err(error);
+            }
+        }
+        Ok(Self::SplitRaw {
+            splitraw_image: Arc::new(RwLock::new(splitraw_image)),
         })
     }
 
@@ -595,49 +716,6 @@ impl ImageTool {
         Ok(())
     }
 
-    /// Retrieves a file mode string representation.
-    fn get_file_mode_string(file_mode: u16) -> String {
-        let mut string_parts: Vec<&str> = vec!["-"; 10];
-
-        if file_mode & 0x0001 != 0 {
-            string_parts[9] = "x";
-        }
-        if file_mode & 0x0002 != 0 {
-            string_parts[8] = "w";
-        }
-        if file_mode & 0x0004 != 0 {
-            string_parts[7] = "r";
-        }
-        if file_mode & 0x0008 != 0 {
-            string_parts[6] = "x";
-        }
-        if file_mode & 0x0010 != 0 {
-            string_parts[5] = "w";
-        }
-        if file_mode & 0x0020 != 0 {
-            string_parts[4] = "r";
-        }
-        if file_mode & 0x0040 != 0 {
-            string_parts[3] = "x";
-        }
-        if file_mode & 0x0080 != 0 {
-            string_parts[2] = "w";
-        }
-        if file_mode & 0x0100 != 0 {
-            string_parts[1] = "r";
-        }
-        string_parts[0] = match file_mode & 0xf000 {
-            0x1000 => "p",
-            0x2000 => "c",
-            0x4000 => "d",
-            0x6000 => "b",
-            0xa000 => "l",
-            0xc000 => "s",
-            _ => "-",
-        };
-        string_parts.join("")
-    }
-
     /// Retrieves a file mode string representation of file attribute flags.
     fn get_file_mode_string_from_file_attribute_flags(
         file_type: &VfsFileType,
@@ -755,8 +833,9 @@ impl ImageTool {
         let file_mode_string: String = match file_entry {
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
+                let file_mode_info: FileModeInfo = FileModeInfo::new(file_mode);
 
-                Self::get_file_mode_string(file_mode)
+                file_mode_info.to_string()
             }
             VfsFileEntry::Fat(fat_file_entry) => {
                 let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
@@ -1410,26 +1489,33 @@ mod tests {
 
     #[test]
     fn test_get_file_mode_string() {
-        let string: String = ImageTool::get_file_mode_string(0x1000);
+        let string: String = FileModeInfo::get_file_mode_string(0x1000);
         assert_eq!(string, "p---------");
 
-        let string: String = ImageTool::get_file_mode_string(0x2000);
+        let string: String = FileModeInfo::get_file_mode_string(0x2000);
         assert_eq!(string, "c---------");
 
-        let string: String = ImageTool::get_file_mode_string(0x4000);
+        let string: String = FileModeInfo::get_file_mode_string(0x4000);
         assert_eq!(string, "d---------");
 
-        let string: String = ImageTool::get_file_mode_string(0x6000);
+        let string: String = FileModeInfo::get_file_mode_string(0x6000);
         assert_eq!(string, "b---------");
 
-        let string: String = ImageTool::get_file_mode_string(0xa000);
+        let string: String = FileModeInfo::get_file_mode_string(0xa000);
         assert_eq!(string, "l---------");
 
-        let string: String = ImageTool::get_file_mode_string(0xc000);
+        let string: String = FileModeInfo::get_file_mode_string(0xc000);
         assert_eq!(string, "s---------");
 
-        let string: String = ImageTool::get_file_mode_string(0x81ff);
+        let string: String = FileModeInfo::get_file_mode_string(0x81ff);
         assert_eq!(string, "-rwxrwxrwx");
+    }
+
+    #[test]
+    fn test_file_mode_information_fmt() {
+        let test_struct: FileModeInfo = FileModeInfo::new(0x81a4);
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "-rw-r--r-- (0o100644)");
     }
 
     #[test]

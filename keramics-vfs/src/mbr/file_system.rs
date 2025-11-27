@@ -100,7 +100,7 @@ impl MbrFileSystem {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                format!("Unable to retrieve GPT partition: {}", partition_index)
+                                format!("Unable to retrieve MBR partition: {}", partition_index)
                             );
                             return Err(error);
                         }

@@ -206,12 +206,18 @@ impl VfsScanner {
                 if result.is_none() {
                     let mut splitraw_image: SplitRawImage = SplitRawImage::new();
 
-                    result = match SplitRawFileSystem::open_image(&mut splitraw_image, file_system, path) {
-                        Ok(_) => if splitraw_image.get_number_of_segments() > 1 {
-                            Some(VfsType::SplitRaw)
-                        } else {
-                            None
-                        },
+                    result = match SplitRawFileSystem::open_image(
+                        &mut splitraw_image,
+                        file_system,
+                        path,
+                    ) {
+                        Ok(_) => {
+                            if splitraw_image.get_number_of_segments() > 1 {
+                                Some(VfsType::SplitRaw)
+                            } else {
+                                None
+                            }
+                        }
                         Err(_) => None,
                     };
                 }

@@ -12,6 +12,8 @@
  */
 
 use std::io::SeekFrom;
+use std::iter::Rev;
+use std::str::Chars;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
@@ -220,40 +222,45 @@ impl SplitRawImage {
         };
         match &self.naming_schema {
             SplitRawNamingSchema::Alphabetic => {
-                let file_name_size: usize = file_name_string.len();
+                let mut characters: Rev<Chars> = file_name_string.chars().rev();
 
-                self.name_suffix_size = match file_name_string
-                    .chars()
-                    .rev()
-                    .position(|value| value != 'a')
-                {
+                self.name_suffix_size = match characters.position(|value| value != 'a') {
                     Some(value_index) => {
                         // Note that value_index is relative to end of the string.
                         value_index - 1
                     }
                     None => 0,
                 };
-                let name_size: usize = file_name_size - self.name_suffix_size;
+                let name_size: usize = file_name_string.len() - self.name_suffix_size;
 
                 self.name = file_name_string[0..name_size].to_string();
+                self.name_first_segment_number = 0;
+                self.number_of_segment_files = 0;
             }
             SplitRawNamingSchema::Numeric => {
-                let file_name_size: usize = file_name_string.len();
+                let mut characters: Rev<Chars> = file_name_string.chars().rev();
 
-                self.name_suffix_size = match file_name_string[0..file_name_size - 1]
-                    .chars()
-                    .rev()
-                    .position(|value| value != '0')
-                {
+                self.name_first_segment_number = match characters.next() {
+                    Some('0') => 0,
+                    Some('1') => 1,
+                    _ => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unable to determine first segment number from segment file: {}",
+                            file_name,
+                        )));
+                    }
+                };
+                self.name_suffix_size = match characters.position(|value| value != '0') {
                     Some(value_index) => {
-                        // Note that value_index is relative to end of the string.
+                        // Note that value_index is relative to last character in the string.
                         value_index - 1
                     }
                     None => 1,
                 };
-                let name_size: usize = file_name_size - self.name_suffix_size;
+                let name_size: usize = file_name_string.len() - self.name_suffix_size;
 
                 self.name = file_name_string[0..name_size].to_string();
+                self.number_of_segment_files = 0;
             }
             SplitRawNamingSchema::XOfN => {
                 let string_index: usize = match file_name_string.rfind("1of") {
@@ -280,20 +287,16 @@ impl SplitRawImage {
                         ));
                     }
                 };
+                self.name = file_name_string[0..string_index].to_string();
+                self.name_first_segment_number = 0;
             }
         }
         let mut segment_number: u16 = 1;
-        let mut segment_file_size: u64 = 0;
-        let mut segment_file_name: String = String::new();
+        let mut last_segment_file_name: String = String::new();
+        let mut last_segment_file_size: u64 = 0;
 
         loop {
-            if self.segment_size != 0 && self.segment_size != segment_file_size {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Mismatch in size of segment file: {}",
-                    segment_file_name
-                )));
-            }
-            segment_file_name = match Self::get_segment_file_name(
+            let segment_file_name: String = match Self::get_segment_file_name(
                 &self.name,
                 segment_number,
                 self.number_of_segment_files,
@@ -327,7 +330,13 @@ impl SplitRawImage {
                         return Err(error);
                     }
                 };
-            segment_file_size = keramics_core::data_stream_get_size!(data_stream);
+            if last_segment_file_size > 0 && last_segment_file_size != self.segment_size {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch in size of segment file: {}",
+                    last_segment_file_name
+                )));
+            }
+            let segment_file_size: u64 = keramics_core::data_stream_get_size!(data_stream);
 
             if self.segment_size == 0 {
                 self.segment_size = segment_file_size;
@@ -335,9 +344,12 @@ impl SplitRawImage {
             segment_number += 1;
 
             self.media_size += segment_file_size;
+
+            last_segment_file_name = segment_file_name;
+            last_segment_file_size = segment_file_size;
         }
         if self.number_of_segment_files == 0 {
-            self.number_of_segment_files = segment_number;
+            self.number_of_segment_files = segment_number - self.name_first_segment_number;
         }
         Ok(())
     }

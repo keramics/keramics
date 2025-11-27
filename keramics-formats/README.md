@@ -16,6 +16,7 @@ Supported data formats:
 * [Master Boot Record (MBR) format](https://keramics.github.io/mbr.html)
 * [New Technologies File System (NTFS) format](https://keramics.github.io/ntfs.html)
 * [QEMU Copy-On-Write (QCOW) image file format](https://keramics.github.io/qcow.html)
+* Split raw storage media image format
 * [Universal Disk Image Format (UDIF)](https://keramics.github.io/udif.html)
 * [Virtual Hard Disk version 2 (VHDX) image format](https://keramics.github.io/vhdx.html)
 * [Virtual Hard Disk (VHD) image format](https://keramics.github.io/vhd.html)
