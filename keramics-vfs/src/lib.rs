@@ -33,6 +33,7 @@ mod mbr;
 mod os;
 mod qcow;
 mod sparseimage;
+mod splitraw;
 mod udif;
 mod vhd;
 mod vhdx;

@@ -18,6 +18,7 @@ use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
+use crate::lru_cache::LruCache;
 use crate::path_component::PathComponent;
 use crate::plist::XmlPlist;
 
@@ -31,6 +32,9 @@ pub struct SparseBundleImage {
 
     /// Block size.
     pub block_size: u32,
+
+    /// Band file cache.
+    band_file_cache: LruCache<u64, DataStreamReference>,
 
     /// The current offset.
     current_offset: u64,
@@ -46,6 +50,7 @@ impl SparseBundleImage {
             mediator: Mediator::current(),
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             block_size: 0,
+            band_file_cache: LruCache::new(16),
             current_offset: 0,
             media_size: 0,
         }
@@ -210,30 +215,41 @@ impl SparseBundleImage {
             if media_offset >= self.media_size {
                 break;
             }
-            let band_file_name: String = format!("{:x}", block_number);
+            if !self.band_file_cache.contains(&block_number) {
+                let band_file_name: String = format!("{:x}", block_number);
 
-            // TODO: cache band files like EWF
-            let path_components: [PathComponent; 2] = [
-                PathComponent::from("bands"),
-                PathComponent::from(&band_file_name),
-            ];
-            let data_stream: DataStreamReference =
-                match self.file_resolver.get_data_stream(&path_components) {
-                    Ok(Some(data_stream)) => data_stream,
-                    Ok(None) => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing bands file: {}",
-                            band_file_name
-                        )));
-                    }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to open bands file: {}", band_file_name)
-                        );
-                        return Err(error);
-                    }
-                };
+                let path_components: [PathComponent; 2] = [
+                    PathComponent::from("bands"),
+                    PathComponent::from(&band_file_name),
+                ];
+                let data_stream: DataStreamReference =
+                    match self.file_resolver.get_data_stream(&path_components) {
+                        Ok(Some(data_stream)) => data_stream,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing band file: {}",
+                                band_file_name
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to open band file: {}", band_file_name)
+                            );
+                            return Err(error);
+                        }
+                    };
+                self.band_file_cache.insert(block_number, data_stream);
+            }
+            let data_stream: &DataStreamReference = match self.band_file_cache.get(&block_number) {
+                Some(file) => file,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to retrieve band file: bands/{:x} from cache",
+                        block_number
+                    )));
+                }
+            };
             let mut range_read_size: usize = read_size - data_offset;
 
             if (range_read_size as u64) > range_remainder_size {
@@ -376,8 +392,27 @@ mod tests {
 
     // TODO: add tests for read_data_from_bands
 
-    // TODO: add tests for get_offset.
-    // TODO: add tests for get_size.
+    #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut image: SparseBundleImage = get_image()?;
+
+        let offset: u64 = image.seek(SeekFrom::Start(1024))?;
+
+        let offset: u64 = image.get_offset()?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut image: SparseBundleImage = get_image()?;
+
+        let size: u64 = image.get_size()?;
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {

@@ -11,43 +11,13 @@
  * under the License.
  */
 
-/// Header value type
-#[derive(Eq, Hash, PartialEq)]
-pub enum EwfHeaderValueType {
-    AcquisitionDate,
-    CaseNumber,
-    CompressionLevel,
-    Description,
-    DeviceLabel,
-    EvidenceNumber,
-    ExaminerName,
-    Model,
-    Notes,
-    NotSet,
-    PasswordHash,
-    Platform,
-    ProcessIdentifier,
-    SerialNumber,
-    SystemDate,
-    Version,
-}
-
-/// Media type.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum EwfMediaType {
-    FixedDisk,
-    LogicalEvidence,
-    Memory,
-    OpticalDisk,
-    RemoveableDisk,
-    Unknown,
-}
-
 /// Segment file naming schema.
 #[derive(Debug, PartialEq)]
-pub enum EwfNamingSchema {
-    E01LowerCase,
-    E01UpperCase,
-    S01LowerCase,
-    S01UpperCase,
+pub enum SplitRawNamingSchema {
+    /// Alphabetic naming schema such as imageaa
+    Alphabetic,
+    /// Numeric naming schema such as image.1, image.001 or image_001
+    Numeric,
+    /// "X of N" naming schema such as image.1of5
+    XOfN,
 }

@@ -133,7 +133,8 @@ mod tests {
     fn get_file() -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
+        let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 

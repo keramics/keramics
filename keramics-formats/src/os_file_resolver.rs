@@ -11,7 +11,9 @@
  * under the License.
  */
 
-use std::path::PathBuf;
+use std::fs::symlink_metadata;
+use std::io::ErrorKind;
+use std::path::{MAIN_SEPARATOR_STR, PathBuf};
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 
@@ -40,26 +42,36 @@ impl FileResolver for OsFileResolver {
 
         for path_component in path_components.iter() {
             match path_component {
-                PathComponent::String(string) => {
+                PathComponent::ByteString(byte_string) => {
+                    let string: String = byte_string.to_string();
+
                     path_buf.push(string);
                 }
-                _ => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unsupported path component"
-                    ));
+                PathComponent::OsString(os_string) => path_buf.push(os_string),
+                PathComponent::String(string) => path_buf.push(string),
+                PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
+                PathComponent::Ucs2String(ucs2_string) => {
+                    let string: String = ucs2_string.to_string();
+
+                    path_buf.push(string);
                 }
             }
         }
-        let data_stream: DataStreamReference = match open_os_data_stream(&path_buf) {
-            Ok(data_stream) => data_stream,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
+        // Note that symlink_metadata() is used to prevent traversing symbolic links.
+        match symlink_metadata(&path_buf) {
+            Ok(_) => match open_os_data_stream(&path_buf) {
+                Ok(data_stream) => Ok(Some(data_stream)),
+                Err(error) => Err(keramics_core::error_trace_new_with_error!(
                     "Unable to open data stream with error",
                     error
-                ));
-            }
-        };
-        Ok(Some(data_stream))
+                )),
+            },
+            Err(ref error) if error.kind() == ErrorKind::NotFound => Ok(None),
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                "Unable to determine if data stream exists",
+                error
+            )),
+        }
     }
 }
 

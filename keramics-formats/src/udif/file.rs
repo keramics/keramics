@@ -664,8 +664,27 @@ mod tests {
     // TODO: add tests for read_data_from_blocks
     // TODO: add tests for read_compressed_block
 
-    // TODO: add tests for get_offset.
-    // TODO: add tests for get_size.
+    #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut file: UdifFile = get_file()?;
+
+        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
+
+        let offset: u64 = file.get_offset()?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut file: UdifFile = get_file()?;
+
+        let size: u64 = file.get_size()?;
+        assert_eq!(size, 1964032);
+
+        Ok(())
+    }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {

@@ -54,7 +54,7 @@ pub struct EwfImage {
     /// Name.
     name: String,
 
-    /// Segment file cache.
+    /// Segment file naming schema.
     naming_schema: EwfNamingSchema,
 
     /// Segment file cache.
@@ -225,8 +225,8 @@ impl EwfImage {
             Ok(Some(extension)) => extension.to_string(),
             Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Extension missing in segment file: {}",
-                    file_name.to_string(),
+                    "Missing extension in segment file: {}",
+                    file_name,
                 )));
             }
             Err(mut error) => {
@@ -234,7 +234,7 @@ impl EwfImage {
                     error,
                     format!(
                         "Unable to retrieve extension of segment file: {}",
-                        file_name.to_string()
+                        file_name,
                     )
                 );
                 return Err(error);
@@ -248,7 +248,7 @@ impl EwfImage {
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported extension in segment file: {}",
-                    file_name.to_string(),
+                    file_name,
                 )));
             }
         }
@@ -697,8 +697,8 @@ impl EwfImage {
             Ok(Some(file_stem)) => file_stem.to_string(),
             Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Extension missing in segment file: {}",
-                    file_name.to_string(),
+                    "Missing file stem in segment file: {}",
+                    file_name,
                 )));
             }
             Err(mut error) => {
@@ -706,7 +706,7 @@ impl EwfImage {
                     error,
                     format!(
                         "Unable to retrieve file stem of segment file: {}",
-                        file_name.to_string()
+                        file_name,
                     )
                 );
                 return Err(error);
@@ -718,8 +718,8 @@ impl EwfImage {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to determine segment file naming schema: {}",
-                        file_name.to_string()
+                        "Unable to determine naming schema from segment file: {}",
+                        file_name,
                     )
                 );
                 return Err(error);
@@ -1225,13 +1225,43 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_segment_file_naming_schema
+    #[test]
+    fn test_get_segment_file_naming_schema() -> Result<(), ErrorTrace> {
+        let file_name: PathComponent = PathComponent::from("image.E01");
+        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, EwfNamingSchema::E01UpperCase);
+
+        let file_name: PathComponent = PathComponent::from("image.e01");
+        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, EwfNamingSchema::E01LowerCase);
+
+        let file_name: PathComponent = PathComponent::from("image.S01");
+        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, EwfNamingSchema::S01UpperCase);
+
+        let file_name: PathComponent = PathComponent::from("image.s01");
+        let naming_schema: EwfNamingSchema = EwfImage::get_segment_file_naming_schema(&file_name)?;
+        assert_eq!(naming_schema, EwfNamingSchema::S01LowerCase);
+
+        let file_name: PathComponent = PathComponent::from("image");
+        let result: Result<EwfNamingSchema, ErrorTrace> =
+            EwfImage::get_segment_file_naming_schema(&file_name);
+        assert!(result.is_err());
+
+        let file_name: PathComponent = PathComponent::from("image.raw");
+        let result: Result<EwfNamingSchema, ErrorTrace> =
+            EwfImage::get_segment_file_naming_schema(&file_name);
+        assert!(result.is_err());
+
+        Ok(())
+    }
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
         let mut image: EwfImage = EwfImage::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf").as_str());
+        let path_string: String = get_test_data_path("ewf");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ext2.E01");
         image.open(&file_resolver, &file_name)?;
@@ -1247,8 +1277,27 @@ mod tests {
     // TODO: add tests for read_table_section
     // TODO: add tests for read_volume_section
 
-    // TODO: add tests for get_offset.
-    // TODO: add tests for get_size.
+    #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut image: EwfImage = get_image()?;
+
+        let offset: u64 = image.seek(SeekFrom::Start(1024))?;
+
+        let offset: u64 = image.get_offset()?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut image: EwfImage = get_image()?;
+
+        let size: u64 = image.get_size()?;
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {

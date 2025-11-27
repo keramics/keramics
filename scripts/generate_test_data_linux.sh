@@ -528,6 +528,12 @@ qemu-img convert -f raw -O qcow2 ${IMAGE_FILE} test_data/qcow/fat32.qcow2
 
 rm -f ${IMAGE_FILE}
 
+# Create a split raw image with an ext2 file system.
+IMAGE_FILE="test_data/splitraw/ext2.raw."
+SEGMENT_SIZE=$(( 1 * 1024 * 1024 ))
+
+split --bytes=${SEGMENT_SIZE} --numeric-suffixes=0 --suffix-length=3 test_data/ext/ext2.raw ${IMAGE_FILE}
+
 # Create a VDI image with an ext2 file system.
 IMAGE_FILE="test_data/vdi/ext2.vdi"
 

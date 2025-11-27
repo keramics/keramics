@@ -107,14 +107,14 @@ mod tests {
     fn test_get_data_stream_by_location_and_name() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         let result: Option<DataStreamReference> =
             vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_some());
 
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("directory/bogus.txt").as_str());
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         let result: Option<DataStreamReference> =
             vfs_resolver.get_data_stream_by_location_and_name(&vfs_location, None)?;
         assert!(result.is_none());
@@ -126,14 +126,14 @@ mod tests {
     fn test_get_file_entry_by_location() -> Result<(), ErrorTrace> {
         let vfs_resolver: VfsResolverReference = VfsResolver::current();
 
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("directory/file.txt").as_str());
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         let result: Option<VfsFileEntry> =
             vfs_resolver.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_some());
 
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("directory/bogus.txt").as_str());
+        let path_string: String = get_test_data_path("directory/bogus.txt");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         let result: Option<VfsFileEntry> =
             vfs_resolver.get_file_entry_by_location(&vfs_location)?;
         assert!(result.is_none());

@@ -215,8 +215,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
+        let path_string: String = get_test_data_path("apm/apm.dmg");
+        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         apm_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(apm_file_system)
@@ -301,8 +301,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
+        let path_string: String = get_test_data_path("apm/apm.dmg");
+        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         apm_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(apm_file_system.number_of_partitions, 2);

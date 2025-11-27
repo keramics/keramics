@@ -69,16 +69,12 @@ impl PathComponent {
         };
         match code_points[1..]
             .iter()
-            .rev()
-            .position(|value| *value == 0x0000002e)
+            .rposition(|value| *value == 0x0000002e)
         {
             Some(value_index) => {
-                // Note that value_index is relative to end of the code points.
-                let extention_index: usize = code_points.len() - value_index;
-
                 let mut extension_string: String = String::new();
 
-                for code_point in code_points[extention_index..].iter() {
+                for code_point in code_points[value_index + 2..].iter() {
                     match char::from_u32(*code_point) {
                         Some(character) => extension_string.push(character),
                         None => {
@@ -121,15 +117,11 @@ impl PathComponent {
         }
         match ucs2_string.elements[1..]
             .iter()
-            .rev()
-            .position(|value| *value == 0x002e)
+            .rposition(|value| *value == 0x002e)
         {
             Some(value_index) => {
-                // Note that value_index is relative to end of the string.
-                let extention_index: usize = ucs2_string.len() - value_index;
-
                 let extension_string: Ucs2String =
-                    Ucs2String::from(&ucs2_string.elements[extention_index..]);
+                    Ucs2String::from(&ucs2_string.elements[value_index + 2..]);
 
                 Some(PathComponent::Ucs2String(extension_string))
             }
@@ -174,16 +166,12 @@ impl PathComponent {
         };
         match code_points[1..]
             .iter()
-            .rev()
-            .position(|value| *value == 0x0000002e)
+            .rposition(|value| *value == 0x0000002e)
         {
             Some(value_index) => {
-                // Note that value_index is relative to end of the code points.
-                let string_size: usize = code_points.len() - value_index - 1;
-
                 let mut string: String = String::new();
 
-                for code_point in code_points[0..string_size].iter() {
+                for code_point in code_points[0..value_index + 1].iter() {
                     match char::from_u32(*code_point) {
                         Some(character) => string.push(character),
                         None => {
@@ -224,17 +212,11 @@ impl PathComponent {
         }
         match ucs2_string.elements[1..]
             .iter()
-            .rev()
-            .position(|value| *value == 0x002e)
+            .rposition(|value| *value == 0x002e)
         {
-            Some(value_index) => {
-                // Note that value_index is relative to end of the string.
-                let string_size: usize = ucs2_string.len() - value_index - 1;
-
-                Some(PathComponent::Ucs2String(Ucs2String::from(
-                    &ucs2_string.elements[0..string_size],
-                )))
-            }
+            Some(value_index) => Some(PathComponent::Ucs2String(Ucs2String::from(
+                &ucs2_string.elements[0..value_index + 1],
+            ))),
             None => Some(PathComponent::Ucs2String(ucs2_string.clone())),
         }
     }

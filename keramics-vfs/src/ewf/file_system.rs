@@ -203,8 +203,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
+        let path_string: String = get_test_data_path("ewf/ext2.E01");
+        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         ewf_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(ewf_file_system)
@@ -292,8 +292,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
+        let path_string: String = get_test_data_path("ewf/ext2.E01");
+        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         ewf_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(ewf_file_system.number_of_layers, 1);

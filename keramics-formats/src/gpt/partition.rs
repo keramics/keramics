@@ -170,7 +170,17 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_offset.
+    #[test]
+    fn test_get_offset() -> Result<(), ErrorTrace> {
+        let mut partition: GptPartition = get_partition()?;
+
+        let offset: u64 = partition.seek(SeekFrom::Start(1024))?;
+
+        let offset: u64 = partition.get_offset()?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {

@@ -31,6 +31,7 @@ pub mod ewf;
 pub mod qcow;
 pub mod sparsebundle;
 pub mod sparseimage;
+pub mod splitraw;
 pub mod udif;
 pub mod vhd;
 pub mod vhdx;

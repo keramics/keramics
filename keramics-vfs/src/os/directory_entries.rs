@@ -90,7 +90,8 @@ mod tests {
     fn test_get_entry_by_index() -> Result<(), ErrorTrace> {
         let mut directory_entries: OsDirectoryEntries = OsDirectoryEntries::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
+        let path_string: String = get_test_data_path("directory");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         directory_entries.read(&path_buf)?;
 
         let entry: Option<&OsString> = directory_entries.get_entry_by_index(0);
@@ -106,7 +107,8 @@ mod tests {
     fn test_get_number_of_entries() -> Result<(), ErrorTrace> {
         let mut directory_entries: OsDirectoryEntries = OsDirectoryEntries::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
+        let path_string: String = get_test_data_path("directory");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         directory_entries.read(&path_buf)?;
 
         assert_eq!(directory_entries.get_number_of_entries(), 2);
@@ -121,7 +123,8 @@ mod tests {
         assert_eq!(directory_entries.entries.len(), 0);
         assert_eq!(directory_entries.is_read, false);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory").as_str());
+        let path_string: String = get_test_data_path("directory");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         directory_entries.read(&path_buf)?;
 
         assert_eq!(directory_entries.entries.len(), 2);

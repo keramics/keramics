@@ -331,7 +331,16 @@ mod tests {
     // TODO: add tests for read_data_from_blocks
 
     // TODO: add tests for get_offset.
-    // TODO: add tests for get_size.
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+
+        let size: u64 = block_stream.get_size()?;
+        assert_eq!(size, 11358);
+
+        Ok(())
+    }
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {

@@ -56,6 +56,7 @@ impl VfsScanNode {
             | VfsType::Os
             | VfsType::Qcow
             | VfsType::SparseImage
+            | VfsType::SplitRaw
             | VfsType::Udif
             | VfsType::Vhd
             | VfsType::Vhdx => false,

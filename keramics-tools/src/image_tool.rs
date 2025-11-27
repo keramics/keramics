@@ -1093,7 +1093,7 @@ impl ImageTool {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
             match vfs_scan_node.get_type() {
-                VfsType::Ext { .. } | VfsType::Fat { .. } | VfsType::Ntfs { .. } => {}
+                VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {}
                 _ => return Ok(()),
             }
             let vfs_resolver: VfsResolverReference = VfsResolver::current();

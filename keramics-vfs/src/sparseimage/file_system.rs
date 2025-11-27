@@ -201,8 +201,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
+        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         Ok(sparseimage_file_system)
@@ -297,8 +297,8 @@ mod tests {
 
         let parent_file_system: VfsFileSystemReference =
             VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let parent_vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
+        let parent_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         sparseimage_file_system.open(Some(&parent_file_system), &parent_vfs_location)?;
 
         assert_eq!(sparseimage_file_system.number_of_layers, 1);

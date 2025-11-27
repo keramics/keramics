@@ -88,8 +88,9 @@ impl EwfFile {
                 return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
-        let mut file_offset: u64 = 13;
         let file_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
+        let mut file_offset: u64 = 13;
 
         while file_offset < file_size {
             let mut section_header: EwfSectionHeader = EwfSectionHeader::new();

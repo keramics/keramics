@@ -35,6 +35,7 @@ use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
 use super::qcow::QcowFileEntry;
 use super::sparseimage::SparseImageFileEntry;
+use super::splitraw::SplitRawFileEntry;
 use super::udif::UdifFileEntry;
 use super::vhd::VhdFileEntry;
 use super::vhdx::VhdxFileEntry;
@@ -52,6 +53,7 @@ pub enum VfsFileEntry {
     Os(OsFileEntry),
     Qcow(QcowFileEntry),
     SparseImage(SparseImageFileEntry),
+    SplitRaw(SplitRawFileEntry),
     Udif(UdifFileEntry),
     Vhd(VhdFileEntry),
     Vhdx(VhdxFileEntry),
@@ -67,6 +69,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -88,6 +91,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -107,6 +111,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -130,6 +135,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => Ok(None),
@@ -160,6 +166,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -211,6 +218,7 @@ impl VfsFileEntry {
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.get_file_type()
             }
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.get_file_type(),
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_file_type(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_file_type(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_file_type(),
@@ -226,6 +234,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -249,6 +258,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -269,6 +279,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -310,6 +321,7 @@ impl VfsFileEntry {
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 Some(sparseimage_file_entry.get_name())
             }
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => Some(splitraw_file_entry.get_name()),
             VfsFileEntry::Udif(udif_file_entry) => Some(udif_file_entry.get_name()),
             VfsFileEntry::Vhd(vhd_file_entry) => Some(vhd_file_entry.get_name()),
             VfsFileEntry::Vhdx(vhdx_file_entry) => Some(vhdx_file_entry.get_name()),
@@ -328,6 +340,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -348,6 +361,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => None,
@@ -370,6 +384,7 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_size(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_size(),
             VfsFileEntry::SparseImage(sparseimage_file_entry) => sparseimage_file_entry.get_size(),
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.get_size(),
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_size(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_size(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_size(),
@@ -387,6 +402,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => Ok(None),
@@ -496,6 +512,10 @@ impl VfsFileEntry {
                 SparseImageFileEntry::Layer { .. } => 1,
                 SparseImageFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => match splitraw_file_entry {
+                SplitRawFileEntry::Layer { .. } => 1,
+                SplitRawFileEntry::Root { .. } => 0,
+            },
             VfsFileEntry::Udif(udif_file_entry) => match udif_file_entry {
                 UdifFileEntry::Layer { .. } => 1,
                 UdifFileEntry::Root { .. } => 0,
@@ -528,6 +548,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => {
@@ -574,6 +595,7 @@ impl VfsFileEntry {
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.get_data_stream()
             }
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.get_data_stream(),
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_data_stream(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_data_stream(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_data_stream(),
@@ -603,6 +625,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => match name {
@@ -633,6 +656,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => Ok(0),
@@ -666,6 +690,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => Ok(None),
@@ -708,6 +733,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Qcow(_)
             | VfsFileEntry::SparseImage(_)
+            | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_) => Ok(None),
@@ -764,6 +790,9 @@ impl VfsFileEntry {
             }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 Ok(sparseimage_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => {
+                Ok(splitraw_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::Udif(udif_file_entry) => {
                 Ok(udif_file_entry.get_number_of_sub_file_entries())
@@ -826,6 +855,9 @@ impl VfsFileEntry {
             VfsFileEntry::SparseImage(sparseimage_file_entry) => Ok(VfsFileEntry::SparseImage(
                 sparseimage_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => Ok(VfsFileEntry::SplitRaw(
+                splitraw_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
             VfsFileEntry::Udif(udif_file_entry) => Ok(VfsFileEntry::Udif(
                 udif_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
@@ -874,6 +906,7 @@ impl VfsFileEntry {
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.is_root_file_entry()
             }
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.is_root_file_entry(),
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.is_root_file_entry(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.is_root_file_entry(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.is_root_file_entry(),
@@ -912,8 +945,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apm);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("apm/apm.dmg").as_str());
+        let path_string: String = get_test_data_path("apm/apm.dmg");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1179,7 +1212,8 @@ mod tests {
     fn get_ext_file_system() -> Result<ExtFileSystem, ErrorTrace> {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
+        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -1497,8 +1531,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("ewf/ext2.E01").as_str());
+        let path_string: String = get_test_data_path("ewf/ext2.E01");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -1925,7 +1959,8 @@ mod tests {
     fn get_fat_file_system() -> Result<FatFileSystem, ErrorTrace> {
         let mut file_system: FatFileSystem = FatFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let path_string: String = get_test_data_path("fat/fat12.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -2479,8 +2514,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Mbr);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("mbr/mbr.raw").as_str());
+        let path_string: String = get_test_data_path("mbr/mbr.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -2746,7 +2781,8 @@ mod tests {
     fn get_ntfs_file_system() -> Result<NtfsFileSystem, ErrorTrace> {
         let mut file_system: NtfsFileSystem = NtfsFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -3339,8 +3375,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Qcow);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("qcow/ext2.qcow2").as_str());
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -3607,8 +3643,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseImage);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("sparseimage/hfsplus.sparseimage").as_str());
+        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -3873,14 +3909,282 @@ mod tests {
         Ok(())
     }
 
+    // Tests with split raw.
+
+    fn get_splitraw_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SplitRaw);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("splitraw/ext2.raw.000");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_splitraw_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_splitraw_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("raw1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("raw1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
     // Tests with UDIF.
 
     fn get_udif_file_system() -> Result<VfsFileSystem, ErrorTrace> {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Udif);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("udif/hfsplus_zlib.dmg").as_str());
+        let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -4147,8 +4451,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhd);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("vhd/ntfs-differential.vhd").as_str());
+        let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
@@ -4415,8 +4719,8 @@ mod tests {
         let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vhdx);
 
         let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let vfs_location: VfsLocation =
-            new_os_vfs_location(get_test_data_path("vhdx/ntfs-differential.vhdx").as_str());
+        let path_string: String = get_test_data_path("vhdx/ntfs-differential.vhdx");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
         vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
 
         Ok(vfs_file_system)
