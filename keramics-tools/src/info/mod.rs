@@ -12,6 +12,7 @@
  */
 
 mod apm;
+mod constants;
 mod ewf;
 mod ext;
 mod fat;

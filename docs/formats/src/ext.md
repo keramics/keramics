@@ -1149,6 +1149,13 @@ TODO: complete section
 
 > Note that the excluded bitmap is used for snapshots.
 
+## <a name="corruption_scenarios"></a>Corruption scenarios
+
+### File entry with invalid extents header signature
+
+File content inaccessible but file entry metadata and extended attributes
+accessible.
+
 ## References
 
 * [ext4 Data Structures and Algorithms](https://docs.kernel.org/filesystems/ext4), by the Linux kernel documentation

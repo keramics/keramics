@@ -18,7 +18,7 @@ use keramics_core::ErrorTrace;
 use super::{bytes_to_u16_be, bytes_to_u16_le, bytes_to_u32_be, bytes_to_u32_le};
 
 /// Universally unique identifier (UUID).
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Uuid {
     pub part1: u32,
     pub part2: u16,

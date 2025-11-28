@@ -19,6 +19,8 @@ use keramics_types::Uuid;
 
 use crate::formatters::ByteSize;
 
+use super::constants::*;
+
 /// GUID Partition Table (GPT) parition information.
 struct GptPartitionInfo {
     /// The index of the corresponding partition table entry.
@@ -48,6 +50,14 @@ impl GptPartitionInfo {
             size: 0,
         }
     }
+
+    /// Retrieves the type identifier as a string.
+    pub fn get_type_identifier_string(&self) -> Option<&str> {
+        let lookup_key: String = self.type_identifier.to_string();
+        GTP_TYPE_IDENTIFIERS
+            .binary_search_by(|(key, _)| key.cmp(&lookup_key.as_str()))
+            .map_or_else(|_| None, |index| Some(GTP_TYPE_IDENTIFIERS[index].1))
+    }
 }
 
 impl fmt::Display for GptPartitionInfo {
@@ -56,11 +66,19 @@ impl fmt::Display for GptPartitionInfo {
         writeln!(formatter, "Partition: {}", self.entry_index + 1)?;
 
         writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
-        writeln!(
-            formatter,
-            "    Type identifier\t\t\t\t: {}",
-            self.type_identifier
-        )?;
+
+        match self.get_type_identifier_string() {
+            Some(type_identifier_string) => {
+                writeln!(
+                    formatter,
+                    "    Type\t\t\t\t\t: {} ({})",
+                    self.type_identifier, type_identifier_string
+                )?;
+            }
+            None => {
+                writeln!(formatter, "    Type\t\t\t\t\t: {}", self.type_identifier)?;
+            }
+        };
         writeln!(
             formatter,
             "    Offset\t\t\t\t\t: {} (0x{:08x})",
@@ -171,7 +189,7 @@ mod tests {
         let expected_string: &str = concat!(
             "Partition: 1\n",
             "    Identifier\t\t\t\t\t: 0b119671-75ff-4e2a-a31a-0bc83f857fdd\n",
-            "    Type identifier\t\t\t\t: 0fc63daf-8483-4772-8e79-3d69d8477de4\n",
+            "    Type\t\t\t\t\t: 0fc63daf-8483-4772-8e79-3d69d8477de4 (Linux filesystem data)\n",
             "    Offset\t\t\t\t\t: 1048576 (0x00100000)\n",
             "    Size\t\t\t\t\t: 1.0 MiB (1048576 bytes)\n",
             "\n"
