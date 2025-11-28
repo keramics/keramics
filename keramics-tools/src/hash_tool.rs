@@ -187,18 +187,14 @@ impl HashTool {
             let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
                 Ok(data_fork) => data_fork,
                 Err(mut error) => {
-                    if self.stop_on_error {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve data fork: {} of file entry: {}",
-                                data_fork_index, display_path
-                            )
-                        );
-                        return Err(error);
-                    }
-                    // TODO: mark file entry as error
-                    continue;
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve data fork: {} of file entry: {}",
+                            data_fork_index, display_path
+                        )
+                    );
+                    return Err(error);
                 }
             };
             let name: Option<PathComponent> = data_fork.get_name();
