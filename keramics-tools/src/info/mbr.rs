@@ -20,8 +20,8 @@ use crate::formatters::ByteSize;
 
 /// Master Boot Record (MBR) parition information.
 struct MbrPartitionInfo {
-    /// The partition index.
-    pub index: usize,
+    /// The index of the corresponding partition table entry.
+    pub entry_index: usize,
 
     /// The partition type.
     pub partition_type: u8,
@@ -134,7 +134,7 @@ impl MbrPartitionInfo {
     /// Creates new partition information.
     fn new() -> Self {
         Self {
-            index: 0,
+            entry_index: 0,
             partition_type: 0,
             offset: 0,
             size: 0,
@@ -153,7 +153,7 @@ impl MbrPartitionInfo {
 impl fmt::Display for MbrPartitionInfo {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "Partition: {}", self.index + 1)?;
+        writeln!(formatter, "Partition: {}", self.entry_index + 1)?;
 
         match self.get_partition_type_string() {
             Some(partition_type_string) => {
@@ -190,13 +190,10 @@ pub struct MbrInfo {}
 
 impl MbrInfo {
     /// Retrieves the partition information.
-    fn get_partition_information(
-        partition_index: usize,
-        mbr_partition: &MbrPartition,
-    ) -> MbrPartitionInfo {
+    fn get_partition_information(mbr_partition: &MbrPartition) -> MbrPartitionInfo {
         let mut partition_information: MbrPartitionInfo = MbrPartitionInfo::new();
 
-        partition_information.index = partition_index;
+        partition_information.entry_index = mbr_partition.entry_index;
         partition_information.partition_type = mbr_partition.partition_type;
         partition_information.offset = mbr_partition.offset;
         partition_information.size = mbr_partition.size;
@@ -256,8 +253,7 @@ impl MbrInfo {
                     return Err(error);
                 }
             };
-            let partition_info: MbrPartitionInfo =
-                Self::get_partition_information(partition_index, &mbr_partition);
+            let partition_info: MbrPartitionInfo = Self::get_partition_information(&mbr_partition);
 
             print!("{}", partition_info);
         }
@@ -280,7 +276,7 @@ mod tests {
         let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
 
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(0, &mbr_partition);
+        let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(&mbr_partition);
 
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
@@ -303,9 +299,9 @@ mod tests {
         let mbr_volume_system: MbrVolumeSystem = MbrInfo::open_volume_system(&data_stream)?;
 
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
-        let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(0, &mbr_partition);
+        let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(&mbr_partition);
 
-        assert_eq!(test_struct.index, 0);
+        assert_eq!(test_struct.entry_index, 0);
         assert_eq!(test_struct.partition_type, 0x83);
         assert_eq!(test_struct.offset, 512);
         assert_eq!(test_struct.size, 1049088);

@@ -190,7 +190,7 @@ mod tests {
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
 
         let test_data: Vec<u8> = get_test_data();
         Fat32BootRecord::read_data(&mut test_struct, &test_data)?;
@@ -211,7 +211,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
         let result = Fat32BootRecord::read_data(&mut test_struct, &test_data[0..511]);
         assert!(result.is_err());
     }
@@ -221,7 +221,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[510] = 0xff;
 
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
         let result = Fat32BootRecord::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }
@@ -231,7 +231,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[11] = 0xff;
 
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
         let result = Fat32BootRecord::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }
@@ -241,14 +241,14 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[13] = 0x7f;
 
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
         let result = Fat32BootRecord::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
 
         let mut test_data: Vec<u8> = get_test_data();
         test_data[13] = 0x81;
 
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
         let result = Fat32BootRecord::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }
@@ -258,7 +258,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[44] = 0x01;
 
-        let mut test_struct = FatBootRecord::new();
+        let mut test_struct: FatBootRecord = FatBootRecord::new();
         let result = Fat32BootRecord::read_data(&mut test_struct, &test_data);
         assert!(result.is_err());
     }

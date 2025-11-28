@@ -98,12 +98,24 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(
-            test_struct.type_identifier.to_string(),
-            "0fc63daf-8483-4772-8e79-3d69d8477de4"
+            test_struct.type_identifier,
+            Uuid {
+                part1: 0x0fc63daf,
+                part2: 0x8483,
+                part3: 0x4772,
+                part4: 0x8e79,
+                part5: 0x3d69d8477de4,
+            }
         );
         assert_eq!(
-            test_struct.identifier.to_string(),
-            "1e25588c-27a9-4094-868c-2f257021f87b"
+            test_struct.identifier,
+            Uuid {
+                part1: 0x1e25588c,
+                part2: 0x27a9,
+                part3: 0x4094,
+                part4: 0x868c,
+                part5: 0x2f257021f87b,
+            }
         );
         assert_eq!(test_struct.start_block_number, 2048);
         assert_eq!(test_struct.end_block_number, 2175);

@@ -279,9 +279,9 @@ first cluster offset = first allocation table sector + ( number of allocation ta
 root directory start offset = first cluster sector + ( ( root directory cluster - 2 ) * number of sectors per cluster )
 ```
 
-#### FAT-12, FAT-16 and FAT-32 directory entry
+#### FAT-12 and FAT-16 directory entry
 
-A FAT-12, FAT-16 and FAT-32 directory entry is 32 bytes in size and consists of:
+A FAT-12 and FAT-16 directory entry is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
@@ -293,10 +293,30 @@ A FAT-12, FAT-16 and FAT-32 directory entry is 32 bytes in size and consists of:
 | 14 | 2 | | Creation time
 | 16 | 2 | | Creation date
 | 18 | 2 | | Last access date
-| 20 | 2 | | Unknown (OS/2 extended attribute), which is not used by FAT-12
+| 20 | 2 | | Unknown (OS/2 extended attribute)
 | 22 | 2 | | Last modification time
 | 24 | 2 | | Last modification date
 | 26 | 2 | | Data stream start cluster
+| 28 | 4 | | Data stream data size
+
+#### FAT-32 directory entry
+
+A FAT-32 directory entry is 32 bytes in size and consists of:
+
+| Offset | Size | Value | Description
+| --- | --- | --- | ---
+| 0 | 8 | | Name, which is padded with spaces and the first character can have a special meaning
+| 8 | 3 | | Extension, which is padded with spaces
+| 11 | 1 | | [File attribute flags](#file_attribute_flags)
+| 12 | 1 | | [Flags](#short_file_name_flags)
+| 13 | 1 | | Creation time fraction of seconds, which contains fraction of 2-seconds in 10 ms intervals
+| 14 | 2 | | Creation time
+| 16 | 2 | | Creation date
+| 18 | 2 | | Last access date
+| 20 | 2 | | Data stream data size, which contains the upper 16-bit of the value
+| 22 | 2 | | Last modification time
+| 24 | 2 | | Last modification date
+| 26 | 2 | | Data stream start cluster, which contains the lower 16-bit of the value
 | 28 | 4 | | Data stream data size
 
 ### Short (or 8.3) file name

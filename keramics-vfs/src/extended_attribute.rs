@@ -47,6 +47,7 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::{ErrorTrace, open_os_data_stream};
+    use keramics_encodings::CharacterEncoding;
     use keramics_formats::Path;
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
     use keramics_types::ByteString;
@@ -103,10 +104,13 @@ mod tests {
             VfsExtendedAttribute::Ext(ext_extended_attribute);
 
         let name: PathComponent = vfs_extended_attribute.get_name();
-        assert_eq!(
-            name,
-            PathComponent::ByteString(ByteString::from("security.selinux"))
-        );
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![
+                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
+            ],
+        });
+        assert_eq!(name, expected_name);
         Ok(())
     }
 }

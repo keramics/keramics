@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
+use keramics_encodings::CharacterEncoding;
 use keramics_types::{ByteString, bytes_to_u16_le};
 
 use crate::path_component::PathComponent;
@@ -251,11 +252,10 @@ impl ExtFileEntry {
             );
             Ok(Arc::new(RwLock::new(data_stream)))
         } else {
-            let inode: ExtInode = match self.inode_table.get_inode(
-                &self.data_stream,
-                attributes_entry.value_data_inode_number,
-                &self.sub_directory_entries.encoding,
-            ) {
+            let inode: ExtInode = match self
+                .inode_table
+                .get_inode(&self.data_stream, attributes_entry.value_data_inode_number)
+            {
                 Ok(inode) => inode,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -329,7 +329,7 @@ impl ExtFileEntry {
             }
         }
         let lookup_name: ByteString =
-            match extended_attribute_name.to_byte_string(&self.sub_directory_entries.encoding) {
+            match extended_attribute_name.to_byte_string(&CharacterEncoding::Ascii) {
                 Ok(byte_string) => byte_string,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -402,11 +402,10 @@ impl ExtFileEntry {
             .get_entry_by_index(sub_file_entry_index)
         {
             Some((name, directory_entry)) => {
-                let inode: ExtInode = match self.inode_table.get_inode(
-                    &self.data_stream,
-                    directory_entry.inode_number,
-                    &self.sub_directory_entries.encoding,
-                ) {
+                let inode: ExtInode = match self
+                    .inode_table
+                    .get_inode(&self.data_stream, directory_entry.inode_number)
+                {
                     Ok(inode) => inode,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -459,11 +458,10 @@ impl ExtFileEntry {
             .get_entry_by_name(sub_file_entry_name)
         {
             Ok(Some((name, directory_entry))) => {
-                let inode: ExtInode = match self.inode_table.get_inode(
-                    &self.data_stream,
-                    directory_entry.inode_number,
-                    &self.sub_directory_entries.encoding,
-                ) {
+                let inode: ExtInode = match self
+                    .inode_table
+                    .get_inode(&self.data_stream, directory_entry.inode_number)
+                {
                     Ok(inode) => inode,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -503,8 +501,7 @@ impl ExtFileEntry {
     /// Reads the attributes block.
     fn read_attributes_block(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.file_acl_block_number != 0 {
-            let mut attributes_block: ExtAttributesBlock =
-                ExtAttributesBlock::new(0, &self.sub_directory_entries.encoding);
+            let mut attributes_block: ExtAttributesBlock = ExtAttributesBlock::new(0);
 
             let attributes_block_offset =
                 self.inode.file_acl_block_number * (self.inode_table.block_size as u64);
@@ -839,10 +836,13 @@ mod tests {
 
         let extended_attribute: ExtExtendedAttribute =
             ext_file_entry.get_extended_attribute_by_index(0)?;
-        assert_eq!(
-            extended_attribute.get_name(),
-            &ByteString::from("security.selinux")
-        );
+        let expected_name: ByteString = ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![
+                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
+            ],
+        };
+        assert_eq!(extended_attribute.get_name(), &expected_name);
 
         let result: Result<ExtExtendedAttribute, ErrorTrace> =
             ext_file_entry.get_extended_attribute_by_index(99);
@@ -863,10 +863,13 @@ mod tests {
         let extended_attribute: ExtExtendedAttribute = ext_file_entry
             .get_extended_attribute_by_name(&name)?
             .unwrap();
-        assert_eq!(
-            extended_attribute.get_name(),
-            &ByteString::from("security.selinux")
-        );
+        let expected_name: ByteString = ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![
+                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
+            ],
+        };
+        assert_eq!(extended_attribute.get_name(), &expected_name);
 
         let name: PathComponent = PathComponent::from("bogus");
         let result: Option<ExtExtendedAttribute> =

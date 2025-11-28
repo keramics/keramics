@@ -120,7 +120,7 @@ impl FatFileEntry {
         if self.is_directory() {
             return Ok(None);
         }
-        let (data_start_cluster, data_size): (u16, u32) = match self.directory_entry.as_ref() {
+        let (data_start_cluster, data_size): (u32, u32) = match self.directory_entry.as_ref() {
             Some(directory_entry) => (
                 directory_entry.short_name.data_start_cluster,
                 directory_entry.short_name.data_size,
@@ -187,7 +187,10 @@ impl FatFileEntry {
                 &self.block_allocation_table,
                 directory_entry.identifier,
                 Some(directory_entry.clone()),
-                FatDirectoryEntries::new(&self.sub_directory_entries.case_folding_mappings),
+                FatDirectoryEntries::new(
+                    &self.sub_directory_entries.format,
+                    &self.sub_directory_entries.case_folding_mappings,
+                ),
             )),
             None => Err(keramics_core::error_trace_new!(format!(
                 "Unable to retrieve sub file entry: {}",
@@ -227,7 +230,10 @@ impl FatFileEntry {
                 &self.block_allocation_table,
                 directory_entry.identifier,
                 Some(directory_entry.clone()),
-                FatDirectoryEntries::new(&self.sub_directory_entries.case_folding_mappings),
+                FatDirectoryEntries::new(
+                    &self.sub_directory_entries.format,
+                    &self.sub_directory_entries.case_folding_mappings,
+                ),
             ))),
             Ok(None) => Ok(None),
             Err(mut error) => {

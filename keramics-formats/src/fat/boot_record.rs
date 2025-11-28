@@ -74,7 +74,7 @@ impl FatBootRecord {
         }
     }
 
-    /// Reads the boot record a specific position in a data stream.
+    /// Reads the boot record from a specific position in a data stream.
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,

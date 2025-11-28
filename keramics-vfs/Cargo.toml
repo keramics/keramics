@@ -20,3 +20,6 @@ keramics-datetime = { version = "0.0.1", path = "../keramics-datetime" }
 keramics-formats = { version = "0.0.1", path = "../keramics-formats" }
 keramics-sigscan = { version = "0.0.1", path = "../keramics-sigscan" }
 keramics-types = { version = "0.0.1", path = "../keramics-types" }
+
+[dev-dependencies]
+keramics-encodings = { version = "0.0.1", path = "../keramics-encodings" }

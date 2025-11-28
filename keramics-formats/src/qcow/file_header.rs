@@ -88,7 +88,7 @@ impl QcowFileHeader {
         }
     }
 
-    /// Reads the file header a specific position in a data stream.
+    /// Reads the file header from a specific position in a data stream.
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,

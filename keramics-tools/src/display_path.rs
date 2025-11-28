@@ -161,17 +161,26 @@ impl DisplayPath {
         &self,
         vfs_location: &VfsLocation,
     ) -> Result<String, ErrorTrace> {
-        let result: Option<VfsFileEntry> =
-            match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
-                Ok(file_entry) => file_entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                    return Err(error);
-                }
-            };
-        let display_path: Option<String> = match result {
-            Some(VfsFileEntry::Gpt(gpt_file_entry)) => match gpt_file_entry.get_identifier() {
-                Some(identifier) => Some(format!("/gpt{{{}}}", identifier.to_string())),
+        let display_path: Option<String> = match vfs_location {
+            VfsLocation::Layer { vfs_type, .. } => match vfs_type {
+                VfsType::Gpt => match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
+                    Ok(vfs_file_entry) => match vfs_file_entry {
+                        Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
+                            match gpt_file_entry.get_identifier() {
+                                Some(identifier) => Some(format!("/gpt{{{}}}", identifier)),
+                                None => None,
+                            }
+                        }
+                        _ => None,
+                    },
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve file entry"
+                        );
+                        return Err(error);
+                    }
+                },
                 _ => None,
             },
             _ => None,
@@ -184,36 +193,67 @@ impl DisplayPath {
 
     /// Retrieves an index-based display path of a VFS location.
     fn get_index_display_path(&self, vfs_location: &VfsLocation) -> Result<String, ErrorTrace> {
-        let display_path: String = match vfs_location {
+        let display_path: Option<String> = match vfs_location {
             VfsLocation::Layer {
                 path,
                 parent,
                 vfs_type,
             } => {
                 let path_string: String = path.to_string();
+
                 match vfs_type {
-                    VfsType::Apm => path_string.replace("apm", "p"),
-                    VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {
-                        let parent_display_path: String = match self.get_path(parent) {
-                            Ok(path) => path,
+                    VfsType::Apm => Some(path_string.replace("apm", "p")),
+                    VfsType::Ext | VfsType::Fat | VfsType::Ntfs => match self.get_path(parent) {
+                        Ok(parent_display_path) => {
+                            Some(format!("{}{}", parent_display_path, path_string))
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve parent display path"
+                            );
+                            return Err(error);
+                        }
+                    },
+                    VfsType::Gpt | VfsType::Mbr => {
+                        match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
+                            Ok(vfs_file_entry) => match vfs_file_entry {
+                                Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
+                                    match gpt_file_entry.get_partition_number() {
+                                        Some(partition_number) => {
+                                            Some(format!("/p{}", partition_number))
+                                        }
+                                        None => Some(path_string.replace("gpt", "p")),
+                                    }
+                                }
+                                Some(VfsFileEntry::Mbr(mbr_file_entry)) => {
+                                    match mbr_file_entry.get_partition_number() {
+                                        Some(partition_number) => {
+                                            Some(format!("/p{}", partition_number))
+                                        }
+                                        None => Some(path_string.replace("mbr", "p")),
+                                    }
+                                }
+                                _ => None,
+                            },
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
                                     error,
-                                    "Unable to retrieve parent display path"
+                                    "Unable to retrieve file entry"
                                 );
                                 return Err(error);
                             }
-                        };
-                        format!("{}{}", parent_display_path, path_string)
+                        }
                     }
-                    VfsType::Gpt => path_string.replace("gpt", "p"),
-                    VfsType::Mbr => path_string.replace("mbr", "p"),
-                    _ => String::new(),
+                    _ => None,
                 }
             }
-            _ => String::new(),
+            _ => None,
         };
-        Ok(display_path)
+        match display_path {
+            Some(display_path) => Ok(display_path),
+            None => Ok(String::new()),
+        }
     }
 
     /// Retrieves a display path of a VFS location.

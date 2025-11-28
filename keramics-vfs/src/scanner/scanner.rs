@@ -32,7 +32,6 @@ use crate::apm::ApmFileSystem;
 use crate::enums::{VfsFileType, VfsType};
 use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
-use crate::file_system::VfsFileSystem;
 use crate::gpt::GptFileSystem;
 use crate::location::VfsLocation;
 use crate::mbr::MbrFileSystem;

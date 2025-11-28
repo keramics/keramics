@@ -145,7 +145,30 @@ mod tests {
         Ok(volume_system)
     }
 
-    // TODO: add tests for get_data_stream
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let apm_volume_system: Arc<ApmVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = ApmFileEntry::Root {
+            volume_system: apm_volume_system.clone(),
+        };
+
+        let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
+        assert!(data_stream.is_none());
+
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = apm_partition.size;
+        let file_entry = ApmFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
+        };
+
+        let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
+        assert!(data_stream.is_some());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
@@ -157,6 +180,17 @@ mod tests {
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
+
+        let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = apm_partition.size;
+        let file_entry = ApmFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(apm_partition)),
+            size: partition_size,
+        };
+
+        let file_type: VfsFileType = file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
 
         Ok(())
     }

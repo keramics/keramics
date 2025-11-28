@@ -146,7 +146,7 @@ impl FatFileSystem {
             block_allocation_table,
             file_entry_identifier,
             Some(directory_entry),
-            FatDirectoryEntries::new(&self.case_folding_mappings),
+            FatDirectoryEntries::new(&self.format, &self.case_folding_mappings),
         ))
     }
 
@@ -245,9 +245,11 @@ impl FatFileSystem {
         // TODO: move code into DirectoryEntryScanner
         let mut short_name_entry: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
 
-        match short_name_entry
-            .read_at_position(data_stream, SeekFrom::Start(file_entry_identifier as u64))
-        {
+        match short_name_entry.read_at_position(
+            data_stream,
+            SeekFrom::Start(file_entry_identifier as u64),
+            &self.format,
+        ) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -431,7 +433,7 @@ impl FatFileSystem {
                 }
             };
         let mut directory_entries: FatDirectoryEntries =
-            FatDirectoryEntries::new(&self.case_folding_mappings);
+            FatDirectoryEntries::new(&self.format, &self.case_folding_mappings);
 
         if self.root_directory_size > 0 {
             match directory_entries.read_at_position(

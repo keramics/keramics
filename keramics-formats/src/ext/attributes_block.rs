@@ -16,7 +16,6 @@ use std::io::SeekFrom;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
 use super::attributes_block_header::ExtAttributesBlockHeader;
@@ -29,18 +28,14 @@ pub struct ExtAttributesBlock {
 
     /// Base offset.
     base_offset: usize,
-
-    /// Character encoding.
-    encoding: CharacterEncoding,
 }
 
 impl ExtAttributesBlock {
     /// Creates a new attributes block.
-    pub fn new(base_offset: usize, encoding: &CharacterEncoding) -> Self {
+    pub fn new(base_offset: usize) -> Self {
         Self {
             mediator: Mediator::current(),
             base_offset,
-            encoding: encoding.clone(),
         }
     }
 
@@ -88,8 +83,7 @@ impl ExtAttributesBlock {
             }
             entry_data_offset = data_end_offset;
 
-            let name: ByteString = match entry.read_name(&data[entry_data_offset..], &self.encoding)
-            {
+            let name: ByteString = match entry.read_name(&data[entry_data_offset..]) {
                 Ok(name) => name,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read attribute name");
@@ -102,7 +96,7 @@ impl ExtAttributesBlock {
             }
             entry_data_offset += entry.name_size as usize;
 
-            if entry.value_data_inode_number == 0 {
+            if entry.value_data_inode_number == 0 && entry.value_data_size > 0 {
                 let value_data_offset: usize =
                     self.base_offset + (entry.value_data_offset as usize);
 
@@ -293,7 +287,7 @@ mod tests {
     fn test_read_entries() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let test_struct = ExtAttributesBlock::new(0, &CharacterEncoding::Utf8);
+        let test_struct = ExtAttributesBlock::new(0);
 
         let mut entries: BTreeMap<ByteString, ExtAttributesEntry> = BTreeMap::new();
         test_struct.read_entries(&test_data, 32, 1024, &mut entries)?;
@@ -308,7 +302,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = ExtAttributesBlock::new(0, &CharacterEncoding::Utf8);
+        let mut test_struct = ExtAttributesBlock::new(0);
 
         let mut entries: BTreeMap<ByteString, ExtAttributesEntry> = BTreeMap::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 1024, &mut entries)?;

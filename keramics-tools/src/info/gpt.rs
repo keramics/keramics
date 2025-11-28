@@ -21,8 +21,8 @@ use crate::formatters::ByteSize;
 
 /// GUID Partition Table (GPT) parition information.
 struct GptPartitionInfo {
-    /// The partition index.
-    pub index: usize,
+    /// The index of the corresponding partition table entry.
+    pub entry_index: usize,
 
     /// The partition identifier.
     pub identifier: Uuid,
@@ -41,7 +41,7 @@ impl GptPartitionInfo {
     /// Creates new partition information.
     fn new() -> Self {
         Self {
-            index: 0,
+            entry_index: 0,
             identifier: Uuid::new(),
             type_identifier: Uuid::new(),
             offset: 0,
@@ -53,7 +53,7 @@ impl GptPartitionInfo {
 impl fmt::Display for GptPartitionInfo {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "Partition: {}", self.index + 1)?;
+        writeln!(formatter, "Partition: {}", self.entry_index + 1)?;
 
         writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
         writeln!(
@@ -79,13 +79,10 @@ pub struct GptInfo {}
 
 impl GptInfo {
     /// Retrieves the partition information.
-    fn get_partition_information(
-        partition_index: usize,
-        gpt_partition: &GptPartition,
-    ) -> GptPartitionInfo {
+    fn get_partition_information(gpt_partition: &GptPartition) -> GptPartitionInfo {
         let mut partition_information: GptPartitionInfo = GptPartitionInfo::new();
 
-        partition_information.index = partition_index;
+        partition_information.entry_index = gpt_partition.entry_index;
         partition_information.identifier = gpt_partition.identifier.clone();
         partition_information.type_identifier = gpt_partition.type_identifier.clone();
         partition_information.offset = gpt_partition.offset;
@@ -145,8 +142,7 @@ impl GptInfo {
                     return Err(error);
                 }
             };
-            let partition_info: GptPartitionInfo =
-                Self::get_partition_information(partition_index, &gpt_partition);
+            let partition_info: GptPartitionInfo = Self::get_partition_information(&gpt_partition);
 
             print!("{}", partition_info);
         }
@@ -169,7 +165,7 @@ mod tests {
         let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
-        let test_struct: GptPartitionInfo = GptInfo::get_partition_information(0, &gpt_partition);
+        let test_struct: GptPartitionInfo = GptInfo::get_partition_information(&gpt_partition);
 
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
@@ -192,9 +188,9 @@ mod tests {
         let gpt_volume_system: GptVolumeSystem = GptInfo::open_volume_system(&data_stream)?;
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
-        let test_struct: GptPartitionInfo = GptInfo::get_partition_information(0, &gpt_partition);
+        let test_struct: GptPartitionInfo = GptInfo::get_partition_information(&gpt_partition);
 
-        assert_eq!(test_struct.index, 0);
+        assert_eq!(test_struct.entry_index, 0);
         assert_eq!(
             test_struct.identifier,
             Uuid::from_string("0b119671-75ff-4e2a-a31a-0bc83f857fdd")?

@@ -923,6 +923,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
     use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, PosixTime32};
+    use keramics_encodings::CharacterEncoding;
     use keramics_formats::ext::ExtFileSystem;
     use keramics_formats::fat::FatFileSystem;
     use keramics_formats::ntfs::NtfsFileSystem;
@@ -1458,10 +1459,13 @@ mod tests {
 
         let extended_attribute: VfsExtendedAttribute =
             vfs_file_entry.get_extended_attribute_by_index(0)?;
-        assert_eq!(
-            extended_attribute.get_name(),
-            PathComponent::ByteString(ByteString::from("security.selinux"))
-        );
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![
+                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
+            ],
+        });
+        assert_eq!(extended_attribute.get_name(), expected_name,);
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(99);
@@ -1478,10 +1482,13 @@ mod tests {
         let extended_attribute: VfsExtendedAttribute = vfs_file_entry
             .get_extended_attribute_by_name(&name)?
             .unwrap();
-        assert_eq!(
-            extended_attribute.get_name(),
-            PathComponent::ByteString(ByteString::from("security.selinux"))
-        );
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Ascii,
+            elements: vec![
+                115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
+            ],
+        });
+        assert_eq!(extended_attribute.get_name(), expected_name);
 
         let name: PathComponent = PathComponent::from("bogus");
         let result: Option<VfsExtendedAttribute> =

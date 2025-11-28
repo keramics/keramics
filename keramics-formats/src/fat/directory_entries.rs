@@ -25,13 +25,19 @@ use super::block_allocation_table::FatBlockAllocationTable;
 use super::constants::*;
 use super::directory_entry::FatDirectoryEntry;
 use super::directory_entry_type::FatDirectoryEntryType;
+use super::enums::FatFormat;
 use super::long_name_directory_entry::FatLongNameDirectoryEntry;
 use super::short_name_directory_entry::FatShortNameDirectoryEntry;
+use super::short_name_directory_entry_fat12::Fat12ShortNameDirectoryEntry;
+use super::short_name_directory_entry_fat32::Fat32ShortNameDirectoryEntry;
 
 /// File Allocation Table (FAT) directory entries.
 pub struct FatDirectoryEntries {
     /// Mediator.
     mediator: MediatorReference,
+
+    /// Format.
+    pub format: FatFormat,
 
     /// Case folding mappings.
     pub case_folding_mappings: Arc<HashMap<u16, u16>>,
@@ -48,9 +54,10 @@ pub struct FatDirectoryEntries {
 
 impl FatDirectoryEntries {
     /// Creates new directory entries.
-    pub fn new(case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
+    pub fn new(format: &FatFormat, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
         Self {
             mediator: Mediator::current(),
+            format: format.clone(),
             case_folding_mappings: case_folding_mappings.clone(),
             entries: BTreeMap::new(),
             volume_label: None,
@@ -164,22 +171,49 @@ impl FatDirectoryEntries {
                     safe_last_vfat_sequence_number = vfat_sequence_number;
                 }
                 FatDirectoryEntryType::ShortName => {
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(FatShortNameDirectoryEntry::debug_read_data(
-                                &data[data_offset..data_end_offset],
-                            ));
-                    }
                     let mut entry: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
 
-                    match entry.read_data(&data[data_offset..data_end_offset]) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to read short name directory entry"
+                    if self.format == FatFormat::Fat32 {
+                        if self.mediator.debug_output {
+                            self.mediator.debug_print(
+                                Fat32ShortNameDirectoryEntry::debug_read_data(
+                                    &data[data_offset..data_end_offset],
+                                ),
                             );
-                            return Err(error);
+                        }
+                        match Fat32ShortNameDirectoryEntry::read_data(
+                            &mut entry,
+                            &data[data_offset..data_end_offset],
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read FAT-32 short name directory entry"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    } else {
+                        if self.mediator.debug_output {
+                            self.mediator.debug_print(
+                                Fat12ShortNameDirectoryEntry::debug_read_data(
+                                    &data[data_offset..data_end_offset],
+                                ),
+                            );
+                        }
+                        match Fat12ShortNameDirectoryEntry::read_data(
+                            &mut entry,
+                            &data[data_offset..data_end_offset],
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read FAT-12 or FAT-16 short name directory entry"
+                                );
+                                return Err(error);
+                            }
                         }
                     }
                     if entry.file_attribute_flags & 0x58 == FAT_FILE_ATTRIBUTE_FLAG_VOLUME_LABEL {
@@ -290,7 +324,7 @@ impl FatDirectoryEntries {
         Ok(())
     }
 
-    /// Reads the directories entries a specific position in a data stream.
+    /// Reads the directories entries from a specific position in a data stream.
     pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,
@@ -401,7 +435,7 @@ mod tests {
                 .collect::<HashMap<u16, u16>>(),
         );
         let mut directory_entries: FatDirectoryEntries =
-            FatDirectoryEntries::new(&case_folding_mappings);
+            FatDirectoryEntries::new(&FatFormat::Fat12, &case_folding_mappings);
         let mut last_vfat_sequence_number: u8 = 0;
         let mut long_name_entries: Vec<FatLongNameDirectoryEntry> = Vec::new();
 
@@ -460,7 +494,8 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<u16, u16>>(),
         );
-        let mut test_struct: FatDirectoryEntries = FatDirectoryEntries::new(&case_folding_mappings);
+        let mut test_struct: FatDirectoryEntries =
+            FatDirectoryEntries::new(&FatFormat::Fat12, &case_folding_mappings);
 
         assert_eq!(test_struct.entries.len(), 0);
 
@@ -498,7 +533,8 @@ mod tests {
                 .into_iter()
                 .collect::<HashMap<u16, u16>>(),
         );
-        let mut test_struct: FatDirectoryEntries = FatDirectoryEntries::new(&case_folding_mappings);
+        let mut test_struct: FatDirectoryEntries =
+            FatDirectoryEntries::new(&FatFormat::Fat12, &case_folding_mappings);
 
         assert_eq!(test_struct.entries.len(), 0);
         assert_eq!(test_struct.is_read, false);

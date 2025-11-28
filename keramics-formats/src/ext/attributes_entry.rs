@@ -80,11 +80,7 @@ impl ExtAttributesEntry {
     }
 
     /// Reads the attributes entry name from a buffer.
-    pub fn read_name(
-        &self,
-        data: &[u8],
-        encoding: &CharacterEncoding,
-    ) -> Result<ByteString, ErrorTrace> {
+    pub fn read_name(&self, data: &[u8]) -> Result<ByteString, ErrorTrace> {
         let data_end_offset: usize = self.name_size as usize;
 
         if data.len() < data_end_offset {
@@ -108,7 +104,7 @@ impl ExtAttributesEntry {
                 )));
             }
         };
-        let mut name: ByteString = ByteString::new_with_encoding(encoding);
+        let mut name: ByteString = ByteString::new_with_encoding(&CharacterEncoding::Ascii);
         name.read_data(name_prefix.as_bytes());
         name.read_data(&data[0..data_end_offset]);
 
@@ -159,7 +155,7 @@ mod tests {
         let mut test_struct = ExtAttributesEntry::new();
         test_struct.read_data(&test_data)?;
 
-        let name: ByteString = test_struct.read_name(&test_data[16..], &CharacterEncoding::Utf8)?;
+        let name: ByteString = test_struct.read_name(&test_data[16..])?;
 
         assert_eq!(name.to_string(), "user.myxattr");
 

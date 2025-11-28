@@ -67,6 +67,17 @@ impl MbrFileEntry {
         }
     }
 
+    /// Retrieves the partition number.
+    pub fn get_partition_number(&self) -> Option<usize> {
+        match self {
+            MbrFileEntry::Partition { partition, .. } => match partition.read() {
+                Ok(mbr_partition) => Some(mbr_partition.entry_index + 1),
+                Err(_) => None,
+            },
+            MbrFileEntry::Root { .. } => None,
+        }
+    }
+
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
@@ -145,7 +156,30 @@ mod tests {
         Ok(volume_system)
     }
 
-    // TODO: add tests for get_data_stream
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = MbrFileEntry::Root {
+            volume_system: mbr_volume_system.clone(),
+        };
+
+        let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
+        assert!(data_stream.is_none());
+
+        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = mbr_partition.size;
+        let file_entry = MbrFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(mbr_partition)),
+            size: partition_size,
+        };
+
+        let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
+        assert!(data_stream.is_some());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
@@ -157,6 +191,17 @@ mod tests {
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
+
+        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = mbr_partition.size;
+        let file_entry = MbrFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(mbr_partition)),
+            size: partition_size,
+        };
+
+        let file_type: VfsFileType = file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
 
         Ok(())
     }
@@ -182,6 +227,31 @@ mod tests {
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("mbr1"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_partition_number() -> Result<(), ErrorTrace> {
+        let mbr_volume_system: Arc<MbrVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = MbrFileEntry::Root {
+            volume_system: mbr_volume_system.clone(),
+        };
+
+        let partition_number: Option<usize> = file_entry.get_partition_number();
+        assert_eq!(partition_number, None);
+
+        let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = mbr_partition.size;
+        let file_entry = MbrFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(mbr_partition)),
+            size: partition_size,
+        };
+
+        let partition_number: Option<usize> = file_entry.get_partition_number();
+        assert_eq!(partition_number, Some(1));
 
         Ok(())
     }

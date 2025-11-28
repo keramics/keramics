@@ -151,8 +151,14 @@ mod tests {
         assert_eq!(test_struct.area_start_block_number, 34);
         assert_eq!(test_struct.area_end_block_number, 8158);
         assert_eq!(
-            test_struct.disk_identifier.to_string(),
-            "e86e657a-d840-4c09-afe3-a1a5f665cf44"
+            test_struct.disk_identifier,
+            Uuid {
+                part1: 0xe86e657a,
+                part2: 0xd840,
+                part3: 0x4c09,
+                part4: 0xafe3,
+                part5: 0xa1a5f665cf44,
+            }
         );
         assert_eq!(test_struct.entries_start_block_number, 2);
         assert_eq!(test_struct.number_of_entries, 128);

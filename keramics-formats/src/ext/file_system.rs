@@ -131,20 +131,16 @@ impl ExtFileSystem {
                 "Ext file system has unsupported features"
             ));
         }
-        let inode: ExtInode =
-            match self
-                .inode_table
-                .get_inode(data_stream, inode_number, &self.character_encoding)
-            {
-                Ok(inode) => inode,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to retrieve inode: {}", inode_number)
-                    );
-                    return Err(error);
-                }
-            };
+        let inode: ExtInode = match self.inode_table.get_inode(data_stream, inode_number) {
+            Ok(inode) => inode,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve inode: {}", inode_number)
+                );
+                return Err(error);
+            }
+        };
         Ok(ExtFileEntry::new(
             data_stream,
             &self.inode_table,

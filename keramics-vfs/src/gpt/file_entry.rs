@@ -79,6 +79,17 @@ impl GptFileEntry {
         }
     }
 
+    /// Retrieves the partition number.
+    pub fn get_partition_number(&self) -> Option<usize> {
+        match self {
+            GptFileEntry::Partition { partition, .. } => match partition.read() {
+                Ok(gpt_partition) => Some(gpt_partition.entry_index + 1),
+                Err(_) => None,
+            },
+            GptFileEntry::Root { .. } => None,
+        }
+    }
+
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
@@ -157,7 +168,30 @@ mod tests {
         Ok(volume_system)
     }
 
-    // TODO: add tests for get_data_stream
+    #[test]
+    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+        let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = GptFileEntry::Root {
+            volume_system: gpt_volume_system.clone(),
+        };
+
+        let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
+        assert!(data_stream.is_none());
+
+        let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
+        let file_entry = GptFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
+        };
+
+        let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
+        assert!(data_stream.is_some());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
@@ -170,6 +204,50 @@ mod tests {
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
+        let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
+        let file_entry = GptFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
+        };
+
+        let file_type: VfsFileType = file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = GptFileEntry::Root {
+            volume_system: gpt_volume_system.clone(),
+        };
+
+        let identifier: Option<Uuid> = file_entry.get_identifier();
+        assert_eq!(identifier, None);
+
+        let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
+        let file_entry = GptFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
+        };
+
+        let identifier: Option<Uuid> = file_entry.get_identifier();
+        assert_eq!(
+            identifier,
+            Some(Uuid {
+                part1: 0x0b119671,
+                part2: 0x75ff,
+                part3: 0x4e2a,
+                part4: 0xa31a,
+                part5: 0x0bc83f857fdd,
+            })
+        );
         Ok(())
     }
 
@@ -195,6 +273,30 @@ mod tests {
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("gpt1"));
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_partition_number() -> Result<(), ErrorTrace> {
+        let gpt_volume_system: Arc<GptVolumeSystem> = Arc::new(get_volume_system()?);
+
+        let file_entry = GptFileEntry::Root {
+            volume_system: gpt_volume_system.clone(),
+        };
+
+        let partition_number: Option<usize> = file_entry.get_partition_number();
+        assert_eq!(partition_number, None);
+
+        let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
+        let partition_size: u64 = gpt_partition.size;
+        let file_entry = GptFileEntry::Partition {
+            index: 0,
+            partition: Arc::new(RwLock::new(gpt_partition)),
+            size: partition_size,
+        };
+
+        let partition_number: Option<usize> = file_entry.get_partition_number();
+        assert_eq!(partition_number, Some(1));
         Ok(())
     }
 

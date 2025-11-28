@@ -27,6 +27,8 @@ mod file_entry;
 mod file_system;
 mod long_name_directory_entry;
 mod short_name_directory_entry;
+mod short_name_directory_entry_fat12;
+mod short_name_directory_entry_fat32;
 mod string;
 
 pub use enums::FatFormat;

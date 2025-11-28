@@ -227,7 +227,7 @@ impl SplitRawImage {
                 self.name_suffix_size = match characters.position(|value| value != 'a') {
                     Some(value_index) => {
                         // Note that value_index is relative to end of the string.
-                        value_index - 1
+                        value_index
                     }
                     None => 0,
                 };
@@ -253,7 +253,7 @@ impl SplitRawImage {
                 self.name_suffix_size = match characters.position(|value| value != '0') {
                     Some(value_index) => {
                         // Note that value_index is relative to last character in the string.
-                        value_index - 1
+                        value_index + 1
                     }
                     None => 1,
                 };
