@@ -20,7 +20,7 @@ use clap::Parser;
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::PathComponent;
+use keramics_formats::{Path, PathComponent};
 use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
@@ -165,9 +165,9 @@ impl HashTool {
         &self,
         file_entry: &mut VfsFileEntry,
         file_system_display_path: &String,
-        path_components: &[PathComponent],
+        path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let display_path: String = self.display_path.join_path_components(path_components);
+        let display_path: String = self.display_path.join_path_components(&path.components);
 
         let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
             Ok(number_of_data_forks) => number_of_data_forks,
@@ -182,6 +182,7 @@ impl HashTool {
                 return Err(error);
             }
         };
+        // TODO: use file_entry.data_forks()
         for data_fork_index in 0..number_of_data_forks {
             let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
                 Ok(data_fork) => data_fork,
@@ -215,8 +216,8 @@ impl HashTool {
             //     continue;
             // }
             // TODO: create skip list
-            let hash_string: String = if path_components.len() > 1
-                && path_components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
+            let hash_string: String = if path.components.len() > 1
+                && path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
                 && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
             {
                 String::from("N/A (skipped)")
@@ -276,23 +277,26 @@ impl HashTool {
                 },
                 None => String::new(),
             };
-            for result in VfsFinder::new(&file_system) {
+            let mut vfs_finder: VfsFinder = VfsFinder::new(&file_system);
+
+            while let Some(result) = vfs_finder.next() {
                 match result {
-                    Ok((mut file_entry, path_components)) => match self
-                        .calculate_hash_from_file_entry(
+                    Ok((mut file_entry, path)) => {
+                        match self.calculate_hash_from_file_entry(
                             &mut file_entry,
                             &display_path,
-                            &path_components,
+                            &path,
                         ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to calculate hash from file entry"
-                            );
-                            return Err(error);
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to calculate hash from file entry"
+                                );
+                                return Err(error);
+                            }
                         }
-                    },
+                    }
                     Err(mut error) => {
                         if self.stop_on_error {
                             keramics_core::error_trace_add_frame!(
@@ -301,7 +305,7 @@ impl HashTool {
                             );
                             return Err(error);
                         }
-                        // TODO: mark file entry as error
+                        println!("N/A (error)\t{}{}", display_path, vfs_finder.get_path());
                     }
                 };
             }

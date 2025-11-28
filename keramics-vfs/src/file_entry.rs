@@ -24,6 +24,7 @@ use keramics_types::Ucs2String;
 
 use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
+use super::data_forks::VfsDataForksIterator;
 use super::enums::VfsFileType;
 use super::ewf::EwfFileEntry;
 use super::extended_attribute::VfsExtendedAttribute;
@@ -579,6 +580,11 @@ impl VfsFileEntry {
 
     // TODO: add get_data_fork_by_name
 
+    /// Retrieves a data fork iterator.
+    pub fn data_forks(&mut self) -> VfsDataForksIterator<'_> {
+        VfsDataForksIterator::new(self)
+    }
+
     /// Retrieves the default data stream.
     pub fn get_data_stream(&mut self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
@@ -1112,6 +1118,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_apm() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_apm() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
 
@@ -1411,6 +1434,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_ext() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
@@ -1704,6 +1744,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
 
@@ -1952,6 +2009,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test_get_number_of_data_forks_with_fake
+    // TODO: add tests for test_data_forks
     // TODO: add test_get_data_stream_with_fake
     // TODO: add test_get_data_stream_by_name_with_fake
 
@@ -2144,6 +2203,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_fat() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
 
     #[test]
     fn test_get_data_stream_with_fat() -> Result<(), ErrorTrace> {
@@ -2419,6 +2495,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_gpt() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_gpt() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
 
@@ -2685,6 +2778,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_mbr() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
 
     #[test]
     fn test_get_data_stream_with_mbr() -> Result<(), ErrorTrace> {
@@ -2974,6 +3084,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_ntfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
 
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
@@ -3279,6 +3406,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_os() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_os() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
@@ -3546,6 +3690,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_qcow() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
 
     #[test]
     fn test_get_data_stream_with_qcow() -> Result<(), ErrorTrace> {
@@ -3820,6 +3981,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_sparseimage() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_sparseimage() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
 
@@ -4086,6 +4264,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_splitraw() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
 
     #[test]
     fn test_get_data_stream_with_splitraw() -> Result<(), ErrorTrace> {
@@ -4356,6 +4551,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_udif() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_udif() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
 
@@ -4622,6 +4834,23 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_vhd() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
 
     #[test]
     fn test_get_data_stream_with_vhd() -> Result<(), ErrorTrace> {
@@ -4892,6 +5121,23 @@ mod tests {
     }
 
     #[test]
+    fn test_get_number_of_data_forks_with_vhdx() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    // TODO: add tests for test_data_forks
+
+    #[test]
     fn test_get_data_stream_with_vhdx() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
 
@@ -4989,8 +5235,6 @@ mod tests {
     }
 
     // Other tests.
-
-    // TODO: add tests for get_number_of_data_forks
 
     // TODO: add tests for extended_attributes
     // TODO: add tests for sub_file_entries

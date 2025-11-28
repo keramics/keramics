@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_formats::PathComponent;
+use keramics_formats::Path;
 
 use crate::file_entry::VfsFileEntry;
 use crate::file_system::VfsFileSystem;
@@ -27,15 +27,19 @@ struct VfsFinderState {
 
     /// Sub file entry index.
     sub_file_entry_index: usize,
+
+    /// Value to indicate the state has been initialized.
+    is_initialized: bool,
 }
 
 impl VfsFinderState {
-    /// Creates a new iterator.
-    fn new(file_entry: VfsFileEntry, number_of_sub_file_entries: usize) -> Self {
+    /// Creates a new finder state.
+    fn new(file_entry: VfsFileEntry) -> Self {
         Self {
             file_entry,
-            number_of_sub_file_entries,
+            number_of_sub_file_entries: 0,
             sub_file_entry_index: 0,
+            is_initialized: false,
         }
     }
 }
@@ -45,14 +49,17 @@ pub struct VfsFinder<'a> {
     /// File system.
     file_system: &'a VfsFileSystem,
 
-    /// Path components.
-    pub path_components: Vec<PathComponent>,
+    /// Path.
+    path: Path,
 
     /// Finder states.
     states: Vec<VfsFinderState>,
 
     /// Value to indicate the finder has started searching.
     search_started: bool,
+
+    /// Value to indicate the finder encountered an error.
+    error_encountered: bool,
 }
 
 // TODO: add support for filters (FindSpecs).
@@ -62,15 +69,21 @@ impl<'a> VfsFinder<'a> {
     pub fn new(file_system: &'a VfsFileSystem) -> Self {
         Self {
             file_system,
-            path_components: Vec::new(),
+            path: Path::from("/"),
             states: Vec::new(),
             search_started: false,
+            error_encountered: false,
         }
+    }
+
+    /// Retrieves the current path.
+    pub fn get_path(&self) -> &Path {
+        &self.path
     }
 }
 
 impl<'a> Iterator for VfsFinder<'a> {
-    type Item = Result<(VfsFileEntry, Vec<PathComponent>), ErrorTrace>;
+    type Item = Result<(VfsFileEntry, Path), ErrorTrace>;
 
     /// Retrieves the next file entry.
     fn next(&mut self) -> Option<Self::Item> {
@@ -78,30 +91,48 @@ impl<'a> Iterator for VfsFinder<'a> {
             self.search_started = true;
             match self.file_system.get_root_file_entry() {
                 Ok(result) => match result {
-                    Some(mut file_entry) => {
-                        // TODO: if file_entry.get_number_of_sub_file_entries() fails return file_entry and error.
-                        let number_of_sub_file_entries: usize =
-                            match file_entry.get_number_of_sub_file_entries() {
-                                Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
-                                Err(error) => return Some(Err(error)),
-                            };
-                        self.path_components.push(PathComponent::Root);
-
-                        self.states
-                            .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
+                    Some(file_entry) => {
+                        self.states.push(VfsFinderState::new(file_entry));
                     }
                     None => return None,
                 },
-                Err(error) => return Some(Err(error)),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve root file entry"
+                    );
+                    return Some(Err(error));
+                }
             };
         }
+        if self.error_encountered {
+            self.path.components.pop();
+            self.error_encountered = false;
+        }
         while let Some(mut state) = self.states.pop() {
+            if !state.is_initialized {
+                match state.file_entry.get_number_of_sub_file_entries() {
+                    Ok(number_of_sub_file_entries) => {
+                        state.number_of_sub_file_entries = number_of_sub_file_entries
+                    }
+                    Err(mut error) => {
+                        self.error_encountered = true;
+
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve number of sub file entries"
+                        );
+                        return Some(Err(error));
+                    }
+                }
+                state.is_initialized = true;
+            }
             if state.sub_file_entry_index >= state.number_of_sub_file_entries {
-                let path_components: Vec<PathComponent> = self.path_components.clone();
+                let path: Path = self.path.clone();
 
-                self.path_components.pop();
+                self.path.components.pop();
 
-                return Some(Ok((state.file_entry, path_components)));
+                return Some(Ok((state.file_entry, path)));
             }
             let result: Result<VfsFileEntry, ErrorTrace> = state
                 .file_entry
@@ -112,23 +143,16 @@ impl<'a> Iterator for VfsFinder<'a> {
             self.states.push(state);
 
             match result {
-                Ok(mut file_entry) => {
-                    // TODO: if file_entry.get_number_of_sub_file_entries() fails return file_entry and error.
-                    let number_of_sub_file_entries: usize =
-                        match file_entry.get_number_of_sub_file_entries() {
-                            Ok(number_of_sub_file_entries) => number_of_sub_file_entries,
-                            Err(error) => return Some(Err(error)),
-                        };
+                Ok(file_entry) => {
                     match file_entry.get_name() {
-                        Some(name) => self.path_components.push(name),
+                        Some(name) => self.path.push(name),
                         None => {
                             return Some(Err(keramics_core::error_trace_new!(
                                 "Missing name for file entry"
                             )));
                         }
                     }
-                    self.states
-                        .push(VfsFinderState::new(file_entry, number_of_sub_file_entries));
+                    self.states.push(VfsFinderState::new(file_entry));
                 }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

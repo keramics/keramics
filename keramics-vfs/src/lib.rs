@@ -13,6 +13,7 @@
 
 mod context;
 mod data_fork;
+mod data_forks;
 mod enums;
 mod extended_attribute;
 mod extended_attributes;

@@ -760,7 +760,7 @@ impl ImageTool {
         &self,
         file_entry: &mut VfsFileEntry,
         file_system_display_path: &String,
-        path_components: &[PathComponent],
+        path: &Path,
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
         let md5: String = if !calculate_md5 {
@@ -787,7 +787,7 @@ impl ImageTool {
                 None => String::from("00000000000000000000000000000000"),
             }
         };
-        let display_path: String = self.display_path.join_path_components(path_components);
+        let display_path: String = self.display_path.join_path_components(&path.components);
 
         let result: Option<Path> = match file_entry.get_symbolic_link_target() {
             Ok(result) => result,
@@ -1198,24 +1198,27 @@ impl ImageTool {
                 },
                 None => String::new(),
             };
-            for result in VfsFinder::new(&file_system) {
+            let mut vfs_finder: VfsFinder = VfsFinder::new(&file_system);
+
+            while let Some(result) = vfs_finder.next() {
                 match result {
-                    Ok((mut file_entry, path_components)) => match self
-                        .print_file_entry_as_bodyfile(
+                    Ok((mut file_entry, path)) => {
+                        match self.print_file_entry_as_bodyfile(
                             &mut file_entry,
                             &display_path,
-                            &path_components,
+                            &path,
                             calculate_md5,
                         ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to print file entry"
-                            );
-                            return Err(error);
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to print file entry"
+                                );
+                                return Err(error);
+                            }
                         }
-                    },
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
