@@ -14,7 +14,6 @@
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::{FileResolver, FileResolverReference, Path, PathComponent};
 
-use crate::file_entry::VfsFileEntry;
 use crate::types::VfsFileSystemReference;
 
 pub struct VfsFileResolver {
@@ -45,17 +44,14 @@ impl FileResolver for VfsFileResolver {
             .base_path
             .new_with_join_path_components(path_components);
 
-        let result: Option<VfsFileEntry> = match self.file_system.get_file_entry_by_path(&path) {
-            Ok(result) => result,
+        match self.file_system.get_file_entry_by_path(&path) {
+            // TODO: replace by get_data_fork_by_name
+            Ok(Some(mut file_entry)) => file_entry.get_data_stream_by_name(None),
+            Ok(None) => Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
                 return Err(error);
             }
-        };
-        match result {
-            // TODO: replace by get_data_fork_by_name
-            Some(file_entry) => file_entry.get_data_stream_by_name(None),
-            None => Ok(None),
         }
     }
 }

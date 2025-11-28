@@ -327,8 +327,16 @@ impl PyVfsFileEntry {
     // TODO: add get_data_fork_by_index
     // TODO: add get_data_fork_by_name
 
-    pub fn get_data_stream(&self) -> PyResult<Option<PyVfsDataStream>> {
-        match self.file_entry.get_data_stream() {
+    pub fn get_data_stream(&mut self) -> PyResult<Option<PyVfsDataStream>> {
+        let vfs_file_entry: &mut VfsFileEntry = match Arc::get_mut(&mut self.file_entry) {
+            Some(file_entry) => file_entry,
+            None => {
+                return Err(PyErr::new::<PyRuntimeError, &str>(
+                    "Unable to obtain mutable reference to file entry",
+                ));
+            }
+        };
+        match vfs_file_entry.get_data_stream() {
             Ok(Some(data_stream)) => Ok(Some(PyVfsDataStream { data_stream })),
             Ok(None) => Ok(None),
             Err(error) => Err(PyErr::new::<PyRuntimeError, String>(format!(

@@ -166,7 +166,7 @@ impl VfsFileSystem {
         path: &Path,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.get_file_entry_by_path(path) {
-            Ok(Some(file_entry)) => file_entry.get_data_stream(),
+            Ok(Some(mut file_entry)) => file_entry.get_data_stream(),
             Ok(None) => Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
@@ -184,7 +184,7 @@ impl VfsFileSystem {
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self.get_file_entry_by_path(path) {
             // TODO: replace by get_data_fork_by_name
-            Ok(Some(file_entry)) => file_entry.get_data_stream_by_name(name),
+            Ok(Some(mut file_entry)) => file_entry.get_data_stream_by_name(name),
             Ok(None) => Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");

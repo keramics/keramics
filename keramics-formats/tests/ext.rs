@@ -50,7 +50,7 @@ fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), 
 fn read_path(file_system: &ExtFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
     let path: Path = Path::from(path_string);
 
-    let file_entry: ExtFileEntry = match file_system.get_file_entry_by_path(&path)? {
+    let mut file_entry: ExtFileEntry = match file_system.get_file_entry_by_path(&path)? {
         Some(ext_file_entry) => ext_file_entry,
         None => {
             return Err(keramics_core::error_trace_new!(format!(

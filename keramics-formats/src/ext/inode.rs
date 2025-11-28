@@ -91,6 +91,9 @@ pub struct ExtInode {
 
     /// Attributes.
     pub attributes: BTreeMap<ByteString, ExtAttributesEntry>,
+
+    /// Value to indicate the data reference was read.
+    pub data_reference_is_read: bool,
 }
 
 impl ExtInode {
@@ -117,6 +120,7 @@ impl ExtInode {
             creation_time: None,
             block_ranges: Vec::new(),
             attributes: BTreeMap::new(),
+            data_reference_is_read: false,
         }
     }
 
@@ -140,10 +144,20 @@ impl ExtInode {
 
     /// Retrieves the block stream.
     pub fn get_block_stream(
-        &self,
+        &mut self,
+        format_version: u8,
         data_stream: &DataStreamReference,
         block_size: u32,
     ) -> Result<ExtBlockStream, ErrorTrace> {
+        if !self.data_reference_is_read {
+            match self.read_data_reference(format_version, data_stream, block_size) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read data reference");
+                    return Err(error);
+                }
+            }
+        }
         let number_of_blocks: u64 = max(
             self.data_size.div_ceil(block_size as u64),
             self.number_of_blocks,
@@ -162,7 +176,8 @@ impl ExtInode {
 
     /// Retrieves the data stream.
     pub fn get_data_stream(
-        &self,
+        &mut self,
+        format_version: u8,
         data_stream: &DataStreamReference,
         block_size: u32,
     ) -> Result<DataStreamReference, ErrorTrace> {
@@ -172,7 +187,7 @@ impl ExtInode {
 
             Ok(Arc::new(RwLock::new(data_stream)))
         } else {
-            match self.get_block_stream(data_stream, block_size) {
+            match self.get_block_stream(format_version, data_stream, block_size) {
                 Ok(block_stream) => Ok(Arc::new(RwLock::new(block_stream))),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
@@ -227,7 +242,6 @@ impl ExtInode {
                     self.data_size.div_ceil(block_size as u64),
                     self.number_of_blocks,
                 );
-
                 if format_version == 4 && self.flags & EXT_INODE_FLAG_HAS_EXTENTS != 0 {
                     let mut extents_tree: ExtExtentsTree =
                         ExtExtentsTree::new(block_size, number_of_blocks);
@@ -266,7 +280,9 @@ impl ExtInode {
                     }
                 }
             }
-        };
+        }
+        self.data_reference_is_read = true;
+
         Ok(())
     }
 }

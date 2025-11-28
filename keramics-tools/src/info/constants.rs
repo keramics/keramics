@@ -11,8 +11,6 @@
  * under the License.
  */
 
-use keramics_types::Uuid;
-
 pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
     ("00000000-0000-0000-0000-000000000000", "Unused entry"),
     (
@@ -249,10 +247,7 @@ pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
         "bfbfafe7-a34f-448a-9a5b-6213eb736c22",
         "Lenovo boot partition",
     ),
-    (
-        "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
-        "EFI System partition",
-    ),
+    ("c12a7328-f81f-11d2-ba4b-00a0c93ec93b", "EFI System"),
     ("c5a0aeec-13ea-11e5-a1b1-001e67ca0c3c", "Vendor"),
     ("c91818f9-8025-47af-89d2-f030d7000c2c", "Plan 9 partition"),
     (
@@ -279,13 +274,10 @@ pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
     ("dc76dda9-5ac1-491c-af42-a82591580c0d", "Data"),
     (
         "de94bba4-06d1-4d40-a16a-bfd50179d6ac",
-        "Windows Recovery Environment",
+        "Windows recovery environment",
     ),
     ("e2a1e728-32e3-11d6-a682-7b03a0000000", "Service Partition"),
-    (
-        "e3c9e316-0b5c-4db8-817d-f92df00215ae",
-        "Microsoft Reserved Partition (MSR)",
-    ),
+    ("e3c9e316-0b5c-4db8-817d-f92df00215ae", "Microsoft reserved"),
     (
         "e6d6d379-f507-44c2-a23c-238f2a3df928",
         "Logical Volume Manager (LVM) partition",
@@ -297,7 +289,7 @@ pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
     ("ebc597d0-2053-4b15-8b64-e0aac75f4db1", "Persistent"),
     (
         "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7",
-        "Basic data partition",
+        "Microsoft basic data",
     ),
     ("ec6d6385-e346-45dc-be91-da2a7c8b3261", "Multipath block DB"),
     ("ef32a33b-a409-486c-9141-9ffb711f6266", "Misc"),

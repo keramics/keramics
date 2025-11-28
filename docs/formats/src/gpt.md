@@ -100,17 +100,17 @@ The GPT partition entry is 128 bytes in size and consists of:
 | --- | --- | ---
 | 00000000-0000-0000-0000-000000000000 | | Unused entry
 | 024dee41-33e7-11d3-9d69-0008c781f39f | | MBR partition scheme
-| c12a7328-f81f-11d2-ba4b-00a0c93ec93b | | EFI System partition
+| c12a7328-f81f-11d2-ba4b-00a0c93ec93b | | EFI System
 | 21686148-6449-6e6f-744e-656564454649 | | BIOS boot partition
 | d3bfe2de-3daf-11df-ba40-e3a556d89593 | | Intel Fast Flash (iFFS) partition (for Intel Rapid Start technology)
 | f4019732-066e-4e12-8273-346c5641494f | | Sony boot partition
 | bfbfafe7-a34f-448a-9a5b-6213eb736c22 | | Lenovo boot partition
 | <td colspan="3">*Windows*</td>
-| e3c9e316-0b5c-4db8-817d-f92df00215ae | | Microsoft Reserved Partition (MSR)
-| ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 | | Basic data partition
+| e3c9e316-0b5c-4db8-817d-f92df00215ae | | Microsoft reserved
+| ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 | | Microsoft basic data
 | 5808c8aa-7e8f-42e0-85d2-e1e90434cfb3 | | Logical Disk Manager (LDM) metadata partition
 | af9b60a0-1431-4f62-bc68-3311714a69ad | | Logical Disk Manager data partition
-| de94bba4-06d1-4d40-a16a-bfd50179d6ac | | Windows Recovery Environment
+| de94bba4-06d1-4d40-a16a-bfd50179d6ac | | Windows recovery environment
 | 37affc90-ef7d-4e96-91c3-2d7ae055b174 | | IBM General Parallel File System (GPFS) partition
 | e75caf8f-f680-4cee-afa3-b001e56efc2d | | Storage Spaces partition
 | <td colspan="3">*HP-UX*</td>

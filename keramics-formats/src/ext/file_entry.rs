@@ -177,10 +177,11 @@ impl ExtFileEntry {
             let byte_string: ByteString = if self.inode.data_size < 60 {
                 ByteString::from(self.inode.data_reference.as_slice())
             } else {
-                let mut block_stream: ExtBlockStream = match self
-                    .inode
-                    .get_block_stream(&self.data_stream, self.inode_table.block_size)
-                {
+                let mut block_stream: ExtBlockStream = match self.inode.get_block_stream(
+                    self.inode_table.format_version,
+                    &self.data_stream,
+                    self.inode_table.block_size,
+                ) {
                     Ok(block_stream) => block_stream,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -210,14 +211,15 @@ impl ExtFileEntry {
     }
 
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
+    pub fn get_data_stream(&mut self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
             return Ok(None);
         }
-        match self
-            .inode
-            .get_data_stream(&self.data_stream, self.inode_table.block_size)
-        {
+        match self.inode.get_data_stream(
+            self.inode_table.format_version,
+            &self.data_stream,
+            self.inode_table.block_size,
+        ) {
             Ok(data_stream) => Ok(Some(data_stream)),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
@@ -252,7 +254,7 @@ impl ExtFileEntry {
             );
             Ok(Arc::new(RwLock::new(data_stream)))
         } else {
-            let inode: ExtInode = match self
+            let mut inode: ExtInode = match self
                 .inode_table
                 .get_inode(&self.data_stream, attributes_entry.value_data_inode_number)
             {
@@ -268,7 +270,11 @@ impl ExtFileEntry {
                     return Err(error);
                 }
             };
-            match inode.get_data_stream(&self.data_stream, self.inode_table.block_size) {
+            match inode.get_data_stream(
+                self.inode_table.format_version,
+                &self.data_stream,
+                self.inode_table.block_size,
+            ) {
                 Ok(data_stream) => Ok(data_stream),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
@@ -541,6 +547,22 @@ impl ExtFileEntry {
                 }
             }
         } else {
+            if !self.inode.data_reference_is_read {
+                match self.inode.read_data_reference(
+                    self.inode_table.format_version,
+                    &self.data_stream,
+                    self.inode_table.block_size,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read inode data reference"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             match self.sub_directory_entries.read_block_data(
                 &self.data_stream,
                 self.inode_table.block_size,
@@ -798,13 +820,15 @@ mod tests {
         let ext_file_system: ExtFileSystem = get_file_system("ext/ext2.raw")?;
 
         let path: Path = Path::from("/testdir1");
-        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ext_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
         let path: Path = Path::from("/testdir1/testfile1");
-        let ext_file_entry: ExtFileEntry = ext_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let mut ext_file_entry: ExtFileEntry =
+            ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = ext_file_entry.get_data_stream()?;
         assert!(result.is_some());

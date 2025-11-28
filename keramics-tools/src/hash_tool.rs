@@ -163,7 +163,7 @@ impl HashTool {
     /// Calculates a digest hash from a file entry.
     fn calculate_hash_from_file_entry(
         &self,
-        file_entry: &VfsFileEntry,
+        file_entry: &mut VfsFileEntry,
         file_system_display_path: &String,
         path_components: &[PathComponent],
     ) -> Result<(), ErrorTrace> {
@@ -186,14 +186,18 @@ impl HashTool {
             let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
                 Ok(data_fork) => data_fork,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve data fork: {} of file entry: {}",
-                            data_fork_index, display_path
-                        )
-                    );
-                    return Err(error);
+                    if self.stop_on_error {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve data fork: {} of file entry: {}",
+                                data_fork_index, display_path
+                            )
+                        );
+                        return Err(error);
+                    }
+                    // TODO: mark file entry as error
+                    continue;
                 }
             };
             let name: Option<PathComponent> = data_fork.get_name();
@@ -274,11 +278,12 @@ impl HashTool {
             };
             for result in VfsFinder::new(&file_system) {
                 match result {
-                    Ok((file_entry, path_components)) => match self.calculate_hash_from_file_entry(
-                        &file_entry,
-                        &display_path,
-                        &path_components,
-                    ) {
+                    Ok((mut file_entry, path_components)) => match self
+                        .calculate_hash_from_file_entry(
+                            &mut file_entry,
+                            &display_path,
+                            &path_components,
+                        ) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -289,11 +294,14 @@ impl HashTool {
                         }
                     },
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve file entry from finder"
-                        );
-                        return Err(error);
+                        if self.stop_on_error {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve file entry from finder"
+                            );
+                            return Err(error);
+                        }
+                        // TODO: mark file entry as error
                     }
                 };
             }

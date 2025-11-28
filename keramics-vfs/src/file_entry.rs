@@ -534,7 +534,7 @@ impl VfsFileEntry {
 
     /// Retrieves a specific data fork.
     pub fn get_data_fork_by_index(
-        &self,
+        &mut self,
         data_fork_index: usize,
     ) -> Result<VfsDataFork, ErrorTrace> {
         let result: Result<Option<VfsDataFork>, ErrorTrace> = match self {
@@ -580,7 +580,7 @@ impl VfsFileEntry {
     // TODO: add get_data_fork_by_name
 
     /// Retrieves the default data stream.
-    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
+    pub fn get_data_stream(&mut self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
@@ -611,7 +611,7 @@ impl VfsFileEntry {
 
     /// Retrieves a data stream with the specified name.
     pub fn get_data_stream_by_name(
-        &self,
+        &mut self,
         name: Option<&PathComponent>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
@@ -1113,12 +1113,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_apm() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -1128,7 +1128,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_apm() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -1412,12 +1412,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -1427,7 +1427,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -1705,12 +1705,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -1720,7 +1720,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -2147,12 +2147,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -2162,7 +2162,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_fat() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -2420,12 +2420,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -2435,7 +2435,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_gpt() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -2688,12 +2688,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -2703,7 +2703,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_mbr() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -2977,12 +2977,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -2992,7 +2992,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_ntfs() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/$UpCase")?;
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/$UpCase")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -3280,12 +3280,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -3295,7 +3295,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_os() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -3549,12 +3549,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -3564,7 +3564,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_qcow() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -3821,12 +3821,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -3836,7 +3836,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_sparseimage() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -4089,12 +4089,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_splitraw() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -4104,7 +4104,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_splitraw() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -4357,12 +4357,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -4372,7 +4372,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_udif() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -4625,12 +4625,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -4640,7 +4640,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_vhd() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =
@@ -4893,12 +4893,12 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
         let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -4908,7 +4908,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_by_name_with_vhdx() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
 
         let name: Option<PathComponent> = None;
         let result: Option<DataStreamReference> =

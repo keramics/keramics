@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_ext() -> Result<(), ErrorTrace> {
-        let ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+        let mut ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
@@ -96,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_ext() -> Result<(), ErrorTrace> {
-        let ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+        let mut ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
