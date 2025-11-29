@@ -80,3 +80,10 @@ impl FatDirectoryEntry {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // TODO: add tests
+}

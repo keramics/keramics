@@ -54,10 +54,3 @@ impl<'a> Iterator for GptPartitionsIterator<'a> {
         Some(item)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: add tests
-}

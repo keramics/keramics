@@ -56,10 +56,3 @@ impl<'a> Iterator for MbrPartitionsIterator<'a> {
         Some(item)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: add tests
-}

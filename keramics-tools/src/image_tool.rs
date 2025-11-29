@@ -787,7 +787,7 @@ impl ImageTool {
                 None => String::from("00000000000000000000000000000000"),
             }
         };
-        let display_path: String = self.display_path.join_path_components(&path.components);
+        let display_path: String = self.display_path.escape_path(path);
 
         let result: Option<Path> = match file_entry.get_symbolic_link_target() {
             Ok(result) => result,

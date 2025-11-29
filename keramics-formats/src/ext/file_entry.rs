@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::max;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -31,6 +32,7 @@ use super::extended_attributes::ExtExtendedAttributesIterator;
 use super::file_entries::ExtFileEntriesIterator;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
+use crate::ext::block_range::ExtBlockRange;
 
 /// Extended File System (ext) file entry.
 pub struct ExtFileEntry {
@@ -48,6 +50,9 @@ pub struct ExtFileEntry {
 
     /// The name.
     name: Option<ByteString>,
+
+    /// Block ranges.
+    block_ranges: Vec<ExtBlockRange>,
 
     /// Sub directory entries.
     sub_directory_entries: ExtDirectoryEntries,
@@ -75,6 +80,7 @@ impl ExtFileEntry {
             inode_number,
             inode,
             name,
+            block_ranges: Vec::new(),
             sub_directory_entries,
             symbolic_link_target: None,
             attributes_block_is_read: false,
@@ -84,6 +90,30 @@ impl ExtFileEntry {
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         self.inode.access_time.as_ref()
+    }
+
+    /// Retrieves the block stream.
+    fn get_block_stream(
+        &self,
+        block_ranges: &Vec<ExtBlockRange>,
+    ) -> Result<ExtBlockStream, ErrorTrace> {
+        let number_of_blocks: u64 = max(
+            self.inode
+                .data_size
+                .div_ceil(self.inode_table.block_size as u64),
+            self.inode.number_of_blocks,
+        );
+        let mut block_stream: ExtBlockStream =
+            ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
+
+        match block_stream.open(&self.data_stream, number_of_blocks, block_ranges) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                return Err(error);
+            }
+        }
+        Ok(block_stream)
     }
 
     /// Retrieves the change time.
@@ -177,20 +207,32 @@ impl ExtFileEntry {
             let byte_string: ByteString = if self.inode.data_size < 60 {
                 ByteString::from(self.inode.data_reference.as_slice())
             } else {
-                let mut block_stream: ExtBlockStream = match self.inode.get_block_stream(
+                match self.inode.read_block_ranges(
                     self.inode_table.format_version,
                     &self.data_stream,
                     self.inode_table.block_size,
+                    &mut self.block_ranges,
                 ) {
-                    Ok(block_stream) => block_stream,
+                    Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to retrieve block stream"
+                            "Unable to read block ranges from inode data reference"
                         );
                         return Err(error);
                     }
-                };
+                }
+                let mut block_stream: ExtBlockStream =
+                    match self.get_block_stream(&self.block_ranges) {
+                        Ok(block_stream) => block_stream,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve block stream"
+                            );
+                            return Err(error);
+                        }
+                    };
                 let mut data: Vec<u8> = vec![0; self.inode.data_size as usize];
 
                 match block_stream.read_exact(&mut data) {
@@ -215,15 +257,35 @@ impl ExtFileEntry {
         if self.inode.file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
             return Ok(None);
         }
-        match self.inode.get_data_stream(
-            self.inode_table.format_version,
-            &self.data_stream,
-            self.inode_table.block_size,
-        ) {
-            Ok(data_stream) => Ok(Some(data_stream)),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                Err(error)
+        if self.block_ranges.is_empty() {
+            match self.inode.read_block_ranges(
+                self.inode_table.format_version,
+                &self.data_stream,
+                self.inode_table.block_size,
+                &mut self.block_ranges,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read block ranges from inode data reference"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        if self.inode.has_inline_data() {
+            let data_stream: FakeDataStream =
+                FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
+
+            Ok(Some(Arc::new(RwLock::new(data_stream))))
+        } else {
+            match self.get_block_stream(&self.block_ranges) {
+                Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
+                    Err(error)
+                }
             }
         }
     }
@@ -254,7 +316,7 @@ impl ExtFileEntry {
             );
             Ok(Arc::new(RwLock::new(data_stream)))
         } else {
-            let mut inode: ExtInode = match self
+            let inode: ExtInode = match self
                 .inode_table
                 .get_inode(&self.data_stream, attributes_entry.value_data_inode_number)
             {
@@ -270,15 +332,38 @@ impl ExtFileEntry {
                     return Err(error);
                 }
             };
-            match inode.get_data_stream(
-                self.inode_table.format_version,
-                &self.data_stream,
-                self.inode_table.block_size,
-            ) {
-                Ok(data_stream) => Ok(data_stream),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                    Err(error)
+            if inode.has_inline_data() {
+                let data_stream: FakeDataStream =
+                    FakeDataStream::new(&self.inode.data_reference, self.inode.data_size);
+
+                Ok(Arc::new(RwLock::new(data_stream)))
+            } else {
+                let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+                match self.inode.read_block_ranges(
+                    self.inode_table.format_version,
+                    &self.data_stream,
+                    self.inode_table.block_size,
+                    &mut block_ranges,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read block ranges from inode data reference"
+                        );
+                        return Err(error);
+                    }
+                }
+                match self.get_block_stream(&block_ranges) {
+                    Ok(block_stream) => Ok(Arc::new(RwLock::new(block_stream))),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve block stream"
+                        );
+                        Err(error)
+                    }
                 }
             }
         }
@@ -547,26 +632,27 @@ impl ExtFileEntry {
                 }
             }
         } else {
-            if !self.inode.data_reference_is_read {
-                match self.inode.read_data_reference(
-                    self.inode_table.format_version,
-                    &self.data_stream,
-                    self.inode_table.block_size,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read inode data reference"
-                        );
-                        return Err(error);
-                    }
+            let mut block_ranges: Vec<ExtBlockRange> = Vec::new();
+
+            match self.inode.read_block_ranges(
+                self.inode_table.format_version,
+                &self.data_stream,
+                self.inode_table.block_size,
+                &mut block_ranges,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read block ranges from inode data reference"
+                    );
+                    return Err(error);
                 }
             }
             match self.sub_directory_entries.read_block_data(
                 &self.data_stream,
                 self.inode_table.block_size,
-                &self.inode.block_ranges,
+                &block_ranges,
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -622,6 +708,8 @@ mod tests {
         );
         Ok(())
     }
+
+    // TODO: add tests for get_block_stream
 
     #[test]
     fn test_get_change_time() -> Result<(), ErrorTrace> {

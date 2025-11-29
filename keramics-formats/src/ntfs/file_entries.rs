@@ -68,10 +68,3 @@ impl<'a> Iterator for NtfsFileEntriesIterator<'a> {
         Some(item)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: add tests
-}

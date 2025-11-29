@@ -69,10 +69,3 @@ impl<'a> Iterator for ExtExtendedAttributesIterator<'a> {
         Some(item)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: add tests
-}

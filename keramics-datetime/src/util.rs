@@ -15,13 +15,13 @@ use super::epoch::Epoch;
 
 /// Determines if the year is a leap-year.
 #[inline(always)]
-fn is_leap_year(year: i16) -> bool {
+pub(crate) fn is_leap_year(year: i16) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 
 /// Retrieves the number of days in a specific month.
 #[inline(always)]
-fn get_days_in_month(year: i16, month: u8) -> u8 {
+pub(crate) fn get_days_in_month(year: i16, month: u8) -> u8 {
     match month {
         1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
         2 => {
@@ -58,7 +58,7 @@ static DAYS_IN_YEAR: [i16; 10000] = calculate_days_in_year_lookup_table();
 
 /// Retrieves the number of days in a specific year.
 #[inline(always)]
-fn get_days_in_year(year: i16) -> i16 {
+pub(crate) fn get_days_in_year(year: i16) -> i16 {
     if (0..=10000).contains(&year) {
         DAYS_IN_YEAR[year as usize]
     } else if is_leap_year(year) {
@@ -136,6 +136,7 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
     }
     // Align with the start of the next century.
     let remaining_years: usize = (year as usize) % 100;
+
     for _ in remaining_years..100 {
         let days_in_year: i64 = get_days_in_year(year) as i64;
         if number_of_days < days_in_year {
@@ -149,6 +150,7 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
         number_of_days -= days_in_year;
     }
     let mut days_in_century: i64 = get_days_in_century(year) as i64;
+
     while number_of_days > days_in_century {
         if before_epoch {
             year -= 100;
@@ -160,6 +162,7 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
         days_in_century = get_days_in_century(year) as i64;
     }
     let mut days_in_year: i64 = get_days_in_year(year) as i64;
+
     while number_of_days > days_in_year {
         if before_epoch {
             year -= 1;
@@ -171,6 +174,7 @@ pub fn get_date_values(mut number_of_days: i64, epoch: &Epoch) -> (i16, u8, u8) 
         days_in_year = get_days_in_year(year) as i64;
     }
     let mut days_in_month: i64 = get_days_in_month(year, month) as i64;
+
     while number_of_days > days_in_month {
         if before_epoch {
             month -= 1;

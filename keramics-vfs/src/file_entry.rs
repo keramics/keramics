@@ -1132,7 +1132,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_apm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/apm2")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_apm() -> Result<(), ErrorTrace> {
@@ -1227,6 +1241,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_apm() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apm_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -1448,7 +1480,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_ext() -> Result<(), ErrorTrace> {
@@ -1568,6 +1614,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_ext() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(9).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -1758,7 +1822,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
@@ -1853,6 +1931,23 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -2019,6 +2114,7 @@ mod tests {
     // TODO: add tests for test_get_extended_attribute_by_name_with_fake
     // TODO: add tests for test_get_number_of_sub_file_entries_with_fake
     // TODO: add tests for test_get_sub_file_entry_by_index_with_fake
+    // TODO: add tests for test_sub_file_entries_with_fake
 
     // Tests with FAT.
 
@@ -2219,7 +2315,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1/testfile1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_fat() -> Result<(), ErrorTrace> {
@@ -2319,6 +2429,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_fat() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(2).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -2509,7 +2637,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_gpt() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/gpt2")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_gpt() -> Result<(), ErrorTrace> {
@@ -2604,6 +2746,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_gpt() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_gpt_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -2794,7 +2954,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_mbr() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_mbr() -> Result<(), ErrorTrace> {
@@ -2889,6 +3063,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_mbr() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3100,7 +3292,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1/testfile1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_ntfs() -> Result<(), ErrorTrace> {
@@ -3205,6 +3411,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_ntfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ntfs_file_entry("/testdir1")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(2).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3420,7 +3644,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_os() -> Result<(), ErrorTrace> {
@@ -3516,6 +3754,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_os() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3706,7 +3962,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_qcow() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/qcow1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_qcow() -> Result<(), ErrorTrace> {
@@ -3801,6 +4071,23 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_qcow() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -3995,7 +4282,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_sparseimage() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_sparseimage() -> Result<(), ErrorTrace> {
@@ -4090,6 +4391,23 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_sparseimage() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4280,7 +4598,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/raw1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_splitraw() -> Result<(), ErrorTrace> {
@@ -4375,6 +4707,23 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_splitraw() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_splitraw_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4565,7 +4914,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_udif() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_udif() -> Result<(), ErrorTrace> {
@@ -4660,6 +5023,23 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_udif() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -4850,7 +5230,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_vhd() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/vhd2")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_vhd() -> Result<(), ErrorTrace> {
@@ -4945,6 +5339,24 @@ mod tests {
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_vhd() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhd_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
 
         Ok(())
     }
@@ -5135,7 +5547,21 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for test_data_forks
+    #[test]
+    fn test_data_forks_with_vhdx() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_data_stream_with_vhdx() -> Result<(), ErrorTrace> {
@@ -5234,8 +5660,25 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn test_sub_file_entries_with_vhdx() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
     // Other tests.
 
     // TODO: add tests for extended_attributes
-    // TODO: add tests for sub_file_entries
 }

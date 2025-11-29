@@ -352,15 +352,23 @@ impl UdifFile {
             if media_offset >= self.media_size {
                 break;
             }
-            let block_tree_value: Option<&UdifBlockRange> = self.block_tree.get_value(media_offset);
-
-            let block_range: &UdifBlockRange = match block_tree_value {
-                Some(value) => value,
-                None => {
+            let block_range: &UdifBlockRange = match self.block_tree.get_value(media_offset) {
+                Ok(Some(value)) => value,
+                Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {}",
-                        media_offset
+                        "Missing block range for offset: {} (0x{:08x})",
+                        media_offset, media_offset
                     )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve block range for offset: {} (0x{:08x})",
+                            media_offset, media_offset
+                        )
+                    );
+                    return Err(error);
                 }
             };
             let range_relative_offset: u64 = media_offset - block_range.media_offset;

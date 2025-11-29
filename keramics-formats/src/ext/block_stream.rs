@@ -91,12 +91,22 @@ impl ExtBlockStream {
                 break;
             }
             let block_range: &ExtBlockRange = match self.block_tree.get_value(current_offset) {
-                Some(value) => value,
-                None => {
+                Ok(Some(value)) => value,
+                Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {}",
-                        current_offset
+                        "Missing block range for offset: {} (0x{:08x})",
+                        current_offset, current_offset
                     )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve block range for offset: {} (0x{:08x})",
+                            current_offset, current_offset
+                        )
+                    );
+                    return Err(error);
                 }
             };
             let range_logical_offset: u64 =

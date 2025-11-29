@@ -215,11 +215,8 @@ impl SparseImageFile {
             }
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let block_tree_value: Option<&SparseImageBlockRange> =
-                self.block_tree.get_value(media_offset);
-
-            let range_read_count: usize = match block_tree_value {
-                Some(block_range) => {
+            let range_read_count: usize = match self.block_tree.get_value(media_offset) {
+                Ok(Some(block_range)) => {
                     let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
                         Some(data_stream) => data_stream,
                         None => {
@@ -233,10 +230,20 @@ impl SparseImageFile {
                     );
                     read_count
                 }
-                None => {
+                Ok(None) => {
                     data[data_offset..data_end_offset].fill(0);
 
                     range_read_size
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve block range for offset: {} (0x{:08x})",
+                            media_offset, media_offset
+                        )
+                    );
+                    return Err(error);
                 }
             };
             if range_read_count == 0 {

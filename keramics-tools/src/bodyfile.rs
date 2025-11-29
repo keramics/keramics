@@ -60,6 +60,22 @@ impl Bodyfile {
 
         let string: String = match date_time {
             Some(date_time) => match date_time {
+                DateTime::FatDate(fat_date) => {
+                    let number_of_seconds: u32 = fat_date.get_number_of_seconds();
+
+                    format!("{}", 315532800 + number_of_seconds)
+                }
+                DateTime::FatTimeDate(fat_date_time) => {
+                    let number_of_seconds: u32 = fat_date_time.get_number_of_seconds();
+
+                    format!("{}", 315532800 + number_of_seconds)
+                }
+                DateTime::FatTimeDate10Ms(fat_date_time_10ms) => {
+                    let (number_of_seconds, fraction): (u32, u32) =
+                        fat_date_time_10ms.get_number_of_seconds();
+
+                    format!("{}.{:02}", 315532800 + number_of_seconds, fraction)
+                }
                 DateTime::Filetime(filetime) => {
                     let mut number_of_seconds: u64 = filetime.timestamp / 10000000;
                     let mut fraction: u64 = filetime.timestamp % 10000000;

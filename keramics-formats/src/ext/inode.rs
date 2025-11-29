@@ -13,16 +13,14 @@
 
 use std::cmp::max;
 use std::collections::BTreeMap;
-use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
+use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
 use super::attributes_entry::ExtAttributesEntry;
 use super::block_numbers_tree::ExtBlockNumbersTree;
 use super::block_range::ExtBlockRange;
-use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::extents_tree::ExtExtentsTree;
 use super::inode_ext2::Ext2Inode;
@@ -86,14 +84,8 @@ pub struct ExtInode {
     /// Creation date and time.
     pub creation_time: Option<DateTime>,
 
-    /// Block ranges.
-    pub block_ranges: Vec<ExtBlockRange>,
-
     /// Attributes.
     pub attributes: BTreeMap<ByteString, ExtAttributesEntry>,
-
-    /// Value to indicate the data reference was read.
-    pub data_reference_is_read: bool,
 }
 
 impl ExtInode {
@@ -118,9 +110,7 @@ impl ExtInode {
             file_acl_block_number: 0,
             checksum: 0,
             creation_time: None,
-            block_ranges: Vec::new(),
             attributes: BTreeMap::new(),
-            data_reference_is_read: false,
         }
     }
 
@@ -142,86 +132,18 @@ impl ExtInode {
         string_parts.join("")
     }
 
-    /// Retrieves the block stream.
-    pub fn get_block_stream(
-        &mut self,
+    /// Determines if the inode is has inline data.
+    pub fn has_inline_data(&self) -> bool {
+        self.flags & EXT_INODE_FLAG_INLINE_DATA != 0
+    }
+
+    /// Reads the block ranges.
+    pub fn read_block_ranges(
+        &self,
         format_version: u8,
         data_stream: &DataStreamReference,
         block_size: u32,
-    ) -> Result<ExtBlockStream, ErrorTrace> {
-        if !self.data_reference_is_read {
-            match self.read_data_reference(format_version, data_stream, block_size) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read data reference");
-                    return Err(error);
-                }
-            }
-        }
-        let number_of_blocks: u64 = max(
-            self.data_size.div_ceil(block_size as u64),
-            self.number_of_blocks,
-        );
-        let mut block_stream: ExtBlockStream = ExtBlockStream::new(block_size, self.data_size);
-
-        match block_stream.open(data_stream, number_of_blocks, &self.block_ranges) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
-                return Err(error);
-            }
-        }
-        Ok(block_stream)
-    }
-
-    /// Retrieves the data stream.
-    pub fn get_data_stream(
-        &mut self,
-        format_version: u8,
-        data_stream: &DataStreamReference,
-        block_size: u32,
-    ) -> Result<DataStreamReference, ErrorTrace> {
-        if self.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-            let data_stream: FakeDataStream =
-                FakeDataStream::new(&self.data_reference, self.data_size);
-
-            Ok(Arc::new(RwLock::new(data_stream)))
-        } else {
-            match self.get_block_stream(format_version, data_stream, block_size) {
-                Ok(block_stream) => Ok(Arc::new(RwLock::new(block_stream))),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
-                    Err(error)
-                }
-            }
-        }
-    }
-
-    /// Reads the inode from a buffer.
-    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> Result<(), ErrorTrace> {
-        match format_version {
-            4 => {
-                Ext4Inode::read_data(self, data)?;
-            }
-            3 => {
-                Ext3Inode::read_data(self, data)?;
-            }
-            _ => {
-                Ext2Inode::read_data(self, data)?;
-            }
-        }
-        if data.len() > 128 {
-            Ext4InodeExtension::read_data(self, &data[128..])?;
-        }
-        Ok(())
-    }
-
-    /// Reads the data reference.
-    pub fn read_data_reference(
-        &mut self,
-        format_version: u8,
-        data_stream: &DataStreamReference,
-        block_size: u32,
+        block_ranges: &mut Vec<ExtBlockRange>,
     ) -> Result<(), ErrorTrace> {
         let file_mode_type: u16 = self.file_mode & 0xf000;
 
@@ -249,7 +171,7 @@ impl ExtInode {
                     match extents_tree.read_data_reference(
                         &self.data_reference,
                         data_stream,
-                        &mut self.block_ranges,
+                        block_ranges,
                     ) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -267,7 +189,7 @@ impl ExtInode {
                     match block_numbers_tree.read_data_reference(
                         &self.data_reference,
                         data_stream,
-                        &mut self.block_ranges,
+                        block_ranges,
                     ) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -281,8 +203,25 @@ impl ExtInode {
                 }
             }
         }
-        self.data_reference_is_read = true;
+        Ok(())
+    }
 
+    /// Reads the inode from a buffer.
+    pub fn read_data(&mut self, format_version: u8, data: &[u8]) -> Result<(), ErrorTrace> {
+        match format_version {
+            4 => {
+                Ext4Inode::read_data(self, data)?;
+            }
+            3 => {
+                Ext3Inode::read_data(self, data)?;
+            }
+            _ => {
+                Ext2Inode::read_data(self, data)?;
+            }
+        }
+        if data.len() > 128 {
+            Ext4InodeExtension::read_data(self, &data[128..])?;
+        }
         Ok(())
     }
 }
@@ -347,8 +286,8 @@ mod tests {
         ];
     }
 
-    // TODO: add tests for get_block_stream
-    // TODO: add tests for get_data_stream
+    // TODO: add tests for has_inline_data
+    // TODO: add tests for read_block_ranges
 
     #[test]
     fn test_read_data_ext2() -> Result<(), ErrorTrace> {
@@ -471,6 +410,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for read_data_reference
 }

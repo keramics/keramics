@@ -441,8 +441,19 @@ impl QcowFile {
                 break;
             }
             let mut block_tree_value: Option<&QcowBlockRange> =
-                self.block_tree.get_value(media_offset);
-
+                match self.block_tree.get_value(media_offset) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve block range for offset: {} (0x{:08x})",
+                                media_offset, media_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
             if block_tree_value.is_none() {
                 match self.read_cluster_block_entry(media_offset) {
                     Ok(_) => {}
@@ -454,14 +465,26 @@ impl QcowFile {
                         return Err(error);
                     }
                 }
-                block_tree_value = self.block_tree.get_value(media_offset);
+                block_tree_value = match self.block_tree.get_value(media_offset) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve block range for offset: {} (0x{:08x})",
+                                media_offset, media_offset
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
             }
             let block_range: &QcowBlockRange = match block_tree_value {
                 Some(value) => value,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {}",
-                        media_offset
+                        "Missing block range for offset: {} (0x{:08x})",
+                        media_offset, media_offset
                     )));
                 }
             };

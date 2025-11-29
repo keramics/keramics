@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use keramics_core::ErrorTrace;
 use keramics_encodings::CharacterDecoder;
-use keramics_formats::PathComponent;
+use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference, VfsType};
 
 use crate::enums::DisplayPathType;
@@ -33,12 +33,27 @@ pub struct DisplayPath {
 }
 
 impl DisplayPath {
+    const COMPONENT_SEPARATOR: &str = "/";
+
     /// Creates a new display path helper.
     pub fn new(volume_path_type: &DisplayPathType) -> Self {
         Self {
             vfs_resolver: VfsResolver::current(),
             translation_table: Self::get_character_translation_table(),
             volume_path_type: volume_path_type.clone(),
+        }
+    }
+
+    /// Escapes unprintable characters in a path.
+    pub fn escape_path(&self, path: &Path) -> String {
+        if path.is_root() {
+            String::from(Self::COMPONENT_SEPARATOR)
+        } else {
+            path.components
+                .iter()
+                .map(|component| self.escape_path_component(component))
+                .collect::<Vec<String>>()
+                .join(Self::COMPONENT_SEPARATOR)
         }
     }
 
@@ -265,19 +280,6 @@ impl DisplayPath {
         // TODO: santize path (control characters, etc.)
     }
 
-    /// Joins the path components into a path string.
-    pub fn join_path_components(&self, path_components: &[PathComponent]) -> String {
-        if path_components.len() == 1 && path_components[0].is_empty() {
-            return String::from("/");
-        } else {
-            path_components
-                .iter()
-                .map(|component| self.escape_path_component(component))
-                .collect::<Vec<String>>()
-                .join("/")
-        }
-    }
-
     /// Sets the volume path type.
     pub fn set_volume_path_type(&mut self, volume_path_type: &DisplayPathType) {
         self.volume_path_type = volume_path_type.clone();
@@ -291,6 +293,8 @@ mod tests {
     use keramics_formats::Path;
     use keramics_types::Ucs2String;
     use keramics_vfs::new_os_vfs_location;
+
+    // TODO: add tests for escape_path
 
     #[test]
     fn test_escape_path_component() {
@@ -423,8 +427,6 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for join_path_components
 
     #[test]
     fn test_set_volume_path_type() {

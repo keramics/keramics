@@ -68,10 +68,3 @@ impl<'a> Iterator for ExtFileEntriesIterator<'a> {
         Some(item)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // TODO: add tests
-}

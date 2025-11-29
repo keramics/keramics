@@ -80,7 +80,14 @@ struct PyFatDate {
 }
 
 #[pymethods]
-impl PyFatDate {}
+impl PyFatDate {
+    #[getter]
+    pub fn timestamp(&self) -> PyResult<u32> {
+        let seconds: u32 = self.fat_date.get_number_of_seconds();
+
+        Ok(seconds * 100)
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "FatTimeDate")]
@@ -90,7 +97,14 @@ struct PyFatTimeDate {
 }
 
 #[pymethods]
-impl PyFatTimeDate {}
+impl PyFatTimeDate {
+    #[getter]
+    pub fn timestamp(&self) -> PyResult<u32> {
+        let seconds: u32 = self.fat_time_date.get_number_of_seconds();
+
+        Ok(seconds * 100)
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "FatTimeDate10Ms")]
@@ -100,7 +114,14 @@ struct PyFatTimeDate10Ms {
 }
 
 #[pymethods]
-impl PyFatTimeDate10Ms {}
+impl PyFatTimeDate10Ms {
+    #[getter]
+    pub fn timestamp(&self) -> PyResult<u32> {
+        let (seconds, fraction): (u32, u32) = self.fat_time_date.get_number_of_seconds();
+
+        Ok((seconds * 100) + (fraction as u32))
+    }
+}
 
 #[pyclass]
 #[pyo3(name = "Filetime")]

@@ -188,5 +188,5 @@ impl ExtInodeTable {
 mod tests {
     use super::*;
 
-    // TODO: add tests.
+    // TODO: add tests for get_inode.
 }

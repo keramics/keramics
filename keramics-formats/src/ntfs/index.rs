@@ -53,12 +53,22 @@ impl NtfsIndex {
         let virtual_cluster_offset: u64 = virtual_cluster_number * (self.cluster_block_size as u64);
 
         let block_range: &NtfsBlockRange = match self.block_tree.get_value(virtual_cluster_offset) {
-            Some(value) => value,
-            None => {
+            Ok(Some(value)) => value,
+            Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Missing block range for VCN: {}",
                     virtual_cluster_number
                 )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve block range for VCN: {}",
+                        virtual_cluster_number
+                    )
+                );
+                return Err(error);
             }
         };
         let range_relative_offset: u64 =

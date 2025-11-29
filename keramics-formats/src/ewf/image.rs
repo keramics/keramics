@@ -318,15 +318,23 @@ impl EwfImage {
             if media_offset >= self.media_size {
                 break;
             }
-            let block_tree_value: Option<&EwfBlockRange> = self.block_tree.get_value(media_offset);
-
-            let block_range: &EwfBlockRange = match block_tree_value {
-                Some(value) => value,
-                None => {
+            let block_range: &EwfBlockRange = match self.block_tree.get_value(media_offset) {
+                Ok(Some(value)) => value,
+                Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Missing block range for offset: {} (0x{:08x})",
                         media_offset, media_offset
                     )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve block range for offset: {} (0x{:08x})",
+                            media_offset, media_offset
+                        )
+                    );
+                    return Err(error);
                 }
             };
             if !self

@@ -122,10 +122,10 @@ impl FatFileEntryInfo {
     /// Retrieves the string representation of a date and time value.
     fn get_date_time_string(date_time: &DateTime) -> String {
         match date_time {
-            DateTime::NotSet => String::from("Not set (0)"),
             DateTime::FatDate(fat_date) => fat_date.to_iso8601_string(),
             DateTime::FatTimeDate(fat_date_time) => fat_date_time.to_iso8601_string(),
             DateTime::FatTimeDate10Ms(fat_date_time_10ms) => fat_date_time_10ms.to_iso8601_string(),
+            DateTime::NotSet => String::from("Not set (0)"),
             _ => return String::from("Unsupported date time"),
         }
     }

@@ -15,6 +15,87 @@ use std::fmt;
 
 use keramics_types::bytes_to_u16_le;
 
+use super::util::{get_days_in_month, get_days_in_year};
+
+/// Retrieves date values.
+#[inline(always)]
+fn fat_get_date_values(date: u16) -> (i16, u8, u8) {
+    // The year is stored in bits 9 - 15 of the date (7 bits)
+    // and value of 0 represents 1980
+    let year: u16 = 1980 + ((date >> 9) & 0x007f);
+
+    // The month is stored in bits 5 - 8 of the date (4 bits)
+    // and a value of 1 represents January
+    let month: u16 = (date >> 5) & 0x000f;
+
+    // The day of month is stored in bits 0 - 4 of the date (5 bits)
+    let day_of_month: u16 = date & 0x001f;
+
+    (year as i16, month as u8, day_of_month as u8)
+}
+
+/// Retrieves the number of seconds since January 1, 1980.
+#[inline(always)]
+fn fat_get_number_of_seconds(date: u16, time: u16) -> u32 {
+    let (mut year, mut month, day_of_month): (i16, u8, u8) = fat_get_date_values(date);
+    let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(time);
+
+    let mut number_of_seconds: u32 = day_of_month as u32;
+
+    while month > 0 {
+        number_of_seconds += get_days_in_month(year, month) as u32;
+        month -= 1;
+    }
+    while year > 1980 {
+        number_of_seconds += get_days_in_year(year) as u32;
+        year -= 1;
+    }
+    number_of_seconds = (number_of_seconds * 24) + (hours as u32);
+    number_of_seconds = (number_of_seconds * 60) + (minutes as u32);
+
+    (number_of_seconds * 60) + (seconds as u32)
+}
+
+/// Retrieves the number of seconds since January 1, 1980 with a fraction of a second.
+#[inline(always)]
+fn fat_get_number_of_seconds_with_fraction(date: u16, time: u16, fraction: u8) -> (u32, u32) {
+    let seconds: u32 = fat_get_number_of_seconds(date, time);
+    let milliseconds: u32 = (seconds * 100) + (fraction as u32);
+
+    (milliseconds / 100, milliseconds % 100)
+}
+
+/// Retrieves time values.
+#[inline(always)]
+fn fat_get_time_values(time: u16) -> (u8, u8, u8) {
+    // The hours are stored in bits 11 - 15 of the time (5 bits)
+    let hours: u16 = (time >> 11) & 0x001f;
+
+    // The minutes are stored in bits 5 - 10 of the time (6 bits)
+    let minutes: u16 = (time >> 5) & 0x003f;
+
+    // The seconds are stored in bits 0 - 4 of the time (5 bits)
+    // The seconds are stored as 2 second intervals
+    let seconds: u16 = (time & 0x001f) * 2;
+
+    (hours as u8, minutes as u8, seconds as u8)
+}
+
+/// Retrieves time values with a fraction of second.
+#[inline(always)]
+fn fat_get_time_values_with_fraction(time: u16, fraction: u8) -> (u8, u8, u8, u8) {
+    let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(time);
+
+    let milliseconds: u16 = ((seconds as u16) * 100) + (fraction as u16);
+
+    (
+        hours as u8,
+        minutes as u8,
+        (milliseconds / 100) as u8,
+        (milliseconds % 100) as u8,
+    )
+}
+
 /// FAT date.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FatDate {
@@ -34,11 +115,14 @@ impl FatDate {
         Self { date }
     }
 
+    /// Retrieves the timestamp as number of seconds since January 1, 1980.
+    pub fn get_number_of_seconds(&self) -> u32 {
+        fat_get_number_of_seconds(self.date, 0)
+    }
+
     /// Retrieves an ISO 8601 string representation of the timestamp.
     pub fn to_iso8601_string(&self) -> String {
-        let year: u16 = 1980 + ((self.date >> 9) & 0x7f);
-        let month: u16 = (self.date >> 5) & 0x0f;
-        let day_of_month: u16 = self.date & 0x1f;
+        let (year, month, day_of_month): (i16, u8, u8) = fat_get_date_values(self.date);
 
         format!("{:04}-{:02}-{:02}", year, month, day_of_month)
     }
@@ -79,14 +163,15 @@ impl FatTimeDate {
         Self { date, time }
     }
 
+    /// Retrieves the timestamp as number of seconds since January 1, 1980.
+    pub fn get_number_of_seconds(&self) -> u32 {
+        fat_get_number_of_seconds(self.date, self.time)
+    }
+
     /// Retrieves an ISO 8601 string representation of the timestamp.
     pub fn to_iso8601_string(&self) -> String {
-        let year: u16 = 1980 + ((self.date >> 9) & 0x7f);
-        let month: u16 = (self.date >> 5) & 0x0f;
-        let day_of_month: u16 = self.date & 0x1f;
-        let hours: u16 = (self.time >> 11) & 0x1f;
-        let minutes: u16 = (self.time >> 5) & 0x3f;
-        let seconds: u16 = (self.time & 0x1f) * 2;
+        let (year, month, day_of_month): (i16, u8, u8) = fat_get_date_values(self.date);
+        let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(self.time);
 
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}",
@@ -142,24 +227,20 @@ impl FatTimeDate10Ms {
         }
     }
 
+    /// Retrieves the timestamp as number of seconds since January 1, 1980.
+    pub fn get_number_of_seconds(&self) -> (u32, u32) {
+        fat_get_number_of_seconds_with_fraction(self.date, self.time, self.fraction)
+    }
+
     /// Retrieves an ISO 8601 string representation of the timestamp.
     pub fn to_iso8601_string(&self) -> String {
-        let year: u16 = 1980 + ((self.date >> 9) & 0x7f);
-        let month: u16 = (self.date >> 5) & 0x0f;
-        let day_of_month: u16 = self.date & 0x1f;
-        let hours: u16 = (self.time >> 11) & 0x1f;
-        let minutes: u16 = (self.time >> 5) & 0x3f;
-        let milliseconds: u16 = ((self.time & 0x1f) * 2000) + ((self.fraction as u16) * 10);
+        let (year, month, day_of_month): (i16, u8, u8) = fat_get_date_values(self.date);
+        let (hours, minutes, seconds, fraction): (u8, u8, u8, u8) =
+            fat_get_time_values_with_fraction(self.time, self.fraction);
 
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:02}",
-            year,
-            month,
-            day_of_month,
-            hours,
-            minutes,
-            (milliseconds / 1000),
-            (milliseconds % 1000) / 10
+            year, month, day_of_month, hours, minutes, seconds, fraction
         )
     }
 }
@@ -181,6 +262,11 @@ impl fmt::Display for FatTimeDate10Ms {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // TODO: add tests for fat_get_date_values
+    // TODO: add tests for fat_get_number_of_seconds
+    // TODO: add tests for fat_get_time_values
+    // TODO: add tests for fat_get_time_values_with_fraction
 
     #[test]
     fn test_fat_date_from_bytes() {

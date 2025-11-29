@@ -240,12 +240,22 @@ impl NtfsCompressedStream {
             } else {
                 let compression_unit: &NtfsCompressionRange =
                     match self.block_tree.get_value(current_offset) {
-                        Some(value) => value,
-                        None => {
+                        Ok(Some(value)) => value,
+                        Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
-                                "Missing compression unit for offset: {}",
-                                current_offset
+                                "Missing compression unit for offset: {} (0x{:08x})",
+                                current_offset, current_offset
                             )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve compression unit for offset: {} (0x{:08x})",
+                                    current_offset, current_offset
+                                )
+                            );
+                            return Err(error);
                         }
                     };
                 let range_offset: u64 = compression_unit.offset;

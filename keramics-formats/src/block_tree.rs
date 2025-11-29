@@ -13,8 +13,9 @@
 
 use std::sync::Arc;
 
+use keramics_core::ErrorTrace;
+
 use super::block_tree_node::{BlockTreeNode, BlockTreeNodeType};
-use super::errors::InsertError;
 
 /// Block tree.
 pub(crate) struct BlockTree<T> {
@@ -72,32 +73,50 @@ impl<T> BlockTree<T> {
     }
 
     /// Retrieves a (leaf) value.
-    pub fn get_value(&self, offset: u64) -> Option<&T> {
+    pub fn get_value(&self, offset: u64) -> Result<Option<&T>, ErrorTrace> {
         if self.root_node.is_none() {
-            return None;
+            return Ok(None);
         }
-        let mut node: &BlockTreeNode<T> = self.root_node.as_ref().unwrap();
-
+        let mut node: &BlockTreeNode<T> = match self.root_node.as_ref() {
+            Some(node) => node,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing root node"));
+            }
+        };
         while node.node_type == BlockTreeNodeType::Branch {
             let sub_node_index: u64 = (offset - node.offset) / node.element_size;
 
             if node.sub_nodes[sub_node_index as usize].is_none() {
-                return None;
+                return Ok(None);
             }
-            node = node.sub_nodes[sub_node_index as usize].as_ref().unwrap();
+            node = match node.sub_nodes[sub_node_index as usize].as_ref() {
+                Some(node) => node,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing sub node: {}",
+                        sub_node_index
+                    )));
+                }
+            };
         }
         let value_index: usize = ((offset - node.offset) / node.element_size) as usize;
 
         if value_index >= node.values.len() || node.values[value_index].is_none() {
-            return None;
+            return Ok(None);
         }
-        Some(node.values[value_index].as_ref().unwrap())
+        match node.values[value_index].as_ref() {
+            Some(node) => Ok(Some(node)),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing value: {}",
+                value_index
+            ))),
+        }
     }
 
     /// Inserts a (leaf) value.
-    pub fn insert_value(&mut self, offset: u64, size: u64, value: T) -> Result<(), InsertError> {
+    pub fn insert_value(&mut self, offset: u64, size: u64, value: T) -> Result<(), ErrorTrace> {
         if offset + size > self.data_size {
-            return Err(InsertError::new(format!(
+            return Err(keramics_core::error_trace_new!(format!(
                 "Range: {} - {} exceeds data size: {}",
                 offset,
                 offset + size,
@@ -105,13 +124,13 @@ impl<T> BlockTree<T> {
             )));
         }
         if !offset.is_multiple_of(self.leaf_value_size) {
-            return Err(InsertError::new(format!(
+            return Err(keramics_core::error_trace_new!(format!(
                 "Offset: {} not a multitude of leaf value size: {}",
                 offset, self.leaf_value_size
             )));
         }
         if !size.is_multiple_of(self.leaf_value_size) {
-            return Err(InsertError::new(format!(
+            return Err(keramics_core::error_trace_new!(format!(
                 "Size: {} not a multitude of leaf value size: {}",
                 size, self.leaf_value_size
             )));
@@ -119,15 +138,27 @@ impl<T> BlockTree<T> {
         if self.root_node.is_none() {
             self.create_root_node(size);
         }
-        let root_node: &mut BlockTreeNode<T> = self.root_node.as_mut().unwrap();
-
-        root_node.insert_value(
+        let root_node: &mut BlockTreeNode<T> = match self.root_node.as_mut() {
+            Some(node) => node,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to root node"
+                ));
+            }
+        };
+        match root_node.insert_value(
             self.elements_per_node,
             self.leaf_value_size,
             offset,
             size,
             Arc::new(value),
-        )
+        ) {
+            Ok(_) => Ok(()),
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                "Unable to insert value into root node",
+                error
+            )),
+        }
     }
 }
 
@@ -136,40 +167,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_tree_get_value() -> Result<(), InsertError> {
+    fn test_get_value() -> Result<(), ErrorTrace> {
         let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
 
-        let test_leaf_value: u32 = 0x12345678;
-        test_tree.insert_value(131072, 512, test_leaf_value)?;
+        test_tree.insert_value(131072, 512, 0x12345678)?;
 
-        let value: Option<&u32> = test_tree.get_value(0);
-        assert!(value.is_none());
+        let value: Option<&u32> = test_tree.get_value(0)?;
+        assert_eq!(value, None);
 
-        let value: Option<&u32> = test_tree.get_value(131328);
-        assert!(value.is_some());
-
-        let leaf_value: &u32 = value.unwrap();
-        assert_eq!(*leaf_value, 0x12345678);
+        let value: Option<&u32> = test_tree.get_value(131328)?;
+        assert_eq!(value, Some(&0x12345678));
 
         Ok(())
     }
 
     #[test]
-    fn test_tree_insert_value_with_leaf_size() -> Result<(), InsertError> {
+    fn test_insert_value_with_leaf_size() -> Result<(), ErrorTrace> {
         let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
 
-        let test_leaf_value: u32 = 0x12345678;
-        test_tree.insert_value(131072, 512, test_leaf_value)?;
+        test_tree.insert_value(131072, 512, 0x12345678)?;
 
         let test_node: &BlockTreeNode<u32> = test_tree.root_node.as_ref().unwrap();
-        assert!(test_node.node_type == BlockTreeNodeType::Branch);
+        assert_eq!(test_node.node_type, BlockTreeNodeType::Branch);
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
         assert_eq!(test_node.sub_nodes.len(), 8);
         assert_eq!(test_node.values.len(), 0);
 
         let test_node: &BlockTreeNode<u32> = test_node.sub_nodes[1].as_ref().unwrap();
-        assert!(test_node.node_type == BlockTreeNodeType::Leaf);
+        assert_eq!(test_node.node_type, BlockTreeNodeType::Leaf);
         assert_eq!(test_node.offset, 131072);
         assert_eq!(test_node.element_size, 512);
         assert_eq!(test_node.sub_nodes.len(), 0);
@@ -179,14 +205,14 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_insert_value_with_element_size() -> Result<(), InsertError> {
+    fn test_insert_value_with_element_size() -> Result<(), ErrorTrace> {
         let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
 
         let test_leaf_value: u32 = 0x12345678;
         test_tree.insert_value(131072, 131072, test_leaf_value)?;
 
         let test_node: &BlockTreeNode<u32> = test_tree.root_node.as_ref().unwrap();
-        assert!(test_node.node_type == BlockTreeNodeType::Leaf);
+        assert_eq!(test_node.node_type, BlockTreeNodeType::Leaf);
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
         assert_eq!(test_node.sub_nodes.len(), 0);
@@ -196,7 +222,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_insert_value_with_range_outside_tree() {
+    fn test_insert_value_with_range_outside_tree() {
         let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
 
         let test_leaf_value: u32 = 0x12345678;
@@ -205,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_insert_value_with_unsupported_offset() {
+    fn test_insert_value_with_unsupported_offset() {
         let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
 
         let test_leaf_value: u32 = 0x12345678;
@@ -214,7 +240,7 @@ mod tests {
     }
 
     #[test]
-    fn test_tree_insert_value_with_unsupported_size() {
+    fn test_insert_value_with_unsupported_size() {
         let mut test_tree: BlockTree<u32> = BlockTree::new(1048576, 256, 512);
 
         let test_leaf_value: u32 = 0x12345678;

@@ -167,7 +167,7 @@ impl HashTool {
         file_system_display_path: &String,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let display_path: String = self.display_path.join_path_components(&path.components);
+        let display_path: String = self.display_path.escape_path(path);
 
         let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
             Ok(number_of_data_forks) => number_of_data_forks,

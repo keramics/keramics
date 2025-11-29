@@ -13,10 +13,10 @@
 
 use std::sync::Arc;
 
-use super::errors::InsertError;
+use keramics_core::ErrorTrace;
 
 /// Block tree node type.
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) enum BlockTreeNodeType {
     Branch,
     Leaf,
@@ -60,7 +60,7 @@ impl<T> BlockTreeNode<T> {
         offset: u64,
         size: u64,
         value: Arc<T>,
-    ) -> Result<(), InsertError> {
+    ) -> Result<(), ErrorTrace> {
         if self.node_type == BlockTreeNodeType::Branch {
             if self.sub_nodes.is_empty() {
                 self.sub_nodes = (0..elements_per_node).map(|_| None).collect();
@@ -88,19 +88,35 @@ impl<T> BlockTreeNode<T> {
                     self.sub_nodes[sub_node_index as usize] = Some(sub_node);
                 }
                 let sub_node: &mut BlockTreeNode<T> =
-                    self.sub_nodes[sub_node_index as usize].as_mut().unwrap();
-                sub_node.insert_value(
+                    match self.sub_nodes[sub_node_index as usize].as_mut() {
+                        Some(node) => node,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unable to obtain mutable reference to sub node: {}",
+                                sub_node_index
+                            )));
+                        }
+                    };
+                match sub_node.insert_value(
                     elements_per_node,
                     leaf_value_size,
                     offset,
                     size,
                     value.clone(),
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            format!("Unable to insert value into sub node: {}", sub_node_index),
+                            error
+                        ));
+                    }
+                }
                 sub_node_offset += self.element_size;
             }
         } else {
             if !size.is_multiple_of(self.element_size) {
-                return Err(InsertError::new(format!(
+                return Err(keramics_core::error_trace_new!(format!(
                     "Size: {} not a multitude of node element size: {}",
                     size, self.element_size
                 )));
@@ -114,7 +130,7 @@ impl<T> BlockTreeNode<T> {
 
             for value_index in first_value_index..last_value_index {
                 if self.values[value_index as usize].is_some() {
-                    return Err(InsertError::new(String::from("Leaf value already set")));
+                    return Err(keramics_core::error_trace_new!("Leaf value already set"));
                 }
                 self.values[value_index as usize] = Some(value.clone());
             }
@@ -127,5 +143,15 @@ impl<T> BlockTreeNode<T> {
 mod tests {
     use super::*;
 
-    // TODO: add tests
+    #[test]
+    fn test_insert_value_with_leaf_size() -> Result<(), ErrorTrace> {
+        let mut test_node: BlockTreeNode<u32> =
+            BlockTreeNode::<u32>::new(&BlockTreeNodeType::Leaf, 0, 512);
+
+        test_node.insert_value(256, 512, 0, 512, Arc::new(42))?;
+
+        assert_eq!(test_node.values.len(), 256);
+
+        Ok(())
+    }
 }
