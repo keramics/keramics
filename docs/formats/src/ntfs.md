@@ -282,7 +282,7 @@ VSS is largely a stand-alone but has some integration with NTFS.
 
 TODO: link to VSS format documentation
 
-### <a name="media_descriptor"></a>Media descriptor
+### Media descriptor {#media_descriptor}
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
@@ -368,7 +368,7 @@ freed; it is 0 if the segment is not used.
 The base record file reference is used to store additional attributes for
 another MFT entry, e.g. for attribute lists.
 
-#### <a name="mft_entry_flags"></a>MFT entry flags
+#### MFT entry flags {#mft_entry_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -377,7 +377,7 @@ another MFT entry, e.g. for attribute lists.
 | 0x0004 | MFT_RECORD_IN_EXTEND | Unknown. According to [ntfs_layout.h](https://ultradefrag.net/doc/man/ntfs/ntfs_layout.h.html) this is set for all system files present in the $Extend directory
 | 0x0008 | MFT_RECORD_IS_VIEW_INDEX | Is index. When this flag is set the file entry represents an index. According to [ntfs_layout.h](https://ultradefrag.net/doc/man/ntfs/ntfs_layout.h.html) this is set for all indices other than $I30
 
-#### <a name="fix_up_values"></a>The fix-up values
+#### The fix-up values {#fix_up_values}
 
 The fix-up values are of variable size and consists of:
 
@@ -405,7 +405,7 @@ from.
 
 TODO: provide examples on applying the fix-up values.
 
-### <a name="file_reference"></a>The file reference
+### The file reference {#file_reference}
 
 The file reference (FILE_REFERENCE or MFT_SEGMENT_REFERENCE) is 8 bytes in size
 and consists of:
@@ -443,7 +443,7 @@ consists of:
 | 12 | 2 | | [Attribute data flags](#mft_attribute_data_flags)
 | 14 | 2 | | Attribute identifier (or instance), which contains an unique identifier to distinguish between attributes that contain segmented data.
 
-#### <a name="mft_attribute_data_flags"></a>MFT attribute data flags
+#### MFT attribute data flags {#mft_attribute_data_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -502,7 +502,7 @@ TODO: determine the meaning of a VCN of -1
 
 For more information about compressed MFT attributes see [compression](#compression).
 
-#### <a name="attribute_name"></a>Attribute name
+#### Attribute name {#attribute_name}
 
 The attribute name is of variable size and consists of:
 
@@ -581,7 +581,7 @@ Also see [compression](#compression).
 
 ## The attributes
 
-### <a name="attribute_types"></a>Known attribute types
+### Known attribute types {#attribute_types}
 
 The attribute types are stored in the [$AttrDef metadata file](#attribute_definitions).
 
@@ -620,7 +620,7 @@ The attribute types are stored in the [$AttrDef metadata file](#attribute_defini
 | | |
 | 0xffffffff | | End of attributes marker
 
-### <a name="attribute_chains"></a>Attribute chains
+### Attribute chains {#attribute_chains}
 
 Multiple attributes can be chained to make up a single attribute data stream,
 e.g. the attributes:
@@ -697,7 +697,7 @@ consists of:
 | 26 | ... | | Name, which contains an UCS-2 little-endian string without end-of-string character
 | ... | ... | | alignment padding (8-byte alignment), can contain remnant data
 
-### <a name="file_name_attribute"></a>The file name attribute
+### The file name attribute {#file_name_attribute}
 
 The file name attribute ($FILE_NAME) contains the basic file system information,
 like the parent file entry, various date and time values and name. It is stored
@@ -834,7 +834,7 @@ The volume information attribute data is 12 bytes in size and consists of:
 
 The volume information attribute is used in the $Volume metadata file MFT entry.
 
-#### <a name="volume_flags"></a>Volume flags
+#### Volume flags {#volume_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -946,7 +946,7 @@ The extended attribute data is of variable size and consists of:
 
 TODO: determine if the name is 2-byte aligned
 
-#### <a name="extended_attribute_flags"></a>Extended attribute flags
+#### Extended attribute flags {#extended_attribute_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -976,7 +976,7 @@ TODO: complete section
 | $EFS | | Encrypted NTFS (EFS)
 | $TXF_DATA | | Transactional NTFS (TxF)
 
-## <a name="attribute_types"></a>The attribute types
+## The attribute types {#attribute_types}
 
 The attribute types are stored in the `$AttrDef` metadata file.
 
@@ -989,7 +989,7 @@ The attribute types are stored in the `$AttrDef` metadata file.
 | 144 | 8 | | Unknown (minimum attribute size?)
 | 152 | 8 | | Unknown (maximum attribute size?)
 
-## <a name="index"></a>The index
+## The index {#index}
 
 The index structures are used for various purposes one of which are the
 directory entries.
@@ -1035,7 +1035,7 @@ Indexes commonly used by NTFS are:
 | $Q | | Quotas (used by $Quota)
 | $R | | Reparse points (used by $Reparse)
 
-### <a name="index_root"></a>The index root
+### The index root {#index_root}
 
 The index root consists of:
 
@@ -1058,7 +1058,7 @@ The index root header is 16 bytes in size and consists of:
 > the index entry size in the volume header. The correct size seems to be the
 > value in the index root header.
 
-#### <a name="collation_type"></a>Collation type
+#### Collation type {#collation_type}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1112,7 +1112,7 @@ size of the fix-up values and the alignment padding following it.
 
 The remainder of the index node contains remnant data and/or zero-byte values.
 
-#### <a name="index_node_flags"></a>The index node flags
+#### The index node flags {#index_node_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1177,7 +1177,7 @@ It appears to only to be used by the $Secure metadata file.
 
 Also see [the security descriptor identifier index value](#security_descriptor_identifier_index_value).
 
-## <a name="compression"></a>Compression
+## Compression {#compression}
 
 ### Compressed data-runs
 
@@ -1288,7 +1288,7 @@ the chunk is stored uncompressed.
 
 Also see [Windows Overlay Filter (WOF) compression method](#wof_compression_method).
 
-## <a name="reparse_point"></a>The reparse point
+## The reparse point {#reparse_point}
 
 The reparse point is used to create file system-level links. Reparse data is
 stored in the reparse point attribute. The reparse point data
@@ -1303,7 +1303,7 @@ stored in the reparse point attribute. The reparse point data
 
 TODO: determine if non-native (Microsoft) reparse points are stored with their GUID
 
-### <a name="reparse_point_tag"></a>The reparse point tag
+### The reparse point tag {#reparse_point_tag}
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
@@ -1413,7 +1413,7 @@ TODO: determine if non-native (Microsoft) reparse points are stored with their G
 | | |
 | 0xc0000014 | IO_REPARSE_TAG_APPXSTRM | Unknown (Not used)
 
-### <a name="junction_reparse_data"></a>Junction or mount point reparse data
+### Junction or mount point reparse data {#junction_reparse_data}
 
 A reparse point with tag IO_REPARSE_TAG_MOUNT_POINT (0xa0000003) contains
 junction or mount point reparse data. The junction or mount point reparse data
@@ -1441,7 +1441,7 @@ TODO: determine what character values like 0x0002 represent in the substitute na
 00000040: 6e 00 74 00 73 00 00 00                            n.t.s...
 ```
 
-### <a name="symbolic_link_reparse_data"></a>Symbolic link reparse data
+### Symbolic link reparse data {#symbolic_link_reparse_data}
 
 A reparse point with tag IO_REPARSE_TAG_SYMLINK (0xa000000c) contains symbolic
 link reparse data. The symbolic link reparse data is of variable size and
@@ -1464,7 +1464,7 @@ consists of:
 | --- | --- | ---
 | 0x00000001 | SYMLINK_FLAG_RELATIVE | The substitute name is a path name relative to the directory containing the symbolic link.
 
-### <a name="wof_reparse_data"></a>Windows Overlay Filter (WOF) reparse data
+### Windows Overlay Filter (WOF) reparse data {#wof_reparse_data}
 
 A reparse point with tag IO_REPARSE_TAG_WOF (0x80000017) contains Windows
 Overlay Filter (WOF) reparse data. The Windows Overlay Filter (WOF) reparse
@@ -1479,7 +1479,7 @@ data is 16 bytes in size and consists of:
 | 8 | 4 | 1 | Unknown (file information version)
 | 12 | 4 | | [Compression method](#wof_compression_method)
 
-### <a name="wof_compression_method"></a>Windows Overlay Filter (WOF) compression method
+### Windows Overlay Filter (WOF) compression method {#wof_compression_method}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1490,7 +1490,7 @@ data is 16 bytes in size and consists of:
 
 TODO: link to LZXPRESS Huffman and LZX documentation
 
-### <a name="wci_reparse_data"></a>Windows Container Isolation (WCI) reparse data
+### Windows Container Isolation (WCI) reparse data {#wci_reparse_data}
 
 A reparse point with tag IO_REPARSE_TAG_WCI (0x80000018) contains Windows
 Container Isolation (WCI) reparse data. The Windows Container Isolation (WCI)
@@ -1513,7 +1513,7 @@ block, where the LSB is the first bit in a byte.
 
 TODO: describe what the $SRAT data stream is used for.
 
-## <a name="access_control"></a>Access control
+## Access control {#access_control}
 
 The $Secure metadata file contains the security descriptors used for access control.
 
@@ -1525,7 +1525,7 @@ The $Secure metadata file contains the security descriptors used for access cont
 
 ### Security descriptor hash ($SDH) index
 
-#### <a name="security_descriptor_hash_index_value"></a>The security descriptor hash index value
+#### The security descriptor hash index value {#security_descriptor_hash_index_value}
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
@@ -1541,7 +1541,7 @@ The $Secure metadata file contains the security descriptors used for access cont
 
 ### Security descriptor identifier ($SII) index
 
-#### <a name="security_descriptor_identifier_index_value"></a>The security descriptor identifier index value
+#### The security descriptor identifier index value {#security_descriptor_identifier_index_value}
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
@@ -1582,7 +1582,7 @@ TODO: link to security descriptor format documentation
 | 28 | 16 | | Birth droid file (or object) identifier, which contains a GUID
 | 44 | 16 | | Birth droid domain identifier, which contains a GUID
 
-## <a name="log_file"></a>Metadata transaction journal (log file)
+## Metadata transaction journal (log file) {#log_file}
 
 TODO: complete section
 
@@ -1619,7 +1619,7 @@ in size and consists of:
 | 0 | Transition
 | 1 | Update sequence support
 
-## <a name="usn_change_journal"></a>USN change journal
+## USN change journal {#usn_change_journal}
 
 The metadata file $Extend\$UsnJrnl contains the USN change journal. It is a
 sparse file in which NTFS stores records of changes to files and directories.
@@ -1677,7 +1677,7 @@ of:
 | 60 | (name size) | | Name, which contains an UCS-2 little-endian string without end-of-string character
 | ... | ... | 0x00 | Unknown (Padding)
 
-#### <a name="update_reason_flags"></a>Update reason flags
+#### Update reason flags {#update_reason_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1707,7 +1707,7 @@ of:
 | | |
 | 0x80000000 | USN_REASON_CLOSE | The file or directory was closed
 
-#### <a name="update_source_flags"></a>Update source flags
+#### Update source flags {#update_source_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1747,7 +1747,7 @@ ZoneId=3
 Where ZoneId refers to the [Internet Explorer URL security zone](https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/ms537183(v=vs.85))
 of the origin.
 
-## <a name="transactional_ntfs"></a>Transactional NTFS (TxF)
+## Transactional NTFS (TxF) {#transactional_ntfs}
 
 As of Vista Transactional NTFS (TxF) was added.
 
@@ -1927,7 +1927,7 @@ in size and consist of:
 
 ## Windows definitions
 
-### <a name="file_attribute_flags"></a>File attribute flags
+### File attribute flags {#file_attribute_flags}
 
 The file attribute flags consist of the following values:
 
@@ -1961,7 +1961,7 @@ not updated. For now the latter is assumed.
 | 0x10000000 | | Unknown (Is directory or has $I30 index? Note that an $Extend directory without this flag has been observed)
 | 0x20000000 | | Is index view
 
-## <a name="corruption_scenarios"></a>Corruption scenarios
+## Corruption scenarios {#corruption_scenarios}
 
 ### Data steam with inconsistent data flags
 

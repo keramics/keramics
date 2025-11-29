@@ -94,7 +94,7 @@ The GPT partition entry is 128 bytes in size and consists of:
 | 48 | 8 | | [Attribute flags](#partition_attribute_flags)
 | 56 | 72 | | Partition name, which contains a UTF-16 little-endian string
 
-### <a name="partition_types"></a>Partition types
+### Partition types {#partition_types}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -256,7 +256,7 @@ The GPT partition entry is 128 bytes in size and consists of:
 | <td colspan="3">*Atari TOS*</td>
 | 734e5afe-f61a-11e6-bc64-92361f002671 | | Basic data partition (GEM, BGM, F32)
 
-### <a name="partition_attribute_flags"></a>Partition attribute flags
+### Partition attribute flags {#partition_attribute_flags}
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---

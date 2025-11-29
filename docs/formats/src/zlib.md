@@ -45,7 +45,7 @@ of 31, such that:
 ( ( first x 256 ) + second ) mod 31 = 0
 ```
 
-### <a name="compression_method"></a>Compression method
+### Compression method {#compression_method}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -55,7 +55,7 @@ of 31, such that:
 
 > Note that RFC1950 only defines 8 as a valid compression method.
 
-### <a name="compression_information"></a>Compression information
+### Compression information {#compression_information}
 
 The value of the compression information is dependent on the compression method.
 
@@ -78,7 +78,7 @@ E.g. a compression information value of 7 indicates a 32768 bytes window size.
 Values larger than 7 are not allowed according to RFC1950 and thus the maximum
 window size is 32768 bytes.
 
-### <a name="compression_level"></a>Compression level
+### Compression level {#compression_level}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -89,7 +89,7 @@ window size is 32768 bytes.
 
 ## Compressed data
 
-### Deflate compressed data
+### Deflate compressed data {#deflate_compressed_data}
 
 The deflate compressed data consists of one or more deflate compressed blocks.
 Each block consists of:
@@ -109,7 +109,7 @@ The block header is 3 bits in size and consists of:
 | 0 | 1 bit | | Last block (in stream) marker, where 1 represents the last block and 0 otherwise
 | 0.1 | 2 bits | | [Block type](#deflate_block_types)
 
-#### <a name="deflate_block_types"></a>Block types
+#### Block types {#deflate_block_types}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -251,7 +251,7 @@ The literal codes consist of:
 | <td colspan="3">*0 additional bits*</td>
 | 0x11d | | Size of 258
 
-##### <a name="deflate_distance_codes"></a>Distance codes
+##### Distance codes {#deflate_distance_codes}
 
 The distance codes consist of:
 

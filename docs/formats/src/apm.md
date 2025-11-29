@@ -96,7 +96,7 @@ A partition map entry is 512 bytes in size and consists of:
 
 > Note that the partition name can be empty.
 
-### <a name="partition_types"></a>Partition types
+### Partition types {#partition_types}
 
 The partition types consist of the following values:
 
@@ -133,7 +133,7 @@ The partition types consist of the following values:
 | "Be_BFS" | |
 | "MFS" | |
 
-### <a name="status_flags"></a>Status flags
+### Status flags {#status_flags}
 
 The partition status flags consist of the following values:
 

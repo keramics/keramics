@@ -356,7 +356,7 @@ Also see [header2 values](#header2_values)
 > value in the 4th line was observed. The number of values in the 3rd and 4th
 > can differ.
 
-##### <a name="sources_category1"></a>Sources category
+##### Sources category {#sources_category1}
 
 Line 6 the srce category contains information about acquisition sources.
 
@@ -393,7 +393,7 @@ If the "ha" value contains "00000000000000000000000000000000" this means the
 MD5 hash is not set. The same applies for the "sha" value when it contains
 "0000000000000000000000000000000000000000" the SHA1 has is not set.
 
-##### <a name="subjects_category1"></a>Subjects category
+##### Subjects category {#subjects_category1}
 
 Line 12 the sub category contains information about subjects.
 
@@ -424,7 +424,7 @@ EnCase 5 to 7 (EWF-L01) format. However:
 
 * both the acquired and system date and time are not set
 
-#### <a name="header2_values"></a>Header2 values
+#### Header2 values {#header2_values}
 
 | Identifier | Description | Notes
 | --- | --- | ---
@@ -457,7 +457,7 @@ number of entries
 entries that consist of: S <1> <2> <3>
 ```
 
-#### <a name="header_section"></a>Header section
+### Header section {#header_section}
 
 The header section is identified in the section data type field as "header".
 Some aspects of this section are:
@@ -692,7 +692,7 @@ The 3rd and the 4th line consist of the following tab (0x09) separated values.
 
 Also see [header values](#header_values)
 
-##### <a name="sources_category2"></a>Sources category
+##### Sources category {#sources_category2}
 
 Line 6 the srce category contains information about acquisition sources
 
@@ -723,7 +723,7 @@ Line 10 contains the values defined by line 8.
 > Note the default values of some of these values has changed around linen 6.19
 > or earlier.
 
-##### <a name="subjects_category2"></a>Subjects category
+##### Subjects category {#subjects_category2}
 
 Line 12 the sub category contains information about subjects.
 
@@ -784,7 +784,7 @@ EnCase 5 to 7 (EWF-L01) format, with the following aspects:
 * In EnCase 5 both the acquired and system date and time are set to 0.
 * In EnCase 6 and 7 both the acquired and system date and time are set to Jan 1, 1970 00:00:00 (the time is dependent on the local timezone and daylight savings)
 
-#### <a name="header_values"></a>Header values
+#### Header values {#header_values}
 
 | Identifier | Description | Notes
 | --- | --- | ---
@@ -809,7 +809,7 @@ EnCase 5 to 7 (EWF-L01) format, with the following aspects:
 > Note the restrictions were tested with EnCase 7.02.01, older versions could
 > have a restriction of 40 characters instead of 3000 characters.
 
-##### <a name="date_time_header_value"></a>Date and time header value
+##### Date and time header value {#date_time_header_value}
 
 In EnCase a date and time contains a string of individual values separated by a
 space, e.g. "2002 3 4 10 19 59", which represents March 4, 2002 10:19:59.
@@ -818,7 +818,7 @@ In linen a date and time contains a string with a POSIX 32-bit epoch timestamp,
 e.g. "1142163845" which represents the date: March 12 2006, 11:44:05
 
 
-##### <a name="extents_header_value"></a>Extents header value
+##### Extents header value {#extents_header_value}
 
 An extents header value consist of:
 
@@ -827,7 +827,7 @@ number of entries
 entries that consist of: S <1> <2> <3>
 ```
 
-##### <a name="compression_header_value"></a>Compression header value
+##### Compression header value {#compression_header_value}
 
 A compression header value consist of a single character that represent the
 compression level.
@@ -853,7 +853,7 @@ hashing algorithm is unknown. Need to find out. And does the algorithm differ
 per EnCase version? probably not. The algorithm does not differ in EnCase
 1 to 7. FTK Imager does not bother with a password.
 
-### <a name="volume_section"></a>Volume section
+### Volume section {#volume_section}
 
 The volume section is identified in the section data type field as "volume".
 Some aspects of this section are:
@@ -943,7 +943,7 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 * the number of bytes per sectors is some kind of block size value (4096), perhaps the source file system block size
 * the sectors count, represents some other value because ( sector_size x sector_amount != total_size ). The total size is in the ltree section.
 
-#### <a name="media_type"></a>Media type
+#### Media type {#media_type}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -960,7 +960,7 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 > fixed (0x01). The exact version of FTK imager where this behavior changed is 
 > unknown.
 
-#### <a name="media_flags"></a>Media flags
+#### Media flags {#media_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -972,7 +972,7 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 > Note that if both the the Fastbloc and Tableau write blocker media flags are
 > set EnCase only shows the Fastbloc.
 
-#### <a name="compression_level"></a>Compression level
+#### Compression level {#compression_level}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1451,7 +1451,7 @@ The ltree data string contains the following information:
 
 The end of line character(s) is a newline (0x0a).
 
-#### <a name="records_category3"></a>Records category
+#### Records category {#records_category3}
 
 The rec category contains information about records.
 
@@ -1471,7 +1471,7 @@ The 2nd line of the category contains tab (0x09) separated type indicators.
 
 The 3rd line of the category consist of the tab (0x09) separated values.
 
-#### <a name="permissions_category3"></a>Permissions category
+#### Permissions category {#permissions_category3}
 
 The perm category contains information about file permissions.
 
@@ -1533,7 +1533,7 @@ The 1st line of the permission entry consists of the following 2 values:
 | 6 | nti | Unknown (Windows NT access control entry (ACE) flags?, which contains an integer with a [Windows NT access control entry (ACE) flags](https://github.com/libyal/libfwnt/blob/master/documentation/Security%20Descriptor.asciidoc#access-control-entry-ace-flags)).
 | 7 | nts | Unknown (Permission?) (Removed in EnCase 6)
 
-##### <a name="permission_types"></a>Permission types
+##### Permission types {#permission_types}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1584,7 +1584,7 @@ Access mask seen in combination with property type 2
 | 0x00080000 | |
 | 0x00100000 | |
 
-#### <a name="sources_category3"></a>Sources category
+#### Sources category {#sources_category3}
 
 The srce category contains information about acquisition sources of the file entries.
 
@@ -1670,7 +1670,7 @@ set.
 | --- | ---
 | f | Fixed drive
 
-#### <a name="subjects_category3"></a>Subjects category
+#### Subjects category {#subjects_category3}
 
 The sub category contains information about TODO
 
@@ -1725,7 +1725,7 @@ The 1st line of the subject entry consists of the following 2 values:
 | 5 | co | Unknown (Comment)
 | 6 | gu | Unknown (GUID)
 
-#### <a name="file_entries_category3"></a>File entries category
+#### File entries category {#file_entries_category3}
 
 The entry category contains information about the file entries.
 
@@ -1861,7 +1861,7 @@ If the "ha" value contains "00000000000000000000000000000000" this means the
 MD5 hash is not set. The same applies for the "sha" value when it contains
 "0000000000000000000000000000000000000000" the SHA1 has is not set.
 
-###### <a name="file_entry_name"></a>File entry name
+###### File entry name {#file_entry_name}
 
 A file entry name ("n" value):
 
@@ -1873,7 +1873,7 @@ A file entry name ("n" value):
 
 An empty name has been observed to be represented as "NoName".
 
-###### <a name="short_name"></a>Short name
+###### Short name {#short_name}
 
 The short name ("snh") value contains 2 values:
 
@@ -1905,7 +1905,7 @@ The entries of files and directories:
 | 2 | | The target drive/mount point
 | 3 | | The actual single file entries
 
-##### <a name="file_entry_flags"></a>File entry flags
+##### File entry flags {#file_entry_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1945,7 +1945,7 @@ If the duplicate data offset value is set the single byte in the data is
 ignored and the duplicate data offset refers to the location where the data
 stored.
 
-##### <a name="binary_extents"></a>Binary extents value
+##### Binary extents value {#binary_extents}
 
 The binary extents value contains 3 values separated by a space:
 
@@ -1963,7 +1963,7 @@ The offset and size are specified in hexadecimal values.
 
 > Note that the binary extents value contains only 1 value for the first single file entry.
 
-##### <a name="extended_attributes"></a>Extended attributes value
+##### Extended attributes value {#extended_attributes}
 
 The extended attributes value contains base-16 encoded data, which consists of:
 

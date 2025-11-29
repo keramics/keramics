@@ -85,7 +85,7 @@ and consists of:
 
 > Note that the XML plist size can be 0, such as in an UDIF stub (UDxx) image.
 
-### <a name="image_flags"></a>Image flags
+### Image flags {#image_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -93,7 +93,7 @@ and consists of:
 | | |
 | 0x00000004 | kUDIFFlagsInternetEnabled | Unknown (internet enabled?)
 
-### <a name="image_types"></a>Image types
+### Image types {#image_types}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -215,7 +215,7 @@ A blkx array entry contains the following key-value pairs:
 | ID | string that contains a decimal formatted integer value
 | Name | string
 
-## <a name="udif_block_table"></a>Block table
+## Block table {#udif_block_table}
 
 The block table (BLKXTable) is of variable size and consists of:
 
@@ -259,7 +259,7 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | 24 | 8 | | Data offset, which contains the byte offset relative to the start of the UDIF image file
 | 32 | 8 | | Data size, which contain the number of bytes of data stored, which is 0 for sparse data
 
-#### <a name="udif_block_table_entry_types"></a>UDIF block table entry types
+#### UDIF block table entry types {#udif_block_table_entry_types}
 
 | Value | Identifier | Description 
 | --- | --- | ---

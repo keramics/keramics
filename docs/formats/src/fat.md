@@ -159,7 +159,7 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 | "MSWIN4.1" |
 | "MSDOS 5.0" |
 
-### <a name="media_descriptors"></a>Media descriptors
+### Media descriptors {#media_descriptors}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -350,7 +350,7 @@ Valid FAT short file name characters are:
 | '~' |
 | 0x80 - 0xff | Extended ASCII character, which are codepage dependent.
 
-#### <a name="short_name_first_character"></a>First character
+#### First character {#short_name_first_character}
 
 | Value | Description
 | --- | ---
@@ -360,7 +360,7 @@ Valid FAT short file name characters are:
 | 0x41 - 0x54 | Last VFAT long file name directory entry
 | 0xe5 | Unallocated directory entry
 
-### <a name="file_attribute_flags"></a>File attribute flags
+### File attribute flags {#file_attribute_flags}
 
 | Value | Description
 | --- | ---
@@ -373,7 +373,7 @@ Valid FAT short file name characters are:
 | 0x40 | Is device
 | 0x80 | Unused (reserved)
 
-### <a name="short_file_name_flags"></a>Flags
+### Flags {#short_file_name_flags}
 
 | Value | Description
 | --- | ---

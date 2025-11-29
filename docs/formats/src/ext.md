@@ -346,7 +346,7 @@ file system identifier.
 If checksum type is CRC-32C, the metadata checksum seed is stored as
 0xffffffff - CRC-32C.
 
-### <a name="file_system_state_flags"></a>File system state flags
+### File system state flags {#file_system_state_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -354,7 +354,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 0x0002 | | Has errors
 | 0x0004 | | Recovering orphan inodes
 
-### <a name="error_handling_status"></a>Error-handling status
+### Error-handling status {#error_handling_status}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -362,7 +362,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 2 | | Remount as read-only
 | 3 | | Panic
 
-### <a name="creator_operating_system"></a>Creator operating system
+### Creator operating system {#creator_operating_system}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -372,14 +372,14 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 | 3 | | FreeBSD
 | 4 | | Lites
 
-### <a name="format_revisision"></a>Format revision
+### Format revision {#format_revisision}
 
 | Value | Identifier | Description
 | --- | --- | ---
 | 0 | EXT2_GOOD_OLD_REV | Original version with a fixed inode size of 128 bytes
 | 1 | EXT2_DYNAMIC_REV | Version with dynamic inode size support
 
-### <a name="compatible_feature_flags"></a>Compatible feature flags
+### Compatible feature flags {#compatible_feature_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -400,7 +400,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 > Note that EXT2_FEATURE_COMPAT_, EXT3_FEATURE_COMPAT_, EXT4_FEATURE_COMPAT_ and
 > COMPAT_ can be used interchangeably.
 
-### <a name="incompatible_feature_flags"></a>Incompatible feature flags
+### Incompatible feature flags {#incompatible_feature_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -426,7 +426,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 > Note that EXT2_FEATURE_INCOMPAT_, EXT3_FEATURE_INCOMPAT_,
 > EXT4_FEATURE_INCOMPAT_ and INCOMPAT_ can be used interchangeably.
 
-### <a name="read_only_compatible_feature_flags"></a>Read-only compatible feature flags
+### Read-only compatible feature flags {#read_only_compatible_feature_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -455,7 +455,7 @@ If checksum type is CRC-32C, the metadata checksum seed is stored as
 > the upper 8-bits of the read-only compatible feature flags are set as in
 > 0xff000003. debugfs identifies these as FEATURE_R24 - FEATURE_R31.
 
-### <a name="checksum_types"></a>Checksum types
+### Checksum types {#checksum_types}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -538,7 +538,7 @@ TODO: describe the block bitmap checksum calculation: crc32c(s_uuid+grp_num+bbit
 
 TODO: describe the inode bitmap checksum calculation: crc32c(s_uuid+grp_num+ibitmap)
 
-### <a name="block_group_flags"></a>Block group flags
+### Block group flags {#block_group_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -583,7 +583,7 @@ An extents B-tree node consists of:
 > data size is greater than the total data size defined by the extent
 > descriptors.
 
-### <a name="ext4_extents_header"></a>The ext4 extents header
+### The ext4 extents header {#ext4_extents_header}
 
 The ext4 extents header (ext4_extent_header) is 12 bytes in size and consists of:
 
@@ -595,7 +595,7 @@ The ext4 extents header (ext4_extent_header) is 12 bytes in size and consists of
 | 6 | 2 | | Depth, where 0 reprensents a leaf node and 1 to 5 different levels of branch nodes.
 | 8 | 4 | | Generation, which is used by Lustre, but not by standard ext4.
 
-### <a name="ext4_extent_descriptor"></a>The ext4 extent descriptor
+### The ext4 extent descriptor {#ext4_extent_descriptor}
 
 The ext4 extent descriptor (ext4_extent) is 12 bytes in size and consists of:
 
@@ -621,7 +621,7 @@ sparse_number_of_blocks = number_of_blocks - 32768
 > Note that the native Linux ext implementation expects the extents to be stored
 > in order of logical block number.
 
-### <a name="ext4_extent_index"></a>The ext4 extents index
+### The ext4 extents index {#ext4_extent_index}
 
 The ext4 extent index (ext4_extent_idx) is 12 bytes in size and consists of:
 
@@ -837,7 +837,7 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 > referenced by multiple inodes) to verify that the EA inode is the correct
 > one being accessed.
 
-### <a name="file_mode"></a>File mode
+### File mode {#file_mode}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -866,7 +866,7 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 | 0xa000 | S_IFLNK | Symbolic link
 | 0xc000 | S_IFSOCK | Socket
 
-### <a name="inode_flags"></a>Inode flags
+### Inode flags {#inode_flags}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -929,7 +929,7 @@ EXT4_INLINE_DATA_FL is set.
 > Note that inodes can have an implicit last sparse extent if the the inode
 > data size is greater than 60 bytes.
 
-## <a name="huge_files"></a>Huge files
+## Huge files {#huge_files}
 
 TODO: complete section
 
@@ -952,7 +952,7 @@ Linear directory entries contain:
 * directory entry for ".." (parent)
 * directory entry for other file system entries
 
-#### <a name="directory_entry"></a>The directory entry
+#### The directory entry {#directory_entry}
 
 The directory entry is of variable size, at most 263 bytes, and consists of:
 
@@ -970,7 +970,7 @@ the upper byte was never used.
 The name can contain any character value except the path segment separator ('/')
 and the NUL-character ('\0').
 
-#### <a name="file_types"></a>File types
+#### File types {#file_types}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -1043,7 +1043,7 @@ and 3 indirect block numbers. If the target path is longer than 60 characters,
 a block is allocated, and the block contains the target path. The inode data
 size contains the length of the target path.
 
-## <a name="extended_attributes"></a>Extended attributes
+## Extended attributes {#extended_attributes}
 
 Extended attributes can be stored:
 
@@ -1149,7 +1149,7 @@ TODO: complete section
 
 > Note that the excluded bitmap is used for snapshots.
 
-## <a name="corruption_scenarios"></a>Corruption scenarios
+## Corruption scenarios {#corruption_scenarios}
 
 ### File entry with invalid extents header signature
 

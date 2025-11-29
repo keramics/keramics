@@ -105,7 +105,7 @@ The region table entry is 32 bytes in size and consists of:
 | 24 | 4 | | Region data size, which according to MS-VHDX this value must be a multitude of 1 MiB
 | 28 | 4 | | Is required flag, which contains 1 to indicate the region type needs to be supported.
 
-### <a name="region_type_identifiers"></a>Region type identifiers
+### Region type identifiers {#region_type_identifiers}
 
 | Value | Identifier | Description
 | --- | --- | ---
@@ -161,7 +161,7 @@ TODO: describe last 8 bytes
 
 ### Metadata items
 
-#### <a name="metdata_item_identifiers"></a>Metadata item identifiers
+#### Metadata item identifiers {#metdata_item_identifiers}
 
 | Value | Identifier | Description
 | --- | --- | ---

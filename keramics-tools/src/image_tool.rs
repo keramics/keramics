@@ -1140,22 +1140,37 @@ impl ImageTool {
 
         let vfs_type: &VfsType = vfs_scan_node.get_type();
 
-        let suffix: String = match result.as_ref() {
+        let path_string: String = path.to_string();
+
+        let path_string: String = match result.as_ref() {
             Some(file_entry) => match file_entry {
-                VfsFileEntry::Gpt(gpt_file_entry) => match gpt_file_entry.get_identifier() {
-                    Some(identifier) => format!(" (alias: /gpt{{{}}})", identifier.to_string()),
-                    _ => String::new(),
+                VfsFileEntry::Gpt(gpt_file_entry) => {
+                    let path_string: String = match gpt_file_entry.get_partition_number() {
+                        Some(partition_number) => format!("/p{}", partition_number),
+                        _ => path_string,
+                    };
+                    match gpt_file_entry.get_identifier() {
+                        Some(identifier) => format!(
+                            "{} (alias: /gpt{{{}}})",
+                            path_string,
+                            identifier.to_string()
+                        ),
+                        _ => path_string,
+                    }
+                }
+                VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_partition_number() {
+                    Some(partition_number) => format!("/p{}", partition_number),
+                    None => path_string,
                 },
-                _ => String::new(),
+                _ => path_string,
             },
-            None => String::new(),
+            None => path_string,
         };
         println!(
-            "{}{}: path: {}{}",
+            "{}{}: path: {}",
             indentation,
             vfs_type.as_str(),
-            path.to_string(),
-            suffix,
+            path_string,
         );
         for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
             self.print_scan_node(sub_scan_node, depth + 1)?;
@@ -1280,6 +1295,8 @@ impl ImageTool {
             },
             None => {}
         }
+        println!();
+
         Ok(())
     }
 
@@ -1376,22 +1393,26 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            let progress_bar_style: ProgressStyle = match ProgressStyle::with_template(
-                "Hashing at {percent}% [{wide_bar}] {bytes}/{total_bytes} ({binary_bytes_per_sec}) elapsed: {elapsed_precise} (remaining: {eta_precise})",
-            ) {
-                Ok(style) => {
-                    style.with_key("eta", |state: &ProgressState, writer: &mut dyn Write| {
-                        write!(writer, "{:.1}s", state.eta().as_secs_f64()).unwrap()
-                    })
-                }
-                Err(error) => {
-                    println!(
-                        "Unable to create progress bar style from template with error: {}",
-                        error
-                    );
-                    return ExitCode::FAILURE;
-                }
-            };
+            let progress_bar_template: &str = concat!(
+                "Hashing at {percent}% [{wide_bar}] ",
+                "{bytes}/{total_bytes} ({binary_bytes_per_sec}) ",
+                "elapsed: {elapsed_precise} (remaining: {eta_precise})",
+            );
+            let progress_bar_style: ProgressStyle =
+                match ProgressStyle::with_template(progress_bar_template) {
+                    Ok(style) => {
+                        style.with_key("eta", |state: &ProgressState, writer: &mut dyn Write| {
+                            write!(writer, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+                        })
+                    }
+                    Err(error) => {
+                        println!(
+                            "Unable to create progress bar style from template with error: {}",
+                            error
+                        );
+                        return ExitCode::FAILURE;
+                    }
+                };
             let progress_bar: ProgressBar = ProgressBar::new(media_size);
             progress_bar.set_style(progress_bar_style.progress_chars("#>-"));
 

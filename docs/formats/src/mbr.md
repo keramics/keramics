@@ -145,7 +145,7 @@ The partition table entry is 16 bytes in size and consists of:
 | 8 | 4 | | The partition start address, which contains a LBA (sectors) relative from the start of the harddisk
 | 12 | 4 | | Size of the partition in number of sectors
 
-### <a name="partition_flags"></a>Partition flags
+### Partition flags {#partition_flags}
 
 The partition flags consist of the following values:
 
@@ -153,7 +153,7 @@ The partition flags consist of the following values:
 | --- | --- | ---
 | 0x80 | | Partition is boot-able
 
-### <a name="partition_types"></a>Partition types
+### Partition types {#partition_types}
 
 The partition types consist of the following values:
 

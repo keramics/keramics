@@ -232,7 +232,7 @@ A directory entry is 32 bytes in size and consists of:
 | 1 | 1 | | Unknown (Flags)
 | 2 | 30 | | Name string, which contains an UCS-2 little-endian string without an end-of-string character
 
-### <a name="file_attribute_flags"></a>File attribute flags
+### File attribute flags {#file_attribute_flags}
 
 | Value | Description
 | --- | ---
