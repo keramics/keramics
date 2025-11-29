@@ -169,76 +169,67 @@ impl HashTool {
     ) -> Result<(), ErrorTrace> {
         let display_path: String = self.display_path.escape_path(path);
 
-        let number_of_data_forks: usize = match file_entry.get_number_of_data_forks() {
-            Ok(number_of_data_forks) => number_of_data_forks,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to retrieve number of data forks of file entry: {}",
-                        display_path
-                    )
-                );
-                return Err(error);
-            }
-        };
-        // TODO: use file_entry.data_forks()
-        for data_fork_index in 0..number_of_data_forks {
-            let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
-                Ok(data_fork) => data_fork,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve data fork: {} of file entry: {}",
-                            data_fork_index, display_path
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-            let name: Option<PathComponent> = data_fork.get_name();
+        for result in file_entry.data_forks() {
+            match result {
+                Ok(data_fork) => {
+                    let name: Option<PathComponent> = data_fork.get_name();
 
-            let display_path_and_name: String = match name.as_ref() {
-                Some(name) => {
-                    let escaped_name: String = self.display_path.escape_path_component(name);
+                    let display_path_and_name: String = match name.as_ref() {
+                        Some(name) => {
+                            let escaped_name: String =
+                                self.display_path.escape_path_component(name);
 
-                    format!("{}:{}", display_path, escaped_name)
-                }
-                None => display_path.clone(),
-            };
-            // TODO: add option for dfImageTools compatibility mode
-            // if name == Some(String::from("WofCompressedData")) {
-            //     continue;
-            // }
-            // TODO: create skip list
-            let hash_string: String = if path.components.len() > 1
-                && path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
-                && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
-            {
-                String::from("N/A (skipped)")
-            } else {
-                match self.calculate_hash_from_data_fork(&data_fork) {
-                    Ok(hash_string) => hash_string,
-                    Err(mut error) => {
-                        if self.stop_on_error {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to calculate hash of data stream: {}",
-                                    display_path_and_name
-                                )
-                            );
-                            return Err(error);
+                            format!("{}:{}", display_path, escaped_name)
                         }
-                        String::from("N/A (error)")
-                    }
+                        None => display_path.clone(),
+                    };
+                    // TODO: add option for dfImageTools compatibility mode
+                    // if name == Some(String::from("WofCompressedData")) {
+                    //     continue;
+                    // }
+                    // TODO: create skip list
+                    let hash_string: String = if path.components.len() > 1
+                        && path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
+                        && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
+                    {
+                        String::from("N/A (skipped)")
+                    } else {
+                        match self.calculate_hash_from_data_fork(&data_fork) {
+                            Ok(hash_string) => hash_string,
+                            Err(mut error) => {
+                                if self.stop_on_error {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        format!(
+                                            "Unable to calculate hash of data stream: {}",
+                                            display_path_and_name
+                                        )
+                                    );
+                                    return Err(error);
+                                }
+                                String::from("N/A (error)")
+                            }
+                        }
+                    };
+                    println!(
+                        "{}\t{}{}",
+                        hash_string, file_system_display_path, display_path_and_name
+                    );
                 }
-            };
-            println!(
-                "{}\t{}{}",
-                hash_string, file_system_display_path, display_path_and_name
-            );
+                Err(mut error) => {
+                    if self.stop_on_error {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve data fork of file entry: {}",
+                                display_path
+                            )
+                        );
+                        return Err(error);
+                    }
+                    println!("N/A (error)\t{}", display_path);
+                }
+            }
         }
         Ok(())
     }
@@ -294,14 +285,19 @@ impl HashTool {
                         }
                     }
                     Err(mut error) => {
+                        let path: &Path = vfs_finder.get_path();
+
                         if self.stop_on_error {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to retrieve file entry from finder"
+                                format!(
+                                    "Unable to retrieve file entry from finder: {}{}",
+                                    display_path, path
+                                )
                             );
                             return Err(error);
                         }
-                        println!("N/A (error)\t{}{}", display_path, vfs_finder.get_path());
+                        println!("N/A (error)\t{}{}", display_path, path);
                     }
                 };
             }

@@ -66,3 +66,56 @@ impl VfsType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vfs_type_as_str() {
+        let vfs_type: VfsType = VfsType::Apm;
+        assert_eq!(vfs_type.as_str(), "APM");
+
+        let vfs_type: VfsType = VfsType::Ext;
+        assert_eq!(vfs_type.as_str(), "EXT");
+
+        let vfs_type: VfsType = VfsType::Ewf;
+        assert_eq!(vfs_type.as_str(), "EWF");
+
+        let vfs_type: VfsType = VfsType::Fake;
+        assert_eq!(vfs_type.as_str(), "FAKE");
+
+        let vfs_type: VfsType = VfsType::Fat;
+        assert_eq!(vfs_type.as_str(), "FAT");
+
+        let vfs_type: VfsType = VfsType::Gpt;
+        assert_eq!(vfs_type.as_str(), "GPT");
+
+        let vfs_type: VfsType = VfsType::Mbr;
+        assert_eq!(vfs_type.as_str(), "MBR");
+
+        let vfs_type: VfsType = VfsType::Ntfs;
+        assert_eq!(vfs_type.as_str(), "NTFS");
+
+        let vfs_type: VfsType = VfsType::Os;
+        assert_eq!(vfs_type.as_str(), "OS");
+
+        let vfs_type: VfsType = VfsType::Qcow;
+        assert_eq!(vfs_type.as_str(), "QCOW");
+
+        let vfs_type: VfsType = VfsType::SparseImage;
+        assert_eq!(vfs_type.as_str(), "SPARSEIMAGE");
+
+        let vfs_type: VfsType = VfsType::SplitRaw;
+        assert_eq!(vfs_type.as_str(), "SPLITRAW");
+
+        let vfs_type: VfsType = VfsType::Udif;
+        assert_eq!(vfs_type.as_str(), "UDIF");
+
+        let vfs_type: VfsType = VfsType::Vhd;
+        assert_eq!(vfs_type.as_str(), "VHD");
+
+        let vfs_type: VfsType = VfsType::Vhdx;
+        assert_eq!(vfs_type.as_str(), "VHDX");
+    }
+}
