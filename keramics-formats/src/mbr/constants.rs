@@ -12,4 +12,4 @@
  */
 
 /// MBR boot signature: "\x55\xaa".
-pub(super) const MBR_BOOT_SIGNATURE: [u8; 2] = [0x55, 0xaa];
+pub(crate) const MBR_BOOT_SIGNATURE: &[u8] = &[0x55, 0xaa];

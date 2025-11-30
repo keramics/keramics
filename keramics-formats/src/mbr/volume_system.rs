@@ -163,7 +163,7 @@ impl MbrVolumeSystem {
                             &mut boot_signature,
                             SeekFrom::Start(offset + 510)
                         );
-                        if boot_signature == MBR_BOOT_SIGNATURE {
+                        if &boot_signature == MBR_BOOT_SIGNATURE {
                             self.bytes_per_sector = *bytes_per_sector;
                             break;
                         }

@@ -118,7 +118,7 @@ impl NtfsMftEntry {
 
             return Ok(());
         }
-        if data[0..4] == NTFS_BAD_MFT_ENTRY_SIGNATURE {
+        if &data[0..4] == NTFS_BAD_MFT_ENTRY_SIGNATURE {
             self.is_bad = true;
 
             return Ok(());

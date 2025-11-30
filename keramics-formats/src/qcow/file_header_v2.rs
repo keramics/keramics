@@ -45,14 +45,10 @@ impl QcowFileHeaderV2 {
     /// Reads the file header from a buffer.
     pub fn read_data(file_header: &mut QcowFileHeader, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 72 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported QCOW file header version 2 data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported QCOW file header version 2 signature"
-            ));
+        if &data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         if data[4..8] != [0x00, 0x00, 0x00, 0x02] {
             return Err(keramics_core::error_trace_new!(

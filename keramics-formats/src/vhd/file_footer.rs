@@ -78,7 +78,7 @@ impl VhdFileFooter {
                 "Unsupported file footer data size"
             ));
         }
-        if data[0..8] != VHD_FILE_FOOTER_SIGNATURE {
+        if &data[0..8] != VHD_FILE_FOOTER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported file footer signature"
             ));

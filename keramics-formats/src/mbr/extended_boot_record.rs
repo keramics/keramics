@@ -56,7 +56,7 @@ impl MbrExtendedBootRecord {
                 "Unsupported MBR extended boot record data size"
             ));
         }
-        if data[510..512] != MBR_BOOT_SIGNATURE {
+        if &data[510..512] != MBR_BOOT_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported MBR extended boot record signature"
             ));

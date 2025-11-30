@@ -117,7 +117,7 @@ impl Ext4InodeExtension {
         let data_size: usize = data.len();
 
         if data_end_offset < data_size {
-            if data[data_offset..data_end_offset] == EXT_ATTRIBUTES_HEADER_SIGNATURE {
+            if &data[data_offset..data_end_offset] == EXT_ATTRIBUTES_HEADER_SIGNATURE {
                 let attributes_block: ExtAttributesBlock = ExtAttributesBlock::new(data_end_offset);
 
                 match attributes_block.read_entries(

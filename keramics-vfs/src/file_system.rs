@@ -37,8 +37,8 @@ use super::vhdx::{VhdxFileEntry, VhdxFileSystem};
 /// Virtual File System (VFS) file system.
 pub enum VfsFileSystem {
     Apm(ApmFileSystem),
-    Ext(ExtFileSystem),
     Ewf(EwfFileSystem),
+    Ext(ExtFileSystem),
     Fake(FakeFileSystem),
     Fat(FatFileSystem),
     Gpt(GptFileSystem),
@@ -58,8 +58,8 @@ impl VfsFileSystem {
     pub fn new(location_type: &VfsType) -> Self {
         match location_type {
             VfsType::Apm => VfsFileSystem::Apm(ApmFileSystem::new()),
-            VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
             VfsType::Ewf => VfsFileSystem::Ewf(EwfFileSystem::new()),
+            VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
             VfsType::Fake => VfsFileSystem::Fake(FakeFileSystem::new()),
             VfsType::Fat => VfsFileSystem::Fat(FatFileSystem::new()),
             VfsType::Gpt => VfsFileSystem::Gpt(GptFileSystem::new()),
@@ -79,6 +79,7 @@ impl VfsFileSystem {
     pub fn file_entry_exists(&self, path: &Path) -> Result<bool, ErrorTrace> {
         match self {
             VfsFileSystem::Apm(apm_file_system) => Ok(apm_file_system.file_entry_exists(path)),
+            VfsFileSystem::Ewf(ewf_file_system) => Ok(ewf_file_system.file_entry_exists(path)),
             VfsFileSystem::Ext(ext_file_system) => {
                 let result: Option<ExtFileEntry> =
                     match ext_file_system.get_file_entry_by_path(path) {
@@ -96,7 +97,6 @@ impl VfsFileSystem {
                     None => Ok(false),
                 }
             }
-            VfsFileSystem::Ewf(ewf_file_system) => Ok(ewf_file_system.file_entry_exists(path)),
             VfsFileSystem::Fake(fake_file_system) => {
                 match fake_file_system.file_entry_exists(path) {
                     Ok(result) => Ok(result),
@@ -202,15 +202,15 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
-            VfsFileSystem::Ext(ext_file_system) => {
-                match ext_file_system.get_file_entry_by_path(path)? {
-                    Some(file_entry) => Ok(Some(VfsFileEntry::Ext(file_entry))),
-                    None => Ok(None),
-                }
-            }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 match ewf_file_system.get_file_entry_by_path(path)? {
                     Some(ewf_file_entry) => Ok(Some(VfsFileEntry::Ewf(ewf_file_entry))),
+                    None => Ok(None),
+                }
+            }
+            VfsFileSystem::Ext(ext_file_system) => {
+                match ext_file_system.get_file_entry_by_path(path)? {
+                    Some(file_entry) => Ok(Some(VfsFileEntry::Ext(file_entry))),
                     None => Ok(None),
                 }
             }
@@ -306,6 +306,11 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Apm(apm_file_entry)))
             }
+            VfsFileSystem::Ewf(ewf_file_system) => {
+                let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::Ewf(ewf_file_entry)))
+            }
             VfsFileSystem::Ext(ext_file_system) => match ext_file_system.get_root_directory() {
                 Ok(Some(ext_file_entry)) => Ok(Some(VfsFileEntry::Ext(ext_file_entry))),
                 Ok(None) => Ok(None),
@@ -317,11 +322,6 @@ impl VfsFileSystem {
                     Err(error)
                 }
             },
-            VfsFileSystem::Ewf(ewf_file_system) => {
-                let ewf_file_entry: EwfFileEntry = ewf_file_system.get_root_file_entry();
-
-                Ok(Some(VfsFileEntry::Ewf(ewf_file_entry)))
-            }
             VfsFileSystem::Fake(fake_file_system) => match fake_file_system.get_root_file_entry() {
                 Ok(fake_file_entry) => Ok(Some(VfsFileEntry::Fake(fake_file_entry))),
                 Err(mut error) => {
@@ -417,11 +417,11 @@ impl VfsFileSystem {
             VfsFileSystem::Apm(apm_file_system) => {
                 apm_file_system.open(parent_file_system, vfs_location)
             }
-            VfsFileSystem::Ext(ext_file_system) => {
-                Self::open_ext_file_system(ext_file_system, parent_file_system, vfs_location)
-            }
             VfsFileSystem::Ewf(ewf_file_system) => {
                 ewf_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Ext(ext_file_system) => {
+                Self::open_ext_file_system(ext_file_system, parent_file_system, vfs_location)
             }
             VfsFileSystem::Fake(_) | VfsFileSystem::Os => {
                 if parent_file_system.is_some() {
@@ -673,71 +673,6 @@ mod tests {
         Ok(())
     }
 
-    // Tests with ext.
-
-    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
-
-        let parent_file_system: VfsFileSystemReference =
-            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
-        let path_string: String = get_test_data_path("ext/ext2.raw");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    #[test]
-    fn test_file_entry_exists_with_ext() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let path: Path = Path::from("/testdir1/testfile1");
-        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
-
-        let path: Path = Path::from("/bogus");
-        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_entry_by_path_with_ext_non_existing() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let path: Path = Path::from("/bogus");
-        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
-
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_entry_by_path_with_ext_file() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let path: Path = Path::from("/testdir1/testfile1");
-        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
-
-        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
-        assert_eq!(vfs_file_type, VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_entry_by_path_with_ext_root() -> Result<(), ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
-
-        let path: Path = Path::from("/");
-        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
-
-        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
-        assert_eq!(vfs_file_type, VfsFileType::Directory);
-
-        Ok(())
-    }
-
     // Tests with EWF.
 
     fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
@@ -793,6 +728,71 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_ewf_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with ext.
+
+    fn get_ext_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ext);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_ext() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_ext_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_ext_file() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_ext_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ext_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();

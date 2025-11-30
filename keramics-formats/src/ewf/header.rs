@@ -66,18 +66,14 @@ impl EwfHeader {
         }
         let mut object_storage: EwfByteObjectStorage = EwfByteObjectStorage::new(&header_data);
 
-        let number_of_categories: u8 = match object_storage.next_line() {
-            Some(line) => match line {
-                // "1"
-                [b'1'] => 1,
-                // "3"
-                [b'3'] => 3,
-                _ => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid header data - unsupported number of categories"
-                    ));
-                }
-            },
+        let number_of_categories: u8 = match object_storage.next_line().as_deref() {
+            Some(b"1") => 1,
+            Some(b"3") => 3,
+            Some(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - unsupported number of categories"
+                ));
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid header data - missing number of categories"
@@ -87,16 +83,13 @@ impl EwfHeader {
         // TODO: if number_of_categories == 1 then format is at least EnCase 1
         // TODO: if number_of_categories == 3 then format is at least linen 5
 
-        match object_storage.next_line() {
-            Some(line) => match line {
-                // "main"
-                [b'm', b'a', b'i', b'n'] => {}
-                _ => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid header data - unsupported category"
-                    ));
-                }
-            },
+        match object_storage.next_line().as_deref() {
+            Some(b"main") => {}
+            Some(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - unsupported category"
+                ));
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid header data - missing category"
@@ -144,35 +137,35 @@ impl EwfHeader {
         for value_index in 0..number_of_value_types {
             let header_value_type: EwfHeaderValueType = match value_types[value_index] {
                 // "a" => description
-                [b'a'] => EwfHeaderValueType::Description,
+                b"a" => EwfHeaderValueType::Description,
                 // "av" => acquisition software version
-                [b'a', b'v'] => EwfHeaderValueType::Version,
+                b"av" => EwfHeaderValueType::Version,
                 // "c" => case number
-                [b'c'] => EwfHeaderValueType::CaseNumber,
+                b"c" => EwfHeaderValueType::CaseNumber,
                 // "e" => examiner name
-                [b'e'] => EwfHeaderValueType::ExaminerName,
+                b"e" => EwfHeaderValueType::ExaminerName,
                 // "l" => label of source media device
-                [b'l'] => EwfHeaderValueType::DeviceLabel,
+                b"l" => EwfHeaderValueType::DeviceLabel,
                 // "m" => acquisition date and time
-                [b'm'] => EwfHeaderValueType::AcquisitionDate,
+                b"m" => EwfHeaderValueType::AcquisitionDate,
                 // "md" => model of source media device
-                [b'm', b'd'] => EwfHeaderValueType::Model,
+                b"md" => EwfHeaderValueType::Model,
                 // "n" => evidence number
-                [b'n'] => EwfHeaderValueType::EvidenceNumber,
+                b"n" => EwfHeaderValueType::EvidenceNumber,
                 // "ov" => acquisition platform
-                [b'o', b'v'] => EwfHeaderValueType::Platform,
+                b"ov" => EwfHeaderValueType::Platform,
                 // "p" => password hash
-                [b'p'] => EwfHeaderValueType::PasswordHash,
+                b"p" => EwfHeaderValueType::PasswordHash,
                 // "pid" => process identifier of source process
-                [b'p', b'i', b'd'] => EwfHeaderValueType::ProcessIdentifier,
+                b"pid" => EwfHeaderValueType::ProcessIdentifier,
                 // "r" => compression level
-                [b'r'] => EwfHeaderValueType::CompressionLevel,
+                b"r" => EwfHeaderValueType::CompressionLevel,
                 // "sn" => serial number of source media device
-                [b's', b'n'] => EwfHeaderValueType::SerialNumber,
+                b"sn" => EwfHeaderValueType::SerialNumber,
                 // "t" => notes
-                [b't'] => EwfHeaderValueType::Notes,
+                b"t" => EwfHeaderValueType::Notes,
                 // "u" => system date and time
-                [b'u'] => EwfHeaderValueType::SystemDate,
+                b"u" => EwfHeaderValueType::SystemDate,
                 _ => EwfHeaderValueType::NotSet,
             };
             if header_value_type != EwfHeaderValueType::NotSet

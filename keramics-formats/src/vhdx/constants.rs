@@ -13,12 +13,11 @@
 
 use keramics_types::Uuid;
 
-/// VHDX file header signature: "vhdxfile".
-pub(super) const VHDX_FILE_HEADER_SIGNATURE: [u8; 8] =
-    [0x76, 0x68, 0x64, 0x78, 0x66, 0x69, 0x6c, 0x65];
+/// VHDX file header signature.
+pub(crate) const VHDX_FILE_HEADER_SIGNATURE: &[u8] = b"vhdxfile";
 
-/// VHDX image header signature: "head".
-pub(super) const VHDX_IMAGE_HEADER_SIGNATURE: [u8; 4] = [0x68, 0x65, 0x61, 0x64];
+/// VHDX image header signature.
+pub(super) const VHDX_IMAGE_HEADER_SIGNATURE: &[u8] = b"head";
 
 /// VHDX region table header signature: "regi".
 pub(super) const VHDX_REGION_TABLE_HEADER_SIGNATURE: [u8; 4] = [0x72, 0x65, 0x67, 0x69];

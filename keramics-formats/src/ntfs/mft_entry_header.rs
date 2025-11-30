@@ -83,9 +83,9 @@ impl NtfsMftEntryHeader {
                 "Unsupported MFT entry header data size"
             ));
         }
-        if data[0..4] != NTFS_MFT_ENTRY_SIGNATURE {
+        if &data[0..4] != NTFS_MFT_ENTRY_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS MFT entry signature"
+                "Unsupported MFT entry signature"
             ));
         }
         self.fixup_values_offset = bytes_to_u16_le!(data, 4);

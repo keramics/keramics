@@ -180,6 +180,7 @@ impl VfsFileEntry {
     pub fn get_file_type(&self) -> VfsFileType {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
                 let file_type: u16 = file_mode & 0xf000;
@@ -194,7 +195,6 @@ impl VfsFileEntry {
                     _ => VfsFileType::Unknown(file_type),
                 }
             }
-            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_file_type(),
             VfsFileEntry::Fat(fat_file_entry) => {
                 if fat_file_entry.is_directory() {
@@ -293,11 +293,11 @@ impl VfsFileEntry {
     pub fn get_name(&self) -> Option<PathComponent> {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => Some(apm_file_entry.get_name()),
+            VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
                 None => None,
             },
-            VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
             VfsFileEntry::Fake(fake_file_entry) => {
                 let path_component: &PathComponent = fake_file_entry.get_name();
 
@@ -375,8 +375,8 @@ impl VfsFileEntry {
     pub fn get_size(&self) -> u64 {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_size(),
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_size(),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_size(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_size(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_size(),
@@ -457,6 +457,10 @@ impl VfsFileEntry {
                 ApmFileEntry::Partition { .. } => 1,
                 ApmFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry {
+                EwfFileEntry::Layer { .. } => 1,
+                EwfFileEntry::Root { .. } => 0,
+            },
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
 
@@ -466,10 +470,6 @@ impl VfsFileEntry {
                     1
                 }
             }
-            VfsFileEntry::Ewf(ewf_file_entry) => match ewf_file_entry {
-                EwfFileEntry::Layer { .. } => 1,
-                EwfFileEntry::Root { .. } => 0,
-            },
             VfsFileEntry::Fake(fake_file_entry) => match fake_file_entry.get_file_type() {
                 VfsFileType::File => 1,
                 _ => 0,
@@ -540,8 +540,8 @@ impl VfsFileEntry {
     ) -> Result<VfsDataFork, ErrorTrace> {
         let result: Result<Option<VfsDataFork>, ErrorTrace> = match self {
             VfsFileEntry::Apm(_)
-            | VfsFileEntry::Ext(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Ext(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -589,8 +589,8 @@ impl VfsFileEntry {
     pub fn get_data_stream(&mut self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream(),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_data_stream(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_data_stream(),
@@ -622,8 +622,8 @@ impl VfsFileEntry {
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
             VfsFileEntry::Apm(_)
-            | VfsFileEntry::Ext(_)
             | VfsFileEntry::Ewf(_)
+            | VfsFileEntry::Ext(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -775,10 +775,10 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => {
                 Ok(apm_file_entry.get_number_of_sub_file_entries())
             }
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Ewf(ewf_file_entry) => {
                 Ok(ewf_file_entry.get_number_of_sub_file_entries())
             }
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Fake(fake_file_entry) => {
                 Ok(fake_file_entry.get_number_of_sub_file_entries())
             }
@@ -831,11 +831,11 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => Ok(VfsFileEntry::Apm(
                 apm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
-            VfsFileEntry::Ext(ext_file_entry) => Ok(VfsFileEntry::Ext(
-                ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
-            )),
             VfsFileEntry::Ewf(ewf_file_entry) => Ok(VfsFileEntry::Ewf(
                 ewf_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::Ext(ext_file_entry) => Ok(VfsFileEntry::Ext(
+                ext_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
             VfsFileEntry::Fake(fake_file_entry) => Ok(VfsFileEntry::Fake(
                 fake_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
@@ -900,8 +900,8 @@ impl VfsFileEntry {
     pub fn is_root_directory(&self) -> bool {
         match self {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.is_root_file_entry(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.is_root_file_entry(),
@@ -1272,6 +1272,336 @@ mod tests {
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> =
             sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with EWF.
+
+    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("ewf/ext2.E01");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("ewf1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_ewf() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("ewf1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
         assert!(result.is_none());
 
         Ok(())
@@ -1664,336 +1994,6 @@ mod tests {
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> =
             sub_file_entries_iterator.skip(9).next();
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    // Tests with EWF.
-
-    fn get_ewf_file_system() -> Result<VfsFileSystem, ErrorTrace> {
-        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Ewf);
-
-        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
-        let path_string: String = get_test_data_path("ewf/ext2.E01");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
-        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
-
-        Ok(vfs_file_system)
-    }
-
-    fn get_ewf_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
-        let vfs_file_system: VfsFileSystem = get_ewf_file_system()?;
-
-        let path: Path = Path::from(path);
-        match vfs_file_system.get_file_entry_by_path(&path)? {
-            Some(file_entry) => Ok(file_entry),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Missing file entry: {}",
-                path
-            ))),
-        }
-    }
-
-    #[test]
-    fn test_get_access_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_change_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_creation_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_device_identifier_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
-        assert_eq!(device_identifier, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_mode_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
-        assert_eq!(file_mode, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_file_type_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
-
-        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
-        assert_eq!(vfs_file_type, VfsFileType::Directory);
-
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
-        assert_eq!(vfs_file_type, VfsFileType::File);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_group_identifier_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
-        assert_eq!(group_identifier, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_inode_number_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
-        assert_eq!(inode_number, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_modification_time_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
-        assert_eq!(result, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_name_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let name: Option<PathComponent> = vfs_file_entry.get_name();
-        assert_eq!(name, Some(PathComponent::from("ewf1")));
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_number_of_links_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
-        assert_eq!(number_of_links, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_owner_identifier_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
-        assert_eq!(owner_identifier, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_size_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let size: u64 = vfs_file_entry.get_size();
-        assert_eq!(size, 4194304);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_symbolic_link_target_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
-        assert_eq!(link_target, None);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_number_of_data_forks_with_ewf() -> Result<(), ErrorTrace> {
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
-
-        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
-        assert_eq!(number_of_data_forks, 0);
-
-        let vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
-        assert_eq!(number_of_data_forks, 1);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_data_forks_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
-
-        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
-        assert!(result.is_some());
-        assert!(result.unwrap().is_ok());
-
-        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_data_stream_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
-
-        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
-        assert!(result.is_none());
-
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
-        assert!(result.is_some());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_data_stream_by_name_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let name: Option<PathComponent> = None;
-        let result: Option<DataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
-        assert!(result.is_some());
-
-        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
-        let result: Option<DataStreamReference> =
-            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_number_of_extended_attributes_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let number_of_extended_attributes: usize =
-            vfs_file_entry.get_number_of_extended_attributes()?;
-        assert_eq!(number_of_extended_attributes, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_extended_attribute_by_index_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let result: Result<VfsExtendedAttribute, ErrorTrace> =
-            vfs_file_entry.get_extended_attribute_by_index(0);
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_extended_attribute_by_name_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let name: PathComponent = PathComponent::from("bogus");
-        let result: Option<VfsExtendedAttribute> =
-            vfs_file_entry.get_extended_attribute_by_name(&name)?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_extended_attributes_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
-            vfs_file_entry.extended_attributes();
-
-        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
-            extended_attributes_iterator.next();
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_get_number_of_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
-
-        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 1);
-
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/ewf1")?;
-
-        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 0);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_test_get_sub_file_entry_by_index_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
-
-        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
-
-        let name: Option<PathComponent> = sub_file_entry.get_name();
-        assert_eq!(name, Some(PathComponent::from("ewf1")));
-
-        let result: Result<VfsFileEntry, ErrorTrace> =
-            vfs_file_entry.get_sub_file_entry_by_index(99);
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_sub_file_entries_with_ewf() -> Result<(), ErrorTrace> {
-        let mut vfs_file_entry: VfsFileEntry = get_ewf_file_entry("/")?;
-
-        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
-            vfs_file_entry.sub_file_entries();
-
-        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
-        assert!(result.is_some());
-        assert!(result.unwrap().is_ok());
-
-        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
         assert!(result.is_none());
 
         Ok(())

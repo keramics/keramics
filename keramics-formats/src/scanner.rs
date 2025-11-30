@@ -18,6 +18,15 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{BuildError, PatternType, ScanContext, Scanner, Signature};
 
 use super::enums::FormatIdentifier;
+use super::ewf::constants::*;
+use super::ext::constants::*;
+use super::gpt::constants::*;
+use super::mbr::constants::*;
+use super::ntfs::constants::*;
+use super::sparseimage::constants::*;
+use super::udif::constants::*;
+use super::vhd::constants::*;
+use super::vhdx::constants::*;
 
 /// Format scanner.
 pub struct FormatScanner {
@@ -50,25 +59,23 @@ impl FormatScanner {
         ));
     }
 
-    /// Adds Extended File System (ext) signatures.
-    pub fn add_ext_signatures(&mut self) {
-        // Signature in superblock.
-        self.signature_scanner.add_signature(Signature::new(
-            "ext1",
-            PatternType::BoundToStart,
-            1080,
-            &[0x53, 0xef],
-        ));
-    }
-
     /// Adds Expert Witness Compression Format (EWF) signatures.
     pub fn add_ewf_signatures(&mut self) {
-        // Version 1 signature in file header.
         self.signature_scanner.add_signature(Signature::new(
             "ewf1",
             PatternType::BoundToStart,
             0,
-            &[0x45, 0x56, 0x46, 0x09, 0x0d, 0x0a, 0xff, 0x00],
+            EWF_FILE_HEADER_SIGNATURE,
+        ));
+    }
+
+    /// Adds Extended File System (ext) signatures.
+    pub fn add_ext_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "ext1",
+            PatternType::BoundToStart,
+            1080,
+            EXT_SUPERBLOCK_SIGNATURE,
         ));
     }
 
@@ -79,21 +86,21 @@ impl FormatScanner {
             "fat1",
             PatternType::BoundToStart,
             54,
-            &[0x46, 0x41, 0x54, 0x31, 0x32, 0x20, 0x20, 0x20],
+            b"FAT12   ",
         ));
         // FAT-16 file system hint in boot record.
         self.signature_scanner.add_signature(Signature::new(
             "fat2",
             PatternType::BoundToStart,
             54,
-            &[0x46, 0x41, 0x54, 0x31, 0x36, 0x20, 0x20, 0x20],
+            b"FAT16   ",
         ));
         // FAT-32 file system hint in boot record.
         self.signature_scanner.add_signature(Signature::new(
             "fat3",
             PatternType::BoundToStart,
             82,
-            &[0x46, 0x41, 0x54, 0x33, 0x32, 0x20, 0x20, 0x20],
+            b"FAT32   ",
         ));
     }
 
@@ -104,28 +111,28 @@ impl FormatScanner {
             "gpt1",
             PatternType::BoundToStart,
             512,
-            &[0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54],
+            GPT_PARTITION_TABLE_SIGNATURE,
         ));
         // Signature for 1024 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "gpt2",
             PatternType::BoundToStart,
             1024,
-            &[0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54],
+            GPT_PARTITION_TABLE_SIGNATURE,
         ));
         // Signature for 2048 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "gpt3",
             PatternType::BoundToStart,
             2048,
-            &[0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54],
+            GPT_PARTITION_TABLE_SIGNATURE,
         ));
         // Signature for 4096 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "gpt4",
             PatternType::BoundToStart,
             4096,
-            &[0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54],
+            GPT_PARTITION_TABLE_SIGNATURE,
         ));
     }
 
@@ -136,39 +143,38 @@ impl FormatScanner {
             "mbr1",
             PatternType::BoundToStart,
             510,
-            &[0x55, 0xaa],
+            MBR_BOOT_SIGNATURE,
         ));
         // Signature for 1024 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "mbr2",
             PatternType::BoundToStart,
             1022,
-            &[0x55, 0xaa],
+            MBR_BOOT_SIGNATURE,
         ));
         // Signature for 2048 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "mbr3",
             PatternType::BoundToStart,
             2046,
-            &[0x55, 0xaa],
+            MBR_BOOT_SIGNATURE,
         ));
         // Signature for 4096 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "mbr4",
             PatternType::BoundToStart,
             4094,
-            &[0x55, 0xaa],
+            MBR_BOOT_SIGNATURE,
         ));
     }
 
     /// Adds New Technologies File System (NTFS) signatures.
     pub fn add_ntfs_signatures(&mut self) {
-        // Signature in boot record.
         self.signature_scanner.add_signature(Signature::new(
             "ntfs1",
             PatternType::BoundToStart,
             3,
-            &[0x4e, 0x54, 0x46, 0x53, 0x20, 0x20, 0x20, 0x20],
+            NTFS_FILE_SYSTEM_SIGNATURE,
         ));
     }
 
@@ -199,45 +205,41 @@ impl FormatScanner {
 
     /// Adds Mac OS sparse image (.sparseimage) signatures.
     pub fn add_sparseimage_signatures(&mut self) {
-        // Signature in header.
         self.signature_scanner.add_signature(Signature::new(
             "sparseimage1",
             PatternType::BoundToStart,
             0,
-            &[0x73, 0x70, 0x72, 0x73],
+            SPARSEIMAGE_FILE_HEADER_SIGNATURE,
         ));
     }
 
     /// Adds Universal Disk Image Format (UDIF) (signatures.
     pub fn add_udif_signatures(&mut self) {
-        // Signature in footer.
         self.signature_scanner.add_signature(Signature::new(
             "udif1",
             PatternType::BoundToEnd,
             512,
-            &[0x6b, 0x6f, 0x6c, 0x79],
+            UDIF_FILE_FOOTER_SIGNATURE,
         ));
     }
 
     /// Adds Virtual Hard Disk (VHD) signatures.
     pub fn add_vhd_signatures(&mut self) {
-        // Signature in footer.
         self.signature_scanner.add_signature(Signature::new(
             "vhd1",
             PatternType::BoundToEnd,
             512,
-            &[0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78],
+            VHD_FILE_FOOTER_SIGNATURE,
         ));
     }
 
     /// Adds Virtual Hard Disk version 2 (VHDX) signatures.
     pub fn add_vhdx_signatures(&mut self) {
-        // Signature in header.
         self.signature_scanner.add_signature(Signature::new(
             "vhdx1",
             PatternType::BoundToStart,
             0,
-            &[0x76, 0x68, 0x64, 0x78, 0x66, 0x69, 0x6c, 0x65],
+            VHDX_FILE_HEADER_SIGNATURE,
         ));
     }
 
@@ -287,8 +289,8 @@ impl FormatScanner {
         for signature in scan_context.results.values() {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
                 "apm1" => FormatIdentifier::Apm,
-                "ext1" => FormatIdentifier::Ext,
                 "ewf1" => FormatIdentifier::Ewf,
+                "ext1" => FormatIdentifier::Ext,
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
@@ -320,8 +322,8 @@ mod tests {
     fn test_build() -> Result<(), BuildError> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apm_signatures();
-        format_scanner.add_ext_signatures();
         format_scanner.add_ewf_signatures();
+        format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
@@ -338,8 +340,8 @@ mod tests {
     fn test_scan_data_stream() -> Result<(), ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apm_signatures();
-        format_scanner.add_ext_signatures();
         format_scanner.add_ewf_signatures();
+        format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
@@ -365,7 +367,7 @@ mod tests {
             format_scanner.scan_data_stream(&data_stream)?;
 
         assert_eq!(scan_results.len(), 1);
-        assert!(scan_results.iter().next() == Some(&FormatIdentifier::Qcow));
+        assert_eq!(scan_results.iter().next(), Some(&FormatIdentifier::Qcow));
 
         Ok(())
     }

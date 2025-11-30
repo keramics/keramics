@@ -56,26 +56,26 @@ impl QcowImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        let mut files: Vec<QcowFile> = Vec::new();
-
         let path_components: [PathComponent; 1] = [file_name.clone()];
+
         let data_stream: DataStreamReference = match file_resolver.get_data_stream(&path_components)
         {
             Ok(Some(data_stream)) => data_stream,
             Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Missing data stream: {}",
-                    file_name.to_string()
+                    file_name
                 )));
             }
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!("Unable to open file: {}", file_name.to_string())
+                    format!("Unable to open file: {}", file_name)
                 );
                 return Err(error);
             }
         };
+        let mut files: Vec<QcowFile> = Vec::new();
         let mut file: QcowFile = QcowFile::new();
 
         match file.read_data_stream(&data_stream) {

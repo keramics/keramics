@@ -284,10 +284,10 @@ fn main() -> ExitCode {
         }
         None => match &format_identifier {
             FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
+            FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
             FormatIdentifier::Ext => {
                 ExtInfo::print_file_system(&data_stream, character_encoding.as_ref())
             }
-            FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
             FormatIdentifier::Fat => FatInfo::print_file_system(&data_stream),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),

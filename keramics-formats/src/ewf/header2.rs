@@ -84,18 +84,16 @@ impl EwfHeader2 {
         let mut object_storage: EwfUtf16ObjectStorage =
             EwfUtf16ObjectStorage::new(&header2_data[header2_data_offset..], byte_order);
 
-        let number_of_categories: u8 = match object_storage.next_line() {
-            Some(line) => match line.as_slice() {
-                // "1"
-                [0x0031] => 1,
-                // "3"
-                [0x0033] => 3,
-                _ => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid header data - unsupported number of categories"
-                    ));
-                }
-            },
+        let number_of_categories: u8 = match object_storage.next_line().as_deref() {
+            // "1"
+            Some([0x0031]) => 1,
+            // "3"
+            Some([0x0033]) => 3,
+            Some(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - unsupported number of categories"
+                ));
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid header data - missing number of categories"
@@ -105,16 +103,14 @@ impl EwfHeader2 {
         // TODO: if number_of_categories == 1 then format is EnCase 4
         // TODO: if number_of_categories == 3 then format is at least EnCase 5
 
-        match object_storage.next_line() {
-            Some(line) => match line.as_slice() {
-                // "main"
-                [0x006d, 0x0061, 0x0069, 0x006e] => {}
-                _ => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid header data - unsupported category"
-                    ));
-                }
-            },
+        match object_storage.next_line().as_deref() {
+            // "main"
+            Some([0x006d, 0x0061, 0x0069, 0x006e]) => {}
+            Some(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid header data - unsupported category"
+                ));
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid header data - missing category"

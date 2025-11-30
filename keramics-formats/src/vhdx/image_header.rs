@@ -66,7 +66,7 @@ impl VhdxImageHeader {
                 "Unsupported VHDX image header data size"
             ));
         }
-        if data[0..4] != VHDX_IMAGE_HEADER_SIGNATURE {
+        if &data[0..4] != VHDX_IMAGE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported VHDX image header signature"
             ));

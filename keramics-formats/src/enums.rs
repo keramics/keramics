@@ -17,8 +17,8 @@ use std::fmt;
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FormatIdentifier {
     Apm,
-    Ext,
     Ewf,
+    Ext,
     Fat,
     Gpt,
     Mbr,
@@ -37,8 +37,8 @@ impl fmt::Display for FormatIdentifier {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let string: &str = match self {
             FormatIdentifier::Apm => "apm",
-            FormatIdentifier::Ext => "ext",
             FormatIdentifier::Ewf => "ewf",
+            FormatIdentifier::Ext => "ext",
             FormatIdentifier::Fat => "fat",
             FormatIdentifier::Gpt => "gpt",
             FormatIdentifier::Mbr => "mbr",
@@ -65,13 +65,13 @@ mod tests {
         let string: String = format_identifier.to_string();
         assert_eq!(string, "apm");
 
-        let format_identifier: FormatIdentifier = FormatIdentifier::Ext;
-        let string: String = format_identifier.to_string();
-        assert_eq!(string, "ext");
-
         let format_identifier: FormatIdentifier = FormatIdentifier::Ewf;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "ewf");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Ext;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "ext");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Fat;
         let string: String = format_identifier.to_string();

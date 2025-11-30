@@ -12,13 +12,13 @@
  */
 
 /// ext superblock signature: "\x53\xef"
-pub(super) const EXT_SUPERBLOCK_SIGNATURE: [u8; 2] = [0x53, 0xef];
+pub(crate) const EXT_SUPERBLOCK_SIGNATURE: &[u8] = &[0x53, 0xef];
 
 /// ext extents header signature: "\x0a\xf3"
-pub(super) const EXT_EXTENTS_HEADER_SIGNATURE: [u8; 2] = [0x0a, 0xf3];
+pub(super) const EXT_EXTENTS_HEADER_SIGNATURE: &[u8] = &[0x0a, 0xf3];
 
 /// ext attribute inode or block header signature: "\x00\x00\x02\xea"
-pub(super) const EXT_ATTRIBUTES_HEADER_SIGNATURE: [u8; 4] = [0x00, 0x00, 0x02, 0xea];
+pub(super) const EXT_ATTRIBUTES_HEADER_SIGNATURE: &[u8] = &[0x00, 0x00, 0x02, 0xea];
 
 /// ext compatible feature flags
 pub const EXT_COMPATIBLE_FEATURE_FLAG_SPARSE_SUPERBLOCK2: u32 = 0x00000200;

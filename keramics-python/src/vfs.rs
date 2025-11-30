@@ -770,10 +770,10 @@ impl PyVfsResolver {
 pub enum PyVfsType {
     #[pyo3(name = "APM")]
     Apm,
-    #[pyo3(name = "EXT")]
-    Ext,
     #[pyo3(name = "EWF")]
     Ewf,
+    #[pyo3(name = "EXT")]
+    Ext,
     #[pyo3(name = "FAKE")]
     Fake,
     #[pyo3(name = "FAT")]
@@ -802,8 +802,8 @@ impl From<&PyVfsType> for VfsType {
     fn from(vfs_type: &PyVfsType) -> Self {
         match vfs_type {
             PyVfsType::Apm => VfsType::Apm,
-            PyVfsType::Ext => VfsType::Ext,
             PyVfsType::Ewf => VfsType::Ewf,
+            PyVfsType::Ext => VfsType::Ext,
             PyVfsType::Fake => VfsType::Fake,
             PyVfsType::Fat => VfsType::Fat,
             PyVfsType::Gpt => VfsType::Gpt,

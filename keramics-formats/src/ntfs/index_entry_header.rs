@@ -51,12 +51,12 @@ impl NtfsIndexEntryHeader {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 24 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS index entry header data size"
+                "Unsupported index entry header data size"
             ));
         }
-        if data[0..4] != NTFS_INDEX_ENTRY_SIGNATURE {
+        if &data[0..4] != NTFS_INDEX_ENTRY_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS index entry header signature"
+                "Unsupported index entry header signature"
             ));
         }
         self.fixup_values_offset = bytes_to_u16_le!(data, 4);

@@ -82,7 +82,7 @@ impl UdifFileFooter {
                 "Unsupported UDIF file footer data size"
             ));
         }
-        if data[0..4] != UDIF_FILE_FOOTER_SIGNATURE {
+        if &data[0..4] != UDIF_FILE_FOOTER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported UDIF file footer signature"
             ));

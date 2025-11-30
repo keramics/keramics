@@ -11,8 +11,8 @@
  * under the License.
  */
 
-/// UDIF file footer signature: "koly".
-pub(super) const UDIF_FILE_FOOTER_SIGNATURE: [u8; 4] = [0x6b, 0x6f, 0x6c, 0x79];
+/// UDIF file footer signature.
+pub(crate) const UDIF_FILE_FOOTER_SIGNATURE: &[u8] = b"koly";
 
-/// UDIF block table header signature: "mish".
-pub(super) const UDIF_BLOCK_TABLE_HEADER_SIGNATURE: [u8; 4] = [0x6d, 0x69, 0x73, 0x68];
+/// UDIF block table header signature.
+pub(super) const UDIF_BLOCK_TABLE_HEADER_SIGNATURE: &[u8] = b"mish";

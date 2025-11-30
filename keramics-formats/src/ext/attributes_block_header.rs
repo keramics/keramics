@@ -46,7 +46,7 @@ impl ExtAttributesBlockHeader {
                 "Unsupported attributes block header data size"
             ));
         }
-        if data[0..4] != EXT_ATTRIBUTES_HEADER_SIGNATURE {
+        if &data[0..4] != EXT_ATTRIBUTES_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported attributes block header signature"
             ));

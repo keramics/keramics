@@ -99,7 +99,7 @@ impl NtfsBootRecord {
                 "Unsupported boot record data size"
             ));
         }
-        if data[3..11] != NTFS_FILE_SYSTEM_SIGNATURE {
+        if &data[3..11] != NTFS_FILE_SYSTEM_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported file system signature"
             ));

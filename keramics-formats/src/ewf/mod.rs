@@ -12,7 +12,7 @@
  */
 
 mod block_range;
-mod constants;
+pub(crate) mod constants;
 mod digest;
 mod enums;
 mod error2;

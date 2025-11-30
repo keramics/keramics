@@ -15,7 +15,7 @@ mod block_range;
 mod block_table;
 mod block_table_entry;
 mod block_table_header;
-mod constants;
+pub(crate) mod constants;
 mod enums;
 mod file;
 mod file_footer;

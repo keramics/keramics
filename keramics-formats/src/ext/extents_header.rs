@@ -50,7 +50,7 @@ impl ExtExtentsHeader {
                 "Unsupported extents header data size"
             ));
         }
-        if data[0..2] != EXT_EXTENTS_HEADER_SIGNATURE {
+        if &data[0..2] != EXT_EXTENTS_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported extents header signature"
             ));

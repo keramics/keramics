@@ -75,7 +75,7 @@ impl GptPartitionTableHeader {
                 "Unsupported GPT partition table header data size"
             ));
         }
-        if data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {
+        if &data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported GPT partition table header signature"
             )));

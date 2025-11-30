@@ -13,7 +13,7 @@
 
 mod block_allocation_table;
 mod block_range;
-mod constants;
+pub(crate) mod constants;
 mod dynamic_disk_header;
 mod enums;
 mod file;

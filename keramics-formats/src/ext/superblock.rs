@@ -229,7 +229,7 @@ impl ExtSuperblock {
                 "Unsupported superblock data size"
             ));
         }
-        if data[56..58] != EXT_SUPERBLOCK_SIGNATURE {
+        if &data[56..58] != EXT_SUPERBLOCK_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported superblock signature"
             ));

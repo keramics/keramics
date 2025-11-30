@@ -11,18 +11,17 @@
  * under the License.
  */
 
-/// NTFS file system signature: "NTFS    ".
-pub(super) const NTFS_FILE_SYSTEM_SIGNATURE: [u8; 8] =
-    [0x4e, 0x54, 0x46, 0x53, 0x20, 0x20, 0x20, 0x20];
+/// NTFS file system signature.
+pub(crate) const NTFS_FILE_SYSTEM_SIGNATURE: &[u8] = b"NTFS    ";
 
-/// NTFS MFT entry signature: "FILE".
-pub(super) const NTFS_MFT_ENTRY_SIGNATURE: [u8; 4] = [0x46, 0x49, 0x4c, 0x45];
+/// NTFS MFT entry signature.
+pub(super) const NTFS_MFT_ENTRY_SIGNATURE: &[u8] = b"FILE";
 
-/// NTFS bad MFT entry signature: "BAAD".
-pub(super) const NTFS_BAD_MFT_ENTRY_SIGNATURE: [u8; 4] = [0x42, 0x41, 0x41, 0x44];
+/// NTFS bad MFT entry signature.
+pub(super) const NTFS_BAD_MFT_ENTRY_SIGNATURE: &[u8] = b"BAAD";
 
-/// NTFS index entry signature: "INDX".
-pub(super) const NTFS_INDEX_ENTRY_SIGNATURE: [u8; 4] = [0x49, 0x4e, 0x44, 0x58];
+/// NTFS index entry signature.
+pub(super) const NTFS_INDEX_ENTRY_SIGNATURE: &[u8] = b"INDX";
 
 /// NTFS $STANDARD_INFORMATION attribute type.
 pub const NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION: u32 = 0x00000010;

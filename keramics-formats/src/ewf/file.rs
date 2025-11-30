@@ -111,8 +111,8 @@ impl EwfFile {
             let mut is_last_section: bool = false;
             let mut section_size: u64 = section_header.size;
 
-            if section_header.section_type == EWF_SECTION_TYPE_DONE
-                || section_header.section_type == EWF_SECTION_TYPE_NEXT
+            if &section_header.section_type == EWF_SECTION_TYPE_DONE
+                || &section_header.section_type == EWF_SECTION_TYPE_NEXT
             {
                 if section_size == 0 {
                     section_size = 76;

@@ -107,10 +107,8 @@ impl QcowFileHeader {
             ));
             self.mediator.debug_print_data(&data, true);
         }
-        if data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported QCOW file header signature"
-            ));
+        if &data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.format_version = bytes_to_u32_be!(data, 4);
 

@@ -11,5 +11,5 @@
  * under the License.
  */
 
-/// sparseimage file header signature: "sprs"
-pub(super) const SPARSEIMAGE_FILE_HEADER_SIGNATURE: [u8; 4] = [0x73, 0x70, 0x72, 0x73];
+/// Mac OS sparse image (.sparseimage) file header signature.
+pub(crate) const SPARSEIMAGE_FILE_HEADER_SIGNATURE: &[u8] = b"sprs";

@@ -12,5 +12,4 @@
  */
 
 /// GPT partition table signature.
-pub(super) const GPT_PARTITION_TABLE_SIGNATURE: [u8; 8] =
-    [0x45, 0x46, 0x49, 0x20, 0x50, 0x41, 0x52, 0x54]; // "EFI PART"
+pub(crate) const GPT_PARTITION_TABLE_SIGNATURE: &[u8] = b"EFI PART";

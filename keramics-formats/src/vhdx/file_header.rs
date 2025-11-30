@@ -43,7 +43,7 @@ impl VhdxFileHeader {
                 "Unsupported file header data size"
             ));
         }
-        if data[0..8] != VHDX_FILE_HEADER_SIGNATURE {
+        if &data[0..8] != VHDX_FILE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported file header signature"
             ));

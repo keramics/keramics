@@ -12,7 +12,7 @@
  */
 
 mod block_range;
-mod constants;
+pub(crate) mod constants;
 mod file;
 mod file_header;
 

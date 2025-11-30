@@ -502,8 +502,8 @@ impl EwfImage {
         let mut last_sectors_section_header: Option<&EwfSectionHeader> = None;
 
         for section_header in &segment_file.sections {
-            match &section_header.section_type {
-                &EWF_SECTION_TYPE_DATA => {
+            match section_header.section_type.as_slice() {
+                EWF_SECTION_TYPE_DATA => {
                     let mut volume: EwfE01Volume = EwfE01Volume::new();
 
                     match volume.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
@@ -524,7 +524,7 @@ impl EwfImage {
                         )));
                     }
                 }
-                &EWF_SECTION_TYPE_DIGEST => {
+                EWF_SECTION_TYPE_DIGEST => {
                     let mut digest: EwfDigest = EwfDigest::new();
 
                     match digest.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
@@ -540,7 +540,7 @@ impl EwfImage {
                     self.md5_hash.copy_from_slice(&digest.md5_hash);
                     self.sha1_hash.copy_from_slice(&digest.sha1_hash);
                 }
-                &EWF_SECTION_TYPE_DISK | &EWF_SECTION_TYPE_VOLUME => {
+                EWF_SECTION_TYPE_DISK | EWF_SECTION_TYPE_VOLUME => {
                     match self.read_volume_section(
                         segment_file,
                         segment_file_name,
@@ -558,10 +558,10 @@ impl EwfImage {
                         }
                     }
                 }
-                &EWF_SECTION_TYPE_DONE => {
+                EWF_SECTION_TYPE_DONE => {
                     *last_segment_file = true;
                 }
-                &EWF_SECTION_TYPE_ERROR2 => {
+                EWF_SECTION_TYPE_ERROR2 => {
                     let mut error2: EwfError2 = EwfError2::new();
 
                     match error2.read_at_position(
@@ -580,7 +580,7 @@ impl EwfImage {
                     }
                     // TODO: store entries
                 }
-                &EWF_SECTION_TYPE_HASH => {
+                EWF_SECTION_TYPE_HASH => {
                     let mut hash: EwfHash = EwfHash::new();
 
                     match hash.read_at_position(&data_stream, SeekFrom::Start(file_offset + 76)) {
@@ -595,7 +595,7 @@ impl EwfImage {
                     }
                     self.md5_hash.copy_from_slice(&hash.md5_hash);
                 }
-                &EWF_SECTION_TYPE_HEADER => {
+                EWF_SECTION_TYPE_HEADER => {
                     let mut header: EwfHeader = EwfHeader::new();
 
                     match header.read_at_position(
@@ -614,7 +614,7 @@ impl EwfImage {
                         }
                     }
                 }
-                &EWF_SECTION_TYPE_HEADER2 => {
+                EWF_SECTION_TYPE_HEADER2 => {
                     if segment_file.segment_number != 1 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Unsupported header2 section found in segment file: {}",
@@ -641,14 +641,14 @@ impl EwfImage {
                 }
                 // TODO: ltree
                 // TODO: ltypes
-                &EWF_SECTION_TYPE_NEXT => {
+                EWF_SECTION_TYPE_NEXT => {
                     *last_segment_file = false;
                 }
-                &EWF_SECTION_TYPE_SECTORS => {
+                EWF_SECTION_TYPE_SECTORS => {
                     last_sectors_section_header = Some(section_header);
                 }
                 // TODO: session
-                &EWF_SECTION_TYPE_TABLE => {
+                EWF_SECTION_TYPE_TABLE => {
                     match self.read_table_section(
                         segment_file,
                         data_stream,
@@ -667,7 +667,7 @@ impl EwfImage {
                         }
                     }
                 }
-                &EWF_SECTION_TYPE_TABLE2 => {
+                EWF_SECTION_TYPE_TABLE2 => {
                     let mut table2: EwfTable = EwfTable::new();
 
                     match table2.read_at_position(

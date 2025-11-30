@@ -27,10 +27,8 @@ pub(super) const VHD_DISK_TYPES: &[u32] = &[
     VHD_DISK_TYPE_DIFFERENTIAL,
 ];
 
-/// VHD dynamic disk header signature: "cxsparse".
-pub(super) const VHD_DYNAMIC_DISK_HEADER_SIGNATURE: [u8; 8] =
-    [0x63, 0x78, 0x73, 0x70, 0x61, 0x72, 0x73, 0x65];
+/// VHD dynamic disk header signature.
+pub(super) const VHD_DYNAMIC_DISK_HEADER_SIGNATURE: &[u8] = b"cxsparse";
 
-/// VHD file footer signature: "conectix".
-pub(super) const VHD_FILE_FOOTER_SIGNATURE: [u8; 8] =
-    [0x63, 0x6f, 0x6e, 0x65, 0x63, 0x74, 0x69, 0x78];
+/// VHD file footer signature.
+pub(crate) const VHD_FILE_FOOTER_SIGNATURE: &[u8] = b"conectix";
