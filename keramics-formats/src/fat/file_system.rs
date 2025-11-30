@@ -492,7 +492,8 @@ mod tests {
     fn get_file_system() -> Result<FatFileSystem, ErrorTrace> {
         let mut file_system: FatFileSystem = FatFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let path_string: String = get_test_data_path("fat/fat12.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -591,7 +592,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file_system: FatFileSystem = FatFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let path_string: String = get_test_data_path("fat/fat12.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -612,7 +614,8 @@ mod tests {
     fn test_read_metadata() -> Result<(), ErrorTrace> {
         let mut file_system: FatFileSystem = FatFileSystem::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let path_string: String = get_test_data_path("fat/fat12.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_metadata(&data_stream)?;
 

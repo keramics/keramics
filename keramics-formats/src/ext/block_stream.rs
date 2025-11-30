@@ -230,7 +230,8 @@ mod tests {
     fn get_block_stream() -> Result<ExtBlockStream, ErrorTrace> {
         let mut block_stream = ExtBlockStream::new(1024, 11358);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
+        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let block_ranges: Vec<ExtBlockRange> = vec![
@@ -256,7 +257,8 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut block_stream = ExtBlockStream::new(1024, 11358);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ext/ext2.raw").as_str());
+        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let block_ranges: Vec<ExtBlockRange> = vec![

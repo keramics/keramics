@@ -249,7 +249,7 @@ fn main() -> ExitCode {
             }
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
-                format_identifier.to_string()
+                format_identifier
             ))),
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
@@ -260,7 +260,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
-                format_identifier.to_string()
+                format_identifier
             ))),
         },
         Some(Commands::Path(command_arguments)) => {
@@ -278,7 +278,7 @@ fn main() -> ExitCode {
                 FormatIdentifier::Ntfs => NtfsInfo::print_file_entry_by_path(&data_stream, &path),
                 _ => Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
-                    format_identifier.to_string()
+                    format_identifier
                 ))),
             }
         }
@@ -300,7 +300,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
-                format_identifier.to_string()
+                format_identifier
             ))),
         },
     };

@@ -299,7 +299,8 @@ mod tests {
     }
 
     fn get_block_stream() -> Result<NtfsBlockStream, ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
@@ -314,7 +315,8 @@ mod tests {
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ntfs/ntfs.raw").as_str());
+        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();

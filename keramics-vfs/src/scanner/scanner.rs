@@ -138,7 +138,7 @@ impl VfsScanner {
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Missing file entry: {}",
-                    vfs_location.to_string()
+                    vfs_location
                 )));
             }
         };
@@ -171,7 +171,7 @@ impl VfsScanner {
             Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Missing data stream: {}",
-                    vfs_location.to_string()
+                    vfs_location
                 )));
             }
             Err(mut error) => {
@@ -823,7 +823,7 @@ mod tests {
             Some(data_stream) => Ok(data_stream),
             None => Err(keramics_core::error_trace_new!(format!(
                 "Missing data stream: {}",
-                vfs_location.to_string()
+                vfs_location
             ))),
         }
     }

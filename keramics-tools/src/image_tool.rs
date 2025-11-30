@@ -1140,14 +1140,12 @@ impl ImageTool {
 
         let vfs_type: &VfsType = vfs_scan_node.get_type();
 
-        let path_string: String = path.to_string();
-
         let path_string: String = match result.as_ref() {
             Some(file_entry) => match file_entry {
                 VfsFileEntry::Gpt(gpt_file_entry) => {
                     let path_string: String = match gpt_file_entry.get_partition_number() {
                         Some(partition_number) => format!("/p{}", partition_number),
-                        _ => path_string,
+                        _ => path.to_string(),
                     };
                     match gpt_file_entry.get_identifier() {
                         Some(identifier) => format!(
@@ -1160,18 +1158,13 @@ impl ImageTool {
                 }
                 VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry.get_partition_number() {
                     Some(partition_number) => format!("/p{}", partition_number),
-                    None => path_string,
+                    None => path.to_string(),
                 },
-                _ => path_string,
+                _ => path.to_string(),
             },
-            None => path_string,
+            None => path.to_string(),
         };
-        println!(
-            "{}{}: path: {}",
-            indentation,
-            vfs_type.as_str(),
-            path_string,
-        );
+        println!("{}{}: path: {}", indentation, vfs_type, path_string,);
         for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
             self.print_scan_node(sub_scan_node, depth + 1)?;
         }

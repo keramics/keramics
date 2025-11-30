@@ -255,7 +255,8 @@ mod tests {
     fn get_block_stream() -> Result<FatBlockStream, ErrorTrace> {
         let mut block_stream = FatBlockStream::new(2048, 11358);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let path_string: String = get_test_data_path("fat/fat12.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let block_allocation_table: Arc<FatBlockAllocationTable> = Arc::new(
@@ -271,7 +272,8 @@ mod tests {
     fn test_open() -> Result<(), ErrorTrace> {
         let mut block_stream = FatBlockStream::new(2048, 11358);
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("fat/fat12.raw").as_str());
+        let path_string: String = get_test_data_path("fat/fat12.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let block_allocation_table: Arc<FatBlockAllocationTable> = Arc::new(

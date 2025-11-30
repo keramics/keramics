@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::fmt;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum VfsFileType {
     BlockDevice,
@@ -44,10 +46,10 @@ pub enum VfsType {
     Vhdx,
 }
 
-impl VfsType {
-    /// Retrieves a string representation of the type.
-    pub fn as_str(&self) -> &str {
-        match self {
+impl fmt::Display for VfsType {
+    /// Formats the VFS type for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let string: &str = match self {
             VfsType::Apm => "APM",
             VfsType::Ext => "EXT",
             VfsType::Ewf => "EWF",
@@ -63,7 +65,8 @@ impl VfsType {
             VfsType::Udif => "UDIF",
             VfsType::Vhd => "VHD",
             VfsType::Vhdx => "VHDX",
-        }
+        };
+        write!(formatter, "{}", string)
     }
 }
 
@@ -72,50 +75,65 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_vfs_type_as_str() {
+    fn test_vfs_type_fmt() {
         let vfs_type: VfsType = VfsType::Apm;
-        assert_eq!(vfs_type.as_str(), "APM");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "APM");
 
         let vfs_type: VfsType = VfsType::Ext;
-        assert_eq!(vfs_type.as_str(), "EXT");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "EXT");
 
         let vfs_type: VfsType = VfsType::Ewf;
-        assert_eq!(vfs_type.as_str(), "EWF");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "EWF");
 
         let vfs_type: VfsType = VfsType::Fake;
-        assert_eq!(vfs_type.as_str(), "FAKE");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "FAKE");
 
         let vfs_type: VfsType = VfsType::Fat;
-        assert_eq!(vfs_type.as_str(), "FAT");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "FAT");
 
         let vfs_type: VfsType = VfsType::Gpt;
-        assert_eq!(vfs_type.as_str(), "GPT");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "GPT");
 
         let vfs_type: VfsType = VfsType::Mbr;
-        assert_eq!(vfs_type.as_str(), "MBR");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "MBR");
 
         let vfs_type: VfsType = VfsType::Ntfs;
-        assert_eq!(vfs_type.as_str(), "NTFS");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "NTFS");
 
         let vfs_type: VfsType = VfsType::Os;
-        assert_eq!(vfs_type.as_str(), "OS");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "OS");
 
         let vfs_type: VfsType = VfsType::Qcow;
-        assert_eq!(vfs_type.as_str(), "QCOW");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "QCOW");
 
         let vfs_type: VfsType = VfsType::SparseImage;
-        assert_eq!(vfs_type.as_str(), "SPARSEIMAGE");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "SPARSEIMAGE");
 
         let vfs_type: VfsType = VfsType::SplitRaw;
-        assert_eq!(vfs_type.as_str(), "SPLITRAW");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "SPLITRAW");
 
         let vfs_type: VfsType = VfsType::Udif;
-        assert_eq!(vfs_type.as_str(), "UDIF");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "UDIF");
 
         let vfs_type: VfsType = VfsType::Vhd;
-        assert_eq!(vfs_type.as_str(), "VHD");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "VHD");
 
         let vfs_type: VfsType = VfsType::Vhdx;
-        assert_eq!(vfs_type.as_str(), "VHDX");
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "VHDX");
     }
 }

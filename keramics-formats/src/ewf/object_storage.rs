@@ -203,11 +203,8 @@ mod tests {
 
         let mut test_struct = EwfByteObjectStorage::new(&test_data);
 
-        let expected_line: Vec<u8> = vec![0x31];
-        assert_eq!(test_struct.next_line(), Some(expected_line.as_slice()));
-
-        let expected_line: Vec<u8> = vec![0x6d, 0x61, 0x69, 0x6e];
-        assert_eq!(test_struct.next_line(), Some(expected_line.as_slice()));
+        assert_eq!(test_struct.next_line(), Some(&test_data[0..1]));
+        assert_eq!(test_struct.next_line(), Some(&test_data[3..7]));
     }
 
     #[test]

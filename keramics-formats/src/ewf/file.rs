@@ -183,7 +183,8 @@ mod tests {
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file = EwfFile::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf/ext2.E01").as_str());
+        let path_string: String = get_test_data_path("ewf/ext2.E01");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         file.read_data_stream(&data_stream)?;
@@ -196,7 +197,8 @@ mod tests {
     fn test_read_section_headers() -> Result<(), ErrorTrace> {
         let mut file = EwfFile::new();
 
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("ewf/ext2.E01").as_str());
+        let path_string: String = get_test_data_path("ewf/ext2.E01");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 

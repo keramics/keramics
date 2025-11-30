@@ -91,23 +91,21 @@ impl VhdFile {
 
     /// Retrieves the parent file name
     pub fn get_parent_file_name(&self) -> Option<Ucs2String> {
-        let parent_name: &Ucs2String = match &self.parent_name {
-            Some(parent_name) => parent_name,
-            None => return None,
-        };
-        let mut string_index: usize = 0;
-
-        // Look for the last backslash character.
-        for (index, character) in parent_name.elements.iter().enumerate().rev() {
-            if *character == 0x5c {
-                string_index = index + 1;
-                break;
+        match &self.parent_name {
+            Some(parent_name) => {
+                match parent_name
+                    .elements
+                    .iter()
+                    .rposition(|value| *value == 0x005c)
+                {
+                    Some(value_index) => {
+                        Some(Ucs2String::from(&parent_name.elements[value_index + 1..]))
+                    }
+                    None => Some(parent_name.clone()),
+                }
             }
+            None => None,
         }
-        let mut parent_file_name: Ucs2String = Ucs2String::new();
-        parent_file_name.elements = parent_name.elements[string_index..].to_vec();
-
-        Some(parent_file_name)
     }
 
     /// Reads a file from a data stream.

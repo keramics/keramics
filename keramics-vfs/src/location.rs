@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::fmt;
 use std::sync::Arc;
 
 use keramics_formats::Path;
@@ -89,24 +90,21 @@ impl VfsLocation {
             VfsLocation::Layer { vfs_type, .. } => &vfs_type,
         }
     }
+}
 
-    /// Retrieves a string representation of the location.
-    pub fn to_string(&self) -> String {
+impl fmt::Display for VfsLocation {
+    /// Formats the location for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self {
             VfsLocation::Base { path, vfs_type } => {
-                format!("{}: {}\n", vfs_type.as_str(), path.to_string())
+                write!(formatter, "{}: {}\n", vfs_type, path)
             }
             VfsLocation::Layer {
                 path,
                 parent,
                 vfs_type,
             } => {
-                format!(
-                    "{}{}: {}\n",
-                    parent.to_string(),
-                    vfs_type.as_str(),
-                    path.to_string()
-                )
+                write!(formatter, "{}{}: {}\n", parent, vfs_type, path)
             }
         }
     }
@@ -195,6 +193,23 @@ mod tests {
 
     // TODO: add tests for get_path
     // TODO: add tests for get_type
-    // TODO: add tests for to_string
+
+    #[test]
+    fn test_fmt() {
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let test_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+
+        let string: String = test_location.to_string();
+        assert_eq!(string, "OS: ../test_data/directory/file.txt\n");
+
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let os_vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let path: Path = Path::from("/");
+        let test_location: VfsLocation = os_vfs_location.new_with_layer(&VfsType::Qcow, path);
+
+        let string: String = test_location.to_string();
+        assert_eq!(string, "OS: ../test_data/qcow/ext2.qcow2\nQCOW: /\n");
+    }
+
     // TODO: add tests for new_os_vfs_location
 }

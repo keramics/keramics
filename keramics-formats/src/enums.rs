@@ -11,6 +11,8 @@
  * under the License.
  */
 
+use std::fmt;
+
 /// Format identifier.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FormatIdentifier {
@@ -30,10 +32,10 @@ pub enum FormatIdentifier {
     Vhdx,
 }
 
-impl FormatIdentifier {
-    /// Retrieves a string representation of the format identifier.
-    pub fn to_string(&self) -> &str {
-        match self {
+impl fmt::Display for FormatIdentifier {
+    /// Formats the format identifier for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let string: &str = match self {
             FormatIdentifier::Apm => "apm",
             FormatIdentifier::Ext => "ext",
             FormatIdentifier::Ewf => "ewf",
@@ -48,6 +50,71 @@ impl FormatIdentifier {
             FormatIdentifier::Unknown => "unknown",
             FormatIdentifier::Vhd => "vhd",
             FormatIdentifier::Vhdx => "vhdx",
-        }
+        };
+        write!(formatter, "{}", string)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_identifier_fmt() {
+        let format_identifier: FormatIdentifier = FormatIdentifier::Apm;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "apm");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Ext;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "ext");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Ewf;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "ewf");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Fat;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "fat");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Gpt;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "gpt");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Mbr;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "mbr");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Ntfs;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "ntfs");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Qcow;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "qcow");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::SparseImage;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "sparseimage");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::SplitRaw;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "splitraw");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Udif;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "udif");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Unknown;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "unknown");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Vhd;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "vhd");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Vhdx;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "vhdx");
     }
 }

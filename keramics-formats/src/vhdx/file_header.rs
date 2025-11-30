@@ -40,12 +40,12 @@ impl VhdxFileHeader {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 65536 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX file header data size"
+                "Unsupported file header data size"
             ));
         }
         if data[0..8] != VHDX_FILE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX file header signature"
+                "Unsupported file header signature"
             ));
         }
         Ok(())

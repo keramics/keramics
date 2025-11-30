@@ -73,8 +73,8 @@ impl DataStream for File {
 }
 
 /// Opens a new operating system data stream.
-pub fn open_os_data_stream(path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
-    let file: File = match File::open(path) {
+pub fn open_os_data_stream(path_buf: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
+    let file: File = match File::open(path_buf) {
         Ok(file) => file,
         Err(error) => {
             return Err(ErrorTrace::new(format!(
@@ -94,8 +94,9 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_data_stream() -> Result<File, ErrorTrace> {
-        let path: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
-        let file: File = match File::open(path) {
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let file: File = match File::open(&path_buf) {
             Ok(file) => file,
             Err(error) => {
                 return Err(ErrorTrace::new(format!(
@@ -132,7 +133,8 @@ mod tests {
 
     #[test]
     fn test_open_os_data_stream() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("directory/file.txt").as_str());
+        let path_string: String = get_test_data_path("directory/file.txt");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let _ = open_os_data_stream(&path_buf)?;
 
         Ok(())

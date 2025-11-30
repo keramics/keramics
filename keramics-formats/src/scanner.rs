@@ -358,7 +358,8 @@ mod tests {
                 ));
             }
         };
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("qcow/ext2.qcow2").as_str());
+        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         let scan_results: HashSet<FormatIdentifier> =
             format_scanner.scan_data_stream(&data_stream)?;

@@ -92,7 +92,8 @@ mod tests {
 
     #[test]
     fn test_get_data_stream() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("").as_str());
+        let path_string: String = get_test_data_path("");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: OsFileResolver = OsFileResolver::new(path_buf);
 
         let path_components: [PathComponent; 2] = [
@@ -109,7 +110,8 @@ mod tests {
 
     #[test]
     fn test_open_os_file_resolver() -> Result<(), ErrorTrace> {
-        let path_buf: PathBuf = PathBuf::from(get_test_data_path("").as_str());
+        let path_string: String = get_test_data_path("");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let _ = open_os_file_resolver(&path_buf)?;
 
         Ok(())
