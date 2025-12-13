@@ -44,6 +44,7 @@ pub enum VfsType {
     Udif,
     Vhd,
     Vhdx,
+    Vmdk,
 }
 
 impl fmt::Display for VfsType {
@@ -65,6 +66,7 @@ impl fmt::Display for VfsType {
             VfsType::Udif => "UDIF",
             VfsType::Vhd => "VHD",
             VfsType::Vhdx => "VHDX",
+            VfsType::Vmdk => "VMDK",
         };
         write!(formatter, "{}", string)
     }
@@ -135,5 +137,9 @@ mod tests {
         let vfs_type: VfsType = VfsType::Vhdx;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "VHDX");
+
+        let vfs_type: VfsType = VfsType::Vmdk;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "VMDK");
     }
 }

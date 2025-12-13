@@ -13,7 +13,7 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u64_be;
@@ -28,6 +28,7 @@ use keramics_types::bytes_to_u64_be;
 )]
 /// QEMU Copy-On-Write (QCOW) cluster table entry.
 pub struct QcowClusterTableEntry {
+    /// Reference.
     pub reference: u64,
 }
 
@@ -41,7 +42,7 @@ impl QcowClusterTableEntry {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 8 {
             return Err(keramics_core::error_trace_new!(
-                "Unsupported QCOW cluster table entry data size"
+                "Unsupported cluster table entry data size"
             ));
         }
         self.reference = bytes_to_u64_be!(data, 0);
@@ -52,7 +53,10 @@ impl QcowClusterTableEntry {
 
 /// QEMU Copy-On-Write (QCOW) cluster table.
 pub struct QcowClusterTable {
+    /// Offset.
     offset: u64,
+
+    /// Number of entries.
     number_of_entries: u32,
 }
 
@@ -93,7 +97,7 @@ impl QcowClusterTable {
         );
         let mut entry: QcowClusterTableEntry = QcowClusterTableEntry::new();
 
-        let mediator = Mediator::current();
+        let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             mediator.debug_print(format!(
                 "QcowClusterTableEntry: {} data of size: {} at offset: {} (0x{:08x})\n",

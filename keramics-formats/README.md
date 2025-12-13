@@ -20,7 +20,7 @@ Supported data formats:
 * [Universal Disk Image Format (UDIF)](https://keramics.github.io/udif.html)
 * [Virtual Hard Disk (VHD) image format](https://keramics.github.io/vhd.html)
 * [Virtual Hard Disk version 2 (VHDX) image format](https://keramics.github.io/vhdx.html)
-
+* [VMWare Virtual Disk Format (VMDK)](https://keramics.github.io/vmdk.html)
 
 ## License
 

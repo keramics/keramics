@@ -674,7 +674,7 @@ mod tests {
     fn test_get_offset() -> Result<(), ErrorTrace> {
         let mut image: SplitRawImage = get_image()?;
 
-        let offset: u64 = image.seek(SeekFrom::Start(1024))?;
+        image.seek(SeekFrom::Start(1024))?;
 
         let offset: u64 = image.get_offset()?;
         assert_eq!(offset, 1024);

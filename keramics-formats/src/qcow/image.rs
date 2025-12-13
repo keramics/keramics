@@ -26,12 +26,18 @@ pub type QcowImageLayer = Arc<RwLock<QcowFile>>;
 pub struct QcowImage {
     /// Files.
     files: Vec<Arc<RwLock<QcowFile>>>,
+
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
 }
 
 impl QcowImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
-        Self { files: Vec::new() }
+        Self {
+            files: Vec::new(),
+            bytes_per_sector: 0,
+        }
     }
 
     /// Retrieves the number of layers.
@@ -85,6 +91,8 @@ impl QcowImage {
                 return Err(error);
             }
         }
+        self.bytes_per_sector = file.bytes_per_sector;
+
         while let Some(file_name) = file.get_backing_file_name() {
             let backing_file_name: String = file_name.to_string();
 
@@ -182,7 +190,7 @@ mod tests {
                     error
                 ));
             }
-        };
+        }
         Ok(())
     }
 
@@ -195,6 +203,9 @@ mod tests {
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         let file_name: PathComponent = PathComponent::from("ext2.qcow2");
         image.open(&file_resolver, &file_name)?;
+
+        assert_eq!(image.files.len(), 1);
+        assert_eq!(image.bytes_per_sector, 512);
 
         Ok(())
     }

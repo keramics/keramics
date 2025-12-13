@@ -206,6 +206,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "vmdk"
+path = "fuzz_targets/vmdk.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "zlib"
 path = "fuzz_targets/zlib.rs"
 test = false

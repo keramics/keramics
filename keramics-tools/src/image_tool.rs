@@ -32,6 +32,7 @@ use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
+use keramics_formats::vmdk::VmdkImage;
 use keramics_formats::{
     FileResolverReference, FormatIdentifier, FormatScanner, Path, PathComponent,
     open_os_file_resolver,
@@ -183,6 +184,9 @@ enum StorageMediaImage {
     Vhdx {
         vhdx_layer: VhdxImageLayer,
     },
+    Vmdk {
+        vmdk_image: Arc<RwLock<VmdkImage>>,
+    },
 }
 
 impl StorageMediaImage {
@@ -221,6 +225,7 @@ impl StorageMediaImage {
             Self::Udif { udif_file } => udif_file.clone(),
             Self::Vhd { vhd_layer, .. } => vhd_layer.clone(),
             Self::Vhdx { vhdx_layer, .. } => vhdx_layer.clone(),
+            Self::Vmdk { vmdk_image } => vmdk_image.clone(),
         }
     }
 
@@ -269,6 +274,7 @@ impl StorageMediaImage {
                 FormatIdentifier::Udif => Self::open_udif_file(path),
                 FormatIdentifier::Vhd => Self::open_vhd_image(path),
                 FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
+                FormatIdentifier::Vmdk => Self::open_vmdk_image(path),
                 _ => Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
                     format_identifier.to_string()
@@ -615,6 +621,51 @@ impl StorageMediaImage {
         })
     }
 
+    /// Opens a VMDK image.
+    fn open_vmdk_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut vmdk_image: VmdkImage = VmdkImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match vmdk_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open VMDK image");
+                return Err(error);
+            }
+        }
+        Ok(Self::Vmdk {
+            vmdk_image: Arc::new(RwLock::new(vmdk_image)),
+        })
+    }
+
     /// Scans a data stream for storage media image format signatures.
     fn scan_for_storage_image_formats(
         data_stream: &DataStreamReference,
@@ -627,6 +678,7 @@ impl StorageMediaImage {
         format_scanner.add_udif_signatures();
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
+        format_scanner.add_vmdk_signatures();
 
         match format_scanner.build() {
             Ok(_) => {}
@@ -661,6 +713,9 @@ impl StorageMediaImage {
 
 /// Tool for analyzing the contents of a storage media image.
 struct ImageTool {
+    /// The VFS resolver.
+    vfs_resolver: VfsResolverReference,
+
     /// The display path.
     display_path: DisplayPath,
 }
@@ -675,7 +730,10 @@ impl ImageTool {
             .translation_table
             .insert('|' as u32, String::from("\\|"));
 
-        Self { display_path }
+        Self {
+            vfs_resolver: VfsResolver::current(),
+            display_path,
+        }
     }
 
     /// Output file entries in bodyfile format.
@@ -1125,16 +1183,16 @@ impl ImageTool {
 
     /// Prints information about a scan node.
     fn print_scan_node(&self, vfs_scan_node: &VfsScanNode, depth: usize) -> Result<(), ErrorTrace> {
-        let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
-        let result: Option<VfsFileEntry> =
-            match vfs_resolver.get_file_entry_by_location(&vfs_scan_node.location) {
-                Ok(file_entry) => file_entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                    return Err(error);
-                }
-            };
+        let result: Option<VfsFileEntry> = match self
+            .vfs_resolver
+            .get_file_entry_by_location(&vfs_scan_node.location)
+        {
+            Ok(file_entry) => file_entry,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
+            }
+        };
         let indentation: String = vec![" "; depth * 4].join("");
         let path: &Path = vfs_scan_node.location.get_path();
 
@@ -1164,7 +1222,8 @@ impl ImageTool {
             },
             None => path.to_string(),
         };
-        println!("{}{}: path: {}", indentation, vfs_type, path_string,);
+        println!("{}{}: path: {}", indentation, vfs_type, path_string);
+
         for sub_scan_node in vfs_scan_node.sub_nodes.iter() {
             self.print_scan_node(sub_scan_node, depth + 1)?;
         }
@@ -1183,10 +1242,8 @@ impl ImageTool {
                 VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {}
                 _ => return Ok(()),
             }
-            let vfs_resolver: VfsResolverReference = VfsResolver::current();
-
             let file_system: VfsFileSystemReference =
-                match vfs_resolver.open_file_system(&vfs_scan_node.location) {
+                match self.vfs_resolver.open_file_system(&vfs_scan_node.location) {
                     Ok(file_system) => file_system,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open file system");

@@ -12,7 +12,7 @@
  */
 
 /// Virtual Hard Disk version 2 (VHDX) block range type.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum VhdxBlockRangeType {
     InFile,
     InParent,
@@ -20,7 +20,7 @@ pub enum VhdxBlockRangeType {
 }
 
 /// Virtual Hard Disk version 2 (VHDX) block range.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct VhdxBlockRange {
     /// Media offset.
     pub media_offset: u64,

@@ -34,6 +34,7 @@ pub mod splitraw;
 pub mod udif;
 pub mod vhd;
 pub mod vhdx;
+pub mod vmdk;
 
 // Volume system formats
 pub mod apm;

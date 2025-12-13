@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::bytes_to_u16_le;
 
 /// Applies the fix-up values to the buffer.
@@ -44,7 +44,7 @@ pub fn apply_fixup_values(
     let mut placeholder_value_data: [u8; 2] = [0; 2];
     placeholder_value_data.copy_from_slice(&buffer[fixup_value_offset..fixup_value_end_offset]);
 
-    let mediator = Mediator::current();
+    let mediator: MediatorReference = Mediator::current();
     if mediator.debug_output {
         mediator.debug_print(format!(
             "NtfsFixupValues data of size: {} at offset: {} (0x{:08x})\n",

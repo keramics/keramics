@@ -20,23 +20,23 @@ use crate::formatters::ByteSize;
 
 /// Information about a Mac OS sparse image (.sparseimage) file.
 struct SparseImageFileInfo {
+    /// Block size.
+    pub block_size: u32,
+
     /// Media size.
     pub media_size: u64,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
-
-    /// Block size.
-    pub block_size: u32,
 }
 
 impl SparseImageFileInfo {
     /// Creates new file information.
     fn new() -> Self {
         Self {
+            block_size: 0,
             media_size: 0,
             bytes_per_sector: 0,
-            block_size: 0,
         }
     }
 }
@@ -46,26 +46,19 @@ impl fmt::Display for SparseImageFileInfo {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Sparse image (.sparseimage) information:")?;
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+        writeln!(formatter, "    Band size\t\t\t\t\t: {}", byte_size)?;
 
-        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
+        writeln!(formatter, "    Media information:")?;
+
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
-            "    Bytes per sector\t\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {} bytes",
             self.bytes_per_sector
         )?;
-        if self.block_size < 1024 {
-            writeln!(
-                formatter,
-                "    Band size\t\t\t\t\t: {} bytes",
-                self.block_size,
-            )?;
-        } else {
-            let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
-
-            writeln!(formatter, "    Band size\t\t\t\t\t: {}", byte_size)?;
-        }
         writeln!(formatter)
     }
 }
@@ -78,9 +71,9 @@ impl SparseImageInfo {
     fn get_file_information(sparseimage_file: &SparseImageFile) -> SparseImageFileInfo {
         let mut file_information: SparseImageFileInfo = SparseImageFileInfo::new();
 
+        file_information.block_size = sparseimage_file.block_size;
         file_information.media_size = sparseimage_file.media_size;
         file_information.bytes_per_sector = sparseimage_file.bytes_per_sector;
-        file_information.block_size = sparseimage_file.block_size;
 
         file_information
     }
@@ -135,9 +128,10 @@ mod tests {
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Sparse image (.sparseimage) information:\n",
-            "    Media size\t\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
-            "    Bytes per sector\t\t\t\t: 512 bytes\n",
             "    Band size\t\t\t\t\t: 1.0 MiB (1048576 bytes)\n",
+            "    Media information:\n",
+            "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
+            "        Bytes per sector\t\t\t: 512 bytes\n",
             "\n"
         );
         assert_eq!(string, expected_string);
@@ -153,9 +147,9 @@ mod tests {
         let test_struct: SparseImageFileInfo =
             SparseImageInfo::get_file_information(&sparseimage_file);
 
+        assert_eq!(test_struct.block_size, 1048576);
         assert_eq!(test_struct.media_size, 4194304);
         assert_eq!(test_struct.bytes_per_sector, 512);
-        assert_eq!(test_struct.block_size, 1048576);
 
         Ok(())
     }

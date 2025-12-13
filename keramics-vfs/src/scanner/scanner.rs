@@ -26,6 +26,7 @@ use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::VhdImage;
 use keramics_formats::vhdx::VhdxImage;
+use keramics_formats::vmdk::VmdkImage;
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 
 use crate::apm::ApmFileSystem;
@@ -43,6 +44,7 @@ use crate::types::{VfsFileSystemReference, VfsResolverReference};
 use crate::udif::UdifFileSystem;
 use crate::vhd::VhdFileSystem;
 use crate::vhdx::VhdxFileSystem;
+use crate::vmdk::VmdkFileSystem;
 
 use super::scan_context::VfsScanContext;
 use super::scan_node::VfsScanNode;
@@ -90,6 +92,7 @@ impl VfsScanner {
         self.storage_media_image_scanner.add_udif_signatures();
         self.storage_media_image_scanner.add_vhd_signatures();
         self.storage_media_image_scanner.add_vhdx_signatures();
+        self.storage_media_image_scanner.add_vmdk_signatures();
         self.storage_media_image_scanner.build()?;
 
         // The Master Boot Record (MBR) signatures are used in other volume
@@ -189,7 +192,8 @@ impl VfsScanner {
             | VfsType::Qcow
             | VfsType::Udif
             | VfsType::Vhd
-            | VfsType::Vhdx => {
+            | VfsType::Vhdx
+            | VfsType::Vmdk => {
                 let mut result: Option<VfsType> =
                     self.scan_for_volume_system_format(&data_stream)?;
 
@@ -299,6 +303,7 @@ impl VfsScanner {
                 FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
                 FormatIdentifier::Vhd => Ok(Some(VfsType::Vhd)),
                 FormatIdentifier::Vhdx => Ok(Some(VfsType::Vhdx)),
+                FormatIdentifier::Vmdk => Ok(Some(VfsType::Vmdk)),
                 _ => Err(keramics_core::error_trace_new!(
                     "Found unsupported storage media image format signature"
                 )),
@@ -385,7 +390,7 @@ impl VfsScanner {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan APM volume system "
+                            "Unable to scan APM volume system"
                         );
                         return Err(error);
                     }
@@ -409,10 +414,16 @@ impl VfsScanner {
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan EWF image ");
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan EWF image");
                         return Err(error);
                     }
                 }
+            }
+            VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {}
+            VfsType::Fake => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported VFS location type"
+                ));
             }
             VfsType::Gpt => {
                 let mut gpt_volume_system: GptVolumeSystem = GptVolumeSystem::new();
@@ -439,7 +450,7 @@ impl VfsScanner {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan GPT volume system "
+                            "Unable to scan GPT volume system"
                         );
                         return Err(error);
                     }
@@ -470,7 +481,7 @@ impl VfsScanner {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan MBR volume system "
+                            "Unable to scan MBR volume system"
                         );
                         return Err(error);
                     }
@@ -486,7 +497,7 @@ impl VfsScanner {
                     match self.scan_for_sub_nodes(file_system, vfs_location, &mut sub_scan_node) {
                         Ok(_) => {}
                         Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(error, "Unable to scan OS ");
+                            keramics_core::error_trace_add_frame!(error, "Unable to scan OS");
                             return Err(error);
                         }
                     }
@@ -514,7 +525,7 @@ impl VfsScanner {
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan QCOW image ");
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan QCOW image");
                         return Err(error);
                     }
                 }
@@ -542,7 +553,7 @@ impl VfsScanner {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan sparseimage file "
+                            "Unable to scan sparseimage file"
                         );
                         return Err(error);
                     }
@@ -571,7 +582,7 @@ impl VfsScanner {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan split raw image "
+                            "Unable to scan split raw image"
                         );
                         return Err(error);
                     }
@@ -595,7 +606,7 @@ impl VfsScanner {
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan UDIF file ");
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan UDIF file");
                         return Err(error);
                     }
                 }
@@ -620,7 +631,7 @@ impl VfsScanner {
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan VHD image ");
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan VHD image");
                         return Err(error);
                     }
                 }
@@ -645,16 +656,33 @@ impl VfsScanner {
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan VHDX image ");
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan VHDX image");
                         return Err(error);
                     }
                 }
             }
-            VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {}
-            VfsType::Fake => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported VFS location type"
-                ));
+            VfsType::Vmdk => {
+                let mut vmdk_image: VmdkImage = VmdkImage::new();
+
+                match VmdkFileSystem::open_image(&mut vmdk_image, file_system, path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open VMDK image");
+                        return Err(error);
+                    }
+                }
+                match self.scan_for_storage_media_image_sub_nodes(
+                    vfs_location,
+                    scan_node,
+                    VmdkFileSystem::PATH_PREFIX,
+                    1,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan VMDK image");
+                        return Err(error);
+                    }
+                }
             }
         }
         Ok(())
@@ -1092,6 +1120,21 @@ mod tests {
             .unwrap();
 
         assert_eq!(vfs_type, VfsType::Vhdx);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_storage_media_image_format_with_vmdk() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("vmdk/ext2.vmdk");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_storage_media_image_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::Vmdk);
 
         Ok(())
     }

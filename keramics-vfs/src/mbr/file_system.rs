@@ -17,6 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_formats::mbr::{MbrPartition, MbrVolumeSystem};
 
+use crate::file_system::VfsFileSystem;
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
@@ -184,6 +185,52 @@ impl MbrFileSystem {
                 return Err(error);
             }
         };
+        let result: Result<Option<u32>, ErrorTrace> = match file_system.as_ref() {
+            VfsFileSystem::Ewf(ewf_file_system) => {
+                Ok(Some(ewf_file_system.get_bytes_per_sector()?))
+            }
+            VfsFileSystem::Qcow(qcow_file_system) => {
+                Ok(Some(qcow_file_system.get_bytes_per_sector()?))
+            }
+            VfsFileSystem::SparseImage(sparseimage_file_system) => {
+                Ok(Some(sparseimage_file_system.get_bytes_per_sector()?))
+            }
+            VfsFileSystem::Udif(udif_file_system) => {
+                Ok(Some(udif_file_system.get_bytes_per_sector()?))
+            }
+            VfsFileSystem::Vhd(vhd_file_system) => {
+                Ok(Some(vhd_file_system.get_bytes_per_sector()?))
+            }
+            VfsFileSystem::Vhdx(vhdx_file_system) => {
+                Ok(Some(vhdx_file_system.get_bytes_per_sector()?))
+            }
+            VfsFileSystem::Vmdk(vmdk_file_system) => {
+                Ok(Some(vmdk_file_system.get_bytes_per_sector()?))
+            }
+            _ => Ok(None),
+        };
+        match result {
+            Ok(Some(bytes_per_sector)) => {
+                match volume_system.set_bytes_per_sector(bytes_per_sector) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to set bytes per sector"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve bytes per sector from parent file system"
+                );
+                return Err(error);
+            }
+        }
         match volume_system.read_data_stream(&data_stream) {
             Ok(()) => {}
             Err(mut error) => {

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use super::attribute_list_entry::NtfsAttributeListEntry;
@@ -39,7 +39,7 @@ impl NtfsAttributeList {
         let data_size: usize = data.len();
 
         while data_offset < data_size {
-            let mediator = Mediator::current();
+            let mediator: MediatorReference = Mediator::current();
             if mediator.debug_output {
                 mediator.debug_print(NtfsAttributeListEntry::debug_read_data(
                     &data[data_offset..],

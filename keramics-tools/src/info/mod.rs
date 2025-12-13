@@ -24,6 +24,7 @@ mod sparseimage;
 mod udif;
 mod vhd;
 mod vhdx;
+mod vmdk;
 
 pub use apm::ApmInfo;
 pub use ewf::EwfInfo;
@@ -37,3 +38,4 @@ pub use sparseimage::SparseImageInfo;
 pub use udif::UdifInfo;
 pub use vhd::VhdInfo;
 pub use vhdx::VhdxInfo;
+pub use vmdk::VmdkInfo;

@@ -16,7 +16,7 @@
 //! Provides decompression support for DEFLATE compressed data (RFC 1951).
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::huffman::HuffmanTree;
 use super::traits::Bitstream;
@@ -235,7 +235,7 @@ impl DeflateBlockHeader {
         self.last_block_flag = value_32bit & 0x00000001;
         self.block_type = value_32bit >> 1;
 
-        let mediator = Mediator::current();
+        let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             let mut string_parts: Vec<String> = Vec::new();
             string_parts.push(String::from("DeflateBlockHeader {\n"));
@@ -310,7 +310,7 @@ impl DeflateContext {
 
         let number_of_code_sizes: usize = (value_32bit as usize) + 4;
 
-        let mediator = Mediator::current();
+        let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             let mut string_parts: Vec<String> = Vec::new();
             string_parts.push(String::from(
@@ -542,7 +542,7 @@ impl DeflateContext {
     ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
 
-        let mediator = Mediator::current();
+        let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             mediator.debug_print(String::from(
                 "DeflateContext::decompress_huffmann_encoded_block {\n",

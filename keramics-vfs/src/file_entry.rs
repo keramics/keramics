@@ -40,6 +40,7 @@ use super::splitraw::SplitRawFileEntry;
 use super::udif::UdifFileEntry;
 use super::vhd::VhdFileEntry;
 use super::vhdx::VhdxFileEntry;
+use super::vmdk::VmdkFileEntry;
 
 /// Virtual File System (VFS) file entry.
 pub enum VfsFileEntry {
@@ -58,6 +59,7 @@ pub enum VfsFileEntry {
     Udif(UdifFileEntry),
     Vhd(VhdFileEntry),
     Vhdx(VhdxFileEntry),
+    Vmdk(VmdkFileEntry),
 }
 
 impl VfsFileEntry {
@@ -73,7 +75,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_access_time(),
@@ -95,7 +98,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_change_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_change_time(),
@@ -115,7 +119,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_creation_time(),
@@ -139,7 +144,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Ok(None),
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_device_identifier() {
                 Ok(Some(device_identifier)) => Ok(Some(device_identifier as u64)),
                 Ok(None) => Ok(None),
@@ -170,7 +176,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_file_mode() as u32),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_mode(),
         }
@@ -223,6 +230,7 @@ impl VfsFileEntry {
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_file_type(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_file_type(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_file_type(),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.get_file_type(),
         }
     }
 
@@ -238,7 +246,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_modification_time(),
@@ -262,7 +271,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_group_identifier()),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_group_identifier(),
         }
@@ -283,7 +293,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_inode_number() as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_inode_number(),
         }
@@ -326,6 +337,7 @@ impl VfsFileEntry {
             VfsFileEntry::Udif(udif_file_entry) => Some(udif_file_entry.get_name()),
             VfsFileEntry::Vhd(vhd_file_entry) => Some(vhd_file_entry.get_name()),
             VfsFileEntry::Vhdx(vhdx_file_entry) => Some(vhdx_file_entry.get_name()),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => Some(vmdk_file_entry.get_name()),
         }
     }
 
@@ -344,7 +356,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_number_of_links() as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_links(),
         }
@@ -365,7 +378,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => None,
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_owner_identifier()),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_owner_identifier(),
         }
@@ -389,6 +403,7 @@ impl VfsFileEntry {
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_size(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_size(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_size(),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.get_size(),
         }
     }
 
@@ -406,7 +421,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Ok(None),
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_symbolic_link_target() {
                 Ok(result) => match result {
                     Some(symbolic_link_target) => Ok(Some(Path::from(symbolic_link_target))),
@@ -529,6 +545,10 @@ impl VfsFileEntry {
                 VhdxFileEntry::Layer { .. } => 1,
                 VhdxFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::Vmdk(vmdk_file_entry) => match vmdk_file_entry {
+                VmdkFileEntry::Layer { .. } => 1,
+                VmdkFileEntry::Root { .. } => 0,
+            },
         };
         Ok(result)
     }
@@ -552,7 +572,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => {
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => {
                 if data_fork_index != 0 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid data fork index: {}",
@@ -605,6 +626,7 @@ impl VfsFileEntry {
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_data_stream(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.get_data_stream(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.get_data_stream(),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.get_data_stream(),
         };
         match result {
             Ok(result) => Ok(result),
@@ -634,7 +656,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => match name {
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => match name {
                 Some(_) => Ok(None),
                 None => self.get_data_stream(),
             },
@@ -665,7 +688,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Ok(0),
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(0),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_extended_attributes(),
         };
         match result {
@@ -699,7 +723,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Ok(None),
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => Ok(Some(VfsExtendedAttribute::Ext(
                 ext_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
             ))),
@@ -742,7 +767,8 @@ impl VfsFileEntry {
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
             | VfsFileEntry::Vhd(_)
-            | VfsFileEntry::Vhdx(_) => Ok(None),
+            | VfsFileEntry::Vhdx(_)
+            | VfsFileEntry::Vmdk(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => {
                 match ext_file_entry.get_extended_attribute_by_name(extended_attribute_name)? {
                     Some(ext_extended_attribute) => {
@@ -809,6 +835,9 @@ impl VfsFileEntry {
             VfsFileEntry::Vhdx(vhdx_file_entry) => {
                 Ok(vhdx_file_entry.get_number_of_sub_file_entries())
             }
+            VfsFileEntry::Vmdk(vmdk_file_entry) => {
+                Ok(vmdk_file_entry.get_number_of_sub_file_entries())
+            }
         };
         match result {
             Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
@@ -873,6 +902,9 @@ impl VfsFileEntry {
             VfsFileEntry::Vhdx(vhdx_file_entry) => Ok(VfsFileEntry::Vhdx(
                 vhdx_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => Ok(VfsFileEntry::Vmdk(
+                vmdk_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
         };
         match result {
             Ok(sub_file_entry) => Ok(sub_file_entry),
@@ -916,6 +948,7 @@ impl VfsFileEntry {
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.is_root_file_entry(),
             VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.is_root_file_entry(),
             VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.is_root_file_entry(),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.is_root_file_entry(),
         }
     }
 }
@@ -5875,6 +5908,336 @@ mod tests {
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> =
             sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with VMDK.
+
+    fn get_vmdk_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vmdk);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("vmdk/ext2.vmdk");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_vmdk_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vmdk_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("vmdk1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/vmdk1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("vmdk1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_vmdk() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_vmdk_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
         assert!(result.is_none());
 
         Ok(())

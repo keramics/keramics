@@ -28,7 +28,7 @@ pub struct MbrVolumeSystem {
     data_stream: Option<DataStreamReference>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    pub bytes_per_sector: u32,
 
     /// First extended boot record offset.
     first_extended_boot_record_offset: u64,
@@ -41,7 +41,7 @@ pub struct MbrVolumeSystem {
 }
 
 impl MbrVolumeSystem {
-    const SUPPORTED_BYTES_PER_SECTOR: [u16; 4] = [512, 1024, 2048, 4096];
+    const SUPPORTED_BYTES_PER_SECTOR: [u32; 4] = [512, 1024, 2048, 4096];
 
     /// Creates a volume system.
     pub fn new() -> Self {
@@ -78,9 +78,9 @@ impl MbrVolumeSystem {
                     ));
                 }
                 let mut partition_offset: u64 =
-                    partition_entry.start_address_lba as u64 * self.bytes_per_sector as u64;
+                    (partition_entry.start_address_lba as u64) * (self.bytes_per_sector as u64);
                 let partition_size: u64 =
-                    partition_entry.number_of_sectors as u64 * self.bytes_per_sector as u64;
+                    (partition_entry.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
                 if partition_entry.index >= 4 {
                     partition_offset += self.first_extended_boot_record_offset;
@@ -137,6 +137,7 @@ impl MbrVolumeSystem {
 
     /// Reads the master and extended boot records.
     fn read_boot_records(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let mut boot_signature: [u8; 2] = [0; 2];
         let mut master_boot_record = MbrMasterBootRecord::new();
 
         match master_boot_record.read_at_position(data_stream, SeekFrom::Start(0)) {
@@ -152,11 +153,9 @@ impl MbrVolumeSystem {
         if self.bytes_per_sector == 0 {
             for partition_entry in master_boot_record.partition_entries.iter() {
                 if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
-                    let mut boot_signature: [u8; 2] = [0; 2];
-
                     for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                         let offset: u64 =
-                            partition_entry.start_address_lba as u64 * *bytes_per_sector as u64;
+                            (partition_entry.start_address_lba as u64) * (*bytes_per_sector as u64);
 
                         keramics_core::data_stream_read_at_position!(
                             data_stream,
@@ -188,7 +187,7 @@ impl MbrVolumeSystem {
                     ));
                 }
                 extended_boot_record_offset =
-                    partition_entry.start_address_lba as u64 * self.bytes_per_sector as u64;
+                    (partition_entry.start_address_lba as u64) * (self.bytes_per_sector as u64);
             } else if partition_entry.partition_type != 0 {
                 partition_entry.index = entry_index;
                 self.partition_entries.push(partition_entry);
@@ -218,14 +217,28 @@ impl MbrVolumeSystem {
                 Some(last_partition_entry) => {
                     let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
 
-                    let end_address_lba: u64 = (last_partition_entry.start_address_lba as u64)
-                        + (last_partition_entry.number_of_sectors as u64);
+                    let start_address_lba: u64 = last_partition_entry.start_address_lba as u64;
+                    let end_address_lba: u64 =
+                        start_address_lba + (last_partition_entry.number_of_sectors as u64);
 
-                    for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
+                    for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter().rev() {
+                        // The partition last LBA should not exceed the data stream size.
                         if end_address_lba > data_stream_size / (*bytes_per_sector as u64) {
+                            continue;
+                        }
+                        let offset: u64 = start_address_lba * (*bytes_per_sector as u64);
+
+                        keramics_core::data_stream_read_at_position!(
+                            data_stream,
+                            &mut boot_signature,
+                            SeekFrom::Start(offset + 510)
+                        );
+                        // Some file systems like FAT and NTFS use the MBR boot signature in their boot sectors.
+                        if &boot_signature == MBR_BOOT_SIGNATURE {
+                            self.bytes_per_sector = *bytes_per_sector;
+
                             break;
                         }
-                        self.bytes_per_sector = *bytes_per_sector;
                     }
                 }
                 None => {}
@@ -277,7 +290,7 @@ impl MbrVolumeSystem {
                     ));
                 }
                 extended_boot_record_offset = self.first_extended_boot_record_offset
-                    + (partition_entry.start_address_lba as u64 * self.bytes_per_sector as u64);
+                    + ((partition_entry.start_address_lba as u64) * (self.bytes_per_sector as u64));
             } else if partition_entry.partition_type != 0 {
                 partition_entry.index = first_entry_index + entry_index;
                 self.partition_entries.push(partition_entry);
@@ -304,7 +317,7 @@ impl MbrVolumeSystem {
     }
 
     /// Sets the number of bytes per sector.
-    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u16) -> Result<(), ErrorTrace> {
+    pub fn set_bytes_per_sector(&mut self, bytes_per_sector: u32) -> Result<(), ErrorTrace> {
         if !Self::SUPPORTED_BYTES_PER_SECTOR.contains(&bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported bytes per sector: {}",

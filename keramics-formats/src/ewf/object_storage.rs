@@ -39,6 +39,9 @@ impl<'a> EwfByteObjectStorage<'a> {
 
     /// Retrieves the next line.
     pub fn next_line(&mut self) -> Option<&'a [u8]> {
+        if self.data_offset >= self.data_size {
+            return None;
+        }
         let start_offset: usize = self.data_offset;
         let mut end_offset: usize = start_offset;
 
@@ -94,9 +97,10 @@ impl<'a> EwfUtf16ObjectStorage<'a> {
 
     /// Retrieves the next line.
     pub fn next_line(&mut self) -> Option<Vec<u16>> {
+        if self.data_offset >= self.data_size {
+            return None;
+        }
         let mut line: Vec<u16> = Vec::new();
-
-        let start_offset: usize = self.data_offset;
 
         let mut last_value_16bit: u16 = 0;
         while self.data_offset < self.data_size {

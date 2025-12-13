@@ -13,6 +13,8 @@
 
 use std::io::SeekFrom;
 
+use keramics_compression::ZlibContext;
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
@@ -21,6 +23,9 @@ use super::section_header::EwfSectionHeader;
 
 /// Expert Witness Compression Format (EWF) file.
 pub struct EwfFile {
+    /// Mediator.
+    mediator: MediatorReference,
+
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -35,14 +40,54 @@ impl EwfFile {
     /// Creates a new file.
     pub fn new() -> Self {
         Self {
+            mediator: Mediator::current(),
             data_stream: None,
             segment_number: 0,
             sections: Vec::new(),
         }
     }
 
+    /// Reads a compressed chunk at a specific position.
+    pub(super) fn read_compressed_chunk(
+        &mut self,
+        chunk_offset: u64,
+        chunk_size: u32,
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        let mut compressed_data: Vec<u8> = vec![0; chunk_size as usize];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut compressed_data,
+            SeekFrom::Start(chunk_offset)
+        );
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
+                chunk_size, chunk_offset, chunk_offset,
+            ));
+            self.mediator.debug_print_data(&compressed_data, true);
+        }
+        let mut zlib_context: ZlibContext = ZlibContext::new();
+
+        match zlib_context.decompress(&compressed_data, data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress chunk data");
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
     /// Reads an exact amount of data at a specific position.
-    pub fn read_exact_at_position(
+    pub(super) fn read_exact_at_position(
         &mut self,
         data: &mut [u8],
         position: SeekFrom,
@@ -181,7 +226,7 @@ mod tests {
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
-        let mut file = EwfFile::new();
+        let mut file: EwfFile = EwfFile::new();
 
         let path_string: String = get_test_data_path("ewf/ext2.E01");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
@@ -195,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_read_section_headers() -> Result<(), ErrorTrace> {
-        let mut file = EwfFile::new();
+        let mut file: EwfFile = EwfFile::new();
 
         let path_string: String = get_test_data_path("ewf/ext2.E01");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());

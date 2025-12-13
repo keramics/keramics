@@ -14,6 +14,7 @@
 use std::collections::HashSet;
 use std::io::SeekFrom;
 
+use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{BuildError, PatternType, ScanContext, Scanner, Signature};
 
@@ -27,6 +28,7 @@ use super::sparseimage::constants::*;
 use super::udif::constants::*;
 use super::vhd::constants::*;
 use super::vhdx::constants::*;
+use super::vmdk::constants::*;
 
 /// Format scanner.
 pub struct FormatScanner {
@@ -243,6 +245,23 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds VMware Virtual Disk (VMDK) signatures.
+    pub fn add_vmdk_signatures(&mut self) {
+        // TODO: make this a case insensitive signature
+        self.signature_scanner.add_signature(Signature::new(
+            "vmdk1",
+            PatternType::BoundToStart,
+            0,
+            VMDK_DESCRIPTOR_FILE_HEADER_SIGNATURE,
+        ));
+        self.signature_scanner.add_signature(Signature::new(
+            "vmdk2",
+            PatternType::BoundToStart,
+            0,
+            VMDK_SPARSE_FILE_HEADER_SIGNATURE,
+        ));
+    }
+
     /// Builds the format signature scanner.
     pub fn build(&mut self) -> Result<(), BuildError> {
         self.signature_scanner.build()
@@ -261,6 +280,15 @@ impl FormatScanner {
         let mut data: Vec<u8> = vec![0; scan_context.header_range_size as usize];
 
         keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
+
+        let mediator: MediatorReference = Mediator::current();
+        if mediator.debug_output {
+            mediator.debug_print(format!(
+                "FormatScanner: scanning header range: 0 (0x00000000) - {} (0x{:08x})\n",
+                scan_context.header_range_size, scan_context.header_range_size
+            ));
+            mediator.debug_print_data(&data, true);
+        }
         scan_context.data_offset = 0;
         scan_context.scan_buffer(&data);
 
@@ -282,6 +310,17 @@ impl FormatScanner {
             &mut data[data_offset..],
             SeekFrom::Start(data_stream_offset)
         );
+        if mediator.debug_output {
+            let footer_range_end_offset: u64 = data_stream_offset + scan_context.footer_range_size;
+            mediator.debug_print(format!(
+                "FormatScanner: scanning footer range: {} (0x{:08x}) - {} (0x{:08x})\n",
+                data_stream_offset,
+                data_stream_offset,
+                footer_range_end_offset,
+                footer_range_end_offset
+            ));
+            mediator.debug_print_data(&data, true);
+        }
         scan_context.data_offset = data_stream_offset;
         scan_context.scan_buffer(&data);
 
@@ -300,6 +339,7 @@ impl FormatScanner {
                 "udif1" => FormatIdentifier::Udif,
                 "vhd1" => FormatIdentifier::Vhd,
                 "vhdx1" => FormatIdentifier::Vhdx,
+                "vmdk1" | "vmdk2" => FormatIdentifier::Vmdk,
                 _ => FormatIdentifier::Unknown,
             };
             scan_results.insert(format_identifier);
@@ -332,6 +372,7 @@ mod tests {
         format_scanner.add_udif_signatures();
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
+        format_scanner.add_vmdk_signatures();
 
         format_scanner.build()
     }
@@ -350,6 +391,7 @@ mod tests {
         format_scanner.add_udif_signatures();
         format_scanner.add_vhd_signatures();
         format_scanner.add_vhdx_signatures();
+        format_scanner.add_vmdk_signatures();
 
         match format_scanner.build() {
             Ok(_) => {}

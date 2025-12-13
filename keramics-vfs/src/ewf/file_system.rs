@@ -69,6 +69,17 @@ impl EwfFileSystem {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
+        match self.image.read() {
+            Ok(ewf_image) => Ok(ewf_image.bytes_per_sector),
+            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                "Unable to obtain read lock on EWF image",
+                error
+            )),
+        }
+    }
+
     /// Retrieves the file entry with the specific location.
     pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<EwfFileEntry>, ErrorTrace> {
         if path.is_relative() {
@@ -241,6 +252,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_bytes_per_sector
 
     #[test]
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {

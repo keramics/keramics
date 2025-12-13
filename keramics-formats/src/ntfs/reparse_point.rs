@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::constants::*;
 use super::junction_reparse_data::NtfsJunctionReparseData;
@@ -86,7 +86,7 @@ impl NtfsReparsePoint {
                 "Unsupported non-resident $REPARSE_POINT attribute"
             ));
         }
-        let mediator = Mediator::current();
+        let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             mediator.debug_print(format!(
                 "NtfsReparsePoint data of size: {} at offset: 0 (0x00000000)\n",

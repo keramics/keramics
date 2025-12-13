@@ -11,6 +11,7 @@
     - [Universal Disk Image Format (UDIF)](udif.md)
     - [Virtual Hard Disk (VHD)](vhd.md)
     - [Virtual Hard Disk version 2 (VHDX)](vhdx.md)
+    - [VMWare Virtual Disk Format (VMDK)](vmdk.md)
 - [Volume system formats](volume_system.md)
     - [Apple Partition Map (APM)](apm.md)
     - [GUID Partition Table (GPT)](gpt.md)

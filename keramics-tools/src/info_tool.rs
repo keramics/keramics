@@ -32,7 +32,7 @@ mod range_stream;
 use crate::enums::EncodingType;
 use crate::info::{
     ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, MbrInfo, NtfsInfo, QcowInfo, SparseImageInfo,
-    UdifInfo, VhdInfo, VhdxInfo,
+    UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::range_stream::FileRangeDataStream;
 
@@ -101,11 +101,14 @@ fn scan_for_formats(
     format_scanner.add_gpt_signatures();
     format_scanner.add_ntfs_signatures();
     format_scanner.add_qcow_signatures();
-    // TODO: support for sparse bundle.
+    // TODO: add support for sparse bundle.
     format_scanner.add_sparseimage_signatures();
     format_scanner.add_udif_signatures();
     format_scanner.add_vhd_signatures();
     format_scanner.add_vhdx_signatures();
+    format_scanner.add_vmdk_signatures();
+    // TODO: add support for individual VMDK sparse file.
+    // TODO: add support for individual VMDK sparse COWD file.
 
     match format_scanner.build() {
         Ok(_) => {}
@@ -198,7 +201,23 @@ fn main() -> ExitCode {
         Some(EncodingType::Iso8859_14) => Some(CharacterEncoding::Iso8859_14),
         Some(EncodingType::Iso8859_15) => Some(CharacterEncoding::Iso8859_15),
         Some(EncodingType::Iso8859_16) => Some(CharacterEncoding::Iso8859_16),
+        Some(EncodingType::Koi8R) => Some(CharacterEncoding::Koi8R),
+        Some(EncodingType::Koi8U) => Some(CharacterEncoding::Koi8U),
         Some(EncodingType::Utf8) => Some(CharacterEncoding::Utf8),
+        Some(EncodingType::Windows874) => Some(CharacterEncoding::Windows874),
+        Some(EncodingType::Windows932) => Some(CharacterEncoding::Windows932),
+        Some(EncodingType::Windows936) => Some(CharacterEncoding::Windows936),
+        Some(EncodingType::Windows949) => Some(CharacterEncoding::Windows949),
+        Some(EncodingType::Windows950) => Some(CharacterEncoding::Windows950),
+        Some(EncodingType::Windows1250) => Some(CharacterEncoding::Windows1250),
+        Some(EncodingType::Windows1251) => Some(CharacterEncoding::Windows1251),
+        Some(EncodingType::Windows1252) => Some(CharacterEncoding::Windows1252),
+        Some(EncodingType::Windows1253) => Some(CharacterEncoding::Windows1253),
+        Some(EncodingType::Windows1254) => Some(CharacterEncoding::Windows1254),
+        Some(EncodingType::Windows1255) => Some(CharacterEncoding::Windows1255),
+        Some(EncodingType::Windows1256) => Some(CharacterEncoding::Windows1256),
+        Some(EncodingType::Windows1257) => Some(CharacterEncoding::Windows1257),
+        Some(EncodingType::Windows1258) => Some(CharacterEncoding::Windows1258),
         None => None,
     };
     let mut file_range_stream: FileRangeDataStream = FileRangeDataStream::new(arguments.offset);
@@ -284,6 +303,7 @@ fn main() -> ExitCode {
         }
         None => match &format_identifier {
             FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
+            // TODO: add support for individual EWF segment file.
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
             FormatIdentifier::Ext => {
                 ExtInfo::print_file_system(&data_stream, character_encoding.as_ref())
@@ -292,12 +312,17 @@ fn main() -> ExitCode {
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),
+            // TODO: add support for QCOW image.
             FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
             // TODO: add support for sparse bundle.
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
             FormatIdentifier::Udif => UdifInfo::print_file(&data_stream),
+            // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
+            // TODO: add support for VHDX image.
             FormatIdentifier::Vhdx => VhdxInfo::print_file(&data_stream),
+            // TODO: add support for individual VMDK file.
+            FormatIdentifier::Vmdk => VmdkInfo::print_image(&arguments.source),
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
                 format_identifier

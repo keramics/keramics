@@ -14,7 +14,6 @@
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
-use keramics_compression::ZlibContext;
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
@@ -78,8 +77,8 @@ pub struct EwfImage {
     /// Block tree.
     block_tree: BlockTree<EwfBlockRange>,
 
-    /// Decompressed block cache.
-    block_cache: LruCache<u64, Vec<u8>>,
+    /// Decompressed chunk cache.
+    chunk_cache: LruCache<u64, Vec<u8>>,
 
     /// Error granularity.
     pub error_granularity: u32,
@@ -119,7 +118,7 @@ impl EwfImage {
             number_of_sectors: 0,
             block_size: 0,
             block_tree: BlockTree::<EwfBlockRange>::new(0, 0, 0),
-            block_cache: LruCache::new(64),
+            chunk_cache: LruCache::new(64),
             error_granularity: 0,
             media_type: EwfMediaType::Unknown,
             current_offset: 0,
@@ -392,15 +391,13 @@ impl EwfImage {
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
                 EwfBlockRangeType::Compressed => {
-                    let range_data_offset: usize = range_relative_offset as usize;
-                    let range_data_end_offset: usize = range_data_offset + range_read_size;
+                    if !self.chunk_cache.contains(&block_range.data_offset) {
+                        let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
 
-                    if !self.block_cache.contains(&block_range.data_offset) {
-                        let mut compressed_data: Vec<u8> = vec![0; block_range.data_size as usize];
-
-                        match segment_file.read_exact_at_position(
-                            &mut compressed_data,
-                            SeekFrom::Start(block_range.data_offset),
+                        match segment_file.read_compressed_chunk(
+                            block_range.data_offset,
+                            block_range.data_size,
+                            &mut block_data,
                         ) {
                             Ok(_) => {}
                             Err(mut error) => {
@@ -416,32 +413,9 @@ impl EwfImage {
                                 return Err(error);
                             }
                         }
-                        if self.mediator.debug_output {
-                            self.mediator.debug_print(format!(
-                                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                                block_range.data_size,
-                                block_range.data_offset,
-                                block_range.data_offset,
-                            ));
-                            self.mediator.debug_print_data(&compressed_data, true);
-                        }
-                        let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
-
-                        let mut zlib_context: ZlibContext = ZlibContext::new();
-
-                        match zlib_context.decompress(&compressed_data, &mut block_data) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to decompress chunk data"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        self.block_cache.insert(block_range.data_offset, block_data);
+                        self.chunk_cache.insert(block_range.data_offset, block_data);
                     }
-                    let range_data: &[u8] = match self.block_cache.get(&block_range.data_offset) {
+                    let range_data: &[u8] = match self.chunk_cache.get(&block_range.data_offset) {
                         Some(data) => data,
                         None => {
                             return Err(keramics_core::error_trace_new!(
@@ -449,6 +423,9 @@ impl EwfImage {
                             ));
                         }
                     };
+                    let range_data_offset: usize = range_relative_offset as usize;
+                    let range_data_end_offset: usize = range_data_offset + range_read_size;
+
                     data[data_offset..data_end_offset]
                         .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
 
@@ -1289,7 +1266,7 @@ mod tests {
     fn test_get_offset() -> Result<(), ErrorTrace> {
         let mut image: EwfImage = get_image()?;
 
-        let offset: u64 = image.seek(SeekFrom::Start(1024))?;
+        image.seek(SeekFrom::Start(1024))?;
 
         let offset: u64 = image.get_offset()?;
         assert_eq!(offset, 1024);

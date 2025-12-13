@@ -103,6 +103,54 @@ pub enum EncodingType {
     #[value(alias("latin-10"))]
     Iso8859_16,
 
+    /// KOI8-R (Russian)
+    Koi8R,
+
+    /// KOI8-U (Ukrainian)
+    Koi8U,
+
     /// UTF-8
     Utf8,
+
+    /// Windows-874 (Thai)
+    Windows874,
+
+    /// Windows-932 (Japanese)
+    Windows932,
+
+    /// Windows-936 (Simplified Chinese)
+    Windows936,
+
+    /// Windows-949 (Korean)
+    Windows949,
+
+    /// Windows-950 (Traditional Chinese)
+    Windows950,
+
+    /// Windows-1250 (Central European)
+    Windows1250,
+
+    /// Windows-1251 (Cyrillic)
+    Windows1251,
+
+    /// Windows-1252 (Western European)
+    Windows1252,
+
+    /// Windows-1253 (Greek)
+    Windows1253,
+
+    /// Windows-1254 (Turkish)
+    Windows1254,
+
+    /// Windows-1255 (Hebrew)
+    Windows1255,
+
+    /// Windows-1256 (Arabic)
+    Windows1256,
+
+    /// Windows-1257 (Baltic)
+    Windows1257,
+
+    /// Windows-1258 (Vietnamese)
+    Windows1258,
 }

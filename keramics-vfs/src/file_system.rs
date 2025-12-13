@@ -33,6 +33,7 @@ use super::types::VfsFileSystemReference;
 use super::udif::{UdifFileEntry, UdifFileSystem};
 use super::vhd::{VhdFileEntry, VhdFileSystem};
 use super::vhdx::{VhdxFileEntry, VhdxFileSystem};
+use super::vmdk::{VmdkFileEntry, VmdkFileSystem};
 
 /// Virtual File System (VFS) file system.
 pub enum VfsFileSystem {
@@ -51,6 +52,7 @@ pub enum VfsFileSystem {
     Udif(UdifFileSystem),
     Vhd(VhdFileSystem),
     Vhdx(VhdxFileSystem),
+    Vmdk(VmdkFileSystem),
 }
 
 impl VfsFileSystem {
@@ -72,6 +74,7 @@ impl VfsFileSystem {
             VfsType::Udif => VfsFileSystem::Udif(UdifFileSystem::new()),
             VfsType::Vhd => VfsFileSystem::Vhd(VhdFileSystem::new()),
             VfsType::Vhdx => VfsFileSystem::Vhdx(VhdxFileSystem::new()),
+            VfsType::Vmdk => VfsFileSystem::Vmdk(VmdkFileSystem::new()),
         }
     }
 
@@ -156,6 +159,7 @@ impl VfsFileSystem {
             VfsFileSystem::Udif(udif_file_system) => Ok(udif_file_system.file_entry_exists(path)),
             VfsFileSystem::Vhd(vhd_file_system) => Ok(vhd_file_system.file_entry_exists(path)),
             VfsFileSystem::Vhdx(vhdx_file_system) => Ok(vhdx_file_system.file_entry_exists(path)),
+            VfsFileSystem::Vmdk(vmdk_file_system) => Ok(vmdk_file_system.file_entry_exists(path)),
         }
     }
 
@@ -288,6 +292,12 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::Vmdk(vmdk_file_system) => {
+                match vmdk_file_system.get_file_entry_by_path(path)? {
+                    Some(vmdk_file_entry) => Ok(Some(VfsFileEntry::Vmdk(vmdk_file_entry))),
+                    None => Ok(None),
+                }
+            }
         };
         match result {
             Ok(result) => Ok(result),
@@ -404,6 +414,11 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Vhdx(vhdx_file_entry)))
             }
+            VfsFileSystem::Vmdk(vmdk_file_system) => {
+                let vmdk_file_entry: VmdkFileEntry = vmdk_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::Vmdk(vmdk_file_entry)))
+            }
         }
     }
 
@@ -460,6 +475,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Vhdx(vhdx_file_system) => {
                 vhdx_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Vmdk(vmdk_file_system) => {
+                vmdk_file_system.open(parent_file_system, vfs_location)
             }
         };
         match result {
@@ -1529,6 +1547,71 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_vhdx_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_vhdx_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with VMDK.
+
+    fn get_vmdk_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Vmdk);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("vmdk/ext2.vmdk");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_vmdk() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vmdk_file_system()?;
+
+        let path: Path = Path::from("/vmdk1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_vmdk_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vmdk_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_vmdk_layer() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vmdk_file_system()?;
+
+        let path: Path = Path::from("/vmdk1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_vmdk_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_vmdk_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();

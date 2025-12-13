@@ -227,7 +227,7 @@ impl Bzip2BlockHeader {
                 self.signature
             )));
         }
-        let mediator = Mediator::current();
+        let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
             let mut string_parts: Vec<String> = Vec::new();
             string_parts.push(String::from("Bzip2BlockHeader {\n"));

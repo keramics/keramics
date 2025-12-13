@@ -24,9 +24,6 @@ struct QcowFileInfo {
     /// Format version.
     pub format_version: u32,
 
-    /// Media size.
-    pub media_size: u64,
-
     /// Compression method.
     pub compression_method: QcowCompressionMethod,
 
@@ -35,6 +32,9 @@ struct QcowFileInfo {
 
     /// Backing file name.
     pub backing_file_name: Option<ByteString>,
+
+    /// Media size.
+    pub media_size: u64,
 }
 
 impl QcowFileInfo {
@@ -51,10 +51,10 @@ impl QcowFileInfo {
     fn new() -> Self {
         Self {
             format_version: 0,
-            media_size: 0,
             compression_method: QcowCompressionMethod::Unknown,
             encryption_method: QcowEncryptionMethod::Unknown,
             backing_file_name: None,
+            media_size: 0,
         }
     }
 
@@ -83,15 +83,13 @@ impl fmt::Display for QcowFileInfo {
             "    Format version\t\t\t\t: {}",
             self.format_version
         )?;
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
-        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
-
         let compression_method_string: &str = self.get_compression_method_string();
         writeln!(
             formatter,
             "    Compression method\t\t\t\t: {}",
             compression_method_string
         )?;
+
         let encryption_method_string: &str = self.get_encryption_method_string();
         writeln!(
             formatter,
@@ -107,6 +105,12 @@ impl fmt::Display for QcowFileInfo {
             )?;
         }
         // TODO: print feature flags.
+
+        writeln!(formatter, "    Media information:")?;
+
+        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
+        writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
+
         // TODO: print snapshot information.
 
         writeln!(formatter)
@@ -122,10 +126,10 @@ impl QcowInfo {
         let mut file_information: QcowFileInfo = QcowFileInfo::new();
 
         file_information.format_version = qcow_file.format_version;
-        file_information.media_size = qcow_file.media_size;
         file_information.compression_method = qcow_file.compression_method.clone();
         file_information.encryption_method = qcow_file.encryption_method.clone();
         file_information.backing_file_name = qcow_file.get_backing_file_name().cloned();
+        file_information.media_size = qcow_file.media_size;
 
         file_information
     }
@@ -180,9 +184,10 @@ mod tests {
         let expected_string: &str = concat!(
             "QEMU Copy-On-Write (QCOW) information:\n",
             "    Format version\t\t\t\t: 3\n",
-            "    Media size\t\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
             "    Compression method\t\t\t\t: zlib\n",
             "    Encryption method\t\t\t\t: None\n",
+            "    Media information:\n",
+            "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
             "\n"
         );
         assert_eq!(string, expected_string);
@@ -198,9 +203,9 @@ mod tests {
         let test_struct: QcowFileInfo = QcowInfo::get_file_information(&qcow_file);
 
         assert_eq!(test_struct.format_version, 3);
-        assert_eq!(test_struct.media_size, 4194304);
         assert_eq!(test_struct.compression_method, QcowCompressionMethod::Zlib);
         assert_eq!(test_struct.backing_file_name, None);
+        assert_eq!(test_struct.media_size, 4194304);
 
         Ok(())
     }

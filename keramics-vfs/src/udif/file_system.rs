@@ -68,6 +68,19 @@ impl UdifFileSystem {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
+        match self.file.read() {
+            Ok(udif_file) => Ok(udif_file.bytes_per_sector as u32),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on UDIF file",
+                    error
+                ));
+            }
+        }
+    }
+
     /// Retrieves the file entry with the specific location.
     pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<UdifFileEntry>, ErrorTrace> {
         if path.is_relative() {
@@ -232,6 +245,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_bytes_per_sector
 
     #[test]
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {

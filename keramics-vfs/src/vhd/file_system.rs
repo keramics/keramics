@@ -74,6 +74,11 @@ impl VhdFileSystem {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
+        Ok(self.image.bytes_per_sector as u32)
+    }
+
     /// Retrieves the file entry with the specific location.
     pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<VhdFileEntry>, ErrorTrace> {
         if path.is_relative() {
@@ -264,6 +269,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_bytes_per_sector
 
     #[test]
     fn test_get_file_entry_by_path() -> Result<(), ErrorTrace> {

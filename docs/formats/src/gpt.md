@@ -107,7 +107,7 @@ The GPT partition entry is 128 bytes in size and consists of:
 | bfbfafe7-a34f-448a-9a5b-6213eb736c22 | | Lenovo boot partition
 | <td colspan="3">*Windows*</td>
 | e3c9e316-0b5c-4db8-817d-f92df00215ae | | Microsoft reserved
-| ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 | | Microsoft basic data
+| ebd0a0a2-b9e5-4433-87c0-68b6b72699c7 | | (Microsoft) Basic data
 | 5808c8aa-7e8f-42e0-85d2-e1e90434cfb3 | | Logical Disk Manager (LDM) metadata partition
 | af9b60a0-1431-4f62-bc68-3311714a69ad | | Logical Disk Manager data partition
 | de94bba4-06d1-4d40-a16a-bfd50179d6ac | | Windows recovery environment

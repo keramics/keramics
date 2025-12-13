@@ -59,7 +59,8 @@ impl VfsScanNode {
             | VfsType::SplitRaw
             | VfsType::Udif
             | VfsType::Vhd
-            | VfsType::Vhdx => false,
+            | VfsType::Vhdx
+            | VfsType::Vmdk => false,
             VfsType::Ext | VfsType::Fat | VfsType::Ntfs => true,
         }
     }

@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
+use keramics_core::mediator::{Mediator, MediatorReference};
 
 use super::data_run::{NtfsDataRun, NtfsDataRunType};
 
@@ -62,7 +62,7 @@ impl NtfsClusterGroup {
             data_offset += read_count;
 
             // TODO: move into NtfsDataRun
-            let mediator = Mediator::current();
+            let mediator: MediatorReference = Mediator::current();
             if mediator.debug_output {
                 mediator.debug_print(String::from("NtfsDataRun {\n"));
                 mediator.debug_print(format!("    block_number: {},\n", data_run.block_number));

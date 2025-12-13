@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -341,21 +342,10 @@ impl VhdFile {
             if media_offset >= self.media_size {
                 break;
             }
-            let mut block_tree_value: Option<&VhdBlockRange> =
-                match self.block_tree.get_value(media_offset) {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve block range for offset: {} (0x{:08x})",
-                                media_offset, media_offset
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-            if block_tree_value.is_none() {
+            let mut result: Result<Option<&VhdBlockRange>, ErrorTrace> =
+                self.block_tree.get_value(media_offset);
+
+            if result == Ok(None) {
                 match self.read_block_allocation_entry(block_number) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -366,67 +356,58 @@ impl VhdFile {
                         return Err(error);
                     }
                 }
-                block_tree_value = match self.block_tree.get_value(media_offset) {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve block range for offset: {} (0x{:08x})",
-                                media_offset, media_offset
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
+                result = self.block_tree.get_value(media_offset);
             }
-            let block_range: &VhdBlockRange = match block_tree_value {
-                Some(value) => value,
-                None => {
+            let block_range: &VhdBlockRange = match result {
+                Ok(Some(block_range)) => block_range,
+                Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Missing block range for offset: {} (0x{:08x})",
                         media_offset, media_offset
                     )));
                 }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve block range for offset: {} (0x{:08x})",
+                            media_offset, media_offset,
+                        )
+                    );
+                    return Err(error);
+                }
             };
             let range_relative_offset: u64 = media_offset - block_range.media_offset;
             let range_remainder_size: u64 = block_range.size - range_relative_offset;
-
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
+            let range_read_size: usize =
+                min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
+
             let range_read_count: usize = match block_range.range_type {
-                VhdBlockRangeType::InFile => {
-                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                        Some(data_stream) => data_stream,
-                        None => {
-                            return Err(keramics_core::error_trace_new!("Missing data stream"));
-                        }
-                    };
-                    let read_count: usize = keramics_core::data_stream_read_at_position!(
-                        data_stream,
-                        &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(block_range.data_offset + range_relative_offset)
-                    );
-                    read_count
-                }
-                VhdBlockRangeType::InParent => {
-                    let parent_file: &Arc<RwLock<VhdFile>> = match self.parent_file.as_ref() {
-                        Some(parent_file) => parent_file,
-                        None => {
-                            return Err(keramics_core::error_trace_new!("Missing parent file"));
-                        }
-                    };
-                    let read_count: usize = keramics_core::data_stream_read_at_position!(
-                        parent_file,
-                        &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(media_offset)
-                    );
-                    read_count
-                }
+                VhdBlockRangeType::InFile => match self.data_stream.as_ref() {
+                    Some(data_stream) => {
+                        keramics_core::data_stream_read_at_position!(
+                            data_stream,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(block_range.data_offset + range_relative_offset)
+                        )
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Missing data stream"));
+                    }
+                },
+                VhdBlockRangeType::InParent => match self.parent_file.as_ref() {
+                    Some(parent_file) => {
+                        keramics_core::data_stream_read_at_position!(
+                            parent_file,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(media_offset)
+                        )
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Missing parent file"));
+                    }
+                },
                 VhdBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
 
@@ -591,7 +572,7 @@ mod tests {
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
-        let mut file = VhdFile::new();
+        let mut file: VhdFile = VhdFile::new();
 
         let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
@@ -618,7 +599,7 @@ mod tests {
 
     #[test]
     fn test_read_metadata() -> Result<(), ErrorTrace> {
-        let mut file = VhdFile::new();
+        let mut file: VhdFile = VhdFile::new();
 
         let path_string: String = get_test_data_path("vhd/ntfs-differential.vhd");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
@@ -652,7 +633,7 @@ mod tests {
     fn test_get_offset() -> Result<(), ErrorTrace> {
         let mut file: VhdFile = get_file()?;
 
-        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
+        file.seek(SeekFrom::Start(1024))?;
 
         let offset: u64 = file.get_offset()?;
         assert_eq!(offset, 1024);

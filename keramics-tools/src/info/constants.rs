@@ -287,10 +287,7 @@ pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
         "Storage Spaces partition",
     ),
     ("ebc597d0-2053-4b15-8b64-e0aac75f4db1", "Persistent"),
-    (
-        "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7",
-        "Microsoft basic data",
-    ),
+    ("ebd0a0a2-b9e5-4433-87c0-68b6b72699c7", "Basic data"),
     ("ec6d6385-e346-45dc-be91-da2a7c8b3261", "Multipath block DB"),
     ("ef32a33b-a409-486c-9141-9ffb711f6266", "Misc"),
     (

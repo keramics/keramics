@@ -24,12 +24,6 @@ struct VhdFileInfo {
     /// Disk type.
     pub disk_type: VhdDiskType,
 
-    /// Media size.
-    pub media_size: u64,
-
-    /// Bytes per sector.
-    pub bytes_per_sector: u16,
-
     /// Identifier.
     pub identifier: Uuid,
 
@@ -38,6 +32,12 @@ struct VhdFileInfo {
 
     /// Parent name.
     pub parent_name: Option<Ucs2String>,
+
+    /// Media size.
+    pub media_size: u64,
+
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
 }
 
 impl VhdFileInfo {
@@ -51,11 +51,11 @@ impl VhdFileInfo {
     fn new() -> Self {
         Self {
             disk_type: VhdDiskType::Unknown,
-            media_size: 0,
-            bytes_per_sector: 0,
             identifier: Uuid::new(),
             parent_identifier: None,
             parent_name: None,
+            media_size: 0,
+            bytes_per_sector: 0,
         }
     }
 
@@ -77,26 +77,32 @@ impl fmt::Display for VhdFileInfo {
         let disk_type_string: &str = self.get_disk_type_string();
         writeln!(formatter, "    Disk type\t\t\t\t\t: {}", disk_type_string)?;
 
+        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
+
+        if self.parent_identifier.is_some() || self.parent_name.is_some() {
+            writeln!(formatter, "    Parent information:")?;
+
+            if let Some(parent_identifier) = &self.parent_identifier {
+                writeln!(
+                    formatter,
+                    "        Identifier\t\t\t\t: {}",
+                    parent_identifier
+                )?;
+            }
+            if let Some(parent_name) = &self.parent_name {
+                writeln!(formatter, "        Name\t\t\t\t\t: {}", parent_name)?;
+            }
+        }
+        writeln!(formatter, "    Media information:")?;
+
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
-        writeln!(formatter, "    Media size\t\t\t\t\t: {}", byte_size)?;
+        writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
         writeln!(
             formatter,
-            "    Bytes per sector\t\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {} bytes",
             self.bytes_per_sector
         )?;
-        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
-
-        if let Some(parent_identifier) = &self.parent_identifier {
-            writeln!(
-                formatter,
-                "    Parent identifier\t\t\t\t: {}",
-                parent_identifier
-            )?;
-        }
-        if let Some(parent_name) = &self.parent_name {
-            writeln!(formatter, "    Parent name\t\t\t\t\t: {}", parent_name)?;
-        }
         writeln!(formatter)
     }
 }
@@ -110,11 +116,11 @@ impl VhdInfo {
         let mut file_information: VhdFileInfo = VhdFileInfo::new();
 
         file_information.disk_type = vhd_file.disk_type.clone();
-        file_information.media_size = vhd_file.media_size;
-        file_information.bytes_per_sector = vhd_file.bytes_per_sector;
         file_information.identifier = vhd_file.identifier.clone();
         file_information.parent_identifier = vhd_file.parent_identifier.clone();
         file_information.parent_name = vhd_file.parent_name.clone();
+        file_information.media_size = vhd_file.media_size;
+        file_information.bytes_per_sector = vhd_file.bytes_per_sector;
 
         file_information
     }
@@ -170,9 +176,10 @@ mod tests {
             "Virtual Hard Disk (VHD) information:\n",
             "    Format version\t\t\t\t: 1.0\n",
             "    Disk type\t\t\t\t\t: Dynamic\n",
-            "    Media size\t\t\t\t\t: 4.0 MiB (4212736 bytes)\n",
-            "    Bytes per sector\t\t\t\t: 512 bytes\n",
             "    Identifier\t\t\t\t\t: 4f75d18f-d5ef-438e-b326-d60da6c9ed67\n",
+            "    Media information:\n",
+            "        Media size\t\t\t\t: 4.0 MiB (4212736 bytes)\n",
+            "        Bytes per sector\t\t\t: 512 bytes\n",
             "\n"
         );
         assert_eq!(string, expected_string);
@@ -188,14 +195,14 @@ mod tests {
         let test_struct: VhdFileInfo = VhdInfo::get_file_information(&vhd_file);
 
         assert_eq!(test_struct.disk_type, VhdDiskType::Dynamic);
-        assert_eq!(test_struct.media_size, 4212736);
-        assert_eq!(test_struct.bytes_per_sector, 512);
         assert_eq!(
             test_struct.identifier.to_string(),
             "4f75d18f-d5ef-438e-b326-d60da6c9ed67"
         );
         assert_eq!(test_struct.parent_identifier, None);
         assert_eq!(test_struct.parent_name, None);
+        assert_eq!(test_struct.media_size, 4212736);
+        assert_eq!(test_struct.bytes_per_sector, 512);
 
         Ok(())
     }

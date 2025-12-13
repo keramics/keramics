@@ -30,6 +30,7 @@ pub enum FormatIdentifier {
     Unknown,
     Vhd,
     Vhdx,
+    Vmdk,
 }
 
 impl fmt::Display for FormatIdentifier {
@@ -50,6 +51,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Unknown => "unknown",
             FormatIdentifier::Vhd => "vhd",
             FormatIdentifier::Vhdx => "vhdx",
+            FormatIdentifier::Vmdk => "vmdk",
         };
         write!(formatter, "{}", string)
     }
@@ -116,5 +118,9 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Vhdx;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "vhdx");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Vmdk;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "vmdk");
     }
 }

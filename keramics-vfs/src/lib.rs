@@ -38,6 +38,7 @@ mod splitraw;
 mod udif;
 mod vhd;
 mod vhdx;
+mod vmdk;
 
 // Helpers.
 mod finder;

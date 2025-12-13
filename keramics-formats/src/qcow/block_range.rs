@@ -12,7 +12,7 @@
  */
 
 /// QEMU Copy-On-Write (QCOW) block range type.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum QcowBlockRangeType {
     Compressed,
     InBackingFile,
@@ -21,7 +21,7 @@ pub enum QcowBlockRangeType {
 }
 
 /// QEMU Copy-On-Write (QCOW) block range.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct QcowBlockRange {
     /// Media offset.
     pub media_offset: u64,

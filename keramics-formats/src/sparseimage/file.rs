@@ -381,7 +381,7 @@ mod tests {
     fn test_get_offset() -> Result<(), ErrorTrace> {
         let mut file: SparseImageFile = get_file()?;
 
-        let offset: u64 = file.seek(SeekFrom::Start(1024))?;
+        file.seek(SeekFrom::Start(1024))?;
 
         let offset: u64 = file.get_offset()?;
         assert_eq!(offset, 1024);
