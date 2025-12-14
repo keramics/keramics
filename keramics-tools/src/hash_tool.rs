@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::io::{BufReader, Stdin};
+use std::io::{BufReader, Read, Stdin};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -27,16 +27,15 @@ use keramics_hashes::{
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
-    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, new_os_vfs_location,
+    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner,
+    new_os_vfs_location,
 };
 
 mod display_path;
 mod enums;
-mod hasher;
 
 use crate::display_path::DisplayPath;
 use crate::enums::{DigestHashType, DisplayPathType};
-use crate::hasher::DigestHasher;
 
 #[derive(Parser)]
 #[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
@@ -48,6 +47,10 @@ struct CommandLineArguments {
     /// Digest hash type
     #[arg(short, long, default_value_t = DigestHashType::Md5, value_enum)]
     digest_hash_type: DigestHashType,
+
+    /// Comma seperated list of partitions to include.
+    #[arg(long)]
+    partitions: Option<String>,
 
     /// Path of the file to read the data from, if not provided the data will be read from standard input
     source: Option<PathBuf>,
@@ -61,13 +64,8 @@ struct CommandLineArguments {
     volume_path_type: DisplayPathType,
 }
 
-// TODO: move DigestHasher into HashTool
-
 /// Tool for calculating digest hashes of data streams.
 struct HashTool {
-    /// The digest hasher.
-    pub digest_hasher: DigestHasher,
-
     /// The display path.
     display_path: DisplayPath,
 
@@ -88,7 +86,6 @@ impl HashTool {
         stop_on_error: bool,
     ) -> Self {
         Self {
-            digest_hasher: DigestHasher::new(digest_hash_type),
             display_path: DisplayPath::new(display_path_type),
             digest_hash_type: digest_hash_type.clone(),
             stop_on_error,
@@ -133,10 +130,11 @@ impl HashTool {
             DigestHashType::Sha512 => Box::new(Sha512Context::new()),
         };
         let mut data: [u8; Self::READ_BUFFER_SIZE] = [0; Self::READ_BUFFER_SIZE];
+        let mut total_read_count: usize = 0;
 
         match data_stream.write() {
             Ok(mut data_stream) => loop {
-                let read_count = match data_stream.read(&mut data) {
+                let read_count: usize = match data_stream.read(&mut data) {
                     Ok(read_count) => read_count,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read data stream");
@@ -146,6 +144,7 @@ impl HashTool {
                 if read_count == 0 {
                     break;
                 }
+                total_read_count += read_count;
                 hash_context.update(&data[0..read_count]);
             },
             Err(error) => {
@@ -187,7 +186,7 @@ impl HashTool {
                     // if name == Some(String::from("WofCompressedData")) {
                     //     continue;
                     // }
-                    // TODO: create skip list
+                    // TODO: create path filter as skip list
                     let hash_string: String = if path.components.len() > 1
                         && path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
                         && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
@@ -232,6 +231,37 @@ impl HashTool {
             }
         }
         Ok(())
+    }
+
+    /// Calculates a digest hash from a reader.
+    pub fn calculate_hash_from_reader(&self, reader: &mut dyn Read) -> Result<String, ErrorTrace> {
+        let mut hash_context: Box<dyn DigestHashContext> = match &self.digest_hash_type {
+            DigestHashType::Md5 => Box::new(Md5Context::new()),
+            DigestHashType::Sha1 => Box::new(Sha1Context::new()),
+            DigestHashType::Sha224 => Box::new(Sha224Context::new()),
+            DigestHashType::Sha256 => Box::new(Sha256Context::new()),
+            DigestHashType::Sha512 => Box::new(Sha512Context::new()),
+        };
+        let mut data: [u8; Self::READ_BUFFER_SIZE] = [0; Self::READ_BUFFER_SIZE];
+
+        loop {
+            let read_count: usize = match reader.read(&mut data) {
+                Ok(read_count) => read_count,
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to read from stdin",
+                        error
+                    ));
+                }
+            };
+            if read_count == 0 {
+                break;
+            }
+            hash_context.update(&data[0..read_count]);
+        }
+        let hash: Vec<u8> = hash_context.finalize();
+
+        Ok(format_as_string(&hash))
     }
 
     /// Calculates a digest hash from a scan node.
@@ -336,17 +366,13 @@ fn main() -> ExitCode {
         None => {
             let mut reader: BufReader<Stdin> = BufReader::new(std::io::stdin());
 
-            let hash_string: String = match hash_tool
-                .digest_hasher
-                .calculate_hash_from_reader(&mut reader)
-            {
-                Ok(hash) => hash,
+            match hash_tool.calculate_hash_from_reader(&mut reader) {
+                Ok(hash_string) => println!("{}  -", hash_string),
                 Err(error) => {
                     println!("Unable to calculate hash from stdin\n{}", error);
                     return ExitCode::FAILURE;
                 }
-            };
-            println!("{}  -", hash_string);
+            }
         }
         Some(source_argument) => {
             let source: &str = match source_argument.to_str() {
@@ -356,11 +382,10 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            let vfs_location: VfsLocation = new_os_vfs_location(source);
-
-            // TODO: add scanner options.
             // TODO: add scanner mediator.
+
             let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
             match vfs_scanner.build() {
                 Ok(_) => {}
                 Err(error) => {
@@ -368,8 +393,21 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
+            let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+
+            if let Some(partitions_string) = arguments.partitions {
+                match vfs_scan_options.parse_partitions(partitions_string.as_str()) {
+                    Ok(_) => {}
+                    Err(error) => {
+                        println!("Unable to parse partitions: {}\n{}", source, error);
+                        return ExitCode::FAILURE;
+                    }
+                }
+            }
             let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
-            match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
+            let vfs_location: VfsLocation = new_os_vfs_location(source);
+
+            match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
                 Ok(_) => {}
                 Err(error) => {
                     println!("Unable to scan: {}\n{}", source, error);
@@ -421,11 +459,12 @@ fn main() -> ExitCode {
 mod tests {
     use super::*;
 
+    use std::io::Cursor;
+
     use keramics_core::{DataStreamReference, open_fake_data_stream};
 
-    #[test]
-    fn test_calculate_md5() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = vec![
+    fn get_test_data() -> Vec<u8> {
+        return vec![
             0x41, 0x20, 0x63, 0x65, 0x72, 0x61, 0x6d, 0x69, 0x63, 0x20, 0x69, 0x73, 0x20, 0x61,
             0x6e, 0x79, 0x20, 0x6f, 0x66, 0x20, 0x74, 0x68, 0x65, 0x20, 0x76, 0x61, 0x72, 0x69,
             0x6f, 0x75, 0x73, 0x20, 0x68, 0x61, 0x72, 0x64, 0x2c, 0x20, 0x62, 0x72, 0x69, 0x74,
@@ -442,11 +481,29 @@ mod tests {
             0x61, 0x20, 0x68, 0x69, 0x67, 0x68, 0x20, 0x74, 0x65, 0x6d, 0x70, 0x65, 0x72, 0x61,
             0x74, 0x75, 0x72, 0x65, 0x2e, 0x0a,
         ];
+    }
+
+    #[test]
+    fn test_calculate_hash_from_data_stream() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let hash_tool: HashTool =
             HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, true);
         let md5: String = hash_tool.calculate_hash_from_data_stream(&data_stream)?;
+        assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_calculate_hash_from_reader() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let mut reader: Cursor<&[u8]> = Cursor::new(&test_data);
+
+        let hash_tool: HashTool =
+            HashTool::new(&DigestHashType::Md5, &DisplayPathType::Index, true);
+        let md5: String = hash_tool.calculate_hash_from_reader(&mut reader)?;
         assert_eq!(md5, "f19106bcf25fa9cabc1b5ac91c726001");
 
         Ok(())

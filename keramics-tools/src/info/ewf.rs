@@ -108,11 +108,19 @@ impl fmt::Display for EwfImageInfo {
             "    Sectors per chunk\t\t\t\t: {}",
             self.sectors_per_chunk
         )?;
-        writeln!(
-            formatter,
-            "    Error granularity\t\t\t\t: {} sectors",
-            self.error_granularity
-        )?;
+        if self.error_granularity == 1 {
+            writeln!(
+                formatter,
+                "    Error granularity\t\t\t\t: {} sector",
+                self.error_granularity
+            )?;
+        } else {
+            writeln!(
+                formatter,
+                "    Error granularity\t\t\t\t: {} sectors",
+                self.error_granularity
+            )?;
+        }
         // TODO: print compression method
 
         writeln!(formatter, "    Media information:")?;

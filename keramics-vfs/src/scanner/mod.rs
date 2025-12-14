@@ -13,10 +13,12 @@
 
 mod scan_context;
 mod scan_node;
+mod scan_options;
 mod scanner;
 mod traits;
 
 pub use scan_context::VfsScanContext;
 pub use scan_node::VfsScanNode;
+pub use scan_options::VfsScanOptions;
 pub use scanner::VfsScanner;
 pub use traits::VfsScannerMediator;

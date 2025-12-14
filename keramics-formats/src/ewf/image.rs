@@ -71,8 +71,8 @@ pub struct EwfImage {
     /// Number of sectors.
     pub number_of_sectors: u32,
 
-    /// Block (or chunk) size.
-    block_size: u32,
+    /// Chunk size.
+    chunk_size: u32,
 
     /// Block tree.
     block_tree: BlockTree<EwfBlockRange>,
@@ -116,7 +116,7 @@ impl EwfImage {
             sectors_per_chunk: 0,
             bytes_per_sector: 0,
             number_of_sectors: 0,
-            block_size: 0,
+            chunk_size: 0,
             block_tree: BlockTree::<EwfBlockRange>::new(0, 0, 0),
             chunk_cache: LruCache::new(64),
             error_granularity: 0,
@@ -381,7 +381,7 @@ impl EwfImage {
                     }
                 };
             let range_relative_offset: u64 = media_offset - block_range.media_offset;
-            let range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
+            let range_remainder_size: u64 = (self.chunk_size as u64) - range_relative_offset;
 
             let mut range_read_size: usize = read_size - data_offset;
 
@@ -391,11 +391,16 @@ impl EwfImage {
             let data_end_offset: usize = data_offset + range_read_size;
             let range_read_count: usize = match block_range.range_type {
                 EwfBlockRangeType::Compressed => {
-                    if !self.chunk_cache.contains(&block_range.data_offset) {
-                        let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
+                    let chunk_media_offset: u64 =
+                        (media_offset / (self.chunk_size as u64)) * (self.chunk_size as u64);
+
+                    if !self.chunk_cache.contains(&chunk_media_offset) {
+                        let compressed_chunk_offset: u64 = block_range.data_offset;
+
+                        let mut block_data: Vec<u8> = vec![0; self.chunk_size as usize];
 
                         match segment_file.read_compressed_chunk(
-                            block_range.data_offset,
+                            compressed_chunk_offset,
                             block_range.data_size,
                             &mut block_data,
                         ) {
@@ -406,16 +411,16 @@ impl EwfImage {
                                     format!(
                                         "Unable to read compressed chunk from segment file: {} at offset: {} (0x{:08x})",
                                         block_range.segment_number,
-                                        block_range.data_offset,
-                                        block_range.data_offset
+                                        compressed_chunk_offset,
+                                        compressed_chunk_offset,
                                     )
                                 );
                                 return Err(error);
                             }
                         }
-                        self.chunk_cache.insert(block_range.data_offset, block_data);
+                        self.chunk_cache.insert(chunk_media_offset, block_data);
                     }
-                    let range_data: &[u8] = match self.chunk_cache.get(&block_range.data_offset) {
+                    let range_data: &[u8] = match self.chunk_cache.get(&chunk_media_offset) {
                         Some(data) => data,
                         None => {
                             return Err(keramics_core::error_trace_new!(
@@ -432,12 +437,11 @@ impl EwfImage {
                     range_read_size
                 }
                 EwfBlockRangeType::InFile => {
-                    // TODO: read full chunk
-                    let chunk_offset: u64 = block_range.data_offset + range_relative_offset;
+                    let chunk_data_offset: u64 = block_range.data_offset + range_relative_offset;
 
                     match segment_file.read_exact_at_position(
                         &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(chunk_offset),
+                        SeekFrom::Start(chunk_data_offset),
                     ) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -445,13 +449,13 @@ impl EwfImage {
                                 error,
                                 format!(
                                     "Unable to read uncompressed chunk from segment file: {} at offset: {} (0x{:08x})",
-                                    block_range.segment_number, chunk_offset, chunk_offset
+                                    block_range.segment_number, chunk_data_offset, chunk_data_offset
                                 )
                             );
                             return Err(error);
                         }
                     }
-                    // TODO: calculate and compare checksum
+                    // TODO: read full chunk and calculate and compare checksum
 
                     range_read_size
                 }
@@ -812,7 +816,7 @@ impl EwfImage {
         last_sectors_section_header: &Option<&EwfSectionHeader>,
         block_media_offset: &mut u64,
     ) -> Result<(), ErrorTrace> {
-        if self.block_size == 0 || self.media_size == 0 {
+        if self.chunk_size == 0 || self.media_size == 0 {
             return Err(keramics_core::error_trace_new!(
                 "Missing disk or volume section"
             ));
@@ -892,7 +896,7 @@ impl EwfImage {
             );
             match self.block_tree.insert_value(
                 safe_block_media_offset,
-                self.block_size as u64,
+                self.chunk_size as u64,
                 block_range,
             ) {
                 Ok(_) => {}
@@ -903,7 +907,7 @@ impl EwfImage {
                     ));
                 }
             };
-            safe_block_media_offset += self.block_size as u64;
+            safe_block_media_offset += self.chunk_size as u64;
 
             // handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset
             // overflow)
@@ -959,7 +963,7 @@ impl EwfImage {
         );
         match self.block_tree.insert_value(
             safe_block_media_offset,
-            self.block_size as u64,
+            self.chunk_size as u64,
             block_range,
         ) {
             Ok(_) => {}
@@ -970,7 +974,7 @@ impl EwfImage {
                 ));
             }
         };
-        *block_media_offset = safe_block_media_offset + (self.block_size as u64);
+        *block_media_offset = safe_block_media_offset + (self.chunk_size as u64);
 
         Ok(())
     }
@@ -990,7 +994,7 @@ impl EwfImage {
                 segment_file_name
             )));
         }
-        if self.block_size != 0 || self.media_size != 0 {
+        if self.chunk_size != 0 || self.media_size != 0 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Multipe disk or volume sections found in segment file: {}",
                 segment_file_name
@@ -1045,10 +1049,10 @@ impl EwfImage {
                 )));
             }
         }
-        self.block_size = self.sectors_per_chunk * self.bytes_per_sector;
+        self.chunk_size = self.sectors_per_chunk * self.bytes_per_sector;
         self.media_size = (self.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
-        let block_tree_data_size: u64 = (self.number_of_chunks as u64) * (self.block_size as u64);
+        let block_tree_data_size: u64 = (self.number_of_chunks as u64) * (self.chunk_size as u64);
 
         self.block_tree = BlockTree::<EwfBlockRange>::new(
             block_tree_data_size,

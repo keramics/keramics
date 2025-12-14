@@ -18,21 +18,17 @@ use std::path::PathBuf;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 /// Writes a data stream to a file.
-pub struct DataStreamWriter<'a> {
-    /// Target (or destination) path.
-    target: &'a PathBuf,
-
+pub struct DataStreamWriter {
     /// Number of data streams written.
     pub number_of_streams_written: usize,
 }
 
-impl<'a> DataStreamWriter<'a> {
+impl DataStreamWriter {
     const READ_BUFFER_SIZE: usize = 65536;
 
     /// Creates a new data stream writer.
-    pub fn new(target: &'a PathBuf) -> Self {
+    pub fn new() -> Self {
         Self {
-            target,
             number_of_streams_written: 0,
         }
     }
@@ -41,10 +37,8 @@ impl<'a> DataStreamWriter<'a> {
     pub fn write_data_stream(
         &mut self,
         data_stream: &DataStreamReference,
+        output_path: &PathBuf,
     ) -> Result<(), ErrorTrace> {
-        let mut output_path = self.target.clone();
-        output_path.push("keramics.bin");
-
         let mut output_file: File = match File::create(output_path) {
             Ok(file) => file,
             Err(error) => {
@@ -54,8 +48,7 @@ impl<'a> DataStreamWriter<'a> {
                 ));
             }
         };
-        let mut data: [u8; DataStreamWriter::READ_BUFFER_SIZE] =
-            [0; DataStreamWriter::READ_BUFFER_SIZE];
+        let mut data: [u8; Self::READ_BUFFER_SIZE] = [0; Self::READ_BUFFER_SIZE];
 
         match data_stream.write() {
             Ok(mut data_stream) => {

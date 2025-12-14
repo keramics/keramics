@@ -252,7 +252,7 @@ impl NtfsInfo {
                         }
                     };
                 }
-                println!("");
+                println!();
             }
             // TODO: add support for $EA
             // TODO: add support for $EA_INFORMATION
@@ -311,7 +311,7 @@ impl NtfsInfo {
                         .join("\n")
                 );
                 if file_name.file_attribute_flags != 0 {
-                    println!("");
+                    println!();
                 }
             }
             // TODO: add support for $BITMAP, $DATA, $INDEX_ALLOCATION, $INDEX_ROOT
@@ -321,8 +321,7 @@ impl NtfsInfo {
                     None => {}
                 };
                 let byte_size: ByteSize = ByteSize::new(mft_attribute.data_size, 1024);
-
-                println!("    Data size\t\t\t\t\t: {}\n", byte_size);
+                println!("    Data size\t\t\t\t\t: {}", byte_size);
 
                 if attribute_type == NTFS_ATTRIBUTE_TYPE_DATA {
                     println!(
@@ -340,7 +339,7 @@ impl NtfsInfo {
                         .collect::<Vec<String>>();
                     println!("    VCNs\t\t\t\t\t: [{}]", string_parts.join(", "));
                 }
-                println!("");
+                println!();
             }
             // TODO: add support for $LOGGED_UTILITY_STREAM
             // TODO: add support for $OBJECT_ID
@@ -350,7 +349,7 @@ impl NtfsInfo {
                 println!("    Reparse tag\t\t\t\t\t: 0x{:08x}", reparse_tag);
                 // TODO: print tag name
 
-                println!("");
+                println!();
             }
             // TODO: add support for $SECURITY_DESCRIPTOR
             NtfsAttribute::StandardInformation {
@@ -388,7 +387,7 @@ impl NtfsInfo {
                         .join("\n")
                 );
                 if standard_information.file_attribute_flags != 0 {
-                    println!("");
+                    println!();
                 }
             }
             NtfsAttribute::VolumeInformation { volume_information } => {
@@ -401,11 +400,11 @@ impl NtfsInfo {
                     "    Volume flags\t\t\t\t: 0x{:04x}",
                     volume_information.volume_flags
                 );
-                println!("");
+                println!();
             }
             NtfsAttribute::VolumeName { volume_name } => {
                 println!("    Volume name\t\t\t\t\t: {}", volume_name);
-                println!("");
+                println!();
             }
         }
         Ok(())
@@ -470,7 +469,7 @@ impl NtfsInfo {
                 .collect::<Vec<String>>()
                 .join("\n")
         );
-        println!("");
+        println!();
 
         // TODO: print information about reparse point
 
@@ -538,7 +537,7 @@ impl NtfsInfo {
             let number_of_attributes: usize = file_entry.get_number_of_attributes();
 
             // TODO: print is corrupted.
-            println!("");
+            println!();
 
             for attribute_index in 0..number_of_attributes {
                 let attribute: NtfsAttribute =
@@ -669,7 +668,7 @@ impl NtfsInfo {
             "    Index entry size\t\t\t\t: {} bytes",
             ntfs_file_system.index_entry_size
         );
-        println!("");
+        println!();
 
         Ok(())
     }

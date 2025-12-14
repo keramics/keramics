@@ -48,6 +48,7 @@ use crate::vmdk::VmdkFileSystem;
 
 use super::scan_context::VfsScanContext;
 use super::scan_node::VfsScanNode;
+use super::scan_options::{VfsScanOptionGroup, VfsScanOptions};
 
 /// Virtual File System (VFS) scanner.
 pub struct VfsScanner {
@@ -128,6 +129,7 @@ impl VfsScanner {
     /// Scans a storage media image file for supported formats.
     pub fn scan<'a>(
         &self,
+        scan_options: &VfsScanOptions,
         scan_context: &mut VfsScanContext<'a>,
         vfs_location: &'a VfsLocation,
     ) -> Result<(), ErrorTrace> {
@@ -135,8 +137,7 @@ impl VfsScanner {
 
         let file_system: VfsFileSystemReference = self.resolver.open_file_system(vfs_location)?;
 
-        let path: &Path = vfs_location.get_path();
-        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(path)? {
+        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_location(vfs_location)? {
             Some(file_entry) => file_entry,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -146,16 +147,19 @@ impl VfsScanner {
             }
         };
         let file_type: VfsFileType = file_entry.get_file_type();
-        match file_type {
+
+        match file_entry.get_file_type() {
             VfsFileType::BlockDevice | VfsFileType::CharacterDevice | VfsFileType::Device => {
-                return Err(keramics_core::error_trace_new!("Devices are not supported"));
+                return Err(keramics_core::error_trace_new!(
+                    "Devices are currently not supported"
+                ));
             }
             VfsFileType::File => {}
             _ => {
                 return Err(keramics_core::error_trace_new!("Unsupported file type"));
             }
         };
-        self.scan_for_sub_nodes(&file_system, vfs_location, &mut scan_node)?;
+        self.scan_for_sub_nodes(scan_options, &file_system, vfs_location, &mut scan_node)?;
 
         scan_context.root_node = Some(scan_node);
 
@@ -168,20 +172,20 @@ impl VfsScanner {
         file_system: &VfsFileSystemReference,
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsType>, ErrorTrace> {
-        let path: &Path = vfs_location.get_path();
-        let data_stream: DataStreamReference = match file_system.get_data_stream_by_path(path) {
-            Ok(Some(data_stream)) => data_stream,
-            Ok(None) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Missing data stream: {}",
-                    vfs_location
-                )));
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                return Err(error);
-            }
-        };
+        let data_stream: DataStreamReference =
+            match file_system.get_data_stream_by_location(vfs_location) {
+                Ok(Some(data_stream)) => data_stream,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing data stream: {}",
+                        vfs_location
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                    return Err(error);
+                }
+            };
         match vfs_location.get_type() {
             VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
                 self.scan_for_file_system_format(&data_stream)
@@ -208,6 +212,8 @@ impl VfsScanner {
 
                 if result.is_none() {
                     let mut splitraw_image: SplitRawImage = SplitRawImage::new();
+
+                    let path: &Path = vfs_location.get_path();
 
                     result = match SplitRawFileSystem::open_image(
                         &mut splitraw_image,
@@ -315,6 +321,7 @@ impl VfsScanner {
     /// Scans for storage media image sub nodes.
     fn scan_for_storage_media_image_sub_nodes(
         &self,
+        scan_options: &VfsScanOptions,
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
@@ -345,8 +352,13 @@ impl VfsScanner {
                 let sub_node_vfs_location: VfsLocation =
                     node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
                 let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
-                self.scan_for_sub_nodes(&node_file_system, &node_vfs_location, &mut sub_scan_node)?;
 
+                self.scan_for_sub_nodes(
+                    scan_options,
+                    &node_file_system,
+                    &node_vfs_location,
+                    &mut sub_scan_node,
+                )?;
                 scan_node.sub_nodes.push(sub_scan_node);
             }
             None => {}
@@ -357,6 +369,7 @@ impl VfsScanner {
     /// Scans a node for supported formats.
     fn scan_for_sub_nodes(
         &self,
+        scan_options: &VfsScanOptions,
         file_system: &VfsFileSystemReference,
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
@@ -381,6 +394,7 @@ impl VfsScanner {
                 let number_of_partitions: usize = apm_volume_system.get_number_of_partitions();
 
                 match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     ApmFileSystem::PATH_PREFIX,
@@ -407,6 +421,7 @@ impl VfsScanner {
                     }
                 }
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     EwfFileSystem::PATH_PREFIX,
@@ -441,6 +456,7 @@ impl VfsScanner {
                 let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
 
                 match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     GptFileSystem::PATH_PREFIX,
@@ -472,6 +488,7 @@ impl VfsScanner {
                 let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
 
                 match self.scan_for_volume_system_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     MbrFileSystem::PATH_PREFIX,
@@ -494,7 +511,12 @@ impl VfsScanner {
                         vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
-                    match self.scan_for_sub_nodes(file_system, vfs_location, &mut sub_scan_node) {
+                    match self.scan_for_sub_nodes(
+                        scan_options,
+                        file_system,
+                        vfs_location,
+                        &mut sub_scan_node,
+                    ) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(error, "Unable to scan OS");
@@ -518,6 +540,7 @@ impl VfsScanner {
                 let number_of_layers: usize = qcow_image.get_number_of_layers();
 
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     QcowFileSystem::PATH_PREFIX,
@@ -544,6 +567,7 @@ impl VfsScanner {
                     }
                 }
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     SparseImageFileSystem::PATH_PREFIX,
@@ -573,6 +597,7 @@ impl VfsScanner {
                     }
                 }
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     SplitRawFileSystem::PATH_PREFIX,
@@ -599,6 +624,7 @@ impl VfsScanner {
                     }
                 }
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     UdifFileSystem::PATH_PREFIX,
@@ -624,6 +650,7 @@ impl VfsScanner {
                 let number_of_layers: usize = vhd_image.get_number_of_layers();
 
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     VhdFileSystem::PATH_PREFIX,
@@ -649,6 +676,7 @@ impl VfsScanner {
                 let number_of_layers: usize = vhdx_image.get_number_of_layers();
 
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     VhdxFileSystem::PATH_PREFIX,
@@ -672,6 +700,7 @@ impl VfsScanner {
                     }
                 }
                 match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
                     vfs_location,
                     scan_node,
                     VmdkFileSystem::PATH_PREFIX,
@@ -783,6 +812,7 @@ impl VfsScanner {
     /// Scans for volume system sub nodes.
     fn scan_for_volume_system_sub_nodes(
         &self,
+        scan_options: &VfsScanOptions,
         vfs_location: &VfsLocation,
         scan_node: &mut VfsScanNode,
         path_prefix: &str,
@@ -804,6 +834,16 @@ impl VfsScanner {
         for volume_index in 0..number_of_volumes {
             let vfs_type: &VfsType = scan_node.get_type();
 
+            match vfs_type {
+                VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
+                    if scan_options.partitions == VfsScanOptionGroup::NotSet {
+                        // TODO: invoke mediator to ask which partitions to include.
+                    } else if !scan_options.partitions.contains_index(volume_index + 1) {
+                        continue;
+                    }
+                }
+                _ => {}
+            };
             // TODO: use volume identifier in location?
             let volume_path: String = format!("{}{}", path_prefix, volume_index + 1);
 
@@ -820,6 +860,7 @@ impl VfsScanner {
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
                     self.scan_for_sub_nodes(
+                        scan_options,
                         &node_file_system,
                         &volume_scan_node.location,
                         &mut sub_scan_node,
@@ -885,24 +926,66 @@ mod tests {
     fn test_scan() -> Result<(), ErrorTrace> {
         let format_scanner: VfsScanner = get_format_scanner()?;
 
-        let path_string: String = get_test_data_path("qcow/ext2.qcow2");
-        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let scan_options: VfsScanOptions = VfsScanOptions::new();
+
         let mut scan_context: VfsScanContext = VfsScanContext::new();
-        format_scanner.scan(&mut scan_context, &vfs_location)?;
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
 
         let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
         let vfs_type: &VfsType = scan_node.get_type();
-        assert!(vfs_type == &VfsType::Os);
+        assert_eq!(vfs_type, &VfsType::Os);
         assert_eq!(scan_node.sub_nodes.len(), 1);
 
         let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
         let vfs_type: &VfsType = scan_node.get_type();
-        assert!(vfs_type == &VfsType::Qcow);
+        assert_eq!(vfs_type, &VfsType::Gpt);
+        assert_eq!(scan_node.sub_nodes.len(), 2);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Gpt);
         assert_eq!(scan_node.sub_nodes.len(), 1);
 
         let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
         let vfs_type: &VfsType = scan_node.get_type();
-        assert!(vfs_type == &VfsType::Ext);
+        assert_eq!(vfs_type, &VfsType::Ext);
+        assert_eq!(scan_node.sub_nodes.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_with_options() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let mut scan_options: VfsScanOptions = VfsScanOptions::new();
+        scan_options.parse_partitions("1")?;
+
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("gpt/gpt.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Os);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Gpt);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Gpt);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Ext);
         assert_eq!(scan_node.sub_nodes.len(), 0);
 
         Ok(())

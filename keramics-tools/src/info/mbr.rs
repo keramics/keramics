@@ -148,7 +148,7 @@ impl MbrInfo {
         let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
         println!("    Number of partitions\t\t\t: {}", number_of_partitions);
 
-        println!("");
+        println!();
 
         for (partition_index, result) in mbr_volume_system.partitions().enumerate() {
             let mbr_partition: MbrPartition = match result {

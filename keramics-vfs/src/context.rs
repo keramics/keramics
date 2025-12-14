@@ -77,9 +77,7 @@ impl VfsContext {
                 return Err(error);
             }
         };
-        let path: &Path = vfs_location.get_path();
-
-        match file_system.get_file_entry_by_path(path) {
+        match file_system.get_file_entry_by_location(vfs_location) {
             Ok(file_entry) => Ok(file_entry),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");

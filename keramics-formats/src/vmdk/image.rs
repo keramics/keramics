@@ -380,9 +380,13 @@ impl VmdkImage {
 
                             match block_range.range_type {
                                 VmdkBlockRangeType::Compressed => {
-                                    let compressed_grain_offset: u64 = block_range.data_offset;
+                                    let grain_media_offset: u64 = (media_offset
+                                        / sparse_file.grain_size)
+                                        * sparse_file.grain_size;
 
-                                    if !self.grain_cache.contains(&compressed_grain_offset) {
+                                    if !self.grain_cache.contains(&grain_media_offset) {
+                                        let compressed_grain_offset: u64 = block_range.data_offset;
+
                                         let mut block_data: Vec<u8> =
                                             vec![0; sparse_file.grain_size as usize];
 
@@ -404,11 +408,10 @@ impl VmdkImage {
                                                 return Err(error);
                                             }
                                         }
-                                        self.grain_cache
-                                            .insert(compressed_grain_offset, block_data);
+                                        self.grain_cache.insert(grain_media_offset, block_data);
                                     }
                                     let range_data: &[u8] =
-                                        match self.grain_cache.get(&compressed_grain_offset) {
+                                        match self.grain_cache.get(&grain_media_offset) {
                                             Some(data) => data,
                                             None => {
                                                 return Err(keramics_core::error_trace_new!(

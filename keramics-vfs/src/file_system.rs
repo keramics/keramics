@@ -163,6 +163,22 @@ impl VfsFileSystem {
         }
     }
 
+    /// Retrieves a data stream with the specified location.
+    #[inline(always)]
+    pub(crate) fn get_data_stream_by_location(
+        &self,
+        location: &VfsLocation,
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        match self.get_file_entry_by_location(location) {
+            Ok(Some(mut file_entry)) => file_entry.get_data_stream(),
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                Err(error)
+            }
+        }
+    }
+
     /// Retrieves a data stream with the specified path.
     #[inline(always)]
     pub(crate) fn get_data_stream_by_path(
@@ -192,6 +208,26 @@ impl VfsFileSystem {
             Ok(None) => Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                Err(error)
+            }
+        }
+    }
+
+    /// Retrieves a file entry with the specified loctions.
+    #[inline(always)]
+    pub(crate) fn get_file_entry_by_location(
+        &self,
+        location: &VfsLocation,
+    ) -> Result<Option<VfsFileEntry>, ErrorTrace> {
+        let path: &Path = location.get_path();
+
+        match self.get_file_entry_by_path(path) {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve file entry by path"
+                );
                 Err(error)
             }
         }

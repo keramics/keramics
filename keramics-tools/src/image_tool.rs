@@ -41,8 +41,8 @@ use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsLocation,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanner, VfsType,
-    new_os_vfs_location,
+    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner,
+    VfsType, new_os_vfs_location,
 };
 
 mod bodyfile;
@@ -749,10 +749,14 @@ impl ImageTool {
                 ));
             }
         }
+        let vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        // TODO: set scanner options.
+
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = new_os_vfs_location(source);
 
-        match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
+        match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to scan file system");
@@ -888,6 +892,7 @@ impl ImageTool {
             _ => String::new(),
         };
         let file_type: VfsFileType = file_entry.get_file_type();
+
         let file_mode_string: String = match file_entry {
             VfsFileEntry::Ext(ext_file_entry) => {
                 let file_mode: u16 = ext_file_entry.get_file_mode();
@@ -1323,10 +1328,14 @@ impl ImageTool {
                 ));
             }
         }
+        let vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+
+        // TODO: set scanner options.
+
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = new_os_vfs_location(source);
 
-        match vfs_scanner.scan(&mut vfs_scan_context, &vfs_location) {
+        match vfs_scanner.scan(&vfs_scan_options, &mut vfs_scan_context, &vfs_location) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to scan file system");

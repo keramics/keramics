@@ -55,7 +55,7 @@ pub use file_system::VfsFileSystem;
 pub use finder::VfsFinder;
 pub use location::{VfsLocation, new_os_vfs_location};
 pub use resolver::VfsResolver;
-pub use scanner::{VfsScanContext, VfsScanNode, VfsScanner, VfsScannerMediator};
+pub use scanner::{VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner, VfsScannerMediator};
 pub use types::*;
 
 #[cfg(test)]

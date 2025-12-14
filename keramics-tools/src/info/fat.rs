@@ -314,7 +314,7 @@ impl FatInfo {
         };
         println!("    Volume label\t\t\t\t: {}", volume_label);
 
-        println!("");
+        println!();
 
         Ok(())
     }

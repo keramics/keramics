@@ -702,7 +702,7 @@ impl ExtInfo {
                     attribute_name
                 );
             }
-            println!("");
+            println!();
         }
         Ok(())
     }
@@ -868,7 +868,7 @@ impl ExtInfo {
             }
         };
         println!("    Last written time\t\t\t\t: {}", date_time_string);
-        println!("");
+        println!();
 
         Ok(())
     }

@@ -147,7 +147,7 @@ impl GptInfo {
         let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();
         println!("    Number of partitions\t\t\t: {}", number_of_partitions);
 
-        println!("");
+        println!();
 
         for (partition_index, result) in gpt_volume_system.partitions().enumerate() {
             let gpt_partition: GptPartition = match result {
