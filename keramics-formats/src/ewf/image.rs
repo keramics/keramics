@@ -449,7 +449,9 @@ impl EwfImage {
                                 error,
                                 format!(
                                     "Unable to read uncompressed chunk from segment file: {} at offset: {} (0x{:08x})",
-                                    block_range.segment_number, chunk_data_offset, chunk_data_offset
+                                    block_range.segment_number,
+                                    chunk_data_offset,
+                                    chunk_data_offset
                                 )
                             );
                             return Err(error);
