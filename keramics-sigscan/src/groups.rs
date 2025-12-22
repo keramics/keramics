@@ -14,7 +14,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use super::types::SignatureReference;
+use super::signature::Signature;
 
 /// Byte value group.
 #[derive(Debug)]
@@ -36,7 +36,7 @@ impl ByteValueGroup {
     }
 
     /// Inserts a signature related to a specific byte value.
-    pub fn insert_signature(&mut self, byte_value: u8, signature: &SignatureReference) {
+    pub fn insert_signature(&mut self, byte_value: u8, signature: &Arc<Signature>) {
         match self.signature_groups.get_mut(&byte_value) {
             Some(signature_group) => signature_group.append_signature(signature),
             None => {
@@ -77,7 +77,7 @@ pub(super) struct SignatureGroup {
     pub byte_value: u8,
 
     /// Signatures.
-    pub signatures: Vec<SignatureReference>,
+    pub signatures: Vec<Arc<Signature>>,
 }
 
 impl SignatureGroup {
@@ -90,7 +90,7 @@ impl SignatureGroup {
     }
 
     /// Appends a signature.
-    pub fn append_signature(&mut self, signature: &SignatureReference) {
+    pub fn append_signature(&mut self, signature: &Arc<Signature>) {
         self.signatures.push(Arc::clone(signature));
     }
 }
@@ -108,7 +108,7 @@ mod tests {
 
         assert_eq!(byte_value_group.signature_groups.len(), 0);
 
-        let signature: SignatureReference = Arc::new(Signature::new(
+        let signature: Arc<Signature> = Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,
@@ -138,7 +138,7 @@ mod tests {
 
         assert_eq!(signature_group.signatures.len(), 0);
 
-        let signature: SignatureReference = Arc::new(Signature::new(
+        let signature: Arc<Signature> = Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
             0,

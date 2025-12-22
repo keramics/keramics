@@ -130,7 +130,6 @@ impl HashTool {
             DigestHashType::Sha512 => Box::new(Sha512Context::new()),
         };
         let mut data: [u8; Self::READ_BUFFER_SIZE] = [0; Self::READ_BUFFER_SIZE];
-        let mut total_read_count: usize = 0;
 
         match data_stream.write() {
             Ok(mut data_stream) => loop {
@@ -144,7 +143,6 @@ impl HashTool {
                 if read_count == 0 {
                     break;
                 }
-                total_read_count += read_count;
                 hash_context.update(&data[0..read_count]);
             },
             Err(error) => {

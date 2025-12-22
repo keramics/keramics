@@ -157,7 +157,7 @@ impl fmt::Display for FileModeInfo {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let string: String = Self::get_file_mode_string(self.file_mode);
 
-        write!(formatter, "{} (0o{:0o})", string, self.file_mode)
+        write!(formatter, "{}", string)
     }
 }
 
@@ -851,8 +851,29 @@ impl ImageTool {
         };
         let display_path: String = self.display_path.escape_path(path);
 
-        let result: Option<Path> = match file_entry.get_symbolic_link_target() {
-            Ok(result) => result,
+        let path_prefix: &str = if file_system_display_path.ends_with('/') {
+            &file_system_display_path[..file_system_display_path.len() - 1]
+        } else {
+            file_system_display_path.as_str()
+        };
+        let path_suffix: String = match file_entry.get_symbolic_link_target() {
+            Ok(Some(link_target)) => match file_entry {
+                VfsFileEntry::Ntfs(_) => {
+                    let display_link_target: String = link_target.components[1..]
+                        .iter()
+                        .map(|component| self.display_path.escape_path_component(component))
+                        .collect::<Vec<String>>()
+                        .join("/");
+
+                    format!(" -> {}/{}", link_target.components[0], display_link_target)
+                }
+                _ => {
+                    let display_link_target: String = self.display_path.escape_path(&link_target);
+
+                    format!(" -> {}", display_link_target)
+                }
+            },
+            Ok(None) => String::new(),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
@@ -860,16 +881,6 @@ impl ImageTool {
                 );
                 return Err(error);
             }
-        };
-        let path_prefix: &str = if file_system_display_path.ends_with('/') {
-            &file_system_display_path[..file_system_display_path.len() - 1]
-        } else {
-            file_system_display_path.as_str()
-        };
-        // TODO: escape symbolic link target.
-        let path_suffix: String = match result {
-            Some(symbolic_link_target) => format!(" -> {}", symbolic_link_target.to_string()),
-            None => String::new(),
         };
         let file_identifier: String = match file_entry {
             VfsFileEntry::Ext(ext_file_entry) => {
@@ -1598,7 +1609,7 @@ mod tests {
     fn test_file_mode_information_fmt() {
         let test_struct: FileModeInfo = FileModeInfo::new(0x81a4);
         let string: String = test_struct.to_string();
-        assert_eq!(string, "-rw-r--r-- (0o100644)");
+        assert_eq!(string, "-rw-r--r--");
     }
 
     #[test]

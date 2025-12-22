@@ -163,9 +163,18 @@ The FAT-32 boot record is at least 512 bytes in size and consists of:
 
 | Value | Identifier | Description
 | --- | --- | ---
+| 0xe5 | |
+| <td colspan="3">&nbsp;</td>
+| 0xed | |
+| 0xee | |
+| 0xef | |
 | 0xf0 | | removable media
+| <td colspan="3">&nbsp;</td>
+| 0xf4 | | 
+| 0xf5 | | 
+| <td colspan="3">&nbsp;</td>
 | 0xf8 | | fixed (non-removable) media
-| 0xf9 | |
+| 0xf9 | | 
 | 0xfa | |
 | 0xfb | |
 | 0xfc | |
@@ -331,24 +340,27 @@ Valid FAT short file name characters are:
 | 'A-Z' | Upper case character
 | '0-9' | Numeric character
 | ' ' | Space, where trailing spaces are considered padding and therefore ignored.
-| '.' | Dot, with the exception of "." and  "..". Trailing dot characters are ignored.
-| '!' |
-| '#' |
-| '$' |
-| '%' |
-| '&' |
-| '\'' | 
-| '(' |
-| ')' |
-| '-' |
-| '@' |
-| '^' |
-| '_' |
-| '`' | 
-| '{' |
-| '}' |
-| '~' |
+| '.' | Dot, with the exception of "." and  "..", where trailing dot characters are ignored.
+| '!' | Exclamation mark
+| '#' | Hash
+| '$' | Dollar sign
+| '%' | Percent sign
+| '&' | Ampersand
+| '\'' | Single quote
+| '(' | Left parenthesis
+| ')' | Right parenthesis
+| '-' | Hyphen
+| '@' | At sign
+| '^' | Caret
+| '_' | Underscore
+| '`' | Grave accent
+| '{' | Left curly brace
+| '}' | Right curly brace
+| '~' | Tilde
 | 0x80 - 0xff | Extended ASCII character, which are codepage dependent.
+
+> Note that other characters such as plus sign ('+') have been observed in FAT
+> short file names.
 
 #### First character {#short_name_first_character}
 
@@ -356,7 +368,7 @@ Valid FAT short file name characters are:
 | --- | ---
 | 0x00 | Last (or terminator) directory entry
 | 0x01 - 0x13 | VFAT long file name directory entry
-| 0x05 | Directory entry pending deallocation (deprecated since DOS 3.0) or substitution of a 0xe5 extended ASCII character value
+| 0x05 | Directory entry pending deallocation (deprecated since DOS 3.0) or substitution of a 0xe5 value
 | 0x41 - 0x54 | Last VFAT long file name directory entry
 | 0xe5 | Unallocated directory entry
 

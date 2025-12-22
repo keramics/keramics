@@ -74,7 +74,7 @@ impl VfsScanOptions {
 
     /// Parses the partitions scan option from a string.
     pub fn parse_partitions(&mut self, string: &str) -> Result<(), ErrorTrace> {
-        let lowercase_string = string.to_lowercase();
+        let lowercase_string: String = string.to_lowercase();
 
         match lowercase_string.as_str() {
             "" => {}

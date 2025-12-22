@@ -13,20 +13,19 @@
 
 mod constants;
 mod enums;
-mod errors;
 mod groups;
 mod pattern_weights;
 mod scan_context;
+mod scan_object;
 mod scan_result;
 mod scan_tree;
+mod scan_tree_node;
 mod scanner;
 mod signature;
 mod signature_table;
 mod skip_table;
-mod types;
 
 pub use enums::PatternType;
-pub use errors::BuildError;
 pub use scan_context::ScanContext;
 pub use scanner::Scanner;
 pub use signature::Signature;

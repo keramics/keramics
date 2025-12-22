@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_sigscan::{BuildError, PatternType, ScanContext, Scanner, Signature};
+use keramics_sigscan::{PatternType, ScanContext, Scanner, Signature};
 
 use super::enums::FormatIdentifier;
 use super::ewf::constants::*;
@@ -263,8 +263,15 @@ impl FormatScanner {
     }
 
     /// Builds the format signature scanner.
-    pub fn build(&mut self) -> Result<(), BuildError> {
-        self.signature_scanner.build()
+    pub fn build(&mut self) -> Result<(), ErrorTrace> {
+        match self.signature_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build signature scanner");
+                return Err(error);
+            }
+        }
+        Ok(())
     }
 
     /// Scans a data stream for format signatures.
@@ -359,7 +366,7 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     #[test]
-    fn test_build() -> Result<(), BuildError> {
+    fn test_build() -> Result<(), ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apm_signatures();
         format_scanner.add_ewf_signatures();

@@ -210,10 +210,17 @@ impl FatFileSystem {
                 return Err(error);
             }
         };
+        let root_directory_offset: u64 = if self.root_directory_size > 0 {
+            self.root_directory_offset
+        } else {
+            self.first_cluster_offset
+                + (((self.root_directory_cluster_block_number - 2) as u64)
+                    * (self.cluster_block_size as u64))
+        };
         Ok(FatFileEntry::new(
             data_stream,
             block_allocation_table,
-            self.root_directory_offset as u32,
+            root_directory_offset as u32,
             None,
             directory_entries,
         ))

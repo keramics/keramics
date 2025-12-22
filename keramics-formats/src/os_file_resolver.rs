@@ -47,9 +47,11 @@ impl FileResolver for OsFileResolver {
 
                     path_buf.push(string);
                 }
+                PathComponent::Current => path_buf.push("."),
                 PathComponent::OsString(os_string) => path_buf.push(os_string),
-                PathComponent::String(string) => path_buf.push(string),
+                PathComponent::Parent => path_buf.push(".."),
                 PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
+                PathComponent::String(string) => path_buf.push(string),
                 PathComponent::Ucs2String(ucs2_string) => {
                     let string: String = ucs2_string.to_string();
 

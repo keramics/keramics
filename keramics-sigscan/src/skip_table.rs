@@ -13,8 +13,9 @@
 
 use std::cmp::min;
 use std::collections::HashMap;
+use std::sync::Arc;
 
-use super::types::SignatureReference;
+use super::signature::Signature;
 
 /// Skip table.
 #[derive(Debug)]
@@ -40,7 +41,7 @@ impl SkipTable {
     }
 
     /// Fills the skip table.
-    pub fn fill(&mut self, signatures: &[SignatureReference]) {
+    pub fn fill(&mut self, signatures: &[Arc<Signature>]) {
         for signature in signatures.iter() {
             self.smallest_pattern_size = if self.smallest_pattern_size == 0 {
                 signature.pattern_size
@@ -93,7 +94,7 @@ mod tests {
     fn test_fill() {
         let mut skip_table: SkipTable = SkipTable::new();
 
-        let mut signatures: Vec<SignatureReference> = Vec::new();
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
         signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,

@@ -14,7 +14,6 @@
 use std::collections::HashSet;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_sigscan::BuildError;
 
 use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::ewf::EwfImage;
@@ -85,7 +84,7 @@ impl VfsScanner {
     }
 
     /// Builds the scanner.
-    pub fn build(&mut self) -> Result<(), BuildError> {
+    pub fn build(&mut self) -> Result<(), ErrorTrace> {
         self.storage_media_image_scanner.add_ewf_signatures();
         self.storage_media_image_scanner.add_qcow_signatures();
         self.storage_media_image_scanner
@@ -94,8 +93,16 @@ impl VfsScanner {
         self.storage_media_image_scanner.add_vhd_signatures();
         self.storage_media_image_scanner.add_vhdx_signatures();
         self.storage_media_image_scanner.add_vmdk_signatures();
-        self.storage_media_image_scanner.build()?;
-
+        match self.storage_media_image_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build storage media image scanner"
+                );
+                return Err(error);
+            }
+        }
         // The Master Boot Record (MBR) signatures are used in other volume
         // system or file formats, such as:
         // * BitLocker drive encryption (BDE)
@@ -109,20 +116,49 @@ impl VfsScanner {
 
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
-        self.phase1_volume_system_scanner.build()?;
-
+        match self.phase1_volume_system_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build phase 1 volume system scanner"
+                );
+                return Err(error);
+            }
+        }
         self.phase2_volume_system_scanner.add_fat_signatures();
         self.phase2_volume_system_scanner.add_ntfs_signatures();
-        self.phase2_volume_system_scanner.build()?;
-
+        match self.phase2_volume_system_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build phase 2 volume system scanner"
+                );
+                return Err(error);
+            }
+        }
         self.phase3_volume_system_scanner.add_mbr_signatures();
-        self.phase3_volume_system_scanner.build()?;
-
+        match self.phase3_volume_system_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build phase 3 volume system scanner"
+                );
+                return Err(error);
+            }
+        }
         self.file_system_scanner.add_ext_signatures();
         self.file_system_scanner.add_fat_signatures();
         self.file_system_scanner.add_ntfs_signatures();
-        self.file_system_scanner.build()?;
-
+        match self.file_system_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build file system scanner");
+                return Err(error);
+            }
+        }
         Ok(())
     }
 
@@ -146,8 +182,6 @@ impl VfsScanner {
                 )));
             }
         };
-        let file_type: VfsFileType = file_entry.get_file_type();
-
         match file_entry.get_file_type() {
             VfsFileType::BlockDevice | VfsFileType::CharacterDevice | VfsFileType::Device => {
                 return Err(keramics_core::error_trace_new!(
@@ -917,7 +951,7 @@ mod tests {
     }
 
     #[test]
-    fn test_build() -> Result<(), BuildError> {
+    fn test_build() -> Result<(), ErrorTrace> {
         let mut format_scanner: VfsScanner = VfsScanner::new();
         format_scanner.build()
     }

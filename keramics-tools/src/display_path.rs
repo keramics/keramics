@@ -89,7 +89,9 @@ impl DisplayPath {
                 }
                 string_parts.join("")
             }
+            PathComponent::Current => String::from("."),
             PathComponent::OsString(_) => todo!(),
+            PathComponent::Parent => String::from(".."),
             PathComponent::Root => String::new(),
             PathComponent::String(string) => self.escape_string(string),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string

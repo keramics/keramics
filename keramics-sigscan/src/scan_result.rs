@@ -11,13 +11,15 @@
  * under the License.
  */
 
-use super::scan_tree::ScanTreeNode;
-use super::types::SignatureReference;
+use std::sync::Arc;
+
+use super::scan_tree_node::ScanTreeNode;
+use super::signature::Signature;
 
 /// Scan object.
 #[derive(Debug)]
 pub enum ScanResult<'a> {
     None,
     ScanTreeNode(&'a ScanTreeNode),
-    Signature(SignatureReference),
+    Signature(Arc<Signature>),
 }

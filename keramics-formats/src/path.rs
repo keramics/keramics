@@ -15,7 +15,7 @@ use std::fmt;
 use std::path::{Component, MAIN_SEPARATOR_STR, PathBuf};
 
 use keramics_core::ErrorTrace;
-use keramics_types::ByteString;
+use keramics_types::{ByteString, Ucs2String};
 
 use super::path_component::PathComponent;
 
@@ -37,14 +37,30 @@ impl Path {
         let mut components: Vec<PathComponent> = self.components.clone();
 
         for path_component in path_components.iter() {
-            if path_component == ".." {
-                if components.is_empty() {
-                    components.push(path_component.clone());
-                } else {
-                    components.pop();
+            match path_component {
+                PathComponent::Current => {
+                    if components.is_empty() {
+                        components.push(PathComponent::Current);
+                    }
                 }
-            } else if path_component != "." {
-                components.push(path_component.clone());
+                PathComponent::Parent => match components.last() {
+                    None | Some(PathComponent::Parent) => {
+                        components.push(PathComponent::Parent);
+                    }
+                    Some(PathComponent::Current) => {
+                        _ = components.pop();
+                        components.push(PathComponent::Parent);
+                    }
+                    Some(PathComponent::Root) => {}
+                    _ => _ = components.pop(),
+                },
+                PathComponent::Root => {}
+                _ => {
+                    if let Some(PathComponent::Current) = components.last() {
+                        _ = components.pop();
+                    }
+                    components.push(path_component.clone())
+                }
             }
         }
         Self { components }
@@ -93,12 +109,17 @@ impl Path {
 
     /// Determines if the path is relative.
     pub fn is_relative(&self) -> bool {
-        self.components.len() >= 1 && !self.components[0].is_empty()
+        self.components.len() >= 1 && self.components[0] != PathComponent::Root
     }
 
     /// Determines if the path represents the root.
     pub fn is_root(&self) -> bool {
-        self.components.len() == 1 && self.components[0].is_empty()
+        self.components.len() == 1 && self.components[0] == PathComponent::Root
+    }
+
+    /// Removes the last component from the path.
+    pub fn pop(&mut self) -> Option<PathComponent> {
+        self.components.pop()
     }
 
     /// Appends a component to the path.
@@ -117,9 +138,11 @@ impl Path {
 
                     path_buf.push(string);
                 }
+                PathComponent::Current => path_buf.push("."),
                 PathComponent::OsString(os_string) => path_buf.push(os_string),
-                PathComponent::String(string) => path_buf.push(string),
+                PathComponent::Parent => path_buf.push(".."),
                 PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
+                PathComponent::String(string) => path_buf.push(string),
                 PathComponent::Ucs2String(ucs2_string) => {
                     let string: String = ucs2_string.to_string();
 
@@ -135,10 +158,8 @@ impl From<&ByteString> for Path {
     /// Converts a [`&ByteString`] into a [`Path`]
     fn from(byte_string: &ByteString) -> Self {
         let components: Vec<PathComponent> = if byte_string.is_empty() {
-            // Splitting "" results in [""]
             vec![]
-        } else if byte_string == "/" {
-            // Splitting "/" results in ["", ""]
+        } else if byte_string.elements == [0x2f] {
             vec![PathComponent::Root]
         } else {
             let mut components: Vec<PathComponent> = Vec::new();
@@ -148,9 +169,22 @@ impl From<&ByteString> for Path {
                     if components.is_empty() {
                         components.push(PathComponent::Root);
                     }
-                } else if byte_string_segment == [0x2e, 0x2e] && !components.is_empty() {
-                    components.pop();
-                } else if byte_string_segment != [0x02e] {
+                } else if byte_string_segment == [0x2e] {
+                    if components.is_empty() {
+                        components.push(PathComponent::Current);
+                    }
+                } else if byte_string_segment == [0x2e, 0x2e] {
+                    match components.last() {
+                        None | Some(PathComponent::Parent) => {
+                            components.push(PathComponent::Parent);
+                        }
+                        Some(PathComponent::Root) => {}
+                        _ => _ = components.pop(),
+                    }
+                } else {
+                    if let Some(PathComponent::Current) = components.last() {
+                        _ = components.pop();
+                    }
                     let path_component: PathComponent =
                         PathComponent::ByteString(ByteString::from(byte_string_segment));
 
@@ -171,21 +205,31 @@ impl From<&PathBuf> for Path {
 
         for component in path_buf.components() {
             match component {
-                Component::CurDir | Component::Prefix(_) => {}
+                Component::CurDir => {
+                    if components.is_empty() {
+                        components.push(PathComponent::Current);
+                    }
+                }
                 Component::Normal(os_str) => {
+                    if let Some(PathComponent::Current) = components.last() {
+                        _ = components.pop();
+                    }
                     if !os_str.is_empty() {
                         components.push(PathComponent::from(os_str));
                     }
                 }
-                Component::ParentDir => {
-                    if components.is_empty() {
-                        components.push(PathComponent::from(".."));
-                    } else {
-                        components.pop();
+                Component::ParentDir => match components.last() {
+                    None | Some(PathComponent::Parent) => {
+                        components.push(PathComponent::Parent);
                     }
-                }
+                    Some(PathComponent::Root) => {}
+                    _ => _ = components.pop(),
+                },
+                Component::Prefix(_) => {}
                 Component::RootDir => {
-                    components.push(PathComponent::Root);
+                    if components.is_empty() {
+                        components.push(PathComponent::Root);
+                    }
                 }
             }
         }
@@ -197,10 +241,8 @@ impl From<&str> for Path {
     /// Converts a [`&str`] into a [`Path`]
     fn from(string: &str) -> Self {
         let components: Vec<PathComponent> = if string.is_empty() {
-            // Splitting "" results in [""]
             vec![]
         } else if string == "/" {
-            // Splitting "/" results in ["", ""]
             vec![PathComponent::Root]
         } else {
             let mut components: Vec<PathComponent> = Vec::new();
@@ -210,9 +252,22 @@ impl From<&str> for Path {
                     if components.is_empty() {
                         components.push(PathComponent::Root);
                     }
-                } else if string_segment == ".." && !components.is_empty() {
-                    components.pop();
-                } else if string_segment != "." {
+                } else if string_segment == "." {
+                    if components.is_empty() {
+                        components.push(PathComponent::Current);
+                    }
+                } else if string_segment == ".." {
+                    match components.last() {
+                        None | Some(PathComponent::Parent) => {
+                            components.push(PathComponent::Parent);
+                        }
+                        Some(PathComponent::Root) => {}
+                        _ => _ = components.pop(),
+                    }
+                } else {
+                    if let Some(PathComponent::Current) = components.last() {
+                        _ = components.pop();
+                    }
                     let path_component: PathComponent = PathComponent::from(string_segment);
 
                     components.push(path_component);
@@ -243,9 +298,22 @@ impl From<&[&str]> for Path {
                 if components.is_empty() {
                     components.push(PathComponent::Root);
                 }
-            } else if *string == ".." && !components.is_empty() {
-                components.pop();
-            } else if *string != "." {
+            } else if *string == "." {
+                if components.is_empty() {
+                    components.push(PathComponent::Current);
+                }
+            } else if *string == ".." {
+                match components.last() {
+                    None | Some(PathComponent::Parent) => {
+                        components.push(PathComponent::Parent);
+                    }
+                    Some(PathComponent::Root) => {}
+                    _ => _ = components.pop(),
+                }
+            } else {
+                if let Some(PathComponent::Current) = components.last() {
+                    _ = components.pop();
+                }
                 let path_component: PathComponent = PathComponent::from(*string);
 
                 components.push(path_component);
@@ -266,9 +334,22 @@ impl From<&[String]> for Path {
                 if components.is_empty() {
                     components.push(PathComponent::Root);
                 }
-            } else if string == ".." && !components.is_empty() {
-                components.pop();
-            } else if string != "." {
+            } else if string == "." {
+                if components.is_empty() {
+                    components.push(PathComponent::Current);
+                }
+            } else if string == ".." {
+                match components.last() {
+                    None | Some(PathComponent::Parent) => {
+                        components.push(PathComponent::Parent);
+                    }
+                    Some(PathComponent::Root) => {}
+                    _ => _ = components.pop(),
+                }
+            } else {
+                if let Some(PathComponent::Current) = components.last() {
+                    _ = components.pop();
+                }
                 let path_component: PathComponent = PathComponent::from(string);
 
                 components.push(path_component);
@@ -293,6 +374,49 @@ impl From<Vec<PathComponent>> for Path {
         Self {
             components: path_components,
         }
+    }
+}
+
+impl From<&Ucs2String> for Path {
+    /// Converts a [`&Ucs2String`] into a [`Path`]
+    fn from(ucs2_string: &Ucs2String) -> Self {
+        let components: Vec<PathComponent> = if ucs2_string.is_empty() {
+            vec![]
+        } else if ucs2_string.elements == [0x002f] {
+            vec![PathComponent::Root]
+        } else {
+            let mut components: Vec<PathComponent> = Vec::new();
+
+            for ucs2_string_segment in ucs2_string.elements.split(|value| *value == 0x002f) {
+                if ucs2_string_segment.is_empty() {
+                    if components.is_empty() {
+                        components.push(PathComponent::Root);
+                    }
+                } else if ucs2_string_segment == [0x002e] {
+                    if components.is_empty() {
+                        components.push(PathComponent::Current);
+                    }
+                } else if ucs2_string_segment == [0x002e, 0x002e] {
+                    match components.last() {
+                        None | Some(PathComponent::Parent) => {
+                            components.push(PathComponent::Parent);
+                        }
+                        Some(PathComponent::Root) => {}
+                        _ => _ = components.pop(),
+                    }
+                } else {
+                    if let Some(PathComponent::Current) = components.last() {
+                        _ = components.pop();
+                    }
+                    let path_component: PathComponent =
+                        PathComponent::Ucs2String(Ucs2String::from(ucs2_string_segment));
+
+                    components.push(path_component);
+                }
+            }
+            components
+        };
+        Self { components }
     }
 }
 
@@ -353,6 +477,30 @@ mod tests {
 
         let test_struct: Path = string_path.new_with_join(&additional_string_path);
         assert_eq!(test_struct.to_string(), "../filename.txt");
+
+        let string_path: Path = Path::from("/");
+        let additional_string_path: Path = Path::from("../filename.txt");
+
+        let test_struct: Path = string_path.new_with_join(&additional_string_path);
+        assert_eq!(test_struct.to_string(), "/filename.txt");
+
+        let string_path: Path = Path::from("/../directory");
+        let additional_string_path: Path = Path::from("../filename.txt");
+
+        let test_struct: Path = string_path.new_with_join(&additional_string_path);
+        assert_eq!(test_struct.to_string(), "/filename.txt");
+
+        let string_path: Path = Path::from("..");
+        let additional_string_path: Path = Path::from("../filename.txt");
+
+        let test_struct: Path = string_path.new_with_join(&additional_string_path);
+        assert_eq!(test_struct.to_string(), "../../filename.txt");
+
+        let string_path: Path = Path::from(".");
+        let additional_string_path: Path = Path::from("../filename.txt");
+
+        let test_struct: Path = string_path.new_with_join(&additional_string_path);
+        assert_eq!(test_struct.to_string(), "../filename.txt");
     }
 
     #[test]
@@ -382,20 +530,48 @@ mod tests {
         assert_eq!(test_struct.to_string(), "/directory/filename.txt");
 
         let string_path: Path = Path::from("/directory");
-        let additional_path_components: [PathComponent; 2] = [
-            PathComponent::from(".."),
-            PathComponent::from("filename.txt"),
-        ];
+        let additional_path_components: [PathComponent; 2] =
+            [PathComponent::Parent, PathComponent::from("filename.txt")];
 
         let test_struct: Path =
             string_path.new_with_join_path_components(&additional_path_components);
         assert_eq!(test_struct.to_string(), "/filename.txt");
 
         let string_path: Path = Path::from("../directory");
-        let additional_path_components: [PathComponent; 2] = [
-            PathComponent::from(".."),
-            PathComponent::from("filename.txt"),
-        ];
+        let additional_path_components: [PathComponent; 2] =
+            [PathComponent::Parent, PathComponent::from("filename.txt")];
+
+        let test_struct: Path =
+            string_path.new_with_join_path_components(&additional_path_components);
+        assert_eq!(test_struct.to_string(), "../filename.txt");
+
+        let string_path: Path = Path::from("/");
+        let additional_path_components: [PathComponent; 2] =
+            [PathComponent::Parent, PathComponent::from("filename.txt")];
+
+        let test_struct: Path =
+            string_path.new_with_join_path_components(&additional_path_components);
+        assert_eq!(test_struct.to_string(), "/filename.txt");
+
+        let string_path: Path = Path::from("/../directory");
+        let additional_path_components: [PathComponent; 2] =
+            [PathComponent::Parent, PathComponent::from("filename.txt")];
+
+        let test_struct: Path =
+            string_path.new_with_join_path_components(&additional_path_components);
+        assert_eq!(test_struct.to_string(), "/filename.txt");
+
+        let string_path: Path = Path::from("..");
+        let additional_path_components: [PathComponent; 2] =
+            [PathComponent::Parent, PathComponent::from("filename.txt")];
+
+        let test_struct: Path =
+            string_path.new_with_join_path_components(&additional_path_components);
+        assert_eq!(test_struct.to_string(), "../../filename.txt");
+
+        let string_path: Path = Path::from(".");
+        let additional_path_components: [PathComponent; 2] =
+            [PathComponent::Parent, PathComponent::from("filename.txt")];
 
         let test_struct: Path =
             string_path.new_with_join_path_components(&additional_path_components);
@@ -480,6 +656,9 @@ mod tests {
         assert_eq!(test_struct.is_root(), false);
     }
 
+    // TODO: add tests for pop
+    // TODO: add tests for push
+
     #[test]
     fn test_to_path_buf() -> Result<(), ErrorTrace> {
         let path: Path = Path {
@@ -527,6 +706,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests from byte string
 
     #[test]
     fn test_from_path_buf() {
@@ -599,7 +780,7 @@ mod tests {
             test_struct,
             Path {
                 components: vec![
-                    PathComponent::String(String::from("..")),
+                    PathComponent::Parent,
                     PathComponent::OsString(OsString::from("directory")),
                 ]
             }
@@ -611,9 +792,43 @@ mod tests {
             test_struct,
             Path {
                 components: vec![
-                    PathComponent::String(String::from("..")),
+                    PathComponent::Parent,
                     PathComponent::OsString(OsString::from("filename.txt")),
                 ]
+            }
+        );
+
+        let path_buf: PathBuf = PathBuf::from("../../directory");
+        let test_struct: Path = Path::from(&path_buf);
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![
+                    PathComponent::Parent,
+                    PathComponent::Parent,
+                    PathComponent::OsString(OsString::from("directory")),
+                ]
+            }
+        );
+
+        let path_buf: PathBuf = PathBuf::from("/../directory");
+        let test_struct: Path = Path::from(&path_buf);
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::OsString(OsString::from("directory")),
+                ]
+            }
+        );
+
+        let path_buf: PathBuf = PathBuf::from(".");
+        let test_struct: Path = Path::from(&path_buf);
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![PathComponent::Current]
             }
         );
     }
@@ -621,16 +836,13 @@ mod tests {
     #[test]
     fn test_from_str() {
         let test_struct: Path = Path::from("/");
-        assert_eq!(test_struct.components, vec![PathComponent::Root,]);
+        assert_eq!(test_struct.components, vec![PathComponent::Root]);
 
         let test_struct: Path = Path::from("/directory");
         assert_eq!(
             test_struct,
             Path {
-                components: vec![
-                    PathComponent::Root,
-                    PathComponent::String(String::from("directory")),
-                ]
+                components: vec![PathComponent::Root, PathComponent::from("directory"),]
             }
         );
 
@@ -640,8 +852,8 @@ mod tests {
             Path {
                 components: vec![
                     PathComponent::Root,
-                    PathComponent::String(String::from("directory")),
-                    PathComponent::String(String::from("filename.txt")),
+                    PathComponent::from("directory"),
+                    PathComponent::from("filename.txt"),
                 ]
             }
         );
@@ -652,8 +864,8 @@ mod tests {
             Path {
                 components: vec![
                     PathComponent::Root,
-                    PathComponent::String(String::from("directory")),
-                    PathComponent::String(String::from("filename.txt")),
+                    PathComponent::from("directory"),
+                    PathComponent::from("filename.txt"),
                 ]
             }
         );
@@ -662,10 +874,7 @@ mod tests {
         assert_eq!(
             test_struct,
             Path {
-                components: vec![
-                    PathComponent::Root,
-                    PathComponent::String(String::from("directory")),
-                ]
+                components: vec![PathComponent::Root, PathComponent::from("directory"),]
             }
         );
 
@@ -673,7 +882,7 @@ mod tests {
         assert_eq!(
             test_struct,
             Path {
-                components: vec![PathComponent::String(String::from("directory")),]
+                components: vec![PathComponent::from("directory")]
             }
         );
 
@@ -681,10 +890,7 @@ mod tests {
         assert_eq!(
             test_struct,
             Path {
-                components: vec![
-                    PathComponent::String(String::from("..")),
-                    PathComponent::String(String::from("directory")),
-                ]
+                components: vec![PathComponent::Parent, PathComponent::from("directory"),]
             }
         );
 
@@ -692,10 +898,35 @@ mod tests {
         assert_eq!(
             test_struct,
             Path {
+                components: vec![PathComponent::Parent, PathComponent::from("filename.txt"),]
+            }
+        );
+
+        let test_struct: Path = Path::from("../../directory");
+        assert_eq!(
+            test_struct,
+            Path {
                 components: vec![
-                    PathComponent::String(String::from("..")),
-                    PathComponent::String(String::from("filename.txt")),
+                    PathComponent::Parent,
+                    PathComponent::Parent,
+                    PathComponent::from("directory"),
                 ]
+            }
+        );
+
+        let test_struct: Path = Path::from("/../directory");
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![PathComponent::Root, PathComponent::from("directory"),]
+            }
+        );
+
+        let test_struct: Path = Path::from(".");
+        assert_eq!(
+            test_struct,
+            Path {
+                components: vec![PathComponent::Current]
             }
         );
     }
@@ -733,6 +964,18 @@ mod tests {
         let string: String = String::from("../directory/../filename.txt");
         let test_struct: Path = Path::from(&string);
         assert_eq!(test_struct.components.len(), 2);
+
+        let string: String = String::from("../../directory");
+        let test_struct: Path = Path::from(&string);
+        assert_eq!(test_struct.components.len(), 3);
+
+        let string: String = String::from("/../directory");
+        let test_struct: Path = Path::from(&string);
+        assert_eq!(test_struct.components.len(), 2);
+
+        let string: String = String::from(".");
+        let test_struct: Path = Path::from(&string);
+        assert_eq!(test_struct.components.len(), 1);
     }
 
     #[test]
@@ -764,6 +1007,10 @@ mod tests {
         let str_array: [&str; 2] = ["..", "directory"];
         let test_struct: Path = Path::from(str_array.as_slice());
         assert_eq!(test_struct.components.len(), 2);
+
+        let str_array: [&str; 3] = ["..", "..", "directory"];
+        let test_struct: Path = Path::from(str_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
 
         let str_array: [&str; 4] = ["..", "directory", "..", "filename.txt"];
         let test_struct: Path = Path::from(str_array.as_slice());
@@ -813,6 +1060,14 @@ mod tests {
         let test_struct: Path = Path::from(string_array.as_slice());
         assert_eq!(test_struct.components.len(), 2);
 
+        let string_array: [String; 3] = [
+            String::from(".."),
+            String::from(".."),
+            String::from("directory"),
+        ];
+        let test_struct: Path = Path::from(string_array.as_slice());
+        assert_eq!(test_struct.components.len(), 3);
+
         let string_array: [String; 4] = [
             String::from(".."),
             String::from("directory"),
@@ -826,6 +1081,8 @@ mod tests {
     // TODO: add tests for from path components slice
     // TODO: add tests for from path components vector
 
+    // TODO: add tests from ucs2 string
+
     #[test]
     fn test_to_string() {
         let test_struct: Path = Path::from("/");
@@ -835,21 +1092,39 @@ mod tests {
         assert_eq!(test_struct.to_string(), "/directory");
 
         let test_struct: Path = Path::from("/directory/filename.txt");
-        assert_eq!(test_struct.to_string(), "/directory/filename.txt");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "/directory/filename.txt");
 
         let test_struct: Path = Path::from("/directory/./filename.txt");
-        assert_eq!(test_struct.to_string(), "/directory/filename.txt");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "/directory/filename.txt");
 
         let test_struct: Path = Path::from("/directory/");
-        assert_eq!(test_struct.to_string(), "/directory");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "/directory");
 
         let test_struct: Path = Path::from("./directory");
-        assert_eq!(test_struct.to_string(), "directory");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "directory");
 
         let test_struct: Path = Path::from("../directory");
-        assert_eq!(test_struct.to_string(), "../directory");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "../directory");
 
         let test_struct: Path = Path::from("../directory/../filename.txt");
-        assert_eq!(test_struct.to_string(), "../filename.txt");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "../filename.txt");
+
+        let test_struct: Path = Path::from("../../directory");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "../../directory");
+
+        let test_struct: Path = Path::from("/../directory");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, "/directory");
+
+        let test_struct: Path = Path::from(".");
+        let string: String = test_struct.to_string();
+        assert_eq!(string, ".");
     }
 }

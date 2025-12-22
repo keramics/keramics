@@ -11,7 +11,7 @@ repository = { workspace = true }
 version = { workspace = true }
 
 [dependencies]
-mdbook-preprocessor = { version = "0.5.1" }
+mdbook-preprocessor = { version = "0.5.2" }
 pulldown-cmark = { version = "0.13.0" }
 pulldown-cmark-to-cmark = { version = "21.1.0" }
 serde_json = { version = "1.0.145" }

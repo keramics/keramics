@@ -13,16 +13,16 @@
 
 use std::sync::Arc;
 
+use keramics_core::ErrorTrace;
+
 use super::enums::PatternType;
-use super::errors::BuildError;
 use super::scan_tree::ScanTree;
 use super::signature::Signature;
-use super::types::SignatureReference;
 
 /// Signature scanner.
 pub struct Scanner {
     /// Signatures.
-    pub(super) signatures: Vec<SignatureReference>,
+    pub(super) signatures: Vec<Arc<Signature>>,
 
     /// Header (offset relative from start) scan tree.
     pub(super) header_scan_tree: ScanTree,
@@ -51,10 +51,29 @@ impl Scanner {
     }
 
     /// Builds the scan trees.
-    pub fn build(&mut self) -> Result<(), BuildError> {
-        self.header_scan_tree.build(&self.signatures)?;
-        self.footer_scan_tree.build(&self.signatures)?;
-        self.unbound_scan_tree.build(&self.signatures)
+    pub fn build(&mut self) -> Result<(), ErrorTrace> {
+        match self.header_scan_tree.build(&self.signatures) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build header scan tree");
+                return Err(error);
+            }
+        }
+        match self.footer_scan_tree.build(&self.signatures) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build footer scan tree");
+                return Err(error);
+            }
+        }
+        match self.unbound_scan_tree.build(&self.signatures) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build unbound scan tree");
+                return Err(error);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -74,12 +93,11 @@ mod tests {
             0,
             "conectix".as_bytes(),
         ));
-
         assert_eq!(scanner.signatures.len(), 1);
     }
 
     #[test]
-    fn test_build() -> Result<(), BuildError> {
+    fn test_build() -> Result<(), ErrorTrace> {
         let mut scanner: Scanner = Scanner::new();
 
         scanner.add_signature(Signature::new(

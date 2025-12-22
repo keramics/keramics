@@ -21,7 +21,7 @@ use super::constants::*;
 use super::enums::PatternType;
 use super::groups::ByteValueGroup;
 use super::pattern_weights::PatternWeights;
-use super::types::SignatureReference;
+use super::signature::Signature;
 
 /// Signature table.
 pub(super) struct SignatureTable {
@@ -38,15 +38,15 @@ pub(super) struct SignatureTable {
     pub smallest_pattern_offset: usize,
 
     /// Signatures.
-    pub signatures: Vec<SignatureReference>,
+    pub signatures: Vec<Arc<Signature>>,
 
-    /// Byte value (pattern) weights.
+    /// Byte value weights.
     byte_value_weights: PatternWeights,
 
-    /// Occurrence (pattern) weights.
+    /// Occurrence weights.
     occurrence_weights: PatternWeights,
 
-    /// Similarity (pattern) weights.
+    /// Similarity weights.
     similarity_weights: PatternWeights,
 }
 
@@ -65,8 +65,8 @@ impl SignatureTable {
         }
     }
 
-    /// Calculates the pattern weights.
-    pub fn calculate_pattern_weights(&mut self) {
+    /// Calculates the weights.
+    pub fn calculate_weights(&mut self) {
         for (_, byte_value_group) in self.byte_value_groups.iter() {
             let number_of_signature_groups: usize = byte_value_group.signature_groups.len();
             if number_of_signature_groups > 1 {
@@ -94,7 +94,7 @@ impl SignatureTable {
     /// Fills the signature table.
     pub fn fill(
         &mut self,
-        signatures: &[SignatureReference],
+        signatures: &[Arc<Signature>],
         offsets_to_ignore: &[usize],
         largest_pattern_offset: usize,
     ) {
@@ -151,7 +151,7 @@ impl SignatureTable {
         result
     }
 
-    /// Retrieves the pattern offset for specific byte value weights.
+    /// Retrieves the pattern offset based on the byte value weights.
     fn get_pattern_offset_by_byte_value_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
             self.mediator.debug_print(String::from(
@@ -184,7 +184,7 @@ impl SignatureTable {
             .map(|offset_group| offset_group.offsets[0])
     }
 
-    /// Retrieves the pattern offset for specific occurrence weights.
+    /// Retrieves the pattern offset based on the occurrence weights.
     fn get_pattern_offset_by_occurrence_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
             self.mediator.debug_print(String::from(
@@ -218,11 +218,11 @@ impl SignatureTable {
             Some(offset_group) => {
                 let mut largest_byte_value_weight: isize = 0;
                 let mut pattern_offset: usize = 0;
-                for (offset_index, occurrence_offset) in offset_group.offsets.iter().enumerate() {
+                for (group_index, occurrence_offset) in offset_group.offsets.iter().enumerate() {
                     let byte_value_weight: isize =
                         self.byte_value_weights.get_weight(occurrence_offset);
 
-                    if offset_index == 0 || byte_value_weight > largest_byte_value_weight {
+                    if group_index == 0 || byte_value_weight > largest_byte_value_weight {
                         largest_byte_value_weight = byte_value_weight;
                         pattern_offset = *occurrence_offset;
                     }
@@ -256,7 +256,7 @@ impl SignatureTable {
         }
     }
 
-    /// Retrieves the pattern offset for specific similarity weights.
+    /// Retrieves the pattern offset based on the similarity weights.
     fn get_pattern_offset_by_similarity_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
             self.mediator.debug_print(String::from(
@@ -292,7 +292,7 @@ impl SignatureTable {
                 let mut largest_occurrence_weight: isize = 0;
                 let mut pattern_offset: usize = 0;
 
-                for (offset_index, similarity_offset) in offset_group.offsets.iter().enumerate() {
+                for (group_index, similarity_offset) in offset_group.offsets.iter().enumerate() {
                     let occurrence_weight: isize =
                         self.occurrence_weights.get_weight(similarity_offset);
                     let byte_value_weight: isize =
@@ -304,7 +304,7 @@ impl SignatureTable {
                     {
                         largest_occurrence_weight = 0;
                     }
-                    if offset_index == 0 || occurrence_weight > largest_occurrence_weight {
+                    if group_index == 0 || occurrence_weight > largest_occurrence_weight {
                         largest_byte_value_weight = byte_value_weight;
                         largest_occurrence_weight = occurrence_weight;
                         pattern_offset = *similarity_offset;
@@ -348,11 +348,8 @@ impl SignatureTable {
     }
 
     /// Retrieves the signatures for a specific pattern offset.
-    pub fn get_signatures_by_pattern_offset(
-        &self,
-        pattern_offset: usize,
-    ) -> Vec<SignatureReference> {
-        let mut signatures: Vec<SignatureReference> = Vec::new();
+    pub fn get_signatures_by_pattern_offset(&self, pattern_offset: usize) -> Vec<Arc<Signature>> {
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
 
         if let Some(byte_value_group) = self.byte_value_groups.get(&pattern_offset) {
             for (_, signature_group) in byte_value_group.signature_groups.iter() {
@@ -371,7 +368,7 @@ impl SignatureTable {
         &mut self,
         pattern_offset: usize,
         byte_value: u8,
-        signature: &SignatureReference,
+        signature: &Arc<Signature>,
     ) {
         match self.byte_value_groups.get_mut(&pattern_offset) {
             Some(byte_value_group) => byte_value_group.insert_signature(byte_value, signature),
@@ -386,6 +383,11 @@ impl SignatureTable {
             }
         }
     }
+
+    /// Determines if the signature table is empty.
+    pub fn is_empty(&self) -> bool {
+        self.signatures.is_empty()
+    }
 }
 
 #[cfg(test)]
@@ -395,10 +397,10 @@ mod tests {
     use crate::signature::Signature;
 
     #[test]
-    fn test_calculate_pattern_weights() {
+    fn test_calculate_weights() {
         let mut signature_table: SignatureTable = SignatureTable::new(&PatternType::BoundToStart);
 
-        let mut signatures: Vec<SignatureReference> = Vec::new();
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
         signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
@@ -407,9 +409,9 @@ mod tests {
         )));
         let offsets_to_ignore: Vec<usize> = Vec::new();
         signature_table.fill(&signatures, &offsets_to_ignore, 8);
-        signature_table.calculate_pattern_weights();
+        signature_table.calculate_weights();
 
-        // TODO: check pattern weights.
+        // TODO: check weights.
     }
 
     #[test]
@@ -419,7 +421,7 @@ mod tests {
         assert_eq!(signature_table.byte_value_groups.len(), 0);
         assert_eq!(signature_table.signatures.len(), 0);
 
-        let mut signatures: Vec<SignatureReference> = Vec::new();
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
         signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
@@ -440,7 +442,7 @@ mod tests {
         assert_eq!(signature_table.byte_value_groups.len(), 0);
         assert_eq!(signature_table.signatures.len(), 0);
 
-        let mut signatures: Vec<SignatureReference> = Vec::new();
+        let mut signatures: Vec<Arc<Signature>> = Vec::new();
         signatures.push(Arc::new(Signature::new(
             "vdh",
             PatternType::BoundToStart,
@@ -460,4 +462,5 @@ mod tests {
     // TODO: add tests for get_pattern_offset_by_similarity_weights
     // TODO: add tests for get_signatures_by_pattern_offset
     // TODO: add tests for insert_signature
+    // TODO: add tests for is_empty
 }

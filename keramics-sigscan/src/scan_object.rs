@@ -13,6 +13,12 @@
 
 use std::sync::Arc;
 
+use super::scan_tree_node::ScanTreeNode;
 use super::signature::Signature;
 
-pub type SignatureReference = Arc<Signature>;
+/// Scan object.
+#[derive(Debug)]
+pub(super) enum ScanObject {
+    ScanTreeNode(ScanTreeNode),
+    Signature(Arc<Signature>),
+}

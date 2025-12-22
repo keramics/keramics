@@ -17,10 +17,10 @@ use std::collections::HashMap;
 use super::groups::OffsetGroup;
 
 pub struct PatternWeights {
-    /// Offset (per weight) groups.
+    /// Offset groups per weight.
     pub offset_groups: HashMap<isize, OffsetGroup>,
 
-    /// Weight (per offset) groups.
+    /// Weights per offset.
     pub weights: HashMap<usize, isize>,
 
     /// Largest weight.
@@ -47,7 +47,7 @@ impl PatternWeights {
 
                 self.offset_groups.insert(weight, offset_group);
             }
-        };
+        }
         self.weights.insert(pattern_offset, weight);
 
         self.largest_weight = max(weight, self.largest_weight);

@@ -17,9 +17,10 @@ use std::sync::Arc;
 
 use super::enums::PatternType;
 use super::scan_result::ScanResult;
-use super::scan_tree::{ScanTree, ScanTreeNode};
+use super::scan_tree::ScanTree;
+use super::scan_tree_node::ScanTreeNode;
 use super::scanner::Scanner;
-use super::types::SignatureReference;
+use super::signature::Signature;
 
 /// Scan context.
 pub struct ScanContext<'a> {
@@ -42,7 +43,7 @@ pub struct ScanContext<'a> {
     unbound_range_size: usize,
 
     /// Results.
-    pub results: HashMap<u64, SignatureReference>,
+    pub results: HashMap<u64, Arc<Signature>>,
 }
 
 impl<'a> ScanContext<'a> {
@@ -129,7 +130,7 @@ impl<'a> ScanContext<'a> {
                         }
                     }
                 }
-            };
+            }
             if scan_tree.pattern_type != PatternType::Unbound {
                 break;
             }
