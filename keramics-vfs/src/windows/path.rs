@@ -39,24 +39,21 @@ impl WindowsPath {
     }
 
     /// Converts a [`&str`] containing a Windows path into a [`Path`]
-    pub fn from_str(string: &str) -> Path {
+    pub fn from_str(mut string: &str) -> Path {
         let components: Vec<PathComponent> = if string.is_empty() {
             vec![]
         } else if string == "\\" {
             vec![PathComponent::Root]
         } else {
-            let mut string_slice: &str = string.as_str();
-
-            if string_slice.starts_with("\\\\.\\")
-                || string_slice.starts_with("\\\\?\\")
-                || string_slice.starts_with("\\??\\")
+            if string.starts_with("\\\\.\\")
+                || string.starts_with("\\\\?\\")
+                || string.starts_with("\\??\\")
             {
-                string_slice = &string_slice[4..];
+                string = &string[4..];
             }
-
             let mut components: Vec<PathComponent> = Vec::new();
 
-            for string_segment in string_slice.split("\\") {
+            for string_segment in string.split("\\") {
                 if string_segment.is_empty() {
                     if components.is_empty() {
                         components.push(PathComponent::Root);
