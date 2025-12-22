@@ -26,9 +26,9 @@ use keramics_hashes::{
 };
 use keramics_types::Ucs2String;
 use keramics_vfs::{
-    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
-    VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner,
-    new_os_vfs_location,
+    PathFilter, PathFilterSignature, VfsDataFork, VfsFileEntry, VfsFileSystem,
+    VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver, VfsResolverReference,
+    VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner, WindowsPath, new_os_vfs_location,
 };
 
 mod display_path;
@@ -163,6 +163,7 @@ impl HashTool {
         file_entry: &mut VfsFileEntry,
         file_system_display_path: &String,
         path: &Path,
+        path_filter: &PathFilter,
     ) -> Result<(), ErrorTrace> {
         let display_path: String = self.display_path.escape_path(path);
 
@@ -180,15 +181,7 @@ impl HashTool {
                         }
                         None => display_path.clone(),
                     };
-                    // TODO: add option for dfImageTools compatibility mode
-                    // if name == Some(String::from("WofCompressedData")) {
-                    //     continue;
-                    // }
-                    // TODO: create path filter as skip list
-                    let hash_string: String = if path.components.len() > 1
-                        && path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
-                        && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
-                    {
+                    let hash_string: String = if path_filter.is_match(path, name.as_ref()) {
                         String::from("N/A (skipped)")
                     } else {
                         match self.calculate_hash_from_data_fork(&data_fork) {
@@ -292,6 +285,38 @@ impl HashTool {
                 },
                 None => String::new(),
             };
+            let mut path_filter: PathFilter = PathFilter::new();
+
+            match file_system.as_ref() {
+                VfsFileSystem::Ntfs(_) => {
+                    // TODO: add support for case folding.
+                    path_filter.add_signature(PathFilterSignature::new(
+                        WindowsPath::from_str("\\$BadClus"),
+                        Some(PathComponent::from(Ucs2String::from("$Bad"))),
+                    ));
+                    path_filter.add_signature(PathFilterSignature::new(
+                        WindowsPath::from_str("\\hiberfil.sys"),
+                        None,
+                    ));
+                    path_filter.add_signature(PathFilterSignature::new(
+                        WindowsPath::from_str("\\pagefile.sys"),
+                        None,
+                    ));
+                    // TODO: add option for dfImageTools compatibility mode
+                    // path_filter.add_signature(PathFilterSignature::new(
+                    //     Path::from("/**"),
+                    //     Some(PathComponent::from("WofCompressedData")),
+                    // ));
+                }
+                _ => {}
+            }
+            match path_filter.build() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to build path filter");
+                    return Err(error);
+                }
+            }
             let mut vfs_finder: VfsFinder = VfsFinder::new(&file_system);
 
             while let Some(result) = vfs_finder.next() {
@@ -301,6 +326,7 @@ impl HashTool {
                             &mut file_entry,
                             &display_path,
                             &path,
+                            &path_filter,
                         ) {
                             Ok(_) => {}
                             Err(mut error) => {
@@ -449,7 +475,7 @@ fn main() -> ExitCode {
                 };
             }
         }
-    };
+    }
     ExitCode::SUCCESS
 }
 
