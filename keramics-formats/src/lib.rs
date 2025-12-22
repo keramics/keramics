@@ -24,6 +24,7 @@ mod scanner;
 
 // Data formats used in other formats.
 mod plist;
+mod xml;
 
 // Storage media image formats
 pub mod ewf;
