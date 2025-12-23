@@ -24,8 +24,8 @@ pub struct XmlElement {
     /// Attributes.
     pub attributes: Vec<XmlAttribute>,
 
-    /// Elements.
-    pub elements: Vec<XmlElement>,
+    /// Sub elements.
+    pub sub_elements: Vec<XmlElement>,
 }
 
 impl XmlElement {
@@ -34,7 +34,7 @@ impl XmlElement {
             name: name.to_string(),
             value: String::new(),
             attributes: Vec::new(),
-            elements: Vec::new(),
+            sub_elements: Vec::new(),
         }
     }
 }

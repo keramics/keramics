@@ -174,7 +174,7 @@ A XML plist file consists of:
 
 For example:
 
-```
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist SYSTEM "file://localhost/System/Library/DTDs/PropertyList.dtd">
 <plist version="1.0">

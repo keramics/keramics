@@ -11,8 +11,6 @@
  * under the License.
  */
 
-use std::io;
-
 use pest::Parser;
 use pest::iterators::{Pair, Pairs};
 use pest_derive::Parser;
@@ -57,13 +55,17 @@ impl XmlDocument {
         };
         let mut inner_pairs: Pairs<Rule> = token_pair.into_inner();
 
-        let mut root_element: Option<XmlElement> = None;
-
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
             match rule {
                 Rule::element => {
-                    root_element = Some(self.parse_element(token_pair.into_inner())?);
+                    self.root_element = match self.parse_element(token_pair.into_inner()) {
+                        Ok(element) => Some(element),
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to parse element");
+                            return Err(error);
+                        }
+                    };
                 }
                 Rule::EOI | Rule::miscellaneous => {}
                 Rule::prolog => {
@@ -77,8 +79,6 @@ impl XmlDocument {
                 }
             }
         }
-        self.root_element = root_element;
-
         Ok(())
     }
 
@@ -112,9 +112,16 @@ impl XmlDocument {
             }
         };
         let rule: Rule = token_pair.as_rule();
+
         let mut xml_element: XmlElement = match rule {
             Rule::element_empty_tag | Rule::element_start_tag => {
-                self.parse_element_tag(token_pair.into_inner())?
+                match self.parse_element_tag(token_pair.into_inner()) {
+                    Ok(element) => element,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to parse element tag");
+                        return Err(error);
+                    }
+                }
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -125,26 +132,35 @@ impl XmlDocument {
         };
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::content => {
-                    xml_element.value = self.parse_element_content(token_pair.into_inner())?;
-                }
-                Rule::element_end_tag => {
-                    let inner_token_pair: Pair<Rule> = match token_pair.into_inner().next() {
-                        Some(token_pair) => token_pair,
-                        None => {
-                            return Err(keramics_core::error_trace_new!("Missing element name"));
+                    match self.parse_element_content(token_pair.into_inner(), &mut xml_element) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse element content"
+                            );
+                            return Err(error);
                         }
-                    };
-                    let name: &str = inner_token_pair.as_str();
-
-                    if name != xml_element.name.as_str() {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Name mismatch between start tag: {} and end tag: {}",
-                            xml_element.name, name
-                        )));
                     }
                 }
+                Rule::element_end_tag => match token_pair.into_inner().next() {
+                    Some(inner_token_pair) => {
+                        let name: &str = inner_token_pair.as_str();
+
+                        if name != xml_element.name.as_str() {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Name mismatch between start tag: {} and end tag: {}",
+                                xml_element.name, name
+                            )));
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Missing element name"));
+                    }
+                },
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported rule: {:?}",
@@ -157,7 +173,11 @@ impl XmlDocument {
     }
 
     /// Parses XML element content.
-    fn parse_element_content(&self, mut inner_pairs: Pairs<Rule>) -> Result<String, ErrorTrace> {
+    fn parse_element_content(
+        &self,
+        mut inner_pairs: Pairs<Rule>,
+        xml_element: &mut XmlElement,
+    ) -> Result<(), ErrorTrace> {
         let mut string_parts: Vec<&str> = Vec::new();
 
         while let Some(token_pair) = inner_pairs.next() {
@@ -166,6 +186,13 @@ impl XmlDocument {
                 Rule::character_data => {
                     string_parts.push(token_pair.as_str());
                 }
+                Rule::element => match self.parse_element(token_pair.into_inner()) {
+                    Ok(sub_xml_element) => xml_element.sub_elements.push(sub_xml_element),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to parse sub element");
+                        return Err(error);
+                    }
+                },
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported rule: {:?}",
@@ -174,7 +201,10 @@ impl XmlDocument {
                 }
             }
         }
-        Ok(string_parts.join(""))
+        if !string_parts.is_empty() {
+            xml_element.value = string_parts.join("");
+        }
+        Ok(())
     }
 
     /// Parses a XML element start or empty tag.
@@ -191,12 +221,15 @@ impl XmlDocument {
 
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
-                Rule::attribute => {
-                    let xml_attribute: XmlAttribute =
-                        self.parse_attribute(token_pair.into_inner())?;
-                    xml_element.attributes.push(xml_attribute);
-                }
+                Rule::attribute => match self.parse_attribute(token_pair.into_inner()) {
+                    Ok(xml_attribute) => xml_element.attributes.push(xml_attribute),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to parse attribute");
+                        return Err(error);
+                    }
+                },
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported rule: {:?}",
@@ -215,15 +248,14 @@ mod tests {
 
     #[test]
     fn test_parse() -> Result<(), ErrorTrace> {
-        let test_data: String = [
-            "<?xml version=\"1.0\"?>",
-            "<greeting>Hello, world!</greeting>",
-            "",
-        ]
-        .join("\n");
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\"?>\n",
+            "<greeting>Hello, world!</greeting>\n",
+            "\n"
+        );
 
         let mut document: XmlDocument = XmlDocument::new();
-        document.parse(test_data.as_str())?;
+        document.parse(test_data)?;
 
         assert!(document.root_element.is_some());
 
@@ -236,16 +268,15 @@ mod tests {
 
     #[test]
     fn test_parse_with_doctype() -> Result<(), ErrorTrace> {
-        let test_data: String = [
-            "<?xml version=\"1.0\"?>",
-            "<!DOCTYPE greeting SYSTEM \"hello.dtd\">",
-            "<greeting>Hello, world!</greeting>",
-            "",
-        ]
-        .join("\n");
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\"?>\n",
+            "<!DOCTYPE greeting SYSTEM \"hello.dtd\">\n",
+            "<greeting>Hello, world!</greeting>\n",
+            "\n"
+        );
 
         let mut document: XmlDocument = XmlDocument::new();
-        document.parse(test_data.as_str())?;
+        document.parse(test_data)?;
 
         assert!(document.root_element.is_some());
 
@@ -258,24 +289,49 @@ mod tests {
 
     #[test]
     fn test_parse_with_inline_doctype() -> Result<(), ErrorTrace> {
-        let test_data: String = [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>",
-            "<!DOCTYPE greeting [",
-            "  <!ELEMENT greeting (#PCDATA)>",
-            "]>",
-            "<greeting>Hello, world!</greeting>",
-            "",
-        ]
-        .join("\n");
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n",
+            "<!DOCTYPE greeting [\n",
+            "  <!ELEMENT greeting (#PCDATA)>\n",
+            "]>\n",
+            "<greeting>Hello, world!</greeting>\n",
+            "\n"
+        );
 
         let mut document: XmlDocument = XmlDocument::new();
-        document.parse(test_data.as_str())?;
+        document.parse(test_data)?;
 
         assert!(document.root_element.is_some());
 
         let root_element: XmlElement = document.root_element.unwrap();
         assert_eq!(root_element.name, "greeting");
         assert_eq!(root_element.value, "Hello, world!");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_with_nested_elements() -> Result<(), ErrorTrace> {
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\"?>\n",
+            "<greeting>\n",
+            "    <message>Hello, world!</message>\n",
+            "</greeting>\n",
+            "\n"
+        );
+
+        let mut document: XmlDocument = XmlDocument::new();
+        document.parse(test_data)?;
+
+        assert!(document.root_element.is_some());
+
+        let root_element: XmlElement = document.root_element.unwrap();
+        assert_eq!(root_element.name, "greeting");
+        assert_eq!(root_element.sub_elements.len(), 1);
+
+        let sub_element: &XmlElement = root_element.sub_elements.get(0).unwrap();
+        assert_eq!(sub_element.name, "message");
+        assert_eq!(sub_element.value, "Hello, world!");
 
         Ok(())
     }

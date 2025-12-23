@@ -55,22 +55,24 @@ impl XmlPlist {
         let token_pair: Pair<Rule> = match iterator.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(keramics_core::error_trace_new!("Missing plist document"));
+                return Err(keramics_core::error_trace_new!(
+                    "Missing XML plist document"
+                ));
             }
         };
-        let mut root_object: PlistObject = PlistObject::None;
-
         let mut inner_pairs: Pairs<Rule> = token_pair.into_inner();
+
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::plist_element => {
-                    root_object = match self.parse_plist_element(token_pair.into_inner()) {
+                    self.root_object = match self.parse_plist_element(token_pair.into_inner()) {
                         Ok(element) => element,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to parse plist document"
+                                "Unable to parse XML plist document"
                             );
                             return Err(error);
                         }
@@ -79,14 +81,11 @@ impl XmlPlist {
                 Rule::EOI | Rule::miscellaneous | Rule::plist_prolog => {}
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported plist document rule: {:?}",
+                        "Unsupported XML plist document rule: {:?}",
                         rule
                     )));
                 }
             }
-        }
-        if root_object != PlistObject::None {
-            self.root_object = root_object;
         }
         Ok(())
     }
@@ -103,22 +102,20 @@ impl XmlPlist {
             match rule {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
-                    let object: PlistObject =
-                        match self.parse_plist_object_element(token_pair.into_inner()) {
-                            Ok(element) => element,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to parse plist array"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    array_values.push(object);
+                    match self.parse_plist_object_element(token_pair.into_inner()) {
+                        Ok(object) => array_values.push(object),
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to parse XML plist array"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported plist array content rule: {:?}",
+                        "Unsupported XML plist array content rule: {:?}",
                         rule
                     )));
                 }
@@ -140,15 +137,17 @@ impl XmlPlist {
                 return Err(keramics_core::error_trace_new!("Missing array element"));
             }
         };
-        let array_values: Vec<PlistObject> = match self
-            .parse_plist_array_content(token_pair.into_inner())
-        {
-            Ok(element) => element,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to parse plist array element");
-                return Err(error);
-            }
-        };
+        let array_values: Vec<PlistObject> =
+            match self.parse_plist_array_content(token_pair.into_inner()) {
+                Ok(element) => element,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to parse XML plist array element"
+                    );
+                    return Err(error);
+                }
+            };
         inner_pairs.next();
 
         match inner_pairs.next() {
@@ -156,7 +155,7 @@ impl XmlPlist {
                 return Err(keramics_core::error_trace_new!("Unsupported array element"));
             }
             None => {}
-        };
+        }
         Ok(PlistObject::Array(array_values))
     }
 
@@ -169,30 +168,28 @@ impl XmlPlist {
 
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::character_data => {}
                 Rule::plist_key_and_object_element_pair => {
-                    let (key, object): (String, PlistObject) = match self
-                        .parse_plist_key_and_object_element_pair(token_pair.into_inner())
-                    {
-                        Ok(element) => element,
+                    match self.parse_plist_key_and_object_element_pair(token_pair.into_inner()) {
+                        Ok((key, object)) => dict_values.insert(key, object),
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to parse plist dict"
+                                "Unable to parse XML plist dict"
                             );
                             return Err(error);
                         }
                     };
-                    dict_values.insert(key, object);
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported plist dict content rule: {:?}",
+                        "Unsupported XML plist dict content rule: {:?}",
                         rule
                     )));
                 }
-            };
+            }
         }
         Ok(dict_values)
     }
@@ -208,29 +205,31 @@ impl XmlPlist {
             Some(token_pair) => token_pair,
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Missing plist dict element"
+                    "Missing XML plist dict element"
                 ));
             }
         };
-        let dict_values: HashMap<String, PlistObject> = match self
-            .parse_plist_dict_content(token_pair.into_inner())
-        {
-            Ok(element) => element,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to parse plist dict element");
-                return Err(error);
-            }
-        };
+        let dict_values: HashMap<String, PlistObject> =
+            match self.parse_plist_dict_content(token_pair.into_inner()) {
+                Ok(element) => element,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to parse XML plist dict element"
+                    );
+                    return Err(error);
+                }
+            };
         inner_pairs.next();
 
         match inner_pairs.next() {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unsupported plist dict element"
+                    "Unsupported XML plist dict element"
                 ));
             }
             None => {}
-        };
+        }
         Ok(PlistObject::Dictionary(dict_values))
     }
 
@@ -240,6 +239,7 @@ impl XmlPlist {
 
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
@@ -248,15 +248,15 @@ impl XmlPlist {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to parse plist content"
+                                "Unable to parse XML plist content"
                             );
                             return Err(error);
                         }
-                    }
+                    };
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported plist content rule: {:?}",
+                        "Unsupported XML plist content rule: {:?}",
                         rule
                     )));
                 }
@@ -284,8 +284,9 @@ impl XmlPlist {
         let mut data: Vec<u8> = Vec::new();
 
         loop {
-            let result: Option<u8> = match base64_stream.get_value() {
-                Ok(result) => result,
+            match base64_stream.get_value() {
+                Ok(Some(byte_value)) => data.push(byte_value),
+                Ok(None) => break,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -293,10 +294,6 @@ impl XmlPlist {
                     );
                     return Err(error);
                 }
-            };
-            match result {
-                Some(byte_value) => data.push(byte_value),
-                None => break,
             }
         }
         // TODO: check base64 padding
@@ -308,25 +305,25 @@ impl XmlPlist {
                 return Err(keramics_core::error_trace_new!("Unsupported data element"));
             }
             None => {}
-        };
+        }
         Ok(PlistObject::Data(data))
     }
 
     /// Parses a XML plist element.
     fn parse_plist_element(&self, mut inner_pairs: Pairs<Rule>) -> Result<PlistObject, ErrorTrace> {
-        // TODO: parser plist version.
+        // TODO: parse XML plist version.
         inner_pairs.next();
 
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(keramics_core::error_trace_new!("Missing plist element"));
+                return Err(keramics_core::error_trace_new!("Missing XML plist element"));
             }
         };
         let object: PlistObject = match self.parse_plist_content(token_pair.into_inner()) {
             Ok(element) => element,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to parse plist element");
+                keramics_core::error_trace_add_frame!(error, "Unable to parse XML plist element");
                 return Err(error);
             }
         };
@@ -334,7 +331,9 @@ impl XmlPlist {
 
         match inner_pairs.next() {
             Some(_) => {
-                return Err(keramics_core::error_trace_new!("Unsupported plist element"));
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported XML plist element"
+                ));
             }
             None => {}
         };
@@ -374,7 +373,7 @@ impl XmlPlist {
                 ));
             }
             None => {}
-        };
+        }
         Ok(PlistObject::FloatingPoint(floating_point_value))
     }
 
@@ -409,7 +408,7 @@ impl XmlPlist {
                 ));
             }
             None => {}
-        };
+        }
         Ok(PlistObject::Integer(integer_value))
     }
 
@@ -421,13 +420,15 @@ impl XmlPlist {
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
-                return Err(keramics_core::error_trace_new!("Missing plist key element"));
+                return Err(keramics_core::error_trace_new!(
+                    "Missing XML plist key element"
+                ));
             }
         };
         let key: String = match self.parse_plist_string_element(token_pair.into_inner()) {
             Ok(element) => element,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to parse plist key");
+                keramics_core::error_trace_add_frame!(error, "Unable to parse XML plist key");
                 return Err(error);
             }
         };
@@ -443,7 +444,7 @@ impl XmlPlist {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to parse plist object"
+                                "Unable to parse XML plist object"
                             );
                             return Err(error);
                         }
@@ -451,7 +452,7 @@ impl XmlPlist {
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported plist key and object rule: {:?}",
+                        "Unsupported XML plist key and object rule: {:?}",
                         rule
                     )));
                 }
@@ -459,17 +460,17 @@ impl XmlPlist {
         }
         if object == PlistObject::None {
             return Err(keramics_core::error_trace_new!(
-                "Missing plist object element"
+                "Missing XML plist object element"
             ));
         };
         match inner_pairs.next() {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unsupported plist key and object element pair"
+                    "Unsupported XML plist key and object element pair"
                 ));
             }
             None => {}
-        };
+        }
         Ok((key, object))
     }
 
@@ -482,7 +483,7 @@ impl XmlPlist {
             Some(token_pair) => token_pair,
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Missing plist object element"
+                    "Missing XML plist object element"
                 ));
             }
         };
@@ -565,7 +566,7 @@ impl XmlPlist {
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported plist object rule: {:?}",
+                    "Unsupported XML plist object rule: {:?}",
                     rule
                 )));
             }
@@ -573,7 +574,7 @@ impl XmlPlist {
         match inner_pairs.next() {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unsupported plist object element"
+                    "Unsupported XML plist object element"
                 ));
             }
             None => {}
@@ -596,7 +597,7 @@ impl XmlPlist {
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported plist string content rule: {:?}",
+                        "Unsupported XML plist string content rule: {:?}",
                         rule
                     )));
                 }
@@ -616,14 +617,14 @@ impl XmlPlist {
             Some(token_pair) => token_pair,
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Missing plist string element"
+                    "Missing XML plist string element"
                 ));
             }
         };
         let string_value: String = match self.parse_plist_string_content(token_pair.into_inner()) {
             Ok(element) => element,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to parse plist string");
+                keramics_core::error_trace_add_frame!(error, "Unable to parse XML plist string");
                 return Err(error);
             }
         };
@@ -632,7 +633,7 @@ impl XmlPlist {
         match inner_pairs.next() {
             Some(_) => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unsupported plist string element"
+                    "Unsupported XML plist string element"
                 ));
             }
             None => {}
@@ -647,90 +648,87 @@ mod tests {
 
     #[test]
     fn test_read_xml() -> Result<(), ErrorTrace> {
-        let test_data: String = [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
-            "<plist version=\"1.0\">",
-            "<dict>",
-            "    <key>CFBundleInfoDictionaryVersion</key>",
-            "    <string>6.0</string>",
-            "    <key>band-size</key>",
-            "    <integer>8388608</integer>",
-            "    <key>bundle-backingstore-version</key>",
-            "    <integer>1</integer>",
-            "    <key>diskimage-bundle-type</key>",
-            "    <string>com.apple.diskimage.sparsebundle</string>",
-            "    <key>size</key>",
-            "    <integer>102400000</integer>",
-            "</dict>",
-            "</plist>",
-            "",
-        ]
-        .join("\n");
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n",
+            "<plist version=\"1.0\">\n",
+            "<dict>\n",
+            "    <key>CFBundleInfoDictionaryVersion</key>\n",
+            "    <string>6.0</string>\n",
+            "    <key>band-size</key>\n",
+            "    <integer>8388608</integer>\n",
+            "    <key>bundle-backingstore-version</key>\n",
+            "    <integer>1</integer>\n",
+            "    <key>diskimage-bundle-type</key>\n",
+            "    <string>com.apple.diskimage.sparsebundle</string>\n",
+            "    <key>size</key>\n",
+            "    <integer>102400000</integer>\n",
+            "</dict>\n",
+            "</plist>\n",
+            "\n"
+        );
 
-        let mut plist: XmlPlist = XmlPlist::new();
-        plist.parse(test_data.as_str())?;
+        let mut xml_plist: XmlPlist = XmlPlist::new();
+        xml_plist.parse(test_data)?;
 
-        let hashmap: &HashMap<String, PlistObject> = plist.root_object.as_hashmap().unwrap();
+        let hashmap: &HashMap<String, PlistObject> = xml_plist.root_object.as_hashmap().unwrap();
         assert_eq!(hashmap.len(), 5);
 
-        let string: &String = plist
+        let string: Option<&String> = xml_plist
             .root_object
-            .get_string_by_key("CFBundleInfoDictionaryVersion")
-            .unwrap();
-        assert_eq!(string, "6.0");
+            .get_string_by_key("CFBundleInfoDictionaryVersion");
+        assert_eq!(string, Some(String::from("6.0")).as_ref());
 
-        let integer: &i64 = plist.root_object.get_integer_by_key("band-size").unwrap();
-        assert_eq!(*integer, 8388608);
+        let integer: Option<&i64> = xml_plist.root_object.get_integer_by_key("band-size");
+        assert_eq!(integer, Some(8388608).as_ref());
 
         Ok(())
     }
 
     #[test]
     fn test_read_xml_with_array() -> Result<(), ErrorTrace> {
-        let test_data: String = [
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
-            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">",
-            "<plist version=\"1.0\">",
-            "<dict>",
-            "    <key>resource-fork</key>",
-            "    <dict>",
-            "        <key>blkx</key>",
-            "        <array>",
-            "            <dict>",
-            "                <key>Attributes</key>",
-            "                <string>0x0050</string>",
-            "                <key>CFName</key>",
-            "                <string>Protective Master Boot Record (MBR : 0)</string>",
-            "                <key>Data</key>",
-            "                <data>",
-            "                bWlzaAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAA",
-            "                AAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "                AAIAAAAgQfL6MwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-            "                AAAAAAACgAAABQAAAAMAAAAAAAAAAAAAAAAAAAABAAAA",
-            "                AAAAIA0AAAAAAAAAH/////8AAAAAAAAAAAAAAAEAAAAA",
-            "                AAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-            "                </data>",
-            "                <key>ID</key>",
-            "                <string>-1</string>",
-            "                <key>Name</key>",
-            "                <string>Protective Master Boot Record (MBR : 0)</string>",
-            "            </dict>",
-            "        </array>",
-            "    </dict>",
-            "</dict>",
-            "</plist>",
-            "",
-        ]
-        .join("\n");
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n",
+            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n",
+            "<plist version=\"1.0\">\n",
+            "<dict>\n",
+            "    <key>resource-fork</key>\n",
+            "    <dict>\n",
+            "        <key>blkx</key>\n",
+            "        <array>\n",
+            "            <dict>\n",
+            "                <key>Attributes</key>\n",
+            "                <string>0x0050</string>\n",
+            "                <key>CFName</key>\n",
+            "                <string>Protective Master Boot Record (MBR : 0)</string>\n",
+            "                <key>Data</key>\n",
+            "                <data>\n",
+            "                bWlzaAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAA\n",
+            "                AAgIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+            "                AAIAAAAgQfL6MwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+            "                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+            "                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+            "                AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n",
+            "                AAAAAAACgAAABQAAAAMAAAAAAAAAAAAAAAAAAAABAAAA\n",
+            "                AAAAIA0AAAAAAAAAH/////8AAAAAAAAAAAAAAAEAAAAA\n",
+            "                AAAAAAAAAAAAAAAAAAAAAAAAAAA=\n",
+            "                </data>\n",
+            "                <key>ID</key>\n",
+            "                <string>-1</string>\n",
+            "                <key>Name</key>\n",
+            "                <string>Protective Master Boot Record (MBR : 0)</string>\n",
+            "            </dict>\n",
+            "        </array>\n",
+            "    </dict>\n",
+            "</dict>\n",
+            "</plist>\n",
+            "\n"
+        );
 
-        let mut plist: XmlPlist = XmlPlist::new();
-        plist.parse(test_data.as_str())?;
+        let mut xml_plist: XmlPlist = XmlPlist::new();
+        xml_plist.parse(test_data)?;
 
-        let hashmap: &HashMap<String, PlistObject> = plist.root_object.as_hashmap().unwrap();
+        let hashmap: &HashMap<String, PlistObject> = xml_plist.root_object.as_hashmap().unwrap();
         assert_eq!(hashmap.len(), 1);
 
         let dictionary_object: &PlistObject = hashmap.get("resource-fork").unwrap();

@@ -70,7 +70,7 @@ impl SparseBundleImage {
         Ok(())
     }
 
-    /// Reads Info.plist or Info.bckup.
+    /// Reads an Info.plist or Info.bckup file.
     fn read_info_plist(
         &mut self,
         file_resolver: &FileResolverReference,
@@ -90,7 +90,7 @@ impl SparseBundleImage {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!("Unable to open info.plist file: {}", file_name)
+                    format!("Unable to open file: {}", file_name)
                 );
                 return Err(error);
             }
@@ -98,16 +98,15 @@ impl SparseBundleImage {
         let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
 
         if data_stream_size == 0 || data_stream_size > 65536 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported Info.plist file size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported file size"));
         }
         let mut data: Vec<u8> = vec![0; data_stream_size as usize];
 
         keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
+
         if self.mediator.debug_output {
             self.mediator.debug_print(format!(
-                "Info.plist data of size: {} at offset: 0 (0x00000000)\n",
+                "XML plist data of size: {} at offset: 0 (0x00000000)\n",
                 data_stream_size,
             ));
             self.mediator.debug_print_data(&data, true);
@@ -116,7 +115,7 @@ impl SparseBundleImage {
             Ok(string) => string,
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to convert plist data into UTF-8 string",
+                    "Unable to convert XML plist data into UTF-8 string",
                     error
                 ));
             }
@@ -127,77 +126,79 @@ impl SparseBundleImage {
             Ok(_) => {}
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to parse plist",
+                    "Unable to parse XML plist",
                     error
                 ));
             }
         }
-        let version: &String = match xml_plist
+        match xml_plist
             .root_object
             .get_string_by_key("CFBundleInfoDictionaryVersion")
         {
-            Some(string) => string,
+            Some(string) => {
+                if string != "6.0" {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported CFBundleInfoDictionaryVersion: {}",
+                        string
+                    )));
+                }
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve CFBundleInfoDictionaryVersion value from Info.plist"
+                    "Unable to retrieve CFBundleInfoDictionaryVersion value"
                 ));
             }
-        };
-        if version != "6.0" {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported CFBundleInfoDictionaryVersion: {}",
-                version
-            )));
         }
-        let bundle_type: &String = match xml_plist
+        match xml_plist
             .root_object
             .get_string_by_key("diskimage-bundle-type")
         {
-            Some(string) => string,
+            Some(string) => {
+                if string != "com.apple.diskimage.sparsebundle" {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported diskimage-bundle-type: {}",
+                        string
+                    )));
+                }
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve diskimage-bundle-type value from Info.plist"
+                    "Unable to retrieve diskimage-bundle-type value"
                 ));
             }
-        };
-        if bundle_type != "com.apple.diskimage.sparsebundle" {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported diskimage-bundle-type: {}",
-                bundle_type
-            )));
         }
-        let band_size: &i64 = match xml_plist.root_object.get_integer_by_key("band-size") {
-            Some(integer) => integer,
+        match xml_plist.root_object.get_integer_by_key("band-size") {
+            Some(integer) => {
+                if *integer == 0 || *integer > u32::MAX as i64 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid band-size: {} value out of bounds",
+                        *integer
+                    )));
+                }
+                self.block_size = *integer as u32;
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve band-size value from Info.plist"
+                    "Unable to retrieve band-size value"
                 ));
             }
-        };
-        if *band_size <= 0 || *band_size > u32::MAX as i64 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid band-size: {} value out of bounds",
-                *band_size
-            )));
         }
-        self.block_size = *band_size as u32;
-
-        let size: &i64 = match xml_plist.root_object.get_integer_by_key("size") {
-            Some(integer) => integer,
+        match xml_plist.root_object.get_integer_by_key("size") {
+            Some(integer) => {
+                if *integer == 0 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid size: {} value out of bounds",
+                        *integer
+                    )));
+                }
+                self.media_size = *integer as u64;
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
-                    "Unable to retrieve size value from Info.plist"
+                    "Unable to retrieve size value"
                 ));
             }
-        };
-        if *size <= 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid size: {} value out of bounds",
-                *size
-            )));
         }
-        self.media_size = *size as u64;
-
         Ok(())
     }
 

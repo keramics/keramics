@@ -2266,18 +2266,18 @@ Additional sections provided in the EWF-X format are:
 The xheader section contains [zlib compressed data](zlib.md) containing XML
 data containing the header values.
 
-```
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <xheader>
-        <case_number>1</case_number>
-        <description>Description</description>
-        <examiner_name>John D.</examiner_name>
-        <evidence_number>1.1</evidence_number>
-        <notes>Just a floppy in my system</notes>
-        <acquiry_operating_system>Linux</acquiry_operating_system>
-        <acquiry_date>Sat Jan 20 18:32:08 2007 CET</acquiry_date>
-        <acquiry_software>ewfacquire</acquiry_software>
-        <acquiry_software_version>20070120</acquiry_software_version>
+    <case_number>1</case_number>
+    <description>Description</description>
+    <examiner_name>John D.</examiner_name>
+    <evidence_number>1.1</evidence_number>
+    <notes>Just a floppy in my system</notes>
+    <acquiry_operating_system>Linux</acquiry_operating_system>
+    <acquiry_date>Sat Jan 20 18:32:08 2007 CET</acquiry_date>
+    <acquiry_software>ewfacquire</acquiry_software>
+    <acquiry_software_version>20070120</acquiry_software_version>
 </xheader>
 ```
 
@@ -2286,11 +2286,11 @@ data containing the header values.
 The xhash section contains [zlib compressed data](zlib.md) containing XML data
 containing the hash values.
 
-```
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <xhash>
-        <md5>ae1ce8f5ac079d3ee93f97fe3792bda3</md5>
-        <sha1>31a58f090460b92220d724b28eeb2838a1df6184</sha1>
+    <md5>ae1ce8f5ac079d3ee93f97fe3792bda3</md5>
+    <sha1>31a58f090460b92220d724b28eeb2838a1df6184</sha1>
 </xhash>
 ```
 

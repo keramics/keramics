@@ -38,21 +38,21 @@ single dictionary with the following key-value pairs.
 | diskimage-bundle-type | "com.apple.diskimage.sparsebundle" | The bundle type
 | size | | The media size in bytes
 
-```
+```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-        <key>CFBundleInfoDictionaryVersion</key>
-        <string>6.0</string>
-        <key>band-size</key>
-        <integer>8388608</integer>
-        <key>bundle-backingstore-version</key>
-        <integer>1</integer>
-        <key>diskimage-bundle-type</key>
-        <string>com.apple.diskimage.sparsebundle</string>
-        <key>size</key>
-        <integer>4194304</integer>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>band-size</key>
+    <integer>8388608</integer>
+    <key>bundle-backingstore-version</key>
+    <integer>1</integer>
+    <key>diskimage-bundle-type</key>
+    <string>com.apple.diskimage.sparsebundle</string>
+    <key>size</key>
+    <integer>4194304</integer>
 </dict>
 </plist>
 ```
