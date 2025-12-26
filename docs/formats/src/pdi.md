@@ -31,7 +31,6 @@ The Parallels Disk Image format support multiple disk types:
 | Characteristics | Description
 | --- | ---
 | Byte order | little-endian
-| Date and time values | Number of seconds since January 1, 2000 00:00:00 UTC
 | Character strings | UTF-8 by default, the encoding is defined in the disk descriptor XML file.
 
 The number of bytes per sector is 512.
