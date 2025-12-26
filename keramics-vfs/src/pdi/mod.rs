@@ -11,33 +11,8 @@
  * under the License.
  */
 
-mod apm;
-mod constants;
-mod ewf;
-mod ext;
-mod fat;
-mod gpt;
-mod mbr;
-mod ntfs;
-mod pdi;
-mod qcow;
-mod sparseimage;
-mod udif;
-mod vhd;
-mod vhdx;
-mod vmdk;
+mod file_entry;
+mod file_system;
 
-pub use apm::ApmInfo;
-pub use ewf::EwfInfo;
-pub use ext::ExtInfo;
-pub use fat::FatInfo;
-pub use gpt::GptInfo;
-pub use mbr::MbrInfo;
-pub use ntfs::NtfsInfo;
-pub use pdi::PdiInfo;
-pub use qcow::QcowInfo;
-pub use sparseimage::SparseImageInfo;
-pub use udif::UdifInfo;
-pub use vhd::VhdInfo;
-pub use vhdx::VhdxInfo;
-pub use vmdk::VmdkInfo;
+pub use file_entry::PdiFileEntry;
+pub use file_system::PdiFileSystem;

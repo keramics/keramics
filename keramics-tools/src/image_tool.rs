@@ -26,6 +26,7 @@ use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::ntfs::NtfsAttribute;
+use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
@@ -166,8 +167,11 @@ enum StorageMediaImage {
     Ewf {
         ewf_image: Arc<RwLock<EwfImage>>,
     },
+    Pdi {
+        pdi_image_layer: Arc<RwLock<PdiImageLayer>>,
+    },
     Qcow {
-        qcow_layer: QcowImageLayer,
+        qcow_image_layer: QcowImageLayer,
     },
     SparseImage {
         sparseimage_file: Arc<RwLock<SparseImageFile>>,
@@ -179,10 +183,10 @@ enum StorageMediaImage {
         udif_file: Arc<RwLock<UdifFile>>,
     },
     Vhd {
-        vhd_layer: VhdImageLayer,
+        vhd_image_layer: VhdImageLayer,
     },
     Vhdx {
-        vhdx_layer: VhdxImageLayer,
+        vhdx_image_layer: VhdxImageLayer,
     },
     Vmdk {
         vmdk_image: Arc<RwLock<VmdkImage>>,
@@ -219,12 +223,21 @@ impl StorageMediaImage {
     fn get_data_stream(&self) -> DataStreamReference {
         match self {
             Self::Ewf { ewf_image } => ewf_image.clone(),
-            Self::Qcow { qcow_layer, .. } => qcow_layer.clone(),
+            Self::Pdi {
+                pdi_image_layer, ..
+            } => pdi_image_layer.clone(),
+            Self::Qcow {
+                qcow_image_layer, ..
+            } => qcow_image_layer.clone(),
             Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
             Self::SplitRaw { splitraw_image } => splitraw_image.clone(),
             Self::Udif { udif_file } => udif_file.clone(),
-            Self::Vhd { vhd_layer, .. } => vhd_layer.clone(),
-            Self::Vhdx { vhdx_layer, .. } => vhdx_layer.clone(),
+            Self::Vhd {
+                vhd_image_layer, ..
+            } => vhd_image_layer.clone(),
+            Self::Vhdx {
+                vhdx_image_layer, ..
+            } => vhdx_image_layer.clone(),
             Self::Vmdk { vmdk_image } => vmdk_image.clone(),
         }
     }
@@ -269,6 +282,7 @@ impl StorageMediaImage {
         match Self::scan_for_storage_image_formats(&data_stream) {
             Ok(Some(format_identifier)) => match format_identifier {
                 FormatIdentifier::Ewf => Self::open_ewf_image(path),
+                FormatIdentifier::Pdi => Self::open_pdi_image(path),
                 FormatIdentifier::Qcow => Self::open_qcow_image(path),
                 FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
                 FormatIdentifier::Udif => Self::open_udif_file(path),
@@ -347,6 +361,55 @@ impl StorageMediaImage {
         })
     }
 
+    /// Opens a PDI image.
+    fn open_pdi_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, _) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for base path: {}",
+                        base_path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut pdi_image: PdiImage = PdiImage::new();
+
+        match pdi_image.open(&file_resolver) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open PDI image");
+                return Err(error);
+            }
+        }
+        let number_of_layers: usize = pdi_image.get_number_of_layers();
+
+        match pdi_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(pdi_image_layer) => Ok(Self::Pdi { pdi_image_layer }),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                Err(error)
+            }
+        }
+    }
+
     /// Opens a QCOW image.
     fn open_qcow_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
@@ -389,17 +452,13 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = qcow_image.get_number_of_layers();
 
-        let qcow_layer: QcowImageLayer = match qcow_image.get_layer_by_index(number_of_layers - 1) {
-            Ok(layer) => layer,
+        match qcow_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(qcow_image_layer) => Ok(Self::Qcow { qcow_image_layer }),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve QCOW image upper layer"
-                );
-                return Err(error);
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                Err(error)
             }
-        };
-        Ok(Self::Qcow { qcow_layer })
+        }
     }
 
     /// Opens a sparseimage file.
@@ -549,19 +608,16 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = vhd_image.get_number_of_layers();
 
-        let vhd_layer: VhdImageLayer = match vhd_image.get_layer_by_index(number_of_layers - 1) {
-            Ok(layer) => layer,
+        match vhd_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(vhd_image_layer) => Ok(Self::Vhd { vhd_image_layer }),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to retrieve VHD image upper layer"
+                    "Unable to retrieve top VHD image layer"
                 );
-                return Err(error);
+                Err(error)
             }
-        };
-        Ok(Self::Vhd {
-            vhd_layer: vhd_layer,
-        })
+        }
     }
 
     /// Opens a VHDX image.
@@ -606,19 +662,13 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = vhdx_image.get_number_of_layers();
 
-        let vhdx_layer: VhdxImageLayer = match vhdx_image.get_layer_by_index(number_of_layers - 1) {
-            Ok(layer) => layer,
+        match vhdx_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(vhdx_image_layer) => Ok(Self::Vhdx { vhdx_image_layer }),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve VHDX image upper layer"
-                );
-                return Err(error);
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                Err(error)
             }
-        };
-        Ok(Self::Vhdx {
-            vhdx_layer: vhdx_layer,
-        })
+        }
     }
 
     /// Opens a VMDK image.
@@ -672,6 +722,7 @@ impl StorageMediaImage {
     ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_ewf_signatures();
+        format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
         // TODO: support for sparse bundle.
         format_scanner.add_sparseimage_signatures();

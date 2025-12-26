@@ -23,6 +23,7 @@ pub enum FormatIdentifier {
     Gpt,
     Mbr,
     Ntfs,
+    Pdi,
     Qcow,
     SparseImage,
     SplitRaw,
@@ -44,6 +45,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Gpt => "gpt",
             FormatIdentifier::Mbr => "mbr",
             FormatIdentifier::Ntfs => "ntfs",
+            FormatIdentifier::Pdi => "pdi",
             FormatIdentifier::Qcow => "qcow",
             FormatIdentifier::SparseImage => "sparseimage",
             FormatIdentifier::SplitRaw => "splitraw",
@@ -90,6 +92,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Ntfs;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "ntfs");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Pdi;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "pdi");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Qcow;
         let string: String = format_identifier.to_string();

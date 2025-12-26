@@ -11,33 +11,19 @@
  * under the License.
  */
 
-mod apm;
-mod constants;
-mod ewf;
-mod ext;
-mod fat;
-mod gpt;
-mod mbr;
-mod ntfs;
-mod pdi;
-mod qcow;
-mod sparseimage;
-mod udif;
-mod vhd;
-mod vhdx;
-mod vmdk;
+mod block_allocation_table;
+mod block_range;
+pub(crate) mod constants;
+mod descriptor_extent;
+mod descriptor_image;
+mod descriptor_snapshot;
+mod enums;
+mod extent_file;
+mod image;
+mod image_extent;
+mod image_layer;
+mod sparse_file;
+mod sparse_file_header;
 
-pub use apm::ApmInfo;
-pub use ewf::EwfInfo;
-pub use ext::ExtInfo;
-pub use fat::FatInfo;
-pub use gpt::GptInfo;
-pub use mbr::MbrInfo;
-pub use ntfs::NtfsInfo;
-pub use pdi::PdiInfo;
-pub use qcow::QcowInfo;
-pub use sparseimage::SparseImageInfo;
-pub use udif::UdifInfo;
-pub use vhd::VhdInfo;
-pub use vhdx::VhdxInfo;
-pub use vmdk::VmdkInfo;
+pub use image::PdiImage;
+pub use image_layer::PdiImageLayer;

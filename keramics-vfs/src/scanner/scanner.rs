@@ -19,6 +19,7 @@ use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::gpt::GptVolumeSystem;
 use keramics_formats::mbr::MbrVolumeSystem;
+use keramics_formats::pdi::PdiImage;
 use keramics_formats::qcow::QcowImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
@@ -35,6 +36,7 @@ use crate::file_entry::VfsFileEntry;
 use crate::gpt::GptFileSystem;
 use crate::location::VfsLocation;
 use crate::mbr::MbrFileSystem;
+use crate::pdi::PdiFileSystem;
 use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
 use crate::sparseimage::SparseImageFileSystem;
@@ -86,6 +88,7 @@ impl VfsScanner {
     /// Builds the scanner.
     pub fn build(&mut self) -> Result<(), ErrorTrace> {
         self.storage_media_image_scanner.add_ewf_signatures();
+        self.storage_media_image_scanner.add_pdi_signatures();
         self.storage_media_image_scanner.add_qcow_signatures();
         self.storage_media_image_scanner
             .add_sparseimage_signatures();
@@ -227,6 +230,7 @@ impl VfsScanner {
             VfsType::Ewf
             | VfsType::SparseImage
             | VfsType::SplitRaw
+            | VfsType::Pdi
             | VfsType::Qcow
             | VfsType::Udif
             | VfsType::Vhd
@@ -338,6 +342,7 @@ impl VfsScanner {
         match scan_results.iter().next() {
             Some(format_identifier) => match format_identifier {
                 FormatIdentifier::Ewf => Ok(Some(VfsType::Ewf)),
+                FormatIdentifier::Pdi => Ok(Some(VfsType::Pdi)),
                 FormatIdentifier::Qcow => Ok(Some(VfsType::Qcow)),
                 FormatIdentifier::SparseImage => Ok(Some(VfsType::SparseImage)),
                 FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
@@ -561,6 +566,32 @@ impl VfsScanner {
                 }
                 None => {}
             },
+            VfsType::Pdi => {
+                let mut pdi_image: PdiImage = PdiImage::new();
+
+                match PdiFileSystem::open_image(&mut pdi_image, file_system, path) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to open PDI image");
+                        return Err(error);
+                    }
+                }
+                let number_of_layers: usize = pdi_image.get_number_of_layers();
+
+                match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    PdiFileSystem::PATH_PREFIX,
+                    number_of_layers,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan PDI image");
+                        return Err(error);
+                    }
+                }
+            }
             VfsType::Qcow => {
                 let mut qcow_image: QcowImage = QcowImage::new();
 
@@ -1021,6 +1052,22 @@ mod tests {
         let vfs_type: &VfsType = scan_node.get_type();
         assert_eq!(vfs_type, &VfsType::Ext);
         assert_eq!(scan_node.sub_nodes.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_format_with_pdi() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+        let vfs_file_system: VfsFileSystemReference = get_file_system()?;
+
+        let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        let vfs_type: VfsType = format_scanner
+            .scan_for_format(&vfs_file_system, &vfs_location)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::Pdi);
 
         Ok(())
     }

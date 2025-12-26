@@ -11,33 +11,32 @@
  * under the License.
  */
 
-mod apm;
-mod constants;
-mod ewf;
-mod ext;
-mod fat;
-mod gpt;
-mod mbr;
-mod ntfs;
-mod pdi;
-mod qcow;
-mod sparseimage;
-mod udif;
-mod vhd;
-mod vhdx;
-mod vmdk;
+use super::enums::PdiExtentType;
 
-pub use apm::ApmInfo;
-pub use ewf::EwfInfo;
-pub use ext::ExtInfo;
-pub use fat::FatInfo;
-pub use gpt::GptInfo;
-pub use mbr::MbrInfo;
-pub use ntfs::NtfsInfo;
-pub use pdi::PdiInfo;
-pub use qcow::QcowInfo;
-pub use sparseimage::SparseImageInfo;
-pub use udif::UdifInfo;
-pub use vhd::VhdInfo;
-pub use vhdx::VhdxInfo;
-pub use vmdk::VmdkInfo;
+/// Parallels Disk Image (PDI) image extent.
+#[derive(Debug)]
+pub(super) struct PdiImageExtent {
+    /// Offset.
+    pub offset: u64,
+
+    /// Size.
+    pub size: u64,
+
+    /// File name.
+    pub file_name: String,
+
+    /// Extent type.
+    pub extent_type: PdiExtentType,
+}
+
+impl PdiImageExtent {
+    /// Creates a new image extent.
+    pub fn new(offset: u64, size: u64, file_name: &str, extent_type: PdiExtentType) -> Self {
+        Self {
+            offset,
+            size,
+            file_name: file_name.to_string(),
+            extent_type,
+        }
+    }
+}

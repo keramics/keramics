@@ -11,33 +11,28 @@
  * under the License.
  */
 
-mod apm;
-mod constants;
-mod ewf;
-mod ext;
-mod fat;
-mod gpt;
-mod mbr;
-mod ntfs;
-mod pdi;
-mod qcow;
-mod sparseimage;
-mod udif;
-mod vhd;
-mod vhdx;
-mod vmdk;
+use super::descriptor_image::PdiDescriptorImage;
 
-pub use apm::ApmInfo;
-pub use ewf::EwfInfo;
-pub use ext::ExtInfo;
-pub use fat::FatInfo;
-pub use gpt::GptInfo;
-pub use mbr::MbrInfo;
-pub use ntfs::NtfsInfo;
-pub use pdi::PdiInfo;
-pub use qcow::QcowInfo;
-pub use sparseimage::SparseImageInfo;
-pub use udif::UdifInfo;
-pub use vhd::VhdInfo;
-pub use vhdx::VhdxInfo;
-pub use vmdk::VmdkInfo;
+/// Parallels Disk Image (PDI) descriptor extent.
+#[derive(Debug)]
+pub(super) struct PdiDescriptorExtent {
+    /// Start sector.
+    pub start_sector: u64,
+
+    /// End sector.
+    pub end_sector: u64,
+
+    /// Images.
+    pub images: Vec<PdiDescriptorImage>,
+}
+
+impl PdiDescriptorExtent {
+    /// Creates a new descriptor extent.
+    pub fn new(start_sector: u64, end_sector: u64, images: Vec<PdiDescriptorImage>) -> Self {
+        Self {
+            start_sector,
+            end_sector,
+            images,
+        }
+    }
+}

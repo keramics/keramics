@@ -99,28 +99,28 @@ impl VhdFileSystem {
                 }
                 layer_index -= 1;
 
-                let vhd_layer: VhdImageLayer = match self.image.get_layer_by_index(layer_index) {
-                    Ok(vhd_layer) => vhd_layer,
+                let image_layer: VhdImageLayer = match self.image.get_layer_by_index(layer_index) {
+                    Ok(image_layer) => image_layer,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            format!("Unable to retrieve VHD layer: {}", layer_index)
+                            format!("Unable to retrieve image layer: {}", layer_index)
                         );
                         return Err(error);
                     }
                 };
-                let media_size: u64 = match vhd_layer.read() {
+                let media_size: u64 = match image_layer.read() {
                     Ok(vhd_file) => vhd_file.media_size,
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on VHD layer",
+                            "Unable to obtain read lock on image layer",
                             error
                         ));
                     }
                 };
                 Ok(Some(VhdFileEntry::Layer {
                     index: layer_index,
-                    layer: vhd_layer.clone(),
+                    layer: image_layer.clone(),
                     size: media_size,
                 }))
             }
@@ -218,8 +218,6 @@ impl VhdFileSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    use keramics_formats::PathComponent;
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;

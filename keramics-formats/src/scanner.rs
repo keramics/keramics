@@ -180,6 +180,16 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds Parallels Disk Image (PDI) signatures.
+    pub fn add_pdi_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "pdi1",
+            PatternType::BoundToStart,
+            39,
+            b"<Parallels_disk_image ",
+        ));
+    }
+
     /// Adds QEMU Copy-On-Write (QCOW) signatures.
     pub fn add_qcow_signatures(&mut self) {
         // Version 1 signature and version in header.
@@ -215,7 +225,7 @@ impl FormatScanner {
         ));
     }
 
-    /// Adds Universal Disk Image Format (UDIF) (signatures.
+    /// Adds Universal Disk Image Format (UDIF) signatures.
     pub fn add_udif_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
             "udif1",
@@ -341,6 +351,7 @@ impl FormatScanner {
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
+                "pdi1" => FormatIdentifier::Pdi,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
                 "sparseimage1" => FormatIdentifier::SparseImage,
                 "udif1" => FormatIdentifier::Udif,
@@ -374,6 +385,7 @@ mod tests {
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
+        format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();
@@ -393,6 +405,7 @@ mod tests {
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
+        format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
         format_scanner.add_sparseimage_signatures();
         format_scanner.add_udif_signatures();

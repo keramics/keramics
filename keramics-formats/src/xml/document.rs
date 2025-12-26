@@ -92,12 +92,15 @@ impl XmlDocument {
         };
         let name: &str = token_pair.as_str();
 
+        inner_pairs.next();
+
         let token_pair: Pair<Rule> = match inner_pairs.next() {
             Some(token_pair) => token_pair,
             None => {
                 return Err(keramics_core::error_trace_new!("Missing attribute value"));
             }
         };
+        // TODO: remove quotes from value
         let value: &str = token_pair.as_str();
 
         Ok(XmlAttribute::new(name, value))
@@ -262,6 +265,32 @@ mod tests {
         let root_element: XmlElement = document.root_element.unwrap();
         assert_eq!(root_element.name, "greeting");
         assert_eq!(root_element.value, "Hello, world!");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_with_attribute() -> Result<(), ErrorTrace> {
+        let test_data: &str = concat!(
+            "<?xml version=\"1.0\"?>\n",
+            "<greeting type=\"hello\">Hello, world!</greeting>\n",
+            "\n"
+        );
+
+        let mut document: XmlDocument = XmlDocument::new();
+        document.parse(test_data)?;
+
+        assert!(document.root_element.is_some());
+
+        let root_element: XmlElement = document.root_element.unwrap();
+        assert_eq!(root_element.name, "greeting");
+        assert_eq!(root_element.value, "Hello, world!");
+        assert_eq!(root_element.attributes.len(), 1);
+
+        let attribute: &XmlAttribute = root_element.attributes.get(0).unwrap();
+        assert_eq!(attribute.name, "type");
+        // TODO: remove quotes from value
+        assert_eq!(attribute.value, "\"hello\"");
 
         Ok(())
     }

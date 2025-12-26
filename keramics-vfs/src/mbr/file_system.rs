@@ -189,6 +189,9 @@ impl MbrFileSystem {
             VfsFileSystem::Ewf(ewf_file_system) => {
                 Ok(Some(ewf_file_system.get_bytes_per_sector()?))
             }
+            VfsFileSystem::Pdi(pdi_file_system) => {
+                Ok(Some(pdi_file_system.get_bytes_per_sector()?))
+            }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 Ok(Some(qcow_file_system.get_bytes_per_sector()?))
             }

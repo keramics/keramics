@@ -11,23 +11,23 @@
  * under the License.
  */
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
-use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
+use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 
 use crate::enums::VfsFileType;
 
-/// Virtual Hard Disk version 2 (VHDX) storage media image file entry.
-pub enum VhdxFileEntry {
+/// Parallels Disk Image (PDI) storage media image file entry.
+pub enum PdiFileEntry {
     /// Layer file entry.
     Layer {
         /// Layer index.
         index: usize,
 
         /// Layer.
-        layer: VhdxImageLayer,
+        layer: Arc<RwLock<PdiImageLayer>>,
 
         /// Size.
         size: u64,
@@ -36,48 +36,48 @@ pub enum VhdxFileEntry {
     /// Root file entry.
     Root {
         /// Storage media image.
-        image: Arc<VhdxImage>,
+        image: Arc<PdiImage>,
     },
 }
 
-impl VhdxFileEntry {
+impl PdiFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            VhdxFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
-            VhdxFileEntry::Root { .. } => Ok(None),
+            PdiFileEntry::Layer { layer, .. } => Ok(Some(layer.clone())),
+            PdiFileEntry::Root { .. } => Ok(None),
         }
     }
 
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         match self {
-            VhdxFileEntry::Layer { .. } => VfsFileType::File,
-            VhdxFileEntry::Root { .. } => VfsFileType::Directory,
+            PdiFileEntry::Layer { .. } => VfsFileType::File,
+            PdiFileEntry::Root { .. } => VfsFileType::Directory,
         }
     }
 
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
-            VhdxFileEntry::Layer { index, .. } => PathComponent::from(format!("vhdx{}", index + 1)),
-            VhdxFileEntry::Root { .. } => PathComponent::Root,
+            PdiFileEntry::Layer { index, .. } => PathComponent::from(format!("pdi{}", index + 1)),
+            PdiFileEntry::Root { .. } => PathComponent::Root,
         }
     }
 
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
-            VhdxFileEntry::Layer { size, .. } => *size,
-            VhdxFileEntry::Root { .. } => 0,
+            PdiFileEntry::Layer { size, .. } => *size,
+            PdiFileEntry::Root { .. } => 0,
         }
     }
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&self) -> usize {
         match self {
-            VhdxFileEntry::Layer { .. } => 0,
-            VhdxFileEntry::Root { image } => image.get_number_of_layers(),
+            PdiFileEntry::Layer { .. } => 0,
+            PdiFileEntry::Root { image } => image.get_number_of_layers(),
         }
     }
 
@@ -85,12 +85,12 @@ impl VhdxFileEntry {
     pub fn get_sub_file_entry_by_index(
         &self,
         sub_file_entry_index: usize,
-    ) -> Result<VhdxFileEntry, ErrorTrace> {
+    ) -> Result<PdiFileEntry, ErrorTrace> {
         match self {
-            VhdxFileEntry::Layer { .. } => {
+            PdiFileEntry::Layer { .. } => {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
-            VhdxFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
+            PdiFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
                 Ok(image_layer) => {
                     let media_size: u64 = match image_layer.read() {
                         Ok(vhd_file) => vhd_file.media_size,
@@ -101,7 +101,7 @@ impl VhdxFileEntry {
                             ));
                         }
                     };
-                    Ok(VhdxFileEntry::Layer {
+                    Ok(PdiFileEntry::Layer {
                         index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
@@ -121,8 +121,8 @@ impl VhdxFileEntry {
     /// Determines if the file entry is the root file entry.
     pub fn is_root_file_entry(&self) -> bool {
         match self {
-            VhdxFileEntry::Layer { .. } => false,
-            VhdxFileEntry::Root { .. } => true,
+            PdiFileEntry::Layer { .. } => false,
+            PdiFileEntry::Root { .. } => true,
         }
     }
 }
@@ -137,14 +137,13 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_image() -> Result<VhdxImage, ErrorTrace> {
-        let mut image: VhdxImage = VhdxImage::new();
+    fn get_image() -> Result<PdiImage, ErrorTrace> {
+        let mut image: PdiImage = PdiImage::new();
 
-        let path_string: String = get_test_data_path("vhdx");
+        let path_string: String = get_test_data_path("pdi/hfsplus.hdd");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
-        let file_name: PathComponent = PathComponent::from("ntfs-differential.vhdx");
-        image.open(&file_resolver, &file_name)?;
+        image.open(&file_resolver)?;
 
         Ok(image)
     }
@@ -153,11 +152,11 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let vhdx_image: VhdxImage = get_image()?;
+        let pdi_image: PdiImage = get_image()?;
 
-        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
 
-        let file_entry = VhdxFileEntry::Root {
+        let file_entry = PdiFileEntry::Root {
             image: test_image.clone(),
         };
 
@@ -169,47 +168,47 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let vhdx_image: VhdxImage = get_image()?;
+        let pdi_image: PdiImage = get_image()?;
 
-        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
 
-        let file_entry = VhdxFileEntry::Root {
+        let file_entry = PdiFileEntry::Root {
             image: test_image.clone(),
         };
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let vhdx_image_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdxFileEntry::Layer {
+        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
+        let file_entry = PdiFileEntry::Layer {
             index: 0,
-            layer: vhdx_image_layer.clone(),
+            layer: pdi_image_layer.clone(),
             size: 4194304,
         };
 
         let name: PathComponent = file_entry.get_name();
-        assert_eq!(name, PathComponent::from("vhdx1"));
+        assert_eq!(name, PathComponent::from("pdi1"));
 
         Ok(())
     }
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let vhdx_image: VhdxImage = get_image()?;
+        let pdi_image: PdiImage = get_image()?;
 
-        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
 
-        let file_entry = VhdxFileEntry::Root {
+        let file_entry = PdiFileEntry::Root {
             image: test_image.clone(),
         };
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let vhdx_image_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdxFileEntry::Layer {
+        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
+        let file_entry = PdiFileEntry::Layer {
             index: 0,
-            layer: vhdx_image_layer.clone(),
+            layer: pdi_image_layer.clone(),
             size: 4194304,
         };
 
@@ -221,21 +220,21 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let vhdx_image: VhdxImage = get_image()?;
+        let pdi_image: PdiImage = get_image()?;
 
-        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
 
-        let file_entry = VhdxFileEntry::Root {
+        let file_entry = PdiFileEntry::Root {
             image: test_image.clone(),
         };
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
-        assert_eq!(number_of_sub_file_entries, 2);
+        assert_eq!(number_of_sub_file_entries, 1);
 
-        let vhdx_image_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdxFileEntry::Layer {
+        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
+        let file_entry = PdiFileEntry::Layer {
             index: 0,
-            layer: vhdx_image_layer.clone(),
+            layer: pdi_image_layer.clone(),
             size: 4194304,
         };
 
@@ -247,20 +246,20 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let vhdx_image: VhdxImage = get_image()?;
+        let pdi_image: PdiImage = get_image()?;
 
-        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
 
-        let file_entry = VhdxFileEntry::Root {
+        let file_entry = PdiFileEntry::Root {
             image: test_image.clone(),
         };
 
-        let sub_file_entry: VhdxFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: PdiFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
         let name: PathComponent = sub_file_entry.get_name();
-        assert_eq!(name, PathComponent::from("vhdx1"));
+        assert_eq!(name, PathComponent::from("pdi1"));
 
-        let result: Result<VhdxFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
+        let result: Result<PdiFileEntry, ErrorTrace> = file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
 
         Ok(())
@@ -268,20 +267,20 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let vhdx_image: VhdxImage = get_image()?;
+        let pdi_image: PdiImage = get_image()?;
 
-        let test_image: Arc<VhdxImage> = Arc::new(vhdx_image);
+        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
 
-        let file_entry = VhdxFileEntry::Root {
+        let file_entry = PdiFileEntry::Root {
             image: test_image.clone(),
         };
 
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let vhdx_image_layer: VhdxImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdxFileEntry::Layer {
+        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
+        let file_entry = PdiFileEntry::Layer {
             index: 0,
-            layer: vhdx_image_layer.clone(),
+            layer: pdi_image_layer.clone(),
             size: 4194304,
         };
 

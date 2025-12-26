@@ -91,29 +91,26 @@ impl QcowFileEntry {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
             QcowFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
-                Ok(qcow_layer) => {
-                    let media_size: u64 = match qcow_layer.read() {
+                Ok(image_layer) => {
+                    let media_size: u64 = match image_layer.read() {
                         Ok(qcow_file) => qcow_file.media_size,
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to obtain read lock on QCOW layer",
+                                "Unable to obtain read lock on image layer",
                                 error
                             ));
                         }
                     };
                     Ok(QcowFileEntry::Layer {
                         index: sub_file_entry_index,
-                        layer: qcow_layer.clone(),
+                        layer: image_layer.clone(),
                         size: media_size,
                     })
                 }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!(
-                            "Unable to retrieve QCOW image layer: {}",
-                            sub_file_entry_index
-                        )
+                        format!("Unable to retrieve image layer: {}", sub_file_entry_index)
                     );
                     return Err(error);
                 }
@@ -183,10 +180,10 @@ mod tests {
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
+        let qcow_image_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
             index: 0,
-            layer: qcow_layer.clone(),
+            layer: qcow_image_layer.clone(),
             size: 4194304,
         };
 
@@ -209,10 +206,10 @@ mod tests {
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
+        let qcow_image_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
             index: 0,
-            layer: qcow_layer.clone(),
+            layer: qcow_image_layer.clone(),
             size: 4194304,
         };
 
@@ -235,10 +232,10 @@ mod tests {
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
-        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
+        let qcow_image_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
             index: 0,
-            layer: qcow_layer.clone(),
+            layer: qcow_image_layer.clone(),
             size: 4194304,
         };
 
@@ -281,10 +278,10 @@ mod tests {
 
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let qcow_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
+        let qcow_image_layer: QcowImageLayer = test_image.get_layer_by_index(0)?;
         let file_entry = QcowFileEntry::Layer {
             index: 0,
-            layer: qcow_layer.clone(),
+            layer: qcow_image_layer.clone(),
             size: 4194304,
         };
 

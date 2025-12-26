@@ -26,6 +26,7 @@ use super::gpt::{GptFileEntry, GptFileSystem};
 use super::location::VfsLocation;
 use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileSystem;
+use super::pdi::{PdiFileEntry, PdiFileSystem};
 use super::qcow::{QcowFileEntry, QcowFileSystem};
 use super::sparseimage::{SparseImageFileEntry, SparseImageFileSystem};
 use super::splitraw::{SplitRawFileEntry, SplitRawFileSystem};
@@ -46,6 +47,7 @@ pub enum VfsFileSystem {
     Mbr(MbrFileSystem),
     Ntfs(NtfsFileSystem),
     Os,
+    Pdi(PdiFileSystem),
     Qcow(QcowFileSystem),
     SparseImage(SparseImageFileSystem),
     SplitRaw(SplitRawFileSystem),
@@ -68,6 +70,7 @@ impl VfsFileSystem {
             VfsType::Mbr => VfsFileSystem::Mbr(MbrFileSystem::new()),
             VfsType::Ntfs => VfsFileSystem::Ntfs(NtfsFileSystem::new()),
             VfsType::Os => VfsFileSystem::Os,
+            VfsType::Pdi => VfsFileSystem::Pdi(PdiFileSystem::new()),
             VfsType::Qcow => VfsFileSystem::Qcow(QcowFileSystem::new()),
             VfsType::SparseImage => VfsFileSystem::SparseImage(SparseImageFileSystem::new()),
             VfsType::SplitRaw => VfsFileSystem::SplitRaw(SplitRawFileSystem::new()),
@@ -149,6 +152,7 @@ impl VfsFileSystem {
                 }
             }
             VfsFileSystem::Os => OsFileSystem::file_entry_exists(path),
+            VfsFileSystem::Pdi(pdi_file_system) => Ok(pdi_file_system.file_entry_exists(path)),
             VfsFileSystem::Qcow(qcow_file_system) => Ok(qcow_file_system.file_entry_exists(path)),
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 Ok(sparseimage_file_system.file_entry_exists(path))
@@ -288,6 +292,12 @@ impl VfsFileSystem {
                 Some(os_file_entry) => Ok(Some(VfsFileEntry::Os(os_file_entry))),
                 None => Ok(None),
             },
+            VfsFileSystem::Pdi(pdi_file_system) => {
+                match pdi_file_system.get_file_entry_by_path(path)? {
+                    Some(pdi_file_entry) => Ok(Some(VfsFileEntry::Pdi(pdi_file_entry))),
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 match qcow_file_system.get_file_entry_by_path(path)? {
                     Some(qcow_file_entry) => Ok(Some(VfsFileEntry::Qcow(qcow_file_entry))),
@@ -418,6 +428,11 @@ impl VfsFileSystem {
                     Err(error)
                 }
             },
+            VfsFileSystem::Pdi(pdi_file_system) => {
+                let pdi_file_entry: PdiFileEntry = pdi_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::Pdi(pdi_file_entry)))
+            }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 let qcow_file_entry: QcowFileEntry = qcow_file_system.get_root_file_entry();
 
@@ -493,6 +508,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Ntfs(ntfs_file_system) => {
                 Self::open_ntfs_file_system(ntfs_file_system, parent_file_system, vfs_location)
+            }
+            VfsFileSystem::Pdi(pdi_file_system) => {
+                pdi_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 qcow_file_system.open(parent_file_system, vfs_location)
@@ -1199,6 +1217,71 @@ mod tests {
         let path_string: String = get_test_data_path("directory/bogus.txt");
         let path: Path = Path::from(path_string.as_str());
         assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    // Tests with PDI.
+
+    fn get_pdi_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Pdi);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("pdi/hfsplus.hdd/DiskDescriptor.xml");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_pdi() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_pdi_file_system()?;
+
+        let path: Path = Path::from("/pdi1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_pdi_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_pdi_file_system()?;
+
+        let path: Path = Path::from("/bogus1");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_pdi_layer() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_pdi_file_system()?;
+
+        let path: Path = Path::from("/pdi1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_pdi_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_pdi_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
 
         Ok(())
     }

@@ -28,6 +28,7 @@ mod xml;
 
 // Storage media image formats
 pub mod ewf;
+pub mod pdi;
 pub mod qcow;
 pub mod sparsebundle;
 pub mod sparseimage;

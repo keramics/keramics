@@ -32,6 +32,7 @@ mod fake;
 mod gpt;
 mod mbr;
 mod os;
+mod pdi;
 mod qcow;
 mod sparseimage;
 mod splitraw;

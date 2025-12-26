@@ -207,7 +207,7 @@ impl VmdkImage {
         Ok(())
     }
 
-    /// Reads media data based on the extent files.
+    /// Reads media data based on the extents.
     fn read_data_from_extents(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -232,7 +232,7 @@ impl VmdkImage {
                 media_offset, media_offset
             )));
         }
-        let extent: &VmdkDescriptorExtent = match self.extents.get(extent_index) {
+        let mut extent: &VmdkDescriptorExtent = match self.extents.get(extent_index) {
             Some(extent) => extent,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -491,7 +491,7 @@ impl VmdkImage {
             if extent_offset >= extent_size {
                 extent_index += 1;
 
-                let extent: &VmdkDescriptorExtent = match self.extents.get(extent_index) {
+                extent = match self.extents.get(extent_index) {
                     Some(extent) => extent,
                     None => {
                         return Err(keramics_core::error_trace_new!(format!(
@@ -756,6 +756,8 @@ impl VmdkImage {
             }
             _ => {}
         }
+        // TODO: check if extents align
+
         let number_of_extents: usize = self.extents.len();
 
         for (extent_index, extent) in self.extents.iter().enumerate() {
@@ -846,6 +848,8 @@ impl VmdkImage {
                             "Mismatch in sectors per grain"
                         )));
                     }
+                    // TODO: compare file media size with size of extent
+
                     self.extent_file_cache
                         .insert(extent_index as u64, VmdkExtentFile::SparseVmdk(sparse_file));
                 }
@@ -869,10 +873,14 @@ impl VmdkImage {
                             "Mismatch in sectors per grain"
                         )));
                     }
+                    // TODO: compare file media size with size of extent
+
                     self.extent_file_cache
                         .insert(extent_index as u64, VmdkExtentFile::SparseCowd(sparse_file));
                 }
-                VmdkDescriptorExtentType::Flat | VmdkDescriptorExtentType::VmfsFlat => {}
+                VmdkDescriptorExtentType::Flat | VmdkDescriptorExtentType::VmfsFlat => {
+                    // TODO: compare file size with size of extent
+                }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported extent: {} type",

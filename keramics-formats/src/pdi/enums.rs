@@ -11,33 +11,15 @@
  * under the License.
  */
 
-mod apm;
-mod constants;
-mod ewf;
-mod ext;
-mod fat;
-mod gpt;
-mod mbr;
-mod ntfs;
-mod pdi;
-mod qcow;
-mod sparseimage;
-mod udif;
-mod vhd;
-mod vhdx;
-mod vmdk;
+#[derive(Clone, Debug, PartialEq)]
+pub enum PdiDescriptorImageType {
+    Compressed,
+    NotSet,
+    Plain,
+}
 
-pub use apm::ApmInfo;
-pub use ewf::EwfInfo;
-pub use ext::ExtInfo;
-pub use fat::FatInfo;
-pub use gpt::GptInfo;
-pub use mbr::MbrInfo;
-pub use ntfs::NtfsInfo;
-pub use pdi::PdiInfo;
-pub use qcow::QcowInfo;
-pub use sparseimage::SparseImageInfo;
-pub use udif::UdifInfo;
-pub use vhd::VhdInfo;
-pub use vhdx::VhdxInfo;
-pub use vmdk::VmdkInfo;
+#[derive(Clone, Debug, PartialEq)]
+pub enum PdiExtentType {
+    Raw,
+    Sparse,
+}

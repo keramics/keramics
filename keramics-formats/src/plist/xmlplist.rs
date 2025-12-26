@@ -99,6 +99,7 @@ impl XmlPlist {
 
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
@@ -436,6 +437,7 @@ impl XmlPlist {
 
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::character_data => {}
                 Rule::plist_object_element => {
@@ -456,7 +458,7 @@ impl XmlPlist {
                         rule
                     )));
                 }
-            };
+            }
         }
         if object == PlistObject::None {
             return Err(keramics_core::error_trace_new!(
@@ -578,7 +580,7 @@ impl XmlPlist {
                 ));
             }
             None => {}
-        };
+        }
         Ok(object)
     }
 
@@ -591,6 +593,7 @@ impl XmlPlist {
 
         while let Some(token_pair) = inner_pairs.next() {
             let rule: Rule = token_pair.as_rule();
+
             match rule {
                 Rule::character_data => {
                     string_parts.push(token_pair.as_str());
@@ -601,7 +604,7 @@ impl XmlPlist {
                         rule
                     )));
                 }
-            };
+            }
         }
         Ok(string_parts.join(""))
     }
@@ -637,7 +640,7 @@ impl XmlPlist {
                 ));
             }
             None => {}
-        };
+        }
         Ok(string_value)
     }
 }

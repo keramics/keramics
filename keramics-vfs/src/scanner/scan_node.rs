@@ -54,6 +54,7 @@ impl VfsScanNode {
             | VfsType::Gpt
             | VfsType::Mbr
             | VfsType::Os
+            | VfsType::Pdi
             | VfsType::Qcow
             | VfsType::SparseImage
             | VfsType::SplitRaw
