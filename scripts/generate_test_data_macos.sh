@@ -157,7 +157,7 @@ hdiutil attach ${IMAGE_FILE}.dmg
 create_file_entries "/Volumes/hfsplus_test"
 
 # Sleep to prevent "resource busy" warning.
-sleep 1
+sleep 3
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
@@ -177,7 +177,7 @@ hdiutil attach ${IMAGE_FILE}.sparseimage
 create_file_entries "/Volumes/hfsplus_test"
 
 # Sleep to prevent "resource busy" warning.
-sleep 1
+sleep 3
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
@@ -197,7 +197,7 @@ hdiutil attach ${IMAGE_FILE}.sparsebundle
 create_file_entries "/Volumes/hfsplus_test"
 
 # Sleep to prevent "resource busy" warning.
-sleep 1
+sleep 3
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
@@ -257,7 +257,7 @@ rm -f ${IMAGE_FILE}.dmg
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
 # Sleep to prevent "resource busy" warning.
-sleep 1
+sleep 3
 
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
