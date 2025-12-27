@@ -26,7 +26,7 @@ pub struct PdiFuzzFileResolver {
 }
 
 impl PdiFuzzFileResolver {
-    pub fn new() -> Self {
+    pub fn new(data: &[u8]) -> Self {
         Self {
             data: data.to_vec(),
         }
