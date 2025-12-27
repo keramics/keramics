@@ -58,7 +58,7 @@ start of a data stream.
 #### Long and short (file) name
 
 In Windows terminology the name of a file (or directory) can either be short or
-long. The short name is an equivalent of the filename in the (DOS) 8.3 format.
+long. The short name is an equivalent of the file name in the (DOS) 8.3 format.
 The long name is actual the (full) name of the file. The term long refers to
 the aspect that the name is longer than the short variant. Because most
 documentation refer to the (full) name as the long name, for clarity sake so
@@ -72,7 +72,7 @@ metadata. There are several predefined metadata files.
 
 The following metadata files are predefined and use a fixed MFT entry number.
 
-| MFT entry number | Filename | Description
+| MFT entry number | File name | Description
 | --- | --- | ---
 | 0 | "$MFT" | Master File Table
 | 1 | "$MFTMirr" | Back up of the first 4 entries of the Master File Table
@@ -111,7 +111,7 @@ The following metadata files are predefined and use a fixed MFT entry number.
 The following metadata files are predefined, however the MFT entry number is
 commonly used but not fixed.
 
-| MFT entry number | Filename | Description
+| MFT entry number | File name | Description
 | --- | --- | ---
 | | "$Extend\$UsnJrnl" | [USN change journal](#usn_change_journal)
 
@@ -767,7 +767,7 @@ Make the name unique:
 
 1. use the characters 1 to 6 add ~1 and if the long name has an extension add the a dot and its first 3 letters, e.g. "Program Files" becomes "PROGRA~1" or " ~PLAYMOVIE.REG" becomes "\~PLAYM~1.REG"
 1. if the name already exists try ~2 up to ~9, e.g. "Program Data", in the same directory as "Program Files", becomes "PROGRA~2"
-1. if the name already exists use a 16-bit hexadecimal value for characters 3 to 6 with ~1, e.g. "x86_microsoft-windows-r..ry-editor.resources_31bf3856ad364e35_6.0.6000.16386_en-us_f89a7b0005d42fd4" in a directory with a lot of filenames starting with "x86_microsoft", becomes "X8FCA6~1.163"
+1. if the name already exists use a 16-bit hexadecimal value for characters 3 to 6 with ~1, e.g. "x86_microsoft-windows-r..ry-editor.resources_31bf3856ad364e35_6.0.6000.16386_en-us_f89a7b0005d42fd4" in a directory with a lot of file names starting with "x86_microsoft", becomes "X8FCA6~1.163"
 
 TODO: determine if the behavior is dependent on a setting that can be changed with fsutil
 

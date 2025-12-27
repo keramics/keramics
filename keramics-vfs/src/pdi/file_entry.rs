@@ -137,7 +137,7 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_image() -> Result<PdiImage, ErrorTrace> {
+    fn get_image() -> Result<Arc<PdiImage>, ErrorTrace> {
         let mut image: PdiImage = PdiImage::new();
 
         let path_string: String = get_test_data_path("pdi/hfsplus.hdd");
@@ -145,46 +145,54 @@ mod tests {
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
         image.open(&file_resolver)?;
 
-        Ok(image)
+        Ok(Arc::new(image))
+    }
+
+    fn get_layer_file_entry(image: &Arc<PdiImage>) -> Result<PdiFileEntry, ErrorTrace> {
+        let image_layer: Arc<RwLock<PdiImageLayer>> = image.get_layer_by_index(0)?;
+
+        Ok(PdiFileEntry::Layer {
+            index: 0,
+            layer: image_layer,
+            size: image.media_size,
+        })
+    }
+
+    fn get_root_file_entry(image: &Arc<PdiImage>) -> PdiFileEntry {
+        PdiFileEntry::Root {
+            image: image.clone(),
+        }
     }
 
     // TODO: add tests for get_data_stream
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let pdi_image: PdiImage = get_image()?;
+        let test_image: Arc<PdiImage> = get_image()?;
 
-        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
-
-        let file_entry = PdiFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
+
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
+
+        let file_type: VfsFileType = file_entry.get_file_type();
+        assert_eq!(file_type, VfsFileType::File);
 
         Ok(())
     }
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let pdi_image: PdiImage = get_image()?;
+        let test_image: Arc<PdiImage> = get_image()?;
 
-        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
-
-        let file_entry = PdiFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
-        let file_entry = PdiFileEntry::Layer {
-            index: 0,
-            layer: pdi_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("pdi1"));
@@ -194,49 +202,31 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let pdi_image: PdiImage = get_image()?;
+        let test_image: Arc<PdiImage> = get_image()?;
 
-        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
-
-        let file_entry = PdiFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
-        let file_entry = PdiFileEntry::Layer {
-            index: 0,
-            layer: pdi_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
 
         let size: u64 = file_entry.get_size();
-        assert_eq!(size, 4194304);
+        assert_eq!(size, 33554432);
 
         Ok(())
     }
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let pdi_image: PdiImage = get_image()?;
+        let test_image: Arc<PdiImage> = get_image()?;
 
-        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
-
-        let file_entry = PdiFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
-        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
-        let file_entry = PdiFileEntry::Layer {
-            index: 0,
-            layer: pdi_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
@@ -246,13 +236,9 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let pdi_image: PdiImage = get_image()?;
+        let test_image: Arc<PdiImage> = get_image()?;
 
-        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
-
-        let file_entry = PdiFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
 
         let sub_file_entry: PdiFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -267,23 +253,12 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let pdi_image: PdiImage = get_image()?;
+        let test_image: Arc<PdiImage> = get_image()?;
 
-        let test_image: Arc<PdiImage> = Arc::new(pdi_image);
-
-        let file_entry = PdiFileEntry::Root {
-            image: test_image.clone(),
-        };
-
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let pdi_image_layer: Arc<RwLock<PdiImageLayer>> = test_image.get_layer_by_index(0)?;
-        let file_entry = PdiFileEntry::Layer {
-            index: 0,
-            layer: pdi_image_layer.clone(),
-            size: 4194304,
-        };
-
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

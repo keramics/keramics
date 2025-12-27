@@ -632,7 +632,7 @@ The file header is 2048 bytes in size and consists of:
 | 40 | 4 | | The number of sectors
 | 44 | 1016 | | Unknown (Empty values)
 | <td colspan="4">*In child extent data files*</td>
-| 32 | 1024 | | Parent filename
+| 32 | 1024 | | Parent file name
 | 1056 | 4 | | Parent generation
 | <td colspan="4">*Common*</td>
 | 1060 | 4 | | Generation
@@ -643,7 +643,7 @@ The file header is 2048 bytes in size and consists of:
 | 1648 | 4 | | Value to determine if the extent data file was cleanly closed (or dirty flag)
 | 1652 | 396 | | Unknown (Padding)
 
-> Note that the parent filename seems not to be set in recent delta sparse
+> Note that the parent file name seems not to be set in recent delta sparse
 > extent files.
 
 ### Grain directory

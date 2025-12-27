@@ -24,8 +24,8 @@ pub type QcowImageLayer = Arc<RwLock<QcowFile>>;
 
 /// QEMU Copy-On-Write (QCOW) storage media image.
 pub struct QcowImage {
-    /// Files.
-    files: Vec<Arc<RwLock<QcowFile>>>,
+    /// Layers.
+    layers: Vec<Arc<RwLock<QcowFile>>>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -35,19 +35,19 @@ impl QcowImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self {
-            files: Vec::new(),
+            layers: Vec::new(),
             bytes_per_sector: 0,
         }
     }
 
     /// Retrieves the number of layers.
     pub fn get_number_of_layers(&self) -> usize {
-        self.files.len()
+        self.layers.len()
     }
 
     /// Retrieves a layer by index.
     pub fn get_layer_by_index(&self, layer_index: usize) -> Result<QcowImageLayer, ErrorTrace> {
-        match self.files.get(layer_index) {
+        match self.layers.get(layer_index) {
             Some(file) => Ok(file.clone()),
             None => Err(keramics_core::error_trace_new!(format!(
                 "No layer with index: {}",
@@ -129,7 +129,7 @@ impl QcowImage {
         let mut file_index: usize = 0;
         while let Some(mut file) = files.pop() {
             if file_index > 0 {
-                match file.set_backing_file(&mut self.files[file_index - 1]) {
+                match file.set_backing_file(&mut self.layers[file_index - 1]) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to set backing file");
@@ -137,7 +137,7 @@ impl QcowImage {
                     }
                 }
             }
-            self.files.push(Arc::new(RwLock::new(file)));
+            self.layers.push(Arc::new(RwLock::new(file)));
 
             file_index += 1;
         }
@@ -204,7 +204,7 @@ mod tests {
         let file_name: PathComponent = PathComponent::from("ext2.qcow2");
         image.open(&file_resolver, &file_name)?;
 
-        assert_eq!(image.files.len(), 1);
+        assert_eq!(image.layers.len(), 1);
         assert_eq!(image.bytes_per_sector, 512);
 
         Ok(())

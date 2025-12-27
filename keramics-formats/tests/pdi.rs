@@ -16,12 +16,12 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, ErrorTrace};
-use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
-use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_formats::pdi::{PdiImage, PdiImageLayer};
+use keramics_formats::{FileResolverReference, open_os_file_resolver};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_media_from_image_layer(
-    image_layer: &mut VmdkImageLayer,
+    image_layer: &mut PdiImageLayer,
 ) -> Result<(u64, String), ErrorTrace> {
     let mut data: Vec<u8> = vec![0; 35891];
     let mut md5_context: Md5Context = Md5Context::new();
@@ -34,7 +34,7 @@ fn read_media_from_image_layer(
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to read from VMDK image layer at offset {} (0x{:08x})",
+                        "Unable to read from PDI image layer at offset {} (0x{:08x})",
                         media_offset, media_offset
                     )
                 );
@@ -54,7 +54,7 @@ fn read_media_from_image_layer(
     Ok((media_offset, hash_string))
 }
 
-fn open_image(base_path: &PathBuf, file_name: &str) -> Result<VmdkImage, ErrorTrace> {
+fn open_image(base_path: &PathBuf) -> Result<PdiImage, ErrorTrace> {
     let file_resolver: FileResolverReference = match open_os_file_resolver(base_path) {
         Ok(data_stream) => data_stream,
         Err(error) => {
@@ -64,13 +64,12 @@ fn open_image(base_path: &PathBuf, file_name: &str) -> Result<VmdkImage, ErrorTr
             ));
         }
     };
-    let mut image: VmdkImage = VmdkImage::new();
+    let mut image: PdiImage = PdiImage::new();
 
-    let path_component: PathComponent = PathComponent::from(file_name);
-    match image.open(&file_resolver, &path_component) {
+    match image.open(&file_resolver) {
         Ok(_) => {}
         Err(mut error) => {
-            keramics_core::error_trace_add_frame!(error, "Unable to open VMDK image");
+            keramics_core::error_trace_add_frame!(error, "Unable to open PDI image");
             return Err(error);
         }
     }
@@ -79,15 +78,14 @@ fn open_image(base_path: &PathBuf, file_name: &str) -> Result<VmdkImage, ErrorTr
 
 #[test]
 fn read_media() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/vmdk");
-    let image: VmdkImage = open_image(&path_buf, "ext2.vmdk")?;
+    let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd");
+    let image: PdiImage = open_image(&path_buf)?;
 
     let number_of_layers: usize = image.get_number_of_layers();
 
-    let image_layer: Arc<RwLock<VmdkImageLayer>> =
-        image.get_layer_by_index(number_of_layers - 1)?;
+    let image_layer: Arc<RwLock<PdiImageLayer>> = image.get_layer_by_index(number_of_layers - 1)?;
     let (media_offset, md5_hash): (u64, String) = match image_layer.write() {
-        Ok(mut vmdk_image_layer) => read_media_from_image_layer(&mut vmdk_image_layer)?,
+        Ok(mut pdi_image_layer) => read_media_from_image_layer(&mut pdi_image_layer)?,
         Err(_) => {
             return Err(keramics_core::error_trace_new!(
                 "Unable to obtain write lock on image layer"
@@ -95,7 +93,7 @@ fn read_media() -> Result<(), ErrorTrace> {
         }
     };
     assert_eq!(media_offset, image.media_size);
-    assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
+    assert_eq!(md5_hash.as_str(), "ecaef634016fc699807cec47cef11dda");
 
     Ok(())
 }

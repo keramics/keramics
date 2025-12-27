@@ -320,7 +320,7 @@ The data-file file header extension header is of variable size and consist of:
 
 | Offset | Size | Value | Description
 | --- | --- | --- | ---
-| 0 | ... | | Data-file filename, which contains an UTF-8 string without end-of-string character
+| 0 | ... | | Data-file file name, which contains an UTF-8 string without end-of-string character
 
 #### Feature table file header extension
 

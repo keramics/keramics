@@ -14,11 +14,12 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::ErrorTrace;
-use keramics_formats::vmdk::VmdkImage;
+use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
 
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
+use crate::path::VfsPath;
 use crate::types::VfsFileSystemReference;
 
 use super::file_entry::VmdkFileEntry;
@@ -26,7 +27,7 @@ use super::file_entry::VmdkFileEntry;
 /// VMware Virtual Disk (VMDK) storage media image file system.
 pub struct VmdkFileSystem {
     /// Image.
-    image: Arc<RwLock<VmdkImage>>,
+    image: Arc<VmdkImage>,
 
     /// Number of layers.
     number_of_layers: usize,
@@ -38,7 +39,7 @@ impl VmdkFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            image: Arc::new(RwLock::new(VmdkImage::new())),
+            image: Arc::new(VmdkImage::new()),
             number_of_layers: 0,
         }
     }
@@ -71,13 +72,7 @@ impl VmdkFileSystem {
 
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        match self.image.read() {
-            Ok(vmdk_image) => Ok(vmdk_image.bytes_per_sector as u32),
-            Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                "Unable to obtain read lock on VMDK image",
-                error
-            )),
-        }
+        Ok(self.image.bytes_per_sector as u32)
     }
 
     /// Retrieves the file entry with the specific location.
@@ -90,20 +85,39 @@ impl VmdkFileSystem {
                 if path.get_number_of_components() > 2 {
                     return Ok(None);
                 }
-                if path_component != "vmdk1" {
+                let mut layer_index: usize =
+                    match VfsPath::get_numeric_suffix(path_component, "vmdk") {
+                        Some(layer_index) => layer_index,
+                        None => return Ok(None),
+                    };
+                if layer_index == 0 || layer_index > self.number_of_layers {
                     return Ok(None);
                 }
-                let media_size: u64 = match self.image.read() {
-                    Ok(vmdk_image) => vmdk_image.media_size,
+                layer_index -= 1;
+
+                let image_layer: Arc<RwLock<VmdkImageLayer>> =
+                    match self.image.get_layer_by_index(layer_index) {
+                        Ok(image_layer) => image_layer,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to retrieve image layer: {}", layer_index)
+                            );
+                            return Err(error);
+                        }
+                    };
+                let media_size: u64 = match image_layer.read() {
+                    Ok(vmdk_file) => vmdk_file.media_size,
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on VMDK image",
+                            "Unable to obtain read lock on image layer",
                             error
                         ));
                     }
                 };
                 Ok(Some(VmdkFileEntry::Layer {
-                    image: self.image.clone(),
+                    index: layer_index,
+                    layer: image_layer.clone(),
                     size: media_size,
                 }))
             }
@@ -139,21 +153,20 @@ impl VmdkFileSystem {
         };
         let path: &Path = vfs_location.get_path();
 
-        match self.image.write() {
-            Ok(mut image) => {
-                match Self::open_image(&mut image, file_system, path) {
+        match Arc::get_mut(&mut self.image) {
+            Some(image) => {
+                match Self::open_image(image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open VMDK image");
                         return Err(error);
                     }
                 }
-                self.number_of_layers = 1;
+                self.number_of_layers = image.get_number_of_layers();
             }
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on VMDK image",
-                    error
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to VMDK image"
                 ));
             }
         }

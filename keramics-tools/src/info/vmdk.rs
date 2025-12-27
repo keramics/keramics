@@ -13,16 +13,17 @@
 
 use std::fmt;
 use std::path::PathBuf;
+use std::sync::{Arc, RwLock};
 
 use keramics_core::ErrorTrace;
-use keramics_formats::vmdk::{VmdkCompressionMethod, VmdkDiskType, VmdkImage};
+use keramics_formats::vmdk::{VmdkCompressionMethod, VmdkDiskType, VmdkImage, VmdkImageLayer};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;
 
-/// Information about a VMware Virtual Disk (VMDK) image.
-struct VmdkImageInfo {
+/// Information about a VMware Virtual Disk (VMDK) image layer.
+struct VmdkImageLayerInfo {
     /// Disk type.
     pub disk_type: VmdkDiskType,
 
@@ -48,7 +49,7 @@ struct VmdkImageInfo {
     pub bytes_per_sector: u16,
 }
 
-impl VmdkImageInfo {
+impl VmdkImageLayerInfo {
     const COMPRESSION_METHODS: &[(VmdkCompressionMethod, &'static str); 2] = &[
         (VmdkCompressionMethod::None, "Uncompressed"),
         (VmdkCompressionMethod::Zlib, "zlib"),
@@ -105,7 +106,7 @@ impl VmdkImageInfo {
     }
 }
 
-impl fmt::Display for VmdkImageInfo {
+impl fmt::Display for VmdkImageLayerInfo {
     /// Formats image information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "VMware Virtual Disk (VMDK) information:")?;
@@ -170,20 +171,21 @@ impl fmt::Display for VmdkImageInfo {
 pub struct VmdkInfo {}
 
 impl VmdkInfo {
-    /// Retrieves the image information.
-    fn get_image_information(vmdk_image: &VmdkImage) -> VmdkImageInfo {
-        let mut image_information: VmdkImageInfo = VmdkImageInfo::new();
+    /// Retrieves the image layer information.
+    fn get_image_layer_information(vmdk_image_layer: &VmdkImageLayer) -> VmdkImageLayerInfo {
+        let mut image_layer_information: VmdkImageLayerInfo = VmdkImageLayerInfo::new();
 
-        image_information.disk_type = vmdk_image.disk_type.clone();
-        image_information.sectors_per_grain = vmdk_image.sectors_per_grain;
-        image_information.compression_method = vmdk_image.compression_method.clone();
-        image_information.content_identifier = vmdk_image.content_identifier;
-        image_information.parent_content_identifier = vmdk_image.parent_content_identifier;
-        image_information.parent_name = vmdk_image.parent_name.clone();
-        image_information.media_size = vmdk_image.media_size;
-        image_information.bytes_per_sector = vmdk_image.bytes_per_sector;
+        image_layer_information.disk_type = vmdk_image_layer.disk_type.clone();
+        image_layer_information.sectors_per_grain = vmdk_image_layer.sectors_per_grain;
+        image_layer_information.compression_method = vmdk_image_layer.compression_method.clone();
+        image_layer_information.content_identifier = vmdk_image_layer.content_identifier;
+        image_layer_information.parent_content_identifier =
+            vmdk_image_layer.parent_content_identifier;
+        image_layer_information.parent_name = vmdk_image_layer.parent_name.clone();
+        image_layer_information.media_size = vmdk_image_layer.media_size;
+        image_layer_information.bytes_per_sector = vmdk_image_layer.bytes_per_sector;
 
-        image_information
+        image_layer_information
     }
 
     /// Opens an image.
@@ -230,9 +232,28 @@ impl VmdkInfo {
                 return Err(error);
             }
         };
-        let image_information: VmdkImageInfo = Self::get_image_information(&vmdk_image);
+        let number_of_layers: usize = vmdk_image.get_number_of_layers();
 
-        print!("{}", image_information);
+        let vmdk_image_layer: Arc<RwLock<VmdkImageLayer>> =
+            match vmdk_image.get_layer_by_index(number_of_layers - 1) {
+                Ok(image_layer) => image_layer,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve image layer: {}", number_of_layers - 1)
+                    );
+                    return Err(error);
+                }
+            };
+        let image_layer_information: VmdkImageLayerInfo = match vmdk_image_layer.read() {
+            Ok(image_layer) => Self::get_image_layer_information(&image_layer),
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain read lock on image layer"
+                ));
+            }
+        };
+        print!("{}", image_layer_information);
 
         Ok(())
     }
@@ -245,10 +266,18 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
+    fn test_image_layer_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
         let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
-        let test_struct: VmdkImageInfo = VmdkInfo::get_image_information(&vmdk_image);
+        let vmdk_image_layer: Arc<RwLock<VmdkImageLayer>> = vmdk_image.get_layer_by_index(0)?;
+        let test_struct: VmdkImageLayerInfo = match vmdk_image_layer.read() {
+            Ok(image_layer) => VmdkInfo::get_image_layer_information(&image_layer),
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain read lock on image layer"
+                ));
+            }
+        };
 
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
@@ -268,10 +297,18 @@ mod tests {
     }
 
     #[test]
-    fn test_get_image_information() -> Result<(), ErrorTrace> {
+    fn test_get_image_layer_information() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
         let vmdk_image: VmdkImage = VmdkInfo::open_image(&path_buf)?;
-        let test_struct: VmdkImageInfo = VmdkInfo::get_image_information(&vmdk_image);
+        let vmdk_image_layer: Arc<RwLock<VmdkImageLayer>> = vmdk_image.get_layer_by_index(0)?;
+        let test_struct: VmdkImageLayerInfo = match vmdk_image_layer.read() {
+            Ok(image_layer) => VmdkInfo::get_image_layer_information(&image_layer),
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain read lock on image layer"
+                ));
+            }
+        };
 
         assert_eq!(test_struct.disk_type, VmdkDiskType::MonolithicSparse);
         assert_eq!(test_struct.sectors_per_grain, 128);

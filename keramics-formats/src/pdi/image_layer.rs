@@ -275,8 +275,14 @@ impl PdiImageLayer {
                                 )));
                             }
                         },
-                        PdiBlockRangeType::InParentOrSparse => match self.parent_identifier {
-                            Some(_) => todo!(),
+                        PdiBlockRangeType::InParentOrSparse => match self.parent_layer.as_ref() {
+                            Some(parent_layer) => {
+                                keramics_core::data_stream_read_at_position!(
+                                    parent_layer,
+                                    &mut data[data_offset..data_end_offset],
+                                    SeekFrom::Start(media_offset)
+                                )
+                            }
                             None => {
                                 data[data_offset..data_end_offset].fill(0);
 
@@ -327,8 +333,7 @@ impl PdiImageLayer {
                 if *parent_identifier != image_layer.identifier {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Parent identifier: {} does not match identifier of parent layer: {}",
-                        parent_identifier.to_string(),
-                        image_layer.identifier.to_string(),
+                        parent_identifier, image_layer.identifier,
                     )));
                 }
             }
@@ -436,6 +441,7 @@ mod tests {
         Ok(image_layer)
     }
 
+    // TODO: add test for read_data_from_extents
     // TODO: add test for set_parent
 
     #[test]

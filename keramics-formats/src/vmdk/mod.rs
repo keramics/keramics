@@ -19,6 +19,7 @@ mod descriptor_storage;
 mod enums;
 mod extent_file;
 mod image;
+mod image_layer;
 mod sector_table;
 mod sparse_cowd_file;
 mod sparse_cowd_file_header;
@@ -27,3 +28,4 @@ mod sparse_file_header;
 
 pub use enums::{VmdkCompressionMethod, VmdkDiskType};
 pub use image::VmdkImage;
+pub use image_layer::VmdkImageLayer;

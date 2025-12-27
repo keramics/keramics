@@ -109,175 +109,6 @@ impl PdiImage {
         Ok(())
     }
 
-    /// Reads the extent files.
-    pub fn read_extent_files(
-        &mut self,
-        file_resolver: &FileResolverReference,
-    ) -> Result<(), ErrorTrace> {
-        let snapshots: HashSet<&Uuid> = self
-            .snapshots
-            .iter()
-            .map(|descriptor_snapshot| &descriptor_snapshot.identifier)
-            .collect();
-
-        let mut last_end_sector: u64 = 0;
-
-        for descriptor_extent in self.extents.iter() {
-            if descriptor_extent.start_sector >= descriptor_extent.end_sector {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported extent start sector: {} value exceeds end sector: {}",
-                    descriptor_extent.start_sector, descriptor_extent.end_sector
-                )));
-            }
-            let extent_number_of_sectors: u64 =
-                descriptor_extent.end_sector - descriptor_extent.start_sector;
-
-            if descriptor_extent.start_sector != last_end_sector {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported extent start sector: {} value not aligned with last end sector: {}",
-                    descriptor_extent.start_sector, last_end_sector
-                )));
-            }
-            last_end_sector = descriptor_extent.end_sector;
-
-            for descriptor_image in descriptor_extent.images.iter() {
-                if !snapshots.contains(&descriptor_image.snapshot_identifier) {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing snapshot: {}",
-                        descriptor_image.snapshot_identifier
-                    )));
-                }
-                let path_components: [PathComponent; 1] =
-                    [PathComponent::from(&descriptor_image.file)];
-
-                let data_stream: DataStreamReference =
-                    match file_resolver.get_data_stream(&path_components) {
-                        Ok(Some(data_stream)) => data_stream,
-                        Ok(None) => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Missing image data stream: {}",
-                                descriptor_image.file
-                            )));
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to open image file: {}", descriptor_image.file,)
-                            );
-                            return Err(error);
-                        }
-                    };
-                match &descriptor_image.image_type {
-                    PdiDescriptorImageType::Compressed => {
-                        let mut file_header: PdiSparseFileHeader = PdiSparseFileHeader::new();
-
-                        match file_header.read_at_position(&data_stream, SeekFrom::Start(0)) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to read sparse file header"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        if file_header.number_of_sectors != extent_number_of_sectors {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported sparse file header number of sectors: {} value does not align with extent: {}",
-                                file_header.number_of_sectors, extent_number_of_sectors
-                            )));
-                        }
-                    }
-                    PdiDescriptorImageType::Plain => {
-                        let file_size: u64 = keramics_core::data_stream_get_size!(data_stream);
-
-                        let extent_size: u64 =
-                            extent_number_of_sectors * (self.bytes_per_sector as u64);
-
-                        if file_size != extent_size {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported file size: {} value does not align with extent: {}",
-                                file_size, extent_size
-                            )));
-                        }
-                    }
-                    _ => {
-                        return Err(keramics_core::error_trace_new!("Unsupported image type"));
-                    }
-                }
-            }
-        }
-        let mut layer_indexes: HashMap<&Uuid, usize> = HashMap::new();
-
-        for descriptor_snapshot in self.snapshots.iter().rev() {
-            layer_indexes.insert(&descriptor_snapshot.identifier, self.layers.len());
-
-            let mut image_layer: PdiImageLayer = PdiImageLayer::new(
-                &descriptor_snapshot.identifier,
-                descriptor_snapshot.parent_identifier.as_ref(),
-                self.media_size,
-            );
-            for descriptor_extent in self.extents.iter() {
-                for descriptor_image in descriptor_extent.images.iter() {
-                    if descriptor_image.snapshot_identifier == descriptor_snapshot.identifier {
-                        let offset: u64 =
-                            descriptor_extent.start_sector * (self.bytes_per_sector as u64);
-                        let size: u64 = (descriptor_extent.end_sector
-                            - descriptor_extent.start_sector)
-                            * (self.bytes_per_sector as u64);
-
-                        let extent_type: PdiExtentType =
-                            if descriptor_image.image_type == PdiDescriptorImageType::Compressed {
-                                PdiExtentType::Sparse
-                            } else {
-                                PdiExtentType::Raw
-                            };
-                        image_layer.add_extent(
-                            offset,
-                            size,
-                            descriptor_image.file.as_str(),
-                            extent_type,
-                        );
-                    }
-                }
-            }
-            if let Some(parent_identifier) = descriptor_snapshot.parent_identifier.as_ref() {
-                match layer_indexes.get(parent_identifier) {
-                    Some(parent_layer_index) => {
-                        match image_layer.set_parent(&self.layers[*parent_layer_index]) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to set parent"
-                                );
-                                return Err(error);
-                            }
-                        }
-                    }
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Missing layer: {}",
-                            parent_identifier
-                        )));
-                    }
-                }
-            }
-            match image_layer.open(file_resolver) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to open layer: {}", descriptor_snapshot.identifier)
-                    );
-                    return Err(error);
-                }
-            }
-            self.layers.push(Arc::new(RwLock::new(image_layer)));
-        }
-        Ok(())
-    }
-
     /// Reads a DiskDescriptor.xml file.
     fn read_disk_descriptor(
         &mut self,
@@ -512,6 +343,175 @@ impl PdiImage {
         }
         self.media_size = disk_size * (self.bytes_per_sector as u64);
 
+        Ok(())
+    }
+
+    /// Reads the extent files.
+    pub fn read_extent_files(
+        &mut self,
+        file_resolver: &FileResolverReference,
+    ) -> Result<(), ErrorTrace> {
+        let snapshots: HashSet<&Uuid> = self
+            .snapshots
+            .iter()
+            .map(|descriptor_snapshot| &descriptor_snapshot.identifier)
+            .collect();
+
+        let mut last_end_sector: u64 = 0;
+
+        for descriptor_extent in self.extents.iter() {
+            if descriptor_extent.start_sector >= descriptor_extent.end_sector {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported extent start sector: {} value exceeds end sector: {}",
+                    descriptor_extent.start_sector, descriptor_extent.end_sector
+                )));
+            }
+            let extent_number_of_sectors: u64 =
+                descriptor_extent.end_sector - descriptor_extent.start_sector;
+
+            if descriptor_extent.start_sector != last_end_sector {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported extent start sector: {} value not aligned with last end sector: {}",
+                    descriptor_extent.start_sector, last_end_sector
+                )));
+            }
+            last_end_sector = descriptor_extent.end_sector;
+
+            for descriptor_image in descriptor_extent.images.iter() {
+                if !snapshots.contains(&descriptor_image.snapshot_identifier) {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing snapshot: {}",
+                        descriptor_image.snapshot_identifier
+                    )));
+                }
+                let path_components: [PathComponent; 1] =
+                    [PathComponent::from(&descriptor_image.file)];
+
+                let data_stream: DataStreamReference =
+                    match file_resolver.get_data_stream(&path_components) {
+                        Ok(Some(data_stream)) => data_stream,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing image data stream: {}",
+                                descriptor_image.file
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to open image file: {}", descriptor_image.file,)
+                            );
+                            return Err(error);
+                        }
+                    };
+                match &descriptor_image.image_type {
+                    PdiDescriptorImageType::Compressed => {
+                        let mut file_header: PdiSparseFileHeader = PdiSparseFileHeader::new();
+
+                        match file_header.read_at_position(&data_stream, SeekFrom::Start(0)) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read sparse file header"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        if file_header.number_of_sectors != extent_number_of_sectors {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported sparse file header number of sectors: {} value does not align with extent: {}",
+                                file_header.number_of_sectors, extent_number_of_sectors
+                            )));
+                        }
+                    }
+                    PdiDescriptorImageType::Plain => {
+                        let file_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
+                        let extent_size: u64 =
+                            extent_number_of_sectors * (self.bytes_per_sector as u64);
+
+                        if file_size != extent_size {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported file size: {} value does not align with extent: {}",
+                                file_size, extent_size
+                            )));
+                        }
+                    }
+                    _ => {
+                        return Err(keramics_core::error_trace_new!("Unsupported image type"));
+                    }
+                }
+            }
+        }
+        let mut layer_indexes: HashMap<&Uuid, usize> = HashMap::new();
+
+        for descriptor_snapshot in self.snapshots.iter().rev() {
+            layer_indexes.insert(&descriptor_snapshot.identifier, self.layers.len());
+
+            let mut image_layer: PdiImageLayer = PdiImageLayer::new(
+                &descriptor_snapshot.identifier,
+                descriptor_snapshot.parent_identifier.as_ref(),
+                self.media_size,
+            );
+            for descriptor_extent in self.extents.iter() {
+                for descriptor_image in descriptor_extent.images.iter() {
+                    if descriptor_image.snapshot_identifier == descriptor_snapshot.identifier {
+                        let offset: u64 =
+                            descriptor_extent.start_sector * (self.bytes_per_sector as u64);
+                        let size: u64 = (descriptor_extent.end_sector
+                            - descriptor_extent.start_sector)
+                            * (self.bytes_per_sector as u64);
+
+                        let extent_type: PdiExtentType =
+                            if descriptor_image.image_type == PdiDescriptorImageType::Compressed {
+                                PdiExtentType::Sparse
+                            } else {
+                                PdiExtentType::Raw
+                            };
+                        image_layer.add_extent(
+                            offset,
+                            size,
+                            descriptor_image.file.as_str(),
+                            extent_type,
+                        );
+                    }
+                }
+            }
+            if let Some(parent_identifier) = descriptor_snapshot.parent_identifier.as_ref() {
+                match layer_indexes.get(parent_identifier) {
+                    Some(parent_layer_index) => {
+                        match image_layer.set_parent(&self.layers[*parent_layer_index]) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to set parent"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing layer: {}",
+                            parent_identifier
+                        )));
+                    }
+                }
+            }
+            match image_layer.open(file_resolver) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to open layer: {}", descriptor_snapshot.identifier)
+                    );
+                    return Err(error);
+                }
+            }
+            self.layers.push(Arc::new(RwLock::new(image_layer)));
+        }
         Ok(())
     }
 

@@ -68,6 +68,72 @@ impl VmdkSparseFile {
         }
     }
 
+    /// Reads a compressed grain.
+    pub(super) fn read_compressed_grain(
+        &mut self,
+        mut grain_offset: u64,
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        let mut compressed_grain_header: VmdkCompressedGrainHeader =
+            VmdkCompressedGrainHeader::new();
+
+        match compressed_grain_header.read_at_position(data_stream, SeekFrom::Start(grain_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read compressed grain header at offset: {} (0x{:08x})",
+                        grain_offset, grain_offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        grain_offset += 12;
+
+        // Note that 16777216 is an arbitrary chosen limit.
+        if compressed_grain_header.compressed_data_size == 0
+            || compressed_grain_header.compressed_data_size > 16777216
+        {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid compressed data size: {} value out of bounds",
+                compressed_grain_header.compressed_data_size
+            )));
+        }
+        let mut compressed_data: Vec<u8> =
+            vec![0; compressed_grain_header.compressed_data_size as usize];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut compressed_data,
+            SeekFrom::Start(grain_offset)
+        );
+        if self.mediator.debug_output {
+            self.mediator.debug_print(format!(
+                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
+                compressed_grain_header.compressed_data_size, grain_offset, grain_offset,
+            ));
+            self.mediator.debug_print_data(&compressed_data, true);
+        }
+        let mut zlib_context: ZlibContext = ZlibContext::new();
+
+        match zlib_context.decompress(&compressed_data, data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress grain data");
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
     /// Reads a data stream.
     pub fn read_data_stream(
         &mut self,
@@ -167,74 +233,11 @@ impl VmdkSparseFile {
         Ok(())
     }
 
-    /// Reads a compressed grain.
-    pub(super) fn read_compressed_grain(
+    /// Reads a specific grain directory entry and fills the block tree.
+    pub(super) fn read_grain_directory_entry(
         &mut self,
-        mut grain_offset: u64,
-        data: &mut [u8],
+        extent_offset: u64,
     ) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
-        let mut compressed_grain_header: VmdkCompressedGrainHeader =
-            VmdkCompressedGrainHeader::new();
-
-        match compressed_grain_header.read_at_position(data_stream, SeekFrom::Start(grain_offset)) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to read compressed grain header at offset: {} (0x{:08x})",
-                        grain_offset, grain_offset
-                    )
-                );
-                return Err(error);
-            }
-        }
-        grain_offset += 12;
-
-        // Note that 16777216 is an arbitrary chosen limit.
-        if compressed_grain_header.compressed_data_size == 0
-            || compressed_grain_header.compressed_data_size > 16777216
-        {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid compressed data size: {} value out of bounds",
-                compressed_grain_header.compressed_data_size
-            )));
-        }
-        let mut compressed_data: Vec<u8> =
-            vec![0; compressed_grain_header.compressed_data_size as usize];
-
-        keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
-            &mut compressed_data,
-            SeekFrom::Start(grain_offset)
-        );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                compressed_grain_header.compressed_data_size, grain_offset, grain_offset,
-            ));
-            self.mediator.debug_print_data(&compressed_data, true);
-        }
-        let mut zlib_context: ZlibContext = ZlibContext::new();
-
-        match zlib_context.decompress(&compressed_data, data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decompress grain data");
-                return Err(error);
-            }
-        }
-        Ok(())
-    }
-
-    /// Reads a specific grain table entry and fills the block tree.
-    pub fn read_grain_table_entry(&mut self, extent_offset: u64) -> Result<(), ErrorTrace> {
         let grain_index: u64 = extent_offset / self.grain_size;
         let grain_directory_index: u64 = grain_index / (self.number_of_grain_table_entries as u64);
 
@@ -289,61 +292,87 @@ impl VmdkSparseFile {
                 }
             }
         } else {
-            // TODO: split function into read_grain_directory_entry and read_grain_table_entry
-            let mut grain_table: VmdkSectorTable = VmdkSectorTable::new();
-
             let grain_table_offset: u64 = (entry.sector_number as u64) * 512;
-            grain_table.set_range(grain_table_offset, self.number_of_grain_table_entries);
 
-            let grain_table_index: u64 = grain_index % (self.number_of_grain_table_entries as u64);
-
-            if grain_table_index > u32::MAX as u64 {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid grain table: {} index value out of bounds",
-                    grain_directory_index
-                )));
-            }
-            let entry: VmdkSectorTableEntry =
-                match grain_table.read_entry(data_stream, grain_table_index as u32) {
-                    Ok(sector_number) => sector_number,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read grain table: {} entry: {}",
-                                grain_directory_index, grain_table_index
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-            let grain_data_offset: u64 = (entry.sector_number as u64) * 512;
-            let grain_extent_offset: u64 = grain_index * self.grain_size;
-
-            let range_type: VmdkBlockRangeType = if entry.sector_number == 0 {
-                VmdkBlockRangeType::InParentOrSparse
-            } else if self.compression_method == VmdkCompressionMethod::Zlib {
-                VmdkBlockRangeType::Compressed
-            } else {
-                VmdkBlockRangeType::InFile
-            };
-            let block_range: VmdkBlockRange = VmdkBlockRange::new(
-                grain_extent_offset,
-                grain_data_offset,
-                self.grain_size,
-                range_type,
-            );
-            match self
-                .block_tree
-                .insert_value(grain_extent_offset, self.grain_size, block_range)
-            {
+            match self.read_grain_table_entry(grain_table_offset, grain_index) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read grain table entry for grain directory entry: {}",
+                            grain_directory_index
+                        )
+                    );
+                    return Err(error);
                 }
+            }
+        }
+        Ok(())
+    }
+
+    /// Reads a specific grain table entry and fills the block tree.
+    fn read_grain_table_entry(
+        &mut self,
+        grain_table_offset: u64,
+        grain_index: u64,
+    ) -> Result<(), ErrorTrace> {
+        let grain_table_index: u64 = grain_index % (self.number_of_grain_table_entries as u64);
+
+        if grain_table_index > u32::MAX as u64 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid grain table index value out of bounds",
+            )));
+        }
+        let mut grain_table: VmdkSectorTable = VmdkSectorTable::new();
+        grain_table.set_range(grain_table_offset, self.number_of_grain_table_entries);
+
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        let entry: VmdkSectorTableEntry =
+            match grain_table.read_entry(data_stream, grain_table_index as u32) {
+                Ok(sector_number) => sector_number,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read grain table entry: {} at offset: {} (0x{:08x})",
+                            grain_table_index, grain_table_offset, grain_table_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        let grain_data_offset: u64 = (entry.sector_number as u64) * 512;
+        let grain_extent_offset: u64 = grain_index * self.grain_size;
+
+        let range_type: VmdkBlockRangeType = if entry.sector_number == 0 {
+            VmdkBlockRangeType::InParentOrSparse
+        } else if self.compression_method == VmdkCompressionMethod::Zlib {
+            VmdkBlockRangeType::Compressed
+        } else {
+            VmdkBlockRangeType::InFile
+        };
+        let block_range: VmdkBlockRange = VmdkBlockRange::new(
+            grain_extent_offset,
+            grain_data_offset,
+            self.grain_size,
+            range_type,
+        );
+        match self
+            .block_tree
+            .insert_value(grain_extent_offset, self.grain_size, block_range)
+        {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to insert block range into block tree",
+                    error
+                ));
             }
         }
         Ok(())
@@ -372,6 +401,8 @@ mod tests {
         Ok(file)
     }
 
+    // TODO: add tests for read_compressed_grain
+
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut file: VmdkSparseFile = VmdkSparseFile::new();
@@ -390,13 +421,13 @@ mod tests {
     }
 
     #[test]
-    fn test_read_grain_table_entry() -> Result<(), ErrorTrace> {
+    fn test_read_grain_directory_entry() -> Result<(), ErrorTrace> {
         let mut file: VmdkSparseFile = get_file()?;
 
         let result: Option<&VmdkBlockRange> = file.block_tree.get_value(0)?;
         assert_eq!(result, None);
 
-        file.read_grain_table_entry(0)?;
+        file.read_grain_directory_entry(0)?;
 
         let result: Option<&VmdkBlockRange> = file.block_tree.get_value(0)?;
         assert_eq!(
@@ -410,4 +441,6 @@ mod tests {
         );
         Ok(())
     }
+
+    // TODO: add tests for read_grain_table_entry
 }

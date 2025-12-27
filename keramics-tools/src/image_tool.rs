@@ -33,7 +33,7 @@ use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifFile;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
-use keramics_formats::vmdk::VmdkImage;
+use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
 use keramics_formats::{
     FileResolverReference, FormatIdentifier, FormatScanner, Path, PathComponent,
     open_os_file_resolver,
@@ -189,7 +189,7 @@ enum StorageMediaImage {
         vhdx_image_layer: VhdxImageLayer,
     },
     Vmdk {
-        vmdk_image: Arc<RwLock<VmdkImage>>,
+        vmdk_image_layer: Arc<RwLock<VmdkImageLayer>>,
     },
 }
 
@@ -238,7 +238,9 @@ impl StorageMediaImage {
             Self::Vhdx {
                 vhdx_image_layer, ..
             } => vhdx_image_layer.clone(),
-            Self::Vmdk { vmdk_image } => vmdk_image.clone(),
+            Self::Vmdk {
+                vmdk_image_layer, ..
+            } => vmdk_image_layer.clone(),
         }
     }
 
@@ -711,9 +713,15 @@ impl StorageMediaImage {
                 return Err(error);
             }
         }
-        Ok(Self::Vmdk {
-            vmdk_image: Arc::new(RwLock::new(vmdk_image)),
-        })
+        let number_of_layers: usize = vmdk_image.get_number_of_layers();
+
+        match vmdk_image.get_layer_by_index(number_of_layers - 1) {
+            Ok(vmdk_image_layer) => Ok(Self::Vmdk { vmdk_image_layer }),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                Err(error)
+            }
+        }
     }
 
     /// Scans a data stream for storage media image format signatures.

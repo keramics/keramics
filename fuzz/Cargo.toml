@@ -136,6 +136,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "pdi"
+path = "fuzz_targets/pdi.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "qcow"
 path = "fuzz_targets/qcow.rs"
 test = false
