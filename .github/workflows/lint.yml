@@ -8,22 +8,16 @@ jobs:
   black:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - name: Check format of Python code
-        uses: psf/black@stable
-        with:
-          options: "--check"
-          src: "keramics-python"
+    - uses: actions/checkout@v5
+    - name: Check format of Python code
+      uses: psf/black@stable
+      with:
+        options: "--check"
+        src: "keramics-python"
   cargo_fmt:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v5
-    - name: Install Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        profile: minimal
-        toolchain: stable
-        components: rustfmt
     - name: Check format of Rust code
       run: cargo fmt --check
   rumdl:
