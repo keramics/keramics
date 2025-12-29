@@ -20,18 +20,18 @@ Where {NAME} is an arbitrary name and {GUID} is a unique identifier.
 
 The Parallels Disk Image format support multiple disk types:
 
-| Identifier | Description
-| --- | ---
-| Expanding | Disk that consists of a single (dynamic size) sparse storage data file
-| Plain | Disk that consists of a single single (fixed size) raw storage data file
-| Split | Disk that consists of a one or more split storage data files, either expanding or plain, holding upto 2G of data
+| Identifier | Description |
+| --- | --- |
+| Expanding | Disk that consists of a single (dynamic size) sparse storage data file |
+| Plain | Disk that consists of a single single (fixed size) raw storage data file |
+| Split | Disk that consists of a one or more split storage data files, either expanding or plain, holding upto 2G of data |
 
 ### Characteristics
 
-| Characteristics | Description
-| --- | ---
-| Byte order | little-endian
-| Character strings | UTF-8 by default, the encoding is defined in the disk descriptor XML file.
+| Characteristics | Description |
+| --- | --- |
+| Byte order | little-endian |
+| Character strings | UTF-8 by default, the encoding is defined in the disk descriptor XML file |
 
 The number of bytes per sector is 512.
 
@@ -40,11 +40,11 @@ The number of bytes per sector is 512.
 The DiskDescriptor.xml and its backup (DiskDescriptor.xml.Backup) contain
 the "Parallels_disk_image" XML element tha consists of the following values:
 
-| Identifier | Description
-| --- | ---
-| Disk_Parameters | The disk parameters
-| StorageData | Information about the storage data files
-| Snapshots | Information about snapshots
+| Identifier | Description |
+| --- | --- |
+| Disk_Parameters | The disk parameters |
+| StorageData | Information about the storage data files |
+| Snapshots | Information about snapshots |
 
 ```xml
 <?xml version='1.0' encoding='UTF-8'?>
@@ -99,19 +99,19 @@ the "Parallels_disk_image" XML element tha consists of the following values:
 The disk parameters are stored in the "Disk_Parameters" XML element and
 contains the following values.
 
-| Identifier | Description
-| --- | ---
-| Cylinders | Number of cylinders
-| Disk_size | Disk size, in number of sectors
-| Encryption | "Encryption" sub XML element
-| Heads | Number of heads
-| Miscellaneous | "Miscellaneous" sub XML element
-| Name | Name of the disk
-| LogicSectorSize | Logical sector size
-| Padding | Unknown (padding)
-| PhysicalSectorSize | Physical sector size
-| Sectors | Number of sectors per cylinder
-| UID | Unknown (identifier)
+| Identifier | Description |
+| --- | --- |
+| Cylinders | Number of cylinders |
+| Disk_size | Disk size, in number of sectors |
+| Encryption | "Encryption" sub XML element |
+| Heads | Number of heads |
+| Miscellaneous | "Miscellaneous" sub XML element |
+| Name | Name of the disk |
+| LogicSectorSize | Logical sector size |
+| Padding | Unknown (padding) |
+| PhysicalSectorSize | Physical sector size |
+| Sectors | Number of sectors per cylinder |
+| UID | Unknown (identifier) |
 
 #### Encryption
 
@@ -152,9 +152,9 @@ Seen: level0 and level2
 
 The "StorageData" XML element contains the following values.
 
-| Identifier | Description
-| --- | ---
-| Storage | One or more "Storage" XML sub elements
+| Identifier | Description |
+| --- | --- |
+| Storage | One or more "Storage" XML sub elements |
 
 > Note that a split disks contains multiple "Storage" XML sub elements.
 
@@ -162,48 +162,48 @@ The "StorageData" XML element contains the following values.
 
 The "Storage" XML element contains the following values.
 
-| Identifier | Description
-| --- | ---
-| Start | Start sector number of the segment stored in the storage data file
-| End | End sector number of the segment stored in the storage data file
-| Blocksize | Block size, in number of sectors
-| Image | One or more "Image" sub XML elements
+| Identifier | Description |
+| --- | --- |
+| Start | Start sector number of the segment stored in the storage data file |
+| End | End sector number of the segment stored in the storage data file |
+| Blocksize | Block size, in number of sectors |
+| Image | One or more "Image" sub XML elements |
 
 ##### Image
 
 The "Image" XML element contains the following values.
 
-| Identifier | Description
-| --- | ---
-| GUID | Identifier of snapshot (or layer)
-| Type | [Storage data file type](#storage_data_file_types)
-| File | Name (or path) of the storage data file
+| Identifier | Description |
+| --- | --- |
+| GUID | Identifier of snapshot (or layer) |
+| Type | [Storage data file type](#storage_data_file_types) |
+| File | Name (or path) of the storage data file |
 
 ### Snapshots data
 
 The "Snapshots" XML element contains the following values.
 
-| Identifier | Description
-| --- | ---
-| Shot | One or more "Shot" sub XML elements
+| Identifier | Description |
+| --- | --- |
+| Shot | One or more "Shot" sub XML elements |
 
 #### Shot
 
 The "Shot" XML element contains the following values.
 
-| Identifier | Description
-| --- | ---
-| GUID | Identifier of snapshot (or layer)
-| ParentGUID | Identifier of parent snapshot (or layer), which contains "{00000000-0000-0000-0000-000000000000}" if not set
+| Identifier | Description |
+| --- | --- |
+| GUID | Identifier of snapshot (or layer) |
+| ParentGUID | Identifier of parent snapshot (or layer), which contains "{00000000-0000-0000-0000-000000000000}" if not set |
 
 ## Storage data file
 
 ### Storage data file types {#storage_data_file_types}
 
-| Value | Description
-| --- | ---
-| "Compressed" | Sparse storage data file
-| "Plain" | Raw storage data file
+| Value | Description |
+| --- | --- |
+| "Compressed" | Sparse storage data file |
+| "Plain" | Raw storage data file |
 
 ## Raw storage data file
 
@@ -225,19 +225,19 @@ A sparse storage data file consists of:
 
 The sparse storage data file header is 64 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 16 | "WithoutFreeSpace" or "WithouFreSpacExt" | Signature
-| 16 | 4 | 2 | Format version
-| 20 | 4 | | Number of heads
-| 24 | 4 | | Number of cylinders
-| 28 | 4 | | Block size (or number of tracks) in number of sectors
-| 32 | 4 | | Number of blocks, which is equivalent to the number of block allocation table entries
-| 36 | 8 | | Number of sectors
-| 44 | 4 | | Unknown (Creator?), seen: "\x00\x00\x00\x00", "pd17", "pd22"
-| 48 | 4 | | Data start sector number, which is relative to the start of the sparse storage data file
-| 52 | 4 | | Unknown (Flags?)
-| 56 | 8 | | Unknown (Features start sector?)
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 16 | "WithoutFreeSpace" or "WithouFreSpacExt" | Signature |
+| 16 | 4 | 2 | Format version |
+| 20 | 4 | | Number of heads |
+| 24 | 4 | | Number of cylinders |
+| 28 | 4 | | Block size (or number of tracks) in number of sectors |
+| 32 | 4 | | Number of blocks, which is equivalent to the number of block allocation table entries |
+| 36 | 8 | | Number of sectors |
+| 44 | 4 | | Unknown (Creator?), seen: "\x00\x00\x00\x00", "pd17", "pd22" |
+| 48 | 4 | | Data start sector number, which is relative to the start of the sparse storage data file |
+| 52 | 4 | | Unknown (Flags?) |
+| 56 | 8 | | Unknown (Features start sector?) |
 
 #### Block allocation table (BAT)
 

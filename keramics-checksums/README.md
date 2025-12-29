@@ -1,4 +1,4 @@
-# `keramics-checksums`
+# keramics-checksums
 
 Checksum calculation methods for Keramics.
 

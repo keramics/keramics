@@ -1,4 +1,4 @@
-# `keramics-python`
+# keramics-python
 
 Python bindings for Keramics.
 

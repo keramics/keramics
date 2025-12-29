@@ -1,4 +1,4 @@
-# `keramics-sigscan`
+# keramics-sigscan
 
 Data formats signature scanner for Keramics.
 

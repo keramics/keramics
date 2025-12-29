@@ -1,4 +1,4 @@
-# `keramics-formats`
+# keramics-formats
 
 Data formats for Keramics.
 

@@ -1,4 +1,4 @@
-# `layout-map`
+# keramics-layout-map
 
 Layout map procedural macros for Keramics.
 

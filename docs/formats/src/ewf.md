@@ -16,7 +16,7 @@ The Expert Witness Compression Format (EWF) is used to store:
 
 * storage media images, such as hard disks, USB sticks, optical disks
 * individual volumes or partitions
-* "physical" RAM and process memory 
+* "physical" RAM and process memory
 
 EWF can store data compressed or uncompressed, in a single image in one or more
 segment files. Each segment file consist of a standard header, followed by
@@ -69,12 +69,12 @@ EWF defines that the file header consists of 2 parts, namely:
 The file header, used by both the EWF-E01 and SMART (EWF-S01) formats, is 13
 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 8 | "EVF\x09\x0d\x0a\xff\x00" | Signature
-| 8 | 1 | 0x01 | Start of fields
-| 9 | 2 | | Segment number, which must be 1 or higher
-| 11 | 2 | 0x0000 | End of fields
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 8 | "EVF\x09\x0d\x0a\xff\x00" | Signature |
+| 8 | 1 | 0x01 | Start of fields |
+| 9 | 2 | | Segment number, which must be 1 or higher |
+| 11 | 2 | 0x0000 | End of fields |
 
 The segment number contains a number which refers to the number of the segment
 file, starting with 1 for the first file.
@@ -87,12 +87,12 @@ file, starting with 1 for the first file.
 The file header, used by the EWF-L01 format, is 13 bytes in size and consists
 of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 8 | "LVF\x09\x0d\x0a\xff\x00" | Signature
-| 8 | 1 | 0x01 | Start of fields
-| 9 | 2 | | Segment number, which must be 1 or higher
-| 11 | 2 | 0x0000 | End of fields
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 8 | "LVF\x09\x0d\x0a\xff\x00" | Signature |
+| 8 | 1 | 0x01 | Start of fields |
+| 9 | 2 | | Segment number, which must be 1 or higher |
+| 11 | 2 | 0x0000 | End of fields |
 
 The segment number contains a number which refers to the number of the segment
 file, starting with 1 for the first file.
@@ -168,7 +168,7 @@ purpose. Where:
 * linen 5 to 6 use a time and MAC address based version (1) of the GUID
 * EnCase 5 to 7 and linen 6 to 7 use a random based version (4) of the GUID
 
-> Note that in linen 6 the switch from a version 1 to 4 GUID was somewhere made 
+> Note that in linen 6 the switch from a version 1 to 4 GUID was somewhere made
 > between version 6.01 and 6.19.
 
 See RFC4122 for more information about the different GUID versions.
@@ -185,21 +185,25 @@ unnecessary confusion with the [header section](#header_section).
 The section header consist of 76 bytes, it contains information about a
 specific section.
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 16 | | Section type, a string containing the section type definition, such as "header" or "volume"
-| 16 | 8 | | Next section offset, where the offset is relative from the start of the segment file
-| 24 | 8 | | Section size
-| 32 | 40 | 0x00 | Unknown (Padding)
-| 72 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the section header.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 16 | | Section type, a string containing the section type definition, such as "header" or "volume" |
+| 16 | 8 | | Next section offset, where the offset is relative from the start of the segment file |
+| 24 | 8 | | Section size |
+| 32 | 40 | 0x00 | Unknown (Padding) |
+| 72 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the section header |
 
 Some sections contain additional data, refer to paragraph section types for
 more information.
+
+<!-- rumdl-disable MD028 -->
 
 > Note Expert Witness 1.35 (for Windows) does not set the section size.
 
 > Note that in EnCase 2 DOS version the padding itself does not contains 0-byte
 > values but data, probably the memory is not filled with 0-byte values.
+
+<!-- rumdl-enable MD028 -->
 
 ### Section types
 
@@ -239,9 +243,9 @@ Some aspects of this section are:
 
 The additional data this section contains is the following:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 76 (0x4c) | (variable) | Information about the acquired media.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 76 (0x4c) | (variable) | | Information about the acquired media |
 
 The information about the acquired media consists of [zlib compressed data](zlib.md).
 It contains text in UTF16 format specifying information about the acquired
@@ -259,13 +263,13 @@ In the next paragraphs the various variants of the header2 section are described
 In EnCase 4 (EWF-E01) the header2 information consist of 5 lines, and contains
 the equivalent information as the [header section](#header_section).
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | 1 | The number of categories provided
-| 2 | main | The name/type of the category provided
-| 3 | | Identifiers for the values in the 4th line
-| 4 | | The data for the different identifiers in the 3rd line
-| 5 | | (an empty line)
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | 1 | The number of categories provided |
+| 2 | main | The name/type of the category provided |
+| 3 | | Identifiers for the values in the 4th line |
+| 4 | | The data for the different identifiers in the 3rd line |
+| 5 | | (an empty line) |
 
 The end of line character(s) is a newline (0x0a).
 
@@ -273,18 +277,18 @@ The end of line character(s) is a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values.
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | a | Unique description
-| 2 | c | Case number
-| 3 | n | Evidence number
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | av | Version, which contains the EnCase version used to acquire the media
-| 7 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 8 | m | Acquisition date and time
-| 9 | u | System date and time
-| 10 | p | Password hash
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | a | Unique description |
+| 2 | c | Case number |
+| 3 | n | Evidence number |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | av | Version, which contains the EnCase version used to acquire the media |
+| 7 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 8 | m | Acquisition date and time |
+| 9 | u | System date and time |
+| 10 | p | Password hash |
 
 Also see [header2 values](#header2_values)
 
@@ -295,25 +299,25 @@ Also see [header2 values](#header2_values)
 In EnCase 5 to 7 (EWF-E01) the header2 information consist of 17 lines, and
 contains:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | 3 | The number of categories provided
-| 2 | main | The name/type of the category provided
-| 3 | | Identifier for the values in the category
-| 4 | | The data for the different identifiers in the category
-| 5 | | (an empty line)
-| 6 | srce | The name/type of the category provided, also see [sources category](#sources_category1)
-| 7 | |
-| 8 | | Identifier for the values in the category
-| 9 | | The data for the different identifiers in the category
-| 10 | |
-| 11 | | (an empty line)
-| 12 | sub | The name/type of the category provided, also see [subjects category](#subjects_category1)
-| 13 | |
-| 14 | | Identifier for the values in the category
-| 15 | | The data for the different identifiers in the category
-| 16 | |
-| 17 | | (an empty line)
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | 3 | The number of categories provided |
+| 2 | main | The name/type of the category provided |
+| 3 | | Identifier for the values in the category |
+| 4 | | The data for the different identifiers in the category |
+| 5 | | (an empty line) |
+| 6 | srce | The name/type of the category provided, also see [sources category](#sources_category1) |
+| 7 | | |
+| 8 | | Identifier for the values in the category |
+| 9 | | The data for the different identifiers in the category |
+| 10 | | |
+| 11 | | (an empty line) |
+| 12 | sub | The name/type of the category provided, also see [subjects category](#subjects_category1) |
+| 13 | | |
+| 14 | | Identifier for the values in the category |
+| 15 | | The data for the different identifiers in the category |
+| 16 | | |
+| 17 | | (an empty line) |
 
 The end of line character(s) is a newline (0x0a).
 
@@ -324,37 +328,45 @@ The 3rd and the 4th line consist of the following tab (0x09) separated values.
 > Note the actual values in this category are dependent on the version of
 > EnCase.
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | a | Unique description
-| 2 | c | Case number
-| 3 | n | Evidence number
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | md | The model of the media, such as hard disk model (introduced in EnCase 6)
-| 7 | sn | The serial number of media (introduced in EnCase 6)
-| 8 | l | The device label (introduced in EnCase 6.19)
-| 9 | av | Version, which contains the EnCase version used to acquire the media. EnCase limits this value to 12 characters
-| 10 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 11 | m | Acquisition date and time
-| 12 | u | System date and time
-| 13 | p | Password hash
-| 14 | pid | Process identifier, which contains the identifier of the process memory acquired (introduced in EnCase 6.12/Winen 6.11)
-| 15 | dc | Unknown
-| 16 | ext | Extents, which contains the extents of the process memory acquired (introduced in EnCase 6.12/Winen 6.11)
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | a | Unique description |
+| 2 | c | Case number |
+| 3 | n | Evidence number |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | md | The model of the media, such as hard disk model (introduced in EnCase 6) |
+| 7 | sn | The serial number of media (introduced in EnCase 6) |
+| 8 | l | The device label (introduced in EnCase 6.19) |
+| 9 | av | Version, which contains the EnCase version used to acquire the media. EnCase limits this value to 12 characters |
+| 10 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 11 | m | Acquisition date and time |
+| 12 | u | System date and time |
+| 13 | p | Password hash |
+| 14 | pid | Process identifier, which contains the identifier of the process memory acquired (introduced in EnCase 6.12/Winen 6.11) |
+| 15 | dc | Unknown |
+| 16 | ext | Extents, which contains the extents of the process memory acquired (introduced in EnCase 6.12/Winen 6.11) |
 
 Also see [header2 values](#header2_values)
+
+<!-- rumdl-disable MD028 -->
 
 > Note that both the acquiry and system date and time are empty in a file
 > created by winen.
 
-> Note that rhe date values in the [header section](#header_section) (not the
-> header2 section) are set to: Thu Jan  1 00:00:00 1970. Where the time is
+<!-- rumdl-disable MD064 -->
+
+> Note that the date values in the [header section](#header_section) (not the
+> header2 section) are set to: "Thu Jan  1 00:00:00 1970". Where the time is
 > dependent on the time zone and daylight savings.
+
+<!-- rumdl-enable MD064 -->
 
 > Note that in a Logicube Dossier generated header2 section an additional emtpy
 > value in the 4th line was observed. The number of values in the 3rd and 4th
 > can differ.
+
+<!-- rumdl-enable MD028 -->
 
 ##### Sources category {#sources_category1}
 
@@ -367,20 +379,20 @@ Line 7 consists of 2 values, namely the values are "0 1".
 The 8th line consist of the following tab (0x09) separated values. Note that
 the actual values in this category are dependent on the version of EnCase.
 
-| Identifier number | Character in 8rd line | Meaning
-| --- | --- | ---
-| 1 | p |
-| 2 | n |
-| 3 | id | Identifier, which contains an integer identifying the source
-| 4 | ev | Evidence number, which contains a string
-| 5 | tb | Total bytes, which contains an integer
-| 6 | lo | Logical offset, which contains an integer which is -1 when value is not set
-| 7 | po | Physical offset, which contains an integer which is -1 when value is not set
-| 8 | ah | MD5 hash, which contains a string with the MD5 hash of the source
-| 9 | sh | SHA1 hash, contains a string with the SHA1 hash of the source (introduced in EnCase 6.19)
-| 10 | gu | Device GUID, which contains a string with a GUID or "0" if not set
-| 11 | pgu | Primary device GUID, which contains a string with a GUID or "0" if not set (introduced in EnCase 7)
-| 12 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp
+| Identifier number | Character in 8rd line | Meaning |
+| --- | --- | --- |
+| 1 | p | |
+| 2 | n | |
+| 3 | id | Identifier, which contains an integer identifying the source |
+| 4 | ev | Evidence number, which contains a string |
+| 5 | tb | Total bytes, which contains an integer |
+| 6 | lo | Logical offset, which contains an integer which is -1 when value is not set |
+| 7 | po | Physical offset, which contains an integer which is -1 when value is not set |
+| 8 | ah | MD5 hash, which contains a string with the MD5 hash of the source |
+| 9 | sh | SHA1 hash, contains a string with the SHA1 hash of the source (introduced in EnCase 6.19) |
+| 10 | gu | Device GUID, which contains a string with a GUID or "0" if not set |
+| 11 | pgu | Primary device GUID, which contains a string with a GUID or "0" if not set (introduced in EnCase 7) |
+| 12 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp |
 
 Line 9 consists of 2 values, namely the values are "0 0".
 
@@ -403,14 +415,14 @@ Line 13 consists of 2 values, namely the values are "0 1".
 
 The 14th line consist of the following tab (0x09) separated values.
 
-| Identifier number | Character in 14rd line | Meaning
-| --- | --- | ---
-| 1 | p |
-| 2 | n |
-| 3 | id | Identifier, which contains an integer identifying the subject
-| 4 | nu | Unknown (Number)
-| 5 | co | Unknown (Comment)
-| 6 | gu | Unknown (GUID)
+| Identifier number | Character in 14rd line | Meaning |
+| --- | --- | --- |
+| 1 | p | |
+| 2 | n | |
+| 3 | id | Identifier, which contains an integer identifying the subject |
+| 4 | nu | Unknown (Number) |
+| 5 | co | Unknown (Comment) |
+| 6 | gu | Unknown (GUID) |
 
 Line 15 consists of 2 values, namely the values are "0 0".
 
@@ -426,24 +438,24 @@ EnCase 5 to 7 (EWF-L01) format. However:
 
 #### Header2 values {#header2_values}
 
-| Identifier | Description | Notes
-| --- | --- | ---
-| a | Unique description | Free form string. Note that EnCase might not respond when this value is large e.g. >= 1 MiB
-| av | Version | Free form string. EnCase limits this string to 12 - 1 characters
-| c | Case number | Free form string. EnCase limits this string to 3000 - 1 characters
-| dc | Unknown |
-| e | Examiner name | Free form string. EnCase limits this string to 3000 - 1 characters
-| ext | Extents | Extents header value
-| l | Device label | Free form string
-| m | Acquisition date and time | String containing POSIX 32-bit epoch timestamp, e.g. "1142163845" which represents the date: March 12 2006, 11:44:05
-| md | Model | Free form string. EnCase limits this string to 3000 - 1 characters
-| n | Evidence number | Free form string. EnCase limits this string to 3000 - 1 characters
-| ov | Platform | Free form string. EnCase limits this string to 24 - 1 characters
-| pid | Process identifier | String containing the process identifier (pid) number
-| p | Password hash | String containing the password hash. If no password is set it should be simply the character '0'.
-| sn | Serial Number | Free form string. EnCase limits this string to 3000 - 1 characters
-| t | Notes | Free form string. EnCase limits this string to 3000 - 1 characters
-| u | System date and time | String containing POSIX 32-bit epoch timestamp, e.g. "1142163845" which represents the date: March 12 2006, 11:44:05
+| Identifier | Description | Notes |
+| --- | --- | --- |
+| a | Unique description | Free form string. Note that EnCase might not respond when this value is large e.g. >= 1 MiB |
+| av | Version | Free form string. EnCase limits this string to 12 - 1 characters |
+| c | Case number | Free form string. EnCase limits this string to 3000 - 1 characters |
+| dc | Unknown | |
+| e | Examiner name | Free form string. EnCase limits this string to 3000 - 1 characters |
+| ext | Extents | Extents header value |
+| l | Device label | Free form string |
+| m | Acquisition date and time | String containing POSIX 32-bit epoch timestamp, e.g. "1142163845" which represents the date: March 12 2006, 11:44:05 |
+| md | Model | Free form string. EnCase limits this string to 3000 - 1 characters |
+| n | Evidence number | Free form string. EnCase limits this string to 3000 - 1 characters |
+| ov | Platform | Free form string. EnCase limits this string to 24 - 1 characters |
+| pid | Process identifier | String containing the process identifier (pid) number |
+| p | Password hash | String containing the password hash. If no password is set it should be simply the character '0' |
+| sn | Serial Number | Free form string. EnCase limits this string to 3000 - 1 characters |
+| t | Notes | Free form string. EnCase limits this string to 3000 - 1 characters |
+| u | System date and time | String containing POSIX 32-bit epoch timestamp, e.g. "1142163845" which represents the date: March 12 2006, 11:44:05 |
 
 > Note the restrictions were tested with EnCase 7.02.01, older versions could
 > have a restriction of 40 characters instead of 3000 characters.
@@ -452,7 +464,7 @@ EnCase 5 to 7 (EWF-L01) format. However:
 
 An extents header value consist of:
 
-```
+```text
 number of entries
 entries that consist of: S <1> <2> <3>
 ```
@@ -463,14 +475,17 @@ The header section is identified in the section data type field as "header".
 Some aspects of this section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
-* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and SMART (EWF-S01)
-* Found at the start of the first segment file or in EnCase 4 to 7 after the header2 section in the first segment file. Typically not found in subsequent segment files with the exception of Logicube Dossier generated EWF-E01 files.
+* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
+  SMART (EWF-S01)
+* Found at the start of the first segment file or in EnCase 4 to 7 after the header2 section in the
+  first segment file. Typically not found in subsequent segment files with the exception of Logicube
+  Dossier generated EWF-E01 files.
 
 The additional data this section contains is the following:
 
-| Offset | Number of bytes | Description
-| --- | --- | ---
-| 76 (0x4c) | (variable) | Information about the acquired media.
+| Offset | Number of bytes | Description |
+| --- | --- | --- |
+| 76 (0x4c) | (variable) | Information about the acquired media |
 
 The information about the acquired media consists of [zlib compressed data](zlib.md).
 It contains text in ASCII format specifying information about the acquired
@@ -479,43 +494,45 @@ media. The text multiple lines separated by an end of line character(s).
 In the next paragraphs the various variants of the header section are
 described. In all cases the information consists of at least 4 lines:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | 1 | The number of categories provided
-| 2 | main | The name/type of the category provided
-| 3 | | Identifiers for the values in the 4th line
-| 4 | | The data for the different identifiers in the 3rd line
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | 1 | The number of categories provided |
+| 2 | main | The name/type of the category provided |
+| 3 | | Identifiers for the values in the 4th line |
+| 4 | | The data for the different identifiers in the 3rd line |
 
 An additional 5th line is found in FTK Imager, EnCase 1 to 7 (EWF-E01).
 
-| Line number | Value | Description
-| --- | --- | ---
-| 5 | | (an empty line)
+| Line number | Value | Description |
+| --- | --- | --- |
+| 5 | | (an empty line) |
 
 #### EWF format
 
 Some aspects of this section are:
 
-* [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) specifies the end of line character(s) is a newline (0x0a).
+* [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) specifies the end of
+  line character(s) is a newline (0x0a).
 
 According to [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
 the 3rd and the 4th line consist of the following tab (0x09) separated values:
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | c | Case number
-| 2 | n | Evidence number
-| 3 | a | Unique description
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | m | Acquisition date and time
-| 7 | u | System date and time
-| 8 | p | Password hash
-| 9 | r | Compression level
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | c | Case number |
+| 2 | n | Evidence number |
+| 3 | a | Unique description |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | m | Acquisition date and time |
+| 7 | u | System date and time |
+| 8 | p | Password hash |
+| 9 | r | Compression level |
 
 Also see [header values](#header_values)
 
-[ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) states that the Expert Witness Compression uses 'f', fastest compression.
+[ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) states that the Expert
+Witness Compression uses 'f', fastest compression.
 
 #### EnCase 1 (EWF-E01)
 
@@ -528,17 +545,17 @@ Some aspects of this section are:
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values"
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | c | Case number
-| 2 | n | Evidence number
-| 3 | a | Unique description
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | m | Acquisition date and time
-| 7 | u | System date and time
-| 8 | p | Password hash
-| 9 | r | Compression level
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | c | Case number |
+| 2 | n | Evidence number |
+| 3 | a | Unique description |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | m | Acquisition date and time |
+| 7 | u | System date and time |
+| 8 | p | Password hash |
+| 9 | r | Compression level |
 
 Also see [header values](#header_values)
 
@@ -548,7 +565,8 @@ Some aspects of this section are:
 
 * The header section is defined once.
 * It is the first section of the first segment file. It is not found in subsequent segment files.
-* The header data is always processed by zlib, however the same compression level is used as for the chunks. This could mean compression level 0 which is no compression.
+* The header data is always processed by zlib, however the same compression level is used as for
+  the chunks. This could mean compression level 0 which is no compression.
 
 > The SMART format uses the FTK Imager (EWF-E01) specification for this section.
 > Note that this could be something FTK Imager specific.
@@ -558,25 +576,26 @@ Some aspects of this section are:
 Some aspects of this section are:
 
 * The same header section defined twice.
-* It is the first and second section of the first segment file. It is not found in subsequent segment files.
+* It is the first and second section of the first segment file. It is not found in subsequent
+  segment files.
 * The header data itself is compressed using zlib.
 * The end of line character(s) is a carriage return (0x0d) followed by a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values:
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | c | Case number
-| 2 | n | Evidence number
-| 3 | a | Unique description
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | av | Version, which contains the EnCase version used to acquire the media
-| 7 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 8 | m | Acquisition date and time
-| 9 | u | System date and time
-| 10 | p | Password hash
-| 11 | r | Compression level
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | c | Case number |
+| 2 | n | Evidence number |
+| 3 | a | Unique description |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | av | Version, which contains the EnCase version used to acquire the media |
+| 7 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 8 | m | Acquisition date and time |
+| 9 | u | System date and time |
+| 10 | p | Password hash |
+| 11 | r | Compression level |
 
 Also see [header values](#header_values)
 
@@ -585,24 +604,25 @@ Also see [header values](#header_values)
 Some aspects of this section are:
 
 * The header is defined only once.
-* It resides after the header2 sections of the first segment file. It is not found in subsequent segment files.
+* It resides after the header2 sections of the first segment file. It is not found in subsequent
+  segment files.
 * The header data itself is compressed using zlib.
 * The end of line character(s) is a carriage return (0x0d) followed by a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values:
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | c | Case number
-| 2 | n | Evidence number
-| 3 | a | Unique description
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | av | Version, which contains the EnCase version used to acquire the media
-| 7 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 8 | m | Acquisition date and time
-| 9 | u | System date and time
-| 10 | p | Password hash
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | c | Case number |
+| 2 | n | Evidence number |
+| 3 | a | Unique description |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | av | Version, which contains the EnCase version used to acquire the media |
+| 7 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 8 | m | Acquisition date and time |
+| 9 | u | System date and time |
+| 10 | p | Password hash |
 
 Also see [header values](#header_values)
 
@@ -611,7 +631,8 @@ Also see [header values](#header_values)
 Some aspects of this section are:
 
 * The same header section defined twice.
-* It is the first and second section of the first segment file. It is not found in subsequent segment files.
+* It is the first and second section of the first segment file. It is not found in subsequent
+  segment files.
 * The header data itself is compressed using zlib.
 * The end of line character(s) is a newline (0x0a).
 
@@ -619,25 +640,25 @@ The header information consist of 18 lines
 
 The remainder of the string contains the following information:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | 3 | The number of categories provided
-| 2 | main | The name/type of the category provided
-| 3 | | Identifier for the values in the 4th line
-| 4 | | The data for the different identifiers in the 3rd line
-| 5 | | (an empty line)
-| 6 | srce | The name/type of the section provided, also see [Sources category](#sources_category2)
-| 7 | |
-| 8 | | Identifier for the values in the section
-| 9 | |
-| 10 | |
-| 11 | | (an empty line)
-| 12 | sub | The name/type of the section provided, also see [Subjects category](#subjects_category2)
-| 13 | |
-| 14 | | Identifier for the values in the section
-| 15 | |
-| 16 | |
-| 17 | | (an empty line)
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | 3 | The number of categories provided |
+| 2 | main | The name/type of the category provided |
+| 3 | | Identifier for the values in the 4th line |
+| 4 | | The data for the different identifiers in the 3rd line |
+| 5 | | (an empty line) |
+| 6 | srce | The name/type of the section provided, also see [Sources category](#sources_category2) |
+| 7 | | |
+| 8 | | Identifier for the values in the section |
+| 9 | | |
+| 10 | | |
+| 11 | | (an empty line) |
+| 12 | sub | The name/type of the section provided, also see [Subjects category](#subjects_category2) |
+| 13 | | |
+| 14 | | Identifier for the values in the section |
+| 15 | | |
+| 16 | | |
+| 17 | | (an empty line) |
 
 The end of line character(s) is a newline (0x0a).
 
@@ -647,18 +668,18 @@ The 3rd and the 4th line consist of the following tab (0x09) separated values.
 
 > Note the actual values in this category are dependent on the version of linen.
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | a | Unique description
-| 2 | c | Case number
-| 3 | n | Evidence number
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | av | Version, which contains the linen version used to acquire the media
-| 7 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 8 | m | Acquisition date and time
-| 9 | u | System date and time
-| 10 | p | Password hash
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | a | Unique description |
+| 2 | c | Case number |
+| 3 | n | Evidence number |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | av | Version, which contains the linen version used to acquire the media |
+| 7 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 8 | m | Acquisition date and time |
+| 9 | u | System date and time |
+| 10 | p | Password hash |
 
 Also see [header values](#header_values)
 
@@ -668,24 +689,24 @@ The 3rd and the 4th line consist of the following tab (0x09) separated values.
 
 > Note the actual values in this category are dependent on the version of linen.
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | a | Unique description
-| 2 | c | Case number
-| 3 | n | Evidence number
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | md | The model of the media, such as hard disk model (Introduced in linen 6)
-| 7 | sn | The serial number of media (Introduced in linen 6)
-| 8 | l | The device label (Introduced in linen 6.19)
-| 9 | av | Version, which contains the linen version used to acquire the media
-| 10 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 11 | m | Acquisition date and time
-| 12 | u | System date and time
-| 13 | p | Password hash
-| 14 | pid | Process identifier, which contains the identifier of the process memory acquired (Introduced in linen 6.19 or earlier)
-| 15 | dc | Unknown (Introduced in linen 6)
-| 16 | ext | Extents, which contains the extents of the process memory acquired (Introduced in linen 6.19 or earlier)
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | a | Unique description |
+| 2 | c | Case number |
+| 3 | n | Evidence number |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | md | The model of the media, such as hard disk model (Introduced in linen 6) |
+| 7 | sn | The serial number of media (Introduced in linen 6) |
+| 8 | l | The device label (Introduced in linen 6.19) |
+| 9 | av | Version, which contains the linen version used to acquire the media |
+| 10 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 11 | m | Acquisition date and time |
+| 12 | u | System date and time |
+| 13 | p | Password hash |
+| 14 | pid | Process identifier, which contains the identifier of the process memory acquired (Introduced in linen 6.19 or earlier) |
+| 15 | dc | Unknown (Introduced in linen 6) |
+| 16 | ext | Extents, which contains the extents of the process memory acquired (Introduced in linen 6.19 or earlier) |
 
 > Note as of linen 6.19 the acquire date and time is in UTC and the system date
 > and time is in local time. Where as before both values were in local time.
@@ -702,19 +723,19 @@ Line 7 consists of 2 values, namely the values are "0 1".
 
 The 8th line consist of the following tab (0x09) separated values.
 
-| Identifier number | Character in 8rd line | Meaning
-| --- | --- | ---
-| 1 | p |
-| 2 | n |
-| 3 | id | Identifier, which contains an integer identifying the source
-| 4 | ev | Evidence number, which contains a string
-| 5 | tb | Total bytes, which contains an integer
-| 6 | lo | Logical offset, which contains an integer which is -1 when value is not set
-| 7 | po | Physical offset, which contains an integer which is -1 when value is not set
-| 8 | ah | Unknown (MD5?), which contains a string
-| 9 | sh | Unknown (SHA1?), which contains a string (Introduced in linen 6.19 or earlier)
-| 10 | gu | Device GUID, which contains a string with a GUID or "0" if not set
-| 11 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp
+| Identifier number | Character in 8rd line | Meaning |
+| --- | --- | --- |
+| 1 | p | |
+| 2 | n | |
+| 3 | id | Identifier, which contains an integer identifying the source |
+| 4 | ev | Evidence number, which contains a string |
+| 5 | tb | Total bytes, which contains an integer |
+| 6 | lo | Logical offset, which contains an integer which is -1 when value is not set |
+| 7 | po | Physical offset, which contains an integer which is -1 when value is not set |
+| 8 | ah | Unknown (MD5?), which contains a string |
+| 9 | sh | Unknown (SHA1?), which contains a string (Introduced in linen 6.19 or earlier) |
+| 10 | gu | Device GUID, which contains a string with a GUID or "0" if not set |
+| 11 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp |
 
 Line 9 consists of 2 values, namely the values are "0 0".
 
@@ -733,14 +754,14 @@ Line 13 consists of 2 values, namely the values are "0 1".
 
 The 14th line consist of the following tab (0x09) separated values.
 
-| Identifier number | Character in 14rd line | Meaning
-| --- | --- | ---
-| 1 | p |
-| 2 | n |
-| 3 | id | Identifier, which contains an integer identifying the subject
-| 4 | nu | Unknown (Number)
-| 5 | co | Unknown (Comment)
-| 6 | gu | Unknown (GUID)
+| Identifier number | Character in 14rd line | Meaning |
+| --- | --- | --- |
+| 1 | p | |
+| 2 | n | |
+| 3 | id | Identifier, which contains an integer identifying the subject |
+| 4 | nu | Unknown (Number) |
+| 5 | co | Unknown (Comment) |
+| 6 | gu | Unknown (GUID) |
 
 Line 15 consists of 2 values, namely the values are "0 0".
 
@@ -754,25 +775,27 @@ Line 16 contains the values defined by line 14.
 Some aspects of this section are:
 
 * In FTK Imager (EWF-E01) the same header section defined twice.
-* It is the first and second section of the first segment file. It is not found in subsequent segment files.
-* The header data itself is compressed using zlib. Note that the compression level can be none and therefore the header looks uncompressed.
+* It is the first and second section of the first segment file. It is not found in subsequent
+  segment files.
+* The header data itself is compressed using zlib. Note that the compression level can be none and
+  therefore the header looks uncompressed.
 * In FTK Imager the end of line character(s) is a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values:
 
-| Identifier number | Character in 3rd line | Value in 4th line
-| --- | --- | ---
-| 1 | c | Case number
-| 2 | n | Evidence number
-| 3 | a | Unique description
-| 4 | e | Examiner name
-| 5 | t | Notes
-| 6 | av | Version, which contains the FTK Imager version used to acquire the media
-| 7 | ov | Platform, which contains the platform/operating system used to acquire the media
-| 8 | m | Acquisition date and time
-| 9 | u | System date and time
-| 10 | p | Password hash
-| 11 | r | Compression level
+| Identifier number | Character in 3rd line | Value in 4th line |
+| --- | --- | --- |
+| 1 | c | Case number |
+| 2 | n | Evidence number |
+| 3 | a | Unique description |
+| 4 | e | Examiner name |
+| 5 | t | Notes |
+| 6 | av | Version, which contains the FTK Imager version used to acquire the media |
+| 7 | ov | Platform, which contains the platform/operating system used to acquire the media |
+| 8 | m | Acquisition date and time |
+| 9 | u | System date and time |
+| 10 | p | Password hash |
+| 11 | r | Compression level |
 
 Also see [header values](#header_values)
 
@@ -782,29 +805,30 @@ The EnCase 4 to 7 (EWF-E01) header section specification is also used for the
 EnCase 5 to 7 (EWF-L01) format, with the following aspects:
 
 * In EnCase 5 both the acquired and system date and time are set to 0.
-* In EnCase 6 and 7 both the acquired and system date and time are set to Jan 1, 1970 00:00:00 (the time is dependent on the local timezone and daylight savings)
+* In EnCase 6 and 7 both the acquired and system date and time are set to Jan 1, 1970 00:00:00 (the
+  time is dependent on the local timezone and daylight savings)
 
 #### Header values {#header_values}
 
-| Identifier | Description | Notes
-| --- | --- | ---
-| a | Unique description | Free form string. Note that EnCase might not respond when this value is  large e.g. >= 1 MiB
-| av | Version | Free form string. EnCase limits this string to 12 - 1 characters
-| c | Case number | Free form string. EnCase limits this string to 3000 - 1 characters
-| dc | Unknown |
-| e | Examiner name | Free form string. EnCase limits this string to 3000 - 1 characters
-| ext | Extents | [Extents header value](#extents_header_value)
-| l | Device label | Free form string
-| m | Acquisition date and time | Contains a [date and time header value](#date_time_header_value).
-| md | Model | Free form string. EnCase limits this string to 3000 - 1 characters
-| n | Evidence number | Free form string. EnCase limits this string to 3000 - 1 characters
-| ov | Platform | Free form string. EnCase limits this string to 24 -1 characters
-| pid | Process identifier | String containing the process identifier (pid) number
-| p | Password hash | String containing the password hash. If no password is set it should be simply the character '0'.
-| r | Compression level | [Compression header value](#compression_header_value)
-| sn | Serial Number | Free form string. EnCase limits this string to 3000 - 1 characters
-| t | Notes | Free form string. EnCase limits this string to 3000 - 1 characters
-| u | Systemdate and time | Contains a [date and time header value](#date_time_header_value).
+| Identifier | Description | Notes |
+| --- | --- | --- |
+| a | Unique description | Free form string. Note that EnCase might not respond when this value is  large e.g. >= 1 MiB |
+| av | Version | Free form string. EnCase limits this string to 12 - 1 characters |
+| c | Case number | Free form string. EnCase limits this string to 3000 - 1 characters |
+| dc | Unknown | |
+| e | Examiner name | Free form string. EnCase limits this string to 3000 - 1 characters |
+| ext | Extents | [Extents header value](#extents_header_value) |
+| l | Device label | Free form string |
+| m | Acquisition date and time | Contains a [date and time header value](#date_time_header_value) |
+| md | Model | Free form string. EnCase limits this string to 3000 - 1 characters |
+| n | Evidence number | Free form string. EnCase limits this string to 3000 - 1 characters |
+| ov | Platform | Free form string. EnCase limits this string to 24 -1 characters |
+| pid | Process identifier | String containing the process identifier (pid) number |
+| p | Password hash | String containing the password hash. If no password is set it should be simply the character '0' |
+| r | Compression level | [Compression header value](#compression_header_value) |
+| sn | Serial Number | Free form string. EnCase limits this string to 3000 - 1 characters |
+| t | Notes | Free form string. EnCase limits this string to 3000 - 1 characters |
+| u | Systemdate and time | Contains a [date and time header value](#date_time_header_value) |
 
 > Note the restrictions were tested with EnCase 7.02.01, older versions could
 > have a restriction of 40 characters instead of 3000 characters.
@@ -817,12 +841,11 @@ space, e.g. "2002 3 4 10 19 59", which represents March 4, 2002 10:19:59.
 In linen a date and time contains a string with a POSIX 32-bit epoch timestamp,
 e.g. "1142163845" which represents the date: March 12 2006, 11:44:05
 
-
 ##### Extents header value {#extents_header_value}
 
 An extents header value consist of:
 
-```
+```text
 number of entries
 entries that consist of: S <1> <2> <3>
 ```
@@ -832,11 +855,11 @@ entries that consist of: S <1> <2> <3>
 A compression header value consist of a single character that represent the
 compression level.
 
-| Character value | Meaning
-| --- | ---
-| b | Best compression is used
-| f | Fastest compression is used
-| n | No compression is used
+| Character value | Meaning |
+| --- | --- |
+| b | Best compression is used |
+| f | Fastest compression is used |
+| n | No compression is used |
 
 ##### Notes
 
@@ -859,7 +882,8 @@ The volume section is identified in the section data type field as "volume".
 Some aspects of this section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
-* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and SMART (EWF-S01)
+* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
+  SMART (EWF-S01)
 * Found after the header section of the first segment file. Not found in subsequent segment files.
 
 In the next paragraphs the various versions of the volume section are described.
@@ -870,17 +894,17 @@ The specification according to [ASR Data - E01 Compression Format](http://www.as
 
 The volume section data is 94 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | 0x01 | Unknown (Reserved)
-| 4 | 4 | | The number of chunks within the all segment files.
-| 8 | 4 | | The number of sectors per chunk, which contains 64 per default.
-| 12 | 4 | | The number of bytes per sectors, which contains 512 per default
-| 16 | 4 | | The sectors count, the number of sectors within all segment files
-| 20 | 20 | 0x00 | Unknown (Reserved)
-| 40 | 45 | 0x00 | Unknown (Padding)
-| 85 | 5 | | Signature, which contains the EWF file header signature
-| 90 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the volume section data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | 0x01 | Unknown (Reserved) |
+| 4 | 4 | | The number of chunks within the all segment files |
+| 8 | 4 | | The number of sectors per chunk, which contains 64 per default |
+| 12 | 4 | | The number of bytes per sectors, which contains 512 per default |
+| 16 | 4 | | The sectors count, the number of sectors within all segment files |
+| 20 | 20 | 0x00 | Unknown (Reserved) |
+| 40 | 45 | 0x00 | Unknown (Padding) |
+| 85 | 5 | | Signature, which contains the EWF file header signature |
+| 90 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the volume section data |
 
 The number of chunks is a 32-bit value this means it maximum of addressable
 chunks would be: 4294967295 (= 2^32 - 1). For a chunk size of 32768 x 4294967295 = about 127 TiB.
@@ -903,30 +927,30 @@ The specification for FTK Imager, EnCase 1 to 7 and linen 5 to 7.
 
 The volume section data is 1052 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 1 | | [Media type](#media_type)
-| 1 | 3 | 0x00 | Unknown (empty values)
-| 4 | 4 | | The number of chunks within the all segment files.
-| 8 | 4 | | The number of sectors per chunk (or block size), which contains 64 per default. EnCase 5 is the first version which allows this value to be different than 64.
-| 12 | 4 | | The number of bytes per sector
-| 16 | 8 | | The sectors count, which contains the number of sectors within all segment files. This value probably has been changed in EnCase 6 from a 32-bit value to a 64-bit value to support media >2TiB
-| 24 | 4 | | The number of cylinders of the C:H:S value, which most of the time this value is empty (0x00)
-| 28 | 4 | | The number of heads of the C:H:S value, which most of the time this value is empty (0x00)
-| 32 | 4 | | The number of sectors of the C:H:S value, which most of the time this value is empty (0x00)
-| 36 | 1 | | [Media flags](#media_flags)
-| 37 | 3 | 0x00 | Unknown (empty values)
-| 40 | 4 | | PALM volume start sector
-| 44 | 4 | 0x00 | Unknown (empty values)
-| 48 | 4 | | SMART logs start sector, which contains an offset relative from the end of media, e.g. a value of 10 would refer to sector = number of sectors - 10
-| 52 | 1 | | [Compression level](#compression_level) (Introduced in EnCase 5)
-| 53 | 3 | 0x00 | Unknown (empty values, these values seem to be part of the compression level)
-| 56 | 4 | | The sector error granularity, which contains the error block size (Introduced in EnCase 5)
-| 60 | 4 | 0x00 | Unknown (empty values)
-| 64 | 16 | | Segment file set identifier, which contains a GUID/UUID generated on the acquiry system probably used to uniquely identify a set of segment files (Introduced in EnCase 5)
-| 80 | 963 | 0x00 | Unknown (empty values)
-| 1043 | 5 | 0x00 | Unknown (Signature)
-| 1048 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the volume section data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 1 | | [Media type](#media_type) |
+| 1 | 3 | 0x00 | Unknown (empty values) |
+| 4 | 4 | | The number of chunks within the all segment files |
+| 8 | 4 | | The number of sectors per chunk (or block size), which contains 64 per default. EnCase 5 is the first version which allows this value to be different than 64 |
+| 12 | 4 | | The number of bytes per sector |
+| 16 | 8 | | The sectors count, which contains the number of sectors within all segment files. This value probably has been changed in EnCase 6 from a 32-bit value to a 64-bit value to support media >2TiB |
+| 24 | 4 | | The number of cylinders of the C:H:S value, which most of the time this value is empty (0x00) |
+| 28 | 4 | | The number of heads of the C:H:S value, which most of the time this value is empty (0x00) |
+| 32 | 4 | | The number of sectors of the C:H:S value, which most of the time this value is empty (0x00) |
+| 36 | 1 | | [Media flags](#media_flags) |
+| 37 | 3 | 0x00 | Unknown (empty values) |
+| 40 | 4 | | PALM volume start sector |
+| 44 | 4 | 0x00 | Unknown (empty values) |
+| 48 | 4 | | SMART logs start sector, which contains an offset relative from the end of media, e.g. a value of 10 would refer to sector = number of sectors - 10 |
+| 52 | 1 | | [Compression level](#compression_level) (Introduced in EnCase 5) |
+| 53 | 3 | 0x00 | Unknown (empty values, these values seem to be part of the compression level) |
+| 56 | 4 | | The sector error granularity, which contains the error block size (Introduced in EnCase 5) |
+| 60 | 4 | 0x00 | Unknown (empty values) |
+| 64 | 16 | | Segment file set identifier, which contains a GUID/UUID generated on the acquiry system probably used to uniquely identify a set of segment files (Introduced in EnCase 5) |
+| 80 | 963 | 0x00 | Unknown (empty values) |
+| 1043 | 5 | 0x00 | Unknown (Signature) |
+| 1048 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the volume section data |
 
 TODO: a value that could be in the volume is the RAID stripe size
 
@@ -940,45 +964,47 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 
 * the volume type contains 0x0e
 * the number of chunks is 0
-* the number of bytes per sectors is some kind of block size value (4096), perhaps the source file system block size
-* the sectors count, represents some other value because ( sector_size x sector_amount != total_size ). The total size is in the ltree section.
+* the number of bytes per sectors is some kind of block size value (4096), perhaps the source file
+  system block size
+* the sectors count, represents some other value because (sector_size x sector_amount !=
+  total_size). The total size is in the ltree section.
 
 #### Media type {#media_type}
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00 | | A removable storage media device
-| 0x01 | | A fixed storage media device
-| | |
-| 0x03 | | An optical disc (CD/DVD/BD)
-| | |
-| 0x0e | | Logical Evidence (LEF or L01)
-| | |
-| 0x10 | | Physical Memory (RAM) or process memory
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00 | | A removable storage media device |
+| 0x01 | | A fixed storage media device |
+| | | |
+| 0x03 | | An optical disc (CD/DVD/BD) |
+| | | |
+| 0x0e | | Logical Evidence (LEF or L01) |
+| | | |
+| 0x10 | | Physical Memory (RAM) or process memory |
 
 > Note that FTK imager versions, before version 2.9, set the storage media to
-> fixed (0x01). The exact version of FTK imager where this behavior changed is 
+> fixed (0x01). The exact version of FTK imager where this behavior changed is
 > unknown.
 
 #### Media flags {#media_flags}
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x01 | | Is an image file. In FTK Imager, EnCase 1 to 7 this bit is always set, when not set EnCase seems to see the image file as a device
-| 0x02 | | Is physical device or device type, where 0 represents a non physical device (logical) and 1 represents a physical device
-| 0x04 | | Fastbloc write blocker used
-| 0x08 | | Tableau write blocker used. This was added in EnCase 6.13
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x01 | | Is an image file. In FTK Imager, EnCase 1 to 7 this bit is always set, when not set EnCase seems to see the image file as a device |
+| 0x02 | | Is physical device or device type, where 0 represents a non physical device (logical) and 1 represents a physical device |
+| 0x04 | | Fastbloc write blocker used |
+| 0x08 | | Tableau write blocker used. This was added in EnCase 6.13 |
 
 > Note that if both the the Fastbloc and Tableau write blocker media flags are
 > set EnCase only shows the Fastbloc.
 
 #### Compression level {#compression_level}
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00 | | no compression
-| 0x01 | | good compression
-| 0x02 | | best compression
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00 | | no compression |
+| 0x01 | | good compression |
+| 0x02 | | best compression |
 
 > Note that EnCase 7 no longer provides the fast and best compression options.
 
@@ -1004,9 +1030,12 @@ The data section is identified in the section data type field as "data". Some
 aspects of this section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
-* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, and EWF-L01 in EnCase 5 to 7. Not found in SMART (EWF-S01).
-* For multiple segment files it does not reside in the first segment file. For a single segment file it does.
-* Found after the last table2 section in a single segment file or for multiple segment files at the start of the segment files, except for the first.
+* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, and EWF-L01 in EnCase 5 to 7.
+  Not found in SMART (EWF-S01).
+* For multiple segment files it does not reside in the first segment file. For a single segment
+  file it does.
+* Found after the last table2 section in a single segment file or for multiple segment files at the
+  start of the segment files, except for the first.
 * The data section has data it should should contain the same information as the volume section.
 
 The data section is a copy of the [volume section](#volume_section).
@@ -1023,13 +1052,19 @@ The sectors section is identified in the section data type field as "sectors".
 Some aspects of this section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
-* Found in EWF-E01 in EnCase 2 to 7, or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7. Not found in EnCase 1 (EWF-E01) or SMART (EWF-S01).
-* The first sectors section can be found after the volume section in the first segment file or at the after the data section in subsequent segment files. Successive sector data sections are found after the sector table2 section.
+* Found in EWF-E01 in EnCase 2 to 7, or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7. Not
+  found in EnCase 1 (EWF-E01) or SMART (EWF-S01).
+* The first sectors section can be found after the volume section in the first segment file or at
+  the after the data section in subsequent segment files. Successive sector data sections are
+  found after the sector table2 section.
 
 The sectors section contains the actual chunks of media data.
 
 * The sectors section can contain multiple chunks.
-* The default size of a chunk is 32768 bytes of data (64 standard sectors, with a size of 512 bytes per sector). It is possible in EnCase 5 and 6 and linen 5 and 6 to change the number of sectors per block to 64, 128, 256, 1024, 2048, 4096, 8192, 16384 or 32768. In EnCase 7 and linen 7 this has been reduced to 64, 128, 256, 1024.
+* The default size of a chunk is 32768 bytes of data (64 standard sectors, with a size of 512 bytes
+  per sector). It is possible in EnCase 5 and 6 and linen 5 and 6 to change the number of sectors
+  per block to 64, 128, 256, 1024, 2048, 4096, 8192, 16384 or 32768. In EnCase 7 and linen 7 this
+  has been reduced to 64, 128, 256, 1024.
 
 #### Data chunk
 
@@ -1043,10 +1078,10 @@ sectors).
 
 An uncompressed data chunk is of variable size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | ... | | Uncompressed chunk data
-| ... | 4 | | Checksum, which contains an Adler-32 of the chunk data
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | ... | | Uncompressed chunk data |
+| ... | 4 | | Checksum, which contains an Adler-32 of the chunk data |
 
 The compressed data chunk consist of [zlib compressed data](zlib.md). The
 checksum of the compressed data chunk is part the zlib compressed data format.
@@ -1058,13 +1093,13 @@ per sector (the data).
 
 The raw sector size of a MODE-1 CD-ROM is 2352 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 16 | | Synchronization bytes
-| 16 | 2048 | | Data
-| 2054 | 4 | | Error detection
-| 2058 | 8 | 0x00 | Unknown (Empty values)
-| 2066 | 276 | | Error correction
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 16 | | Synchronization bytes |
+| 16 | 2048 | | Data |
+| 2054 | 4 | | Error detection |
+| 2058 | 8 | 0x00 | Unknown (Empty values) |
+| 2066 | 276 | | Error correction |
 
 TODO: add information about Mode-2 and Mode-XA
 
@@ -1074,7 +1109,8 @@ The table section is identified in the section data type field as "table". Some
 aspects of this section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
-* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and SMART (EWF-S01)
+* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
+  SMART (EWF-S01)
 
 > Note that the offsets within the section header are 8 bytes (64 bits) of
 > size while the offsets in the table entry array are 4 bytes (32 bits) in size.
@@ -1085,7 +1121,8 @@ In the next paragraphs the various versions of the table section are described.
 
 Some aspects of the table section according to the EWF specification are:
 
-* The first table section resides after the volume section in the first segment file or after the file header in subsequent segment files.
+* The first table section resides after the volume section in the first segment file or after the
+  file header in subsequent segment files.
 * It can be found in every segment file.
 
 The table section consists of:
@@ -1098,23 +1135,25 @@ The table section consists of:
 
 The table header is 24 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | The number of entries
-| 4 | 16 | 0x00 | Unknown (Padding)
-| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | The number of entries |
+| 4 | 16 | 0x00 | Unknown (Padding) |
+| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data |
 
 According to [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
+
 * the number of entries, contains 0x01
-* the table can hold 16375 entries if more entries are required an additional table section should be created.
+* the table can hold 16375 entries if more entries are required an additional table section should
+  be created.
 
 ##### Table entry
 
 The table entry is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Chunk data offset
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Chunk data offset |
 
 The most significant bit (MSB) in the chunk data offset indicates if the chunk
 is compressed (1) or uncompressed (0).
@@ -1147,7 +1186,8 @@ EWF specification.
 
 Some aspects of this section are:
 
-* The table section resides after the volume section in the first segment file or after the file header in subsequent segment files.
+* The table section resides after the volume section in the first segment file or after the file
+  header in subsequent segment files.
 * It can be found in every segment file.
 
 The table section consists of:
@@ -1161,21 +1201,22 @@ The table section consists of:
 
 The table header is 24 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | The number of entries
-| 4 | 16 | 0x00 | Unknown (Padding)
-| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | The number of entries |
+| 4 | 16 | 0x00 | Unknown (Padding) |
+| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data |
 
-The table can hold 16375 entries if more entries are required an additional table section should be created.
+The table can hold 16375 entries if more entries are required an additional table section should be
+created.
 
 ##### Table entry
 
 The table entry is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Chunk data offset
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Chunk data offset |
 
 The most significant bit (MSB) in the chunk data offset indicates if the chunk
 is compressed (1) or uncompressed (0).
@@ -1188,9 +1229,9 @@ a value relative to the start of the file.
 
 The table footer is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Checksum, which contains an Adler-32 of the offset array
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Checksum, which contains an Adler-32 of the offset array |
 
 ##### Data chunk
 
@@ -1204,10 +1245,10 @@ sectors).
 
 An uncompressed data chunk is of variable size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | ... | | Uncompressed chunk data
-| ... | 4 | | Checksum, which contains an Adler-32 of the chunk data
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | ... | | Uncompressed chunk data |
+| ... | 4 | | Checksum, which contains an Adler-32 of the chunk data |
 
 The compressed data chunk consist of [zlib compressed data](zlib.md). The
 checksum of the compressed data chunk is part the zlib compressed data format.
@@ -1231,11 +1272,11 @@ The table section consists of:
 
 The sector table header is 24 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | The number of entries
-| 4 | 16 | 0x00 | Unknown (Padding)
-| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | The number of entries |
+| 4 | 16 | 0x00 | Unknown (Padding) |
+| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data |
 
 The table section can hold 16375 entries. A new table section should be created
 to hold more entries. Both FTK Imager and EnCase 5 can handle more than 16375,
@@ -1246,9 +1287,9 @@ sections need to be created after the table2 section.
 
 The table entry is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Chunk data offset
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Chunk data offset |
 
 The most significant bit (MSB) in the chunk data offset indicates if the chunk
 is compressed (1) or uncompressed (0).
@@ -1261,9 +1302,9 @@ contains a value relative to the start of the file.
 
 The table footer is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Checksum, which contains an Adler-32 of the offset array
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Checksum, which contains an Adler-32 of the offset array |
 
 #### EnCase 6 to 7 and linen 6 to 7 (EWF-E01)
 
@@ -1284,13 +1325,13 @@ The table section consists of:
 
 The sector table header is 24 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | The number of entries
-| 4 | 4 | 0x00 | Unknown (Padding)
-| 8 | 8 | | The table base offset
-| 16 | 4 | 0x00 | Unknown (Padding)
-| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | The number of entries |
+| 4 | 4 | 0x00 | Unknown (Padding) |
+| 8 | 8 | | The table base offset |
+| 16 | 4 | 0x00 | Unknown (Padding) |
+| 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data |
 
 As of EnCase 6 the number of entries is no longer restricted to 16375 entries.
 The new limit seems to be 65534.
@@ -1299,9 +1340,9 @@ The new limit seems to be 65534.
 
 The table entry is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Chunk data offset
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Chunk data offset |
 
 The most significant bit (MSB) in the chunk data offset indicates if the chunk
 is compressed (1) or uncompressed (0).
@@ -1322,9 +1363,9 @@ converted by Keramics.
 
 The table footer is 4 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Checksum, which contains an Adler-32 of the offset array
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Checksum, which contains an Adler-32 of the offset array |
 
 #### EnCase 6 to 7 (EWF-L01)
 
@@ -1336,7 +1377,8 @@ The table2 section is identified in the section data type field as "table2".
 Some aspects of this section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
-* Found in EWF-E01 in EnCase 2 to 7, or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7. Not found in EnCase 1 (EWF-E01) or SMART (EWF-S01).
+* Found in EWF-E01 in EnCase 2 to 7, or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7. Not
+  found in EnCase 1 (EWF-E01) or SMART (EWF-S01).
 * Uses the same format as the table section.
 * Resides directly after the table section.
 
@@ -1355,9 +1397,11 @@ The next section is identified in the section data type field as "next". Some
 aspects of this section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
-* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and SMART (EWF-S01)
+* Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
+  SMART (EWF-S01)
 * The last section within a segment other than the last segment file.
-* The offset to the next section in the section header of the next section point to itself (the start of the next section).
+* The offset to the next section in the section header of the next section point to itself (the
+  start of the next section).
 * It should be the last section in a segment file, other than the last segment file.
 
 #### SMART (EWF-S01)
@@ -1385,11 +1429,11 @@ Some aspects of this section are:
 
 The additional ltypes section data is 6 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 2 | | Unknown
-| 2 | 2 | | Unknown
-| 4 | 2 | | Unknown
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 2 | | Unknown |
+| 2 | 2 | | Unknown |
+| 4 | 2 | | Unknown |
 
 ### Ltree section
 
@@ -1408,12 +1452,12 @@ The ltree section consists of:
 
 The ltree header is 48 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 16 | | Integrity hash, which contains the MD5 of the ltree data
-| 16 | 8 | | Data size
-| 24 | 4 | | Checksum, which contains an Adler-32 of all the data within the ltree header where the checksum value itself is zeroed out.
-| 28 | 20 | | Unknown (empty values)
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 16 | | Integrity hash, which contains the MD5 of the ltree data |
+| 16 | 8 | | Data size |
+| 24 | 4 | | Checksum, which contains an Adler-32 of all the data within the ltree header where the checksum value itself is zeroed out |
+| 28 | 20 | | Unknown (empty values) |
 
 #### Ltree data
 
@@ -1435,19 +1479,19 @@ specific for EWF-L01.
 
 The ltree data string contains the following information:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | 5 | The number of categories provided
-| 2 | rec | Information about unknown, also see [Records category](#records_category3)
-| ... | | (an empty line)
-| ... | perm | Information about file permissions, also see [Permissions category](#permissions_category3)
-| ... | | (an empty line)
-| ... | srce | Information about acquisition sources, also see [sources category](#sources_category3)
-| ... | | (an empty line)
-| ... | sub | Information about unknown, also see [subjects category](#subjects_category3)
-| ... | | (an empty line)
-| ... | entry | Information about file entries, also see [File entries category](#file_entries_category3)
-| ... | | (an empty line)
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | 5 | The number of categories provided |
+| 2 | rec | Information about unknown, also see [Records category](#records_category3) |
+| ... | | (an empty line) |
+| ... | perm | Information about file permissions, also see [Permissions category](#permissions_category3) |
+| ... | | (an empty line) |
+| ... | srce | Information about acquisition sources, also see [sources category](#sources_category3) |
+| ... | | (an empty line) |
+| ... | sub | Information about unknown, also see [subjects category](#subjects_category3) |
+| ... | | (an empty line) |
+| ... | entry | Information about file entries, also see [File entries category](#file_entries_category3) |
+| ... | | (an empty line) |
 
 The end of line character(s) is a newline (0x0a).
 
@@ -1459,15 +1503,15 @@ The 1st line of the category contains the string "rec".
 
 The 2nd line of the category contains tab (0x09) separated type indicators.
 
-| Identifier number | Type indicator | Description
-| --- | --- | ---
-| 1 | tb | Total bytes, which contains an integer with size of the logical file data (media data)
-| 2 | cl | Unknown (Clusters?)
-| 3 | n | Unknown (introduced in EnCase 6.19)
-| 4 | fp | Unknown (introduced in EnCase 7)
-| 5 | pg | Unknown (introduced in EnCase 7)
-| 6 | lg | Unknown (introduced in EnCase 7)
-| 7 | ig | Unknown (introduced in EnCase 7)
+| Identifier number | Type indicator | Description |
+| --- | --- | --- |
+| 1 | tb | Total bytes, which contains an integer with size of the logical file data (media data) |
+| 2 | cl | Unknown (Clusters?) |
+| 3 | n | Unknown (introduced in EnCase 6.19) |
+| 4 | fp | Unknown (introduced in EnCase 7) |
+| 5 | pg | Unknown (introduced in EnCase 7) |
+| 6 | lg | Unknown (introduced in EnCase 7) |
+| 7 | ig | Unknown (introduced in EnCase 7) |
 
 The 3rd line of the category consist of the tab (0x09) separated values.
 
@@ -1479,10 +1523,10 @@ The 1st line of the category contains the string "perm".
 
 The 2nd line consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | | The number of permission groups in the category
-| 2 | 1 | Unknown
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | | The number of permission groups in the category |
+| 2 | 1 | Unknown |
 
 The 3rd line of the category contains tab (0x09) separated type indicators. For
 more information see the sections below.
@@ -1495,94 +1539,106 @@ The remaining lines in the category consist of:
 
 Each entry consist of 2 lines:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | | Number of entries
-| 2 | | Tab (0x09) separated values that correspond to the type indicators.
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | | Number of entries |
+| 2 | | Tab (0x09) separated values that correspond to the type indicators |
 
 The 1st line of the category root entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | | The number of permission groups in the category
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | | The number of permission groups in the category |
 
 The 1st line of the permission group entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | | The number of permissions in the group
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | | The number of permissions in the group |
 
 The 1st line of the permission entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | 0 | Unknown
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | 0 | Unknown |
 
 ##### Permission type indicators
 
-| Identifier number | Type indicator | Description
-| --- | --- | ---
-| 1 | p | Is parent, where 1 represents if the entry is a category root or permissions group and 0 represents if the entry is a permission
-| 2 | n | Name, which contains a string
-| 3 | s | Security identifier, which contains a string with either a [Windows NT security identifier (SID)](https://github.com/libyal/libfwnt/blob/master/documentation/Security%20Descriptor.asciidoc#security-identifier) or a POSIX user (uid) or group identifier (gid) in the format " number:" such as " 99:"
-| 4 | pr | Property type, also see [permission types](#permission_types)
-| 5 | nta | Access mask
-| 6 | nti | Unknown (Windows NT access control entry (ACE) flags?, which contains an integer with a [Windows NT access control entry (ACE) flags](https://github.com/libyal/libfwnt/blob/master/documentation/Security%20Descriptor.asciidoc#access-control-entry-ace-flags)).
-| 7 | nts | Unknown (Permission?) (Removed in EnCase 6)
+| Identifier number | Type indicator | Description |
+| --- | --- | --- |
+| 1 | p | Is parent, where 1 represents if the entry is a category root or permissions group and 0 represents if the entry is a permission |
+| 2 | n | Name, which contains a string |
+| 3 | s | Security identifier, which contains a string with either a [Windows NT security identifier (SID)](https://github.com/libyal/libfwnt/blob/master/documentation/Security%20Descriptor.asciidoc#security-identifier) or a POSIX user (uid) or group identifier (gid) in the format " number:" such as " 99:" |
+| 4 | pr | Property type, also see [permission types](#permission_types) |
+| 5 | nta | Access mask |
+| 6 | nti | Unknown (Windows NT access control entry (ACE) flags?, which contains an integer with a [Windows NT access control entry (ACE) flags](https://github.com/libyal/libfwnt/blob/master/documentation/Security%20Descriptor.asciidoc#access-control-entry-ace-flags)) |
+| 7 | nts | Unknown (Permission?) (Removed in EnCase 6) |
 
 ##### Permission types {#permission_types}
 
-| Value | Identifier | Description
-| --- | --- | ---
-| (empty) | | Owner or category root
-| 1 | | Group
-| 2 | | Allow
-| <td colspan="3">&nbsp;</td>
-| 6 | | Other
-| <td colspan="3">&nbsp;</td>
-| 10 | | Unknown (permissions group?)
+<!-- rumdl-disable MD033 MD056 -->
+
+| Value | Identifier | Description |
+| --- | --- | --- |
+| (empty) | | Owner or category root |
+| 1 | | Group |
+| 2 | | Allow |
+| <td colspan="3">&nbsp;</td> |
+| 6 | | Other |
+| <td colspan="3">&nbsp;</td> |
+| 10 | | Unknown (permissions group?) |
+
+<!-- rumdl-enable MD033 MD056 -->
 
 ##### Access mask
 
 Access mask seen in combination with property types 0, 1 and 6
 
-| Value | Identifier | Description
-| --- | --- | ---
-| (empty) | | Owner or category root
-| 0x00000001 | `[Lst Fldr/Rd Data]` | List folder / Read data
-| 0x00000002 | `[Crt Fl/W Data]` | Create file / Write data
-| <td colspan="3">&nbsp;</td>
-| 0x00000020 | `[Trav Fldr/X Fl]` | Traverse folder / Execute file
+<!-- rumdl-disable MD033 MD056 -->
+
+| Value | Identifier | Description |
+| --- | --- | --- |
+| (empty) | | Owner or category root |
+| 0x00000001 | `[Lst Fldr/Rd Data]` | List folder / Read data |
+| 0x00000002 | `[Crt Fl/W Data]` | Create file / Write data |
+| <td colspan="3">&nbsp;</td> |
+| 0x00000020 | `[Trav Fldr/X Fl]` | Traverse folder / Execute file |
+
+<!-- rumdl-enable MD033 MD056 -->
 
 Access mask seen in combination with property type 2
 
-```
+```text
 [0x001200a9] [R&X] [R] [Sync]
 [0x001301bf] [M] [R&X] [R] [W] [Sync]
 [0x001f01ff] [FC] [M] [R&X] [R] [W] [Sync]
 ```
 
-| Value | Identifier | Description
-| --- | --- | ---
-| (empty) | | Owner or category root
-| 0x00000001 | |
-| 0x00000002 | |
-| 0x00000004 | |
-| 0x00000008 | |
-| 0x00000010 | |
-| 0x00000020 | |
-| 0x00000040 | |
-| 0x00000080 | |
-| 0x00000100 | |
-| <td colspan="3">&nbsp;</td>
-| 0x00010000 | |
-| 0x00020000 | |
-| 0x00040000 | |
-| 0x00080000 | |
-| 0x00100000 | |
+<!-- rumdl-disable MD033 MD056 -->
+
+| Value | Identifier | Description |
+| --- | --- | --- |
+| (empty) | | Owner or category root |
+| 0x00000001 | | |
+| 0x00000002 | | |
+| 0x00000004 | | |
+| 0x00000008 | | |
+| 0x00000010 | | |
+| 0x00000020 | | |
+| 0x00000040 | | |
+| 0x00000080 | | |
+| 0x00000100 | | |
+| <td colspan="3">&nbsp;</td> |
+| 0x00010000 | | |
+| 0x00020000 | | |
+| 0x00040000 | | |
+| 0x00080000 | | |
+| 0x00100000 | | |
+
+<!-- rumdl-enable MD033 MD056 -->
 
 #### Sources category {#sources_category3}
 
@@ -1594,10 +1650,10 @@ The 1st line of the category contains the string "srce".
 
 The 2nd line consists of 2 values.
 
-| Value index | Value | Description
-| --- | --- | ---
-| 1 | | The number of sources in the category
-| 2 | 1 | Unknown
+| Value index | Value | Description |
+| --- | --- | --- |
+| 1 | | The number of sources in the category |
+| 2 | 1 | Unknown |
 
 The 3rd line of the category contains tab (0x09) separated type indicators. For
 more information see the sections below.
@@ -1609,50 +1665,50 @@ The remaining lines in the category consist of:
 
 Each entry consist of 2 lines:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | | Number of entries
-| 2 | | Tab (0x09) separated values that correspond to the type indicators.
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | | Number of entries |
+| 2 | | Tab (0x09) separated values that correspond to the type indicators |
 
 The 1st line of the category root entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | | The number of sources in the category
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | | The number of sources in the category |
 
 The 1st line of the source entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | 0 | Unknown
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | 0 | Unknown |
 
 ##### Source type indicators
 
-| Identifier number | Type indicator | Description
-| --- | --- | ---
-| 1 | p |
-| 2 | n |
-| 3 | id | Identifier, which contains an integer identifying the source
-| 4 | ev | Evidence number, which contains a string
-| 5 | do | Domain, which contains a string (introduced in EnCase 7.9)
-| 6 | loc | Location, which contains a string (introduced in EnCase 7.9)
-| 7 | se | Serial number, which contains a string (introduced in EnCase 7.9)
-| 8 | mfr | Manufacturer, which contains a string (introduced in EnCase 7.9)
-| 9 | mo | Model, which contains a string (introduced in EnCase 7.9)
-| 10 | tb | Total bytes, which contains an integer
-| 11 | lo | Logical offset, which contains an integer which is -1 when value is not set
-| 12 | po | Physical offset, which contains an integer which is -1 when value is not set
-| 13 | ah | MD5 hash, which contains a string with the MD5 hash of the source
-| 14 | sh | SHA1 hash, which contains a string with the SHA1 hash of the source (introduced in EnCase 6.19)
-| 15 | gu | Device GUID, which contains a string with a GUID or "0" if not set
-| 16 | pgu | Primary device GUID, which contains a string with a GUID or "0" if not set (introduced in EnCase 7)
-| 17 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp
-| 18 | ip | IP address, which contains a string (introduced in EnCase 7.9)
-| 19 | si | Unknown (Static IP address?), Contains 1 if static, empty otherwise (introduced in EnCase 7.9)
-| 20 | ma | MAC address, which contains a string without separator characters (introduced in EnCase 7.9)
-| 21 | dt | Drive type, which contains a single character (introduced in EnCase 7.9)
+| Identifier number | Type indicator | Description |
+| --- | --- | --- |
+| 1 | p | |
+| 2 | n | |
+| 3 | id | Identifier, which contains an integer identifying the source |
+| 4 | ev | Evidence number, which contains a string |
+| 5 | do | Domain, which contains a string (introduced in EnCase 7.9) |
+| 6 | loc | Location, which contains a string (introduced in EnCase 7.9) |
+| 7 | se | Serial number, which contains a string (introduced in EnCase 7.9) |
+| 8 | mfr | Manufacturer, which contains a string (introduced in EnCase 7.9) |
+| 9 | mo | Model, which contains a string (introduced in EnCase 7.9) |
+| 10 | tb | Total bytes, which contains an integer |
+| 11 | lo | Logical offset, which contains an integer which is -1 when value is not set |
+| 12 | po | Physical offset, which contains an integer which is -1 when value is not set |
+| 13 | ah | MD5 hash, which contains a string with the MD5 hash of the source |
+| 14 | sh | SHA1 hash, which contains a string with the SHA1 hash of the source (introduced in EnCase 6.19) |
+| 15 | gu | Device GUID, which contains a string with a GUID or "0" if not set |
+| 16 | pgu | Primary device GUID, which contains a string with a GUID or "0" if not set (introduced in EnCase 7) |
+| 17 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp |
+| 18 | ip | IP address, which contains a string (introduced in EnCase 7.9) |
+| 19 | si | Unknown (Static IP address?), Contains 1 if static, empty otherwise (introduced in EnCase 7.9) |
+| 20 | ma | MAC address, which contains a string without separator characters (introduced in EnCase 7.9) |
+| 21 | dt | Drive type, which contains a single character (introduced in EnCase 7.9) |
 
 The acquisition date and time is in the form of: "1142163845", which is a POSIX
 epoch timestamp and represents the date: March 12 2006, 11:44:05.
@@ -1666,9 +1722,9 @@ set.
 
 ##### Drive type
 
-| Character value | Meaning
-| --- | ---
-| f | Fixed drive
+| Character value | Meaning |
+| --- | --- |
+| f | Fixed drive |
 
 #### Subjects category {#subjects_category3}
 
@@ -1680,10 +1736,10 @@ The 1st line of the category contains the string "sub".
 
 The 2nd line consists of 2 values.
 
-| Value index | Value | Description
-| --- | --- | ---
-| 1 | | The number of subjects in the category
-| 2 | 1 | Unknown
+| Value index | Value | Description |
+| --- | --- | --- |
+| 1 | | The number of subjects in the category |
+| 2 | 1 | Unknown |
 
 The 3rd line of the category contains tab (0x09) separated type indicators. For
 more information see the sections below.
@@ -1695,35 +1751,35 @@ The remaining lines in the category consist of:
 
 Each entry consist of 2 lines:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | | Number of entries
-| 2 | | Tab (0x09) separated values that correspond to the type indicators.
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | | Number of entries |
+| 2 | | Tab (0x09) separated values that correspond to the type indicators |
 
 The 1st line of the category root entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | | The number of subject in the category
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | | The number of subject in the category |
 
 The 1st line of the subject entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | 0 | Unknown
-| 2 | 0 | Unknown
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | 0 | Unknown |
+| 2 | 0 | Unknown |
 
 ##### Subject type indicators
 
-| Identifier number | Type indicator | Description
-| --- | --- | ---
-| 1 | p |
-| 2 | n |
-| 3 | id | Identifier, which contains an integer identifying the subject
-| 4 | nu | Unknown (Number)
-| 5 | co | Unknown (Comment)
-| 6 | gu | Unknown (GUID)
+| Identifier number | Type indicator | Description |
+| --- | --- | --- |
+| 1 | p | |
+| 2 | n | |
+| 3 | id | Identifier, which contains an integer identifying the subject |
+| 4 | nu | Unknown (Number) |
+| 5 | co | Unknown (Comment) |
+| 6 | gu | Unknown (GUID) |
 
 #### File entries category {#file_entries_category3}
 
@@ -1733,10 +1789,10 @@ The 1st line of the category contains the string "entry".
 
 The 2nd line consists of 2 values.
 
-| Value index | Value | Description
-| --- | --- | ---
-| 1 | | The number of file entries in the category or 1 if unknown
-| 2 | 1 | Unknown
+| Value index | Value | Description |
+| --- | --- | --- |
+| 1 | | The number of file entries in the category or 1 if unknown |
+| 2 | 1 | Unknown |
 
 The 3rd line of the category contains tab (0x09) separated type indicators. For
 more information see the sections below.
@@ -1750,53 +1806,53 @@ The remaining lines in the category consist of:
 
 Each entry consist of 2 lines:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | | Number of entries
-| 2 | | Tab (0x09) separated values that correspond to the type indicators.
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | | Number of entries |
+| 2 | | Tab (0x09) separated values that correspond to the type indicators |
 
 The 1st line of the category root entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | | 0 if not set or 26 if Unknown
-| 2 | | The number of file entries in the category
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | | 0 if not set or 26 if Unknown |
+| 2 | | The number of file entries in the category |
 
 The 1st line of the file entry consists of the following 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | | Number of file entries in the parent file entry or 0 if not set
-| 2 | | The number of sub file entries in the file entry
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | | Number of file entries in the parent file entry or 0 if not set |
+| 2 | | The number of sub file entries in the file entry |
 
 ##### EnCase 5 and 6 (EWF-L01) file entry type indicators
 
-| Identifier number | Character in 29th line | Meaning
-| --- | --- | ---
-| 1 | p | Is parent, where 1 => if the entry is a directory and (empty) => if the entry is a file
-| 2 | n | [Name](#file_entry_name)
-| 3 | id | Identifier, contains an integer identifying the file entry
-| 4 | opr | [File entry flags](#file_entry_flags)
-| 5 | src | Source identifier, which contains an integer that corresponds to an identifier in the [Sources category](#sources_category3)
-| 6 | sub | Subject identifier, which contains an integer that corresponds to an identifier in the [Subjects category](#subjects_category3)
-| 7 | cid | Unknown (record type)
-| 8 | jq | Unknown
-| 9 | cr | Creation date and time
-| 10 | ac | Access date and time, for which currently is assumed the precision is date only
-| 11 | wr | (File) modification (last written) date and time
-| 12 | mo | (File system) entry modification date and time
-| 13 | dl | Deletion date and time
-| 14 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp
-| 15 | ha | MD5 hash, which contains a string with the MD5 hash of the file data
-| 16 | ls | File size in bytes. If the file size is 0 the data size should be 1
-| 17 | du | Duplicate data offset, relative from the start of the media data
-| 18 | lo | Logical offset, which contains an integer which is -1 when value is not set
-| 19 | po | Physical offset, which contains an integer which is -1 when value is not set (or does this value contain the segment file in which the start of the data is stored, -1 for a single segment file?)
-| 20 | mid | GUID, which contains a string with a GUID (introduced in EnCase 6.19)
-| 21 | cfi | Unknown (introduced in EnCase 6.14)
-| 22 | be | [Binary extents](#binary_extents)
-| 23 | pm | Permissions group index, which contains an integer that corresponds to an identifier in the [Permissions category](#permissions_category3) or -1 if not set.  The value is 0 by default
-| 24 | lpt | Unknown (introduced in EnCase 6.19)
+| Identifier number | Character in 29th line | Meaning |
+| --- | --- | --- |
+| 1 | p | Is parent, where 1 => if the entry is a directory and (empty) => if the entry is a file |
+| 2 | n | [Name](#file_entry_name) |
+| 3 | id | Identifier, contains an integer identifying the file entry |
+| 4 | opr | [File entry flags](#file_entry_flags) |
+| 5 | src | Source identifier, which contains an integer that corresponds to an identifier in the [Sources category](#sources_category3) |
+| 6 | sub | Subject identifier, which contains an integer that corresponds to an identifier in the [Subjects category](#subjects_category3) |
+| 7 | cid | Unknown (record type) |
+| 8 | jq | Unknown |
+| 9 | cr | Creation date and time |
+| 10 | ac | Access date and time, for which currently is assumed the precision is date only |
+| 11 | wr | (File) modification (last written) date and time |
+| 12 | mo | (File system) entry modification date and time |
+| 13 | dl | Deletion date and time |
+| 14 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp |
+| 15 | ha | MD5 hash, which contains a string with the MD5 hash of the file data |
+| 16 | ls | File size in bytes. If the file size is 0 the data size should be 1 |
+| 17 | du | Duplicate data offset, relative from the start of the media data |
+| 18 | lo | Logical offset, which contains an integer which is -1 when value is not set |
+| 19 | po | Physical offset, which contains an integer which is -1 when value is not set (or does this value contain the segment file in which the start of the data is stored, -1 for a single segment file?) |
+| 20 | mid | GUID, which contains a string with a GUID (introduced in EnCase 6.19) |
+| 21 | cfi | Unknown (introduced in EnCase 6.14) |
+| 22 | be | [Binary extents](#binary_extents) |
+| 23 | pm | Permissions group index, which contains an integer that corresponds to an identifier in the [Permissions category](#permissions_category3) or -1 if not set.  The value is 0 by default |
+| 24 | lpt | Unknown (introduced in EnCase 6.19) |
 
 The creation, access and last written date and time are in the form of:
 "1142163845", which is a POSIX epoch timestamp and represents the date: March
@@ -1813,49 +1869,49 @@ followed by the number of sub file entries.
 
 The entries of files and directories:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | (empty) | The root directory
-| 2 | | The target drive/mount point
-| 3 | | The actual single file entries
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | (empty) | The root directory |
+| 2 | | The target drive/mount point |
+| 3 | | The actual single file entries |
 
 ##### EnCase 7 (EWF-L01) file entry type indicators
 
-| Identifier number | Character in 29th line | Meaning
-| --- | --- | ---
-| 1 | mid | GUID, which contains a string with a GUID
-| 2 | ls | File size, in bytes. If the file size is 0 the data size should be 1
-| 3 | be | [Binary extents](#binary_extents)
-| 4 | id | Identifier, which contains an integer identifying the file entry
-| 5 | cr | Creation date and time
-| 6 | ac | Access date and time
-| 7 | wr | (File) modification (last written) date and time
-| 8 | mo | (File system) entry modification date and time
-| 9 | dl | Deletion date and time
-| 10 | sig | Unknown (Introduced in EnCase 7)
-| 11 | ha | MD5 hash, which contains a string with the MD5 hash of the file data
-| 12 | sha | SHA1 hash, which contains a string with the SHA1 hash of the file data. (Introduced in EnCase 7)
-| 13 | ent | Unknown, seen "B" (Introduced in EnCase 7.9)
-| 14 | snh | [Short name](#short_name) (or DOS 8.3 name) (Introduced in EnCase 7.9)
-| 15 | p | Is parent, where "1" represents that the entry is a directory and "" (an empty string) that the entry is a file
-| 16 | n | [Name](#file_entry_name)
-| 17 | du | Duplicate data offset, relative from the start of the media data
-| 18 | lo | Logical offset, which contains an integer which is -1 when value is not set
-| 19 | po | Physical offset, which contains an integer which is -1 when value is not set (or does this value contain the segment file in which the start of the data is stored, -1 for a single segment file?)
-| 20 | pm | Permissions group index, which contains an integer that corresponds to an identifier in the [Permissions category](#permissions_category3) or -1 if not set.  The value is 0 by default
-| 21 | oes | Unknown (Original extents?) (Introduced in EnCase 7)
-| 22 | opr | [File entry flags](#file_entry_flags)
-| 23 | src | Source identifier, which contains an integer that corresponds to an identifier in the [Sources category](#sources_category3)
-| 24 | sub | Subject identifier, which contains an integer that corresponds to an identifier in the [Subjects category](#subjects_category3)
-| 25 | cid | Unknown (record type?)
-| 26 | jq | Unknown
-| 27 | alt | Unknown (Introduced in EnCase 7)
-| 28 | ep | Unknown (Introduced in EnCase 7)
-| 29 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp
-| 30 | cfi | Unknown
-| 31 | sg | Unknown (Introduced in EnCase 7)
-| 32 | ea | [Extended attributes](#extended_attributes) (Introduced in EnCase 7.9)
-| 33 | lpt | Unknown
+| Identifier number | Character in 29th line | Meaning |
+| --- | --- | --- |
+| 1 | mid | GUID, which contains a string with a GUID |
+| 2 | ls | File size, in bytes. If the file size is 0 the data size should be 1 |
+| 3 | be | [Binary extents](#binary_extents) |
+| 4 | id | Identifier, which contains an integer identifying the file entry |
+| 5 | cr | Creation date and time |
+| 6 | ac | Access date and time |
+| 7 | wr | (File) modification (last written) date and time |
+| 8 | mo | (File system) entry modification date and time |
+| 9 | dl | Deletion date and time |
+| 10 | sig | Unknown (Introduced in EnCase 7) |
+| 11 | ha | MD5 hash, which contains a string with the MD5 hash of the file data |
+| 12 | sha | SHA1 hash, which contains a string with the SHA1 hash of the file data. (Introduced in EnCase 7) |
+| 13 | ent | Unknown, seen "B" (Introduced in EnCase 7.9) |
+| 14 | snh | [Short name](#short_name) (or DOS 8.3 name) (Introduced in EnCase 7.9) |
+| 15 | p | Is parent, where "1" represents that the entry is a directory and "" (an empty string) that the entry is a file |
+| 16 | n | [Name](#file_entry_name) |
+| 17 | du | Duplicate data offset, relative from the start of the media data |
+| 18 | lo | Logical offset, which contains an integer which is -1 when value is not set |
+| 19 | po | Physical offset, which contains an integer which is -1 when value is not set (or does this value contain the segment file in which the start of the data is stored, -1 for a single segment file?) |
+| 20 | pm | Permissions group index, which contains an integer that corresponds to an identifier in the [Permissions category](#permissions_category3) or -1 if not set.  The value is 0 by default |
+| 21 | oes | Unknown (Original extents?) (Introduced in EnCase 7) |
+| 22 | opr | [File entry flags](#file_entry_flags) |
+| 23 | src | Source identifier, which contains an integer that corresponds to an identifier in the [Sources category](#sources_category3) |
+| 24 | sub | Subject identifier, which contains an integer that corresponds to an identifier in the [Subjects category](#subjects_category3) |
+| 25 | cid | Unknown (record type?) |
+| 26 | jq | Unknown |
+| 27 | alt | Unknown (Introduced in EnCase 7) |
+| 28 | ep | Unknown (Introduced in EnCase 7) |
+| 29 | aq | Acquisition date and time, which contains an integer with a POSIX timestamp |
+| 30 | cfi | Unknown |
+| 31 | sg | Unknown (Introduced in EnCase 7) |
+| 32 | ea | [Extended attributes](#extended_attributes) (Introduced in EnCase 7.9) |
+| 33 | lpt | Unknown |
 
 If the "ha" value contains "00000000000000000000000000000000" this means the
 MD5 hash is not set. The same applies for the "sha" value when it contains
@@ -1866,7 +1922,8 @@ MD5 hash is not set. The same applies for the "sha" value when it contains
 A file entry name ("n" value):
 
 * can contain path segment separator characters like "\\" and "/"
-* uses the "MIDDLE DOT" Unicode character (U+00b7) as a (NTFS) alternative data stream (ADS) name seperator
+* uses the "MIDDLE DOT" Unicode character (U+00b7) as a (NTFS) alternative data stream (ADS) name
+  seperator
 
 > Note that a regular "MIDDLE DOT" Unicode character will be encoded in the
 > same way so no real way to reliably tell the difference.
@@ -1877,10 +1934,10 @@ An empty name has been observed to be represented as "NoName".
 
 The short name ("snh") value contains 2 values:
 
-| Value number | Value | Description
-| --- | --- | ---
-| 1 | | The number of characters in the short name including the end-of-string character
-| 2 | | The short name string, without an end-of-string character
+| Value number | Value | Description |
+| --- | --- | --- |
+| 1 | | The number of characters in the short name including the end-of-string character |
+| 2 | | The short name string, without an end-of-string character |
 
 For example: "13 FILE10~1.TXT"
 
@@ -1888,7 +1945,7 @@ For example: "13 FILE10~1.TXT"
 
 TODO: add some text
 
-```
+```text
 1 30a555b 30a6000 12011ae00 9008d7 3f 43 1 12011ae00 30a6000 120113 30a6 9008d7 18530
 ```
 
@@ -1899,35 +1956,35 @@ followed by the number of sub file entries.
 
 The entries of files and directories:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | LogicalEntries | The root directory
-| 2 | | The target drive/mount point
-| 3 | | The actual single file entries
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | LogicalEntries | The root directory |
+| 2 | | The target drive/mount point |
+| 3 | | The actual single file entries |
 
 ##### File entry flags {#file_entry_flags}
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00000001 | | Unknown (Is read-only?)
-| 0x00000002 | Hidden | Is hidden
-| 0x00000004 | System | Is system
-| 0x00000008 | Archive | Is archive
-| 0x00000010 | Sym Link | Is symbolic link, junction or reparse point
-| | |
-| 0x00000080 | Deleted | Is deleted
-| | |
-| 0x00001000 | Hard Linked | Is hard link
-| 0x00002000 | Stream | Is stream
-| | |
-| 0x00100000 | Internal | Is internal (used in combination with 0x00000006?)
-| | |
-| 0x00200000 | Unallocated Clusters | Unknown
-| 0x00400000 | | Unknown
-| | |
-| 0x01000000 | | Unknown
-| 0x02000000 | Folder | Is folder
-| 0x04000000 | | Data is sparse.
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00000001 | | Unknown (Is read-only?) |
+| 0x00000002 | Hidden | Is hidden |
+| 0x00000004 | System | Is system |
+| 0x00000008 | Archive | Is archive |
+| 0x00000010 | Sym Link | Is symbolic link, junction or reparse point |
+| | | |
+| 0x00000080 | Deleted | Is deleted |
+| | | |
+| 0x00001000 | Hard Linked | Is hard link |
+| 0x00002000 | Stream | Is stream |
+| | | |
+| 0x00100000 | Internal | Is internal (used in combination with 0x00000006?) |
+| | | |
+| 0x00200000 | Unallocated Clusters | Unknown |
+| 0x00400000 | | Unknown |
+| | | |
+| 0x01000000 | | Unknown |
+| 0x02000000 | Folder | Is folder |
+| 0x04000000 | | Data is sparse |
 
 If 0x00002000 or 0x02000000 are not set the file entry is of type "File".
 
@@ -1949,7 +2006,7 @@ stored.
 
 The binary extents value contains 3 values separated by a space:
 
-```
+```text
 Unknown Offset Size
 ```
 
@@ -1974,27 +2031,27 @@ The extended attributes value contains base-16 encoded data, which consists of:
 
 The extended attributes header is 37 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | 0 | Unknown (0 => root, 1 => otherwise)
-| 4 | 1 | 1 | Unknown (0 => is leaf node, 1 => is branch node?)
-| 5 | 4 | 11 | Number of characters in name string including the end-of-string character
-| 9 | 4 | 1 | Number of characters in value string including the end-of-string character
-| 13 | 22 | "Attributes\0" | Name string, which contains an UTF-16 little-endian encoded string including end-of-string character
-| 35 | 2 | "\0" | Value string, which contains an UTF-16 little-endian encoded string including end-of-string character
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | 0 | Unknown (0 => root, 1 => otherwise) |
+| 4 | 1 | 1 | Unknown (0 => is leaf node, 1 => is branch node?) |
+| 5 | 4 | 11 | Number of characters in name string including the end-of-string character |
+| 9 | 4 | 1 | Number of characters in value string including the end-of-string character |
+| 13 | 22 | "Attributes\0" | Name string, which contains an UTF-16 little-endian encoded string including end-of-string character |
+| 35 | 2 | "\0" | Value string, which contains an UTF-16 little-endian encoded string including end-of-string character |
 
 ###### Extended attribute
 
 An extended attributes is of variable size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Unknown (0 => root, 1 => otherwise)
-| 4 | 1 | | Unknown (0 => is leaf node, 1 => is branch node?)
-| 5 | 4 | | Number of characters in name string including the end-of-string character
-| 9 | 4 | | Number of characters in value string including the end-of-string character
-| 13 | ... | | Name string, which contains an UTF-16 little-endian encoded string including end-of-string character
-| ... | ... | | Value string, which contains an UTF-16 little-endian encoded string including end-of-string character
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Unknown (0 => root, 1 => otherwise) |
+| 4 | 1 | | Unknown (0 => is leaf node, 1 => is branch node?) |
+| 5 | 4 | | Number of characters in name string including the end-of-string character |
+| 9 | 4 | | Number of characters in value string including the end-of-string character |
+| 13 | ... | | Name string, which contains an UTF-16 little-endian encoded string including end-of-string character |
+| ... | ... | | Value string, which contains an UTF-16 little-endian encoded string including end-of-string character |
 
 TODO: complete section
 
@@ -2020,19 +2077,19 @@ UTF-16 endian byte order mark.
 
 The map string contains the following information:
 
-| Line number | Value | Description
-| --- | --- | ---
-| 1 | 1 | The number of categories provided
-| 2 | r | Probably the type of information provided
-| 3 | c | Identifier for the values in the 4th line
-| 4 | | The data for the different identifiers in the 3rd line
-| 5 | | (an empty line)
+| Line number | Value | Description |
+| --- | --- | --- |
+| 1 | 1 | The number of categories provided |
+| 2 | r | Probably the type of information provided |
+| 3 | c | Identifier for the values in the 4th line |
+| 4 | | The data for the different identifiers in the 3rd line |
+| 5 | | (an empty line) |
 
 ##### Map string values
 
-| Identifier number | Character in 29th line | Meaning
-| --- | --- | ---
-| 1 | C | Number of map entries (count)
+| Identifier number | Character in 29th line | Meaning |
+| --- | --- | --- |
+| 1 | C | Number of map entries (count) |
 
 The number of map entries should match the number of file entries in the ltree.
 
@@ -2040,15 +2097,16 @@ The number of map entries should match the number of file entries in the ltree.
 
 A map entry is 24 bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Unknown
-| 4 | 4 | | Unknown (empty values or part of previous value)
-| 8 | 16 | | Unknown
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Unknown |
+| 4 | 4 | | Unknown (empty values or part of previous value) |
+| 8 | 16 | | Unknown |
 
 ### Session section
 
-The session section is identifier in the section data type field as "session". Some aspects of this section are:
+The session section is identifier in the section data type field as "session". Some aspects of this
+section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * It is not found in SMART (EWF-S01) and FTK Imager (EWF-E01).
@@ -2066,21 +2124,21 @@ The session section data consists of:
 
 The session header is 36 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Number of sessions
-| 4 | 28 | | Unknown (empty values)
-| 32 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the additional session section data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Number of sessions |
+| 4 | 28 | | Unknown (empty values) |
+| 32 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the additional session section data |
 
 #### Session entry
 
 A session entry is 32 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Flags
-| 4 | 4 | | Start sector
-| 8 | 24 | | Unknown (empty values)
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Flags |
+| 4 | 4 | | Start sector |
+| 8 | 24 | | Unknown (empty values) |
 
 EnCase stores audio tracks as 0 byte data with a sector size of 2048.
 
@@ -2091,17 +2149,17 @@ EnCase stores audio tracks as 0 byte data with a sector size of 2048.
 
 #### Session flags
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00000001 | | If set the track is an audio track otherwise the track is a data track
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00000001 | | If set the track is an audio track otherwise the track is a data track |
 
 #### Session footer
 
 The session footer is 4 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Checksum, which contains an Adler-32 of all the data within the session entries array
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Checksum, which contains an Adler-32 of all the data within the session entries array |
 
 ### Error2 section
 
@@ -2128,28 +2186,28 @@ The error2 section data consists of:
 
 The error2 header is 520 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Number of entries
-| 4 | 512 | | Unknown (empty values)
-| 516 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the error2 header data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Number of entries |
+| 4 | 512 | | Unknown (empty values) |
+| 516 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the error2 header data |
 
 #### Error2 entry
 
 An error2 entry is 8 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Start sector
-| 4 | 4 | | The number of sectors
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Start sector |
+| 4 | 4 | | The number of sectors |
 
 #### Error2 footer
 
 The error2 footer is 4 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Checksum, which contains an Adler-32 of all the data within the error2 entries array
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Checksum, which contains an Adler-32 of all the data within the error2 entries array |
 
 ### Digest section
 
@@ -2162,12 +2220,12 @@ The digest section contains a MD5 and/or SHA1 hash of the data within the chunks
 
 The digest section data is 80 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 16 | | MD5 hash of the media data
-| 16 | 20 | | SHA1 hash of the media data
-| 36 | 40 | 0x00 | Unknown (Padding)
-| 76 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the digest section data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 16 | | MD5 hash of the media data |
+| 16 | 20 | | SHA1 hash of the media data |
+| 36 | 40 | 0x00 | Unknown (Padding) |
+| 76 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the digest section data |
 
 ### Hash section
 
@@ -2177,17 +2235,18 @@ aspects of this section are:
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * It is found in SMART (EWF-S01) and FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01) files.
 * It is not found in EnCase 5 (EWF-L01).
-* The hash section is optional, it does not need to be present. If it does it resides in the last segment file before the done section.
+* The hash section is optional, it does not need to be present. If it does it resides in the last
+  segment file before the done section.
 
 The hash section contains a MD5 hash of the data within the chunks.
 
 The hash section data is 36 byte in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 16 | | MD5 hash of the media data
-| 16 | 16 | | Unknown
-| 32 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the additional hash section data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 16 | | MD5 hash of the media data |
+| 16 | 16 | | Unknown |
+| 32 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the additional hash section data |
 
 #### Notes
 
@@ -2197,14 +2256,17 @@ Observations regarding the unknown value:
 * is zero in EnCase 3 and below
 * in EnCase 4 the first 4 bytes are 0, the next 8 bytes seem random, the last 4 bytes seem fixed
 * in EnCase 5 and 6 the first 8 bytes seem random, the last 8 bytes equal the file header signature
-* in linen 5 the first and last set of 4 bytes seem the same, the second set of 4 bytes seem to be random, the third set of 4 bytes seem to contain a piece of the file header signature
-* in linen 6 the first and third set of 4 bytes seem random, the second and last set of 4 bytes seem to be the same
+* in linen 5 the first and last set of 4 bytes seem the same, the second set of 4 bytes seem to be
+  random, the third set of 4 bytes seem to contain a piece of the file header signature
+* in linen 6 the first and third set of 4 bytes seem random, the second and last set of 4 bytes
+  seem to be the same
 * EnCase5 seems to contain a GUID of the acquired device?
 
 Test with EnCase 4 show that:
 
 * The value does not equal the checksum of the media data
-* Does not differentiate for the same media acquired within the same program session, using different formats, but differ for different media and different program sessions
+* Does not differentiate for the same media acquired within the same program session, using
+  different formats, but differ for different media and different program sessions
 
 ### Done section
 
@@ -2212,9 +2274,11 @@ The done section is identified in the section data type field as "done". Some
 aspects of this section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
-* It is found in SMART (EWF-S01), FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01) and EnCase 5 (EWF-L01) files.
+* It is found in SMART (EWF-S01), FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01) and EnCase 5
+  (EWF-L01) files.
 * The done section is the last section within the last segment file.
-* The offset to the next section in the section header of the done section point to itself (the start of the done section).
+* The offset to the next section in the section header of the done section point to itself (the
+  start of the done section).
 * It should be the last section in the last segment file.
 
 #### SMART (EWF-S01)
@@ -2325,7 +2389,7 @@ Libewf currently does not handle this corruption scenario.
 
 TODO: add description
 
-```
+```text
 reading section header from file IO pool entry: 1 at offset: 415912423
 type                      : table2
 next offset               : 415978027

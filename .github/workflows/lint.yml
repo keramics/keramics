@@ -13,7 +13,7 @@ jobs:
         uses: psf/black@stable
         with:
           options: "--check"
-          src: "./keramics-python/"
+          src: "keramics-python"
   cargo_fmt:
     runs-on: ubuntu-latest
     steps:
@@ -26,3 +26,11 @@ jobs:
         components: rustfmt
     - name: Check format of Rust code
       run: cargo fmt --check
+  rumdl:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v5
+    - name: Install rumdl
+      run: cargo install rumdl
+    - name: Check format of Markdown documents
+      run: rumdl check

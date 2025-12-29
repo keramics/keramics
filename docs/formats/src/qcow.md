@@ -28,11 +28,11 @@ formats. Version 3 is considered as an extended version of QCOW2.
 
 ### Characteristics
 
-| Characteristics | Description
-| --- | ---
-| Byte order | big-endian in most cases, note that some values are in little-endian
-| Date and time values | Number of seconds since Jan 1, 1970 00:00:00 UTC (POSIX epoch)
-| Character strings | UTF-8
+| Characteristics | Description |
+| --- | --- |
+| Byte order | big-endian in most cases, note that some values are in little-endian |
+| Date and time values | Number of seconds since Jan 1, 1970 00:00:00 UTC (POSIX epoch) |
+| Character strings | UTF-8 |
 
 > Note that this docuement assumes that character strings are stored in UTF-8
 
@@ -81,45 +81,41 @@ TODO: complete section
 
 The file header - version 1 is 48 bytes in size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier)
-| 4 | 4 | 1 | Format version
-| 8 | 8 | | Backing file name offset
-| 16 | 4 | | Backing file name size
-| 20 | 4 | | Modification date and time, which contains a POSIX timestamp
-| 24 | 8 | | Storage media size
-| 32 | 1 | | Number of cluster block bits
-| 33 | 1 | | Number of level 2 table bits
-| 34 | 2 | | [yellow-background]*Unknown (empty values)*
-| 36 | 4 | | Encryption method
-| 40 | 8 | | Level 1 table offset
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier) |
+| 4 | 4 | 1 | Format version |
+| 8 | 8 | | Backing file name offset |
+| 16 | 4 | | Backing file name size |
+| 20 | 4 | | Modification date and time, which contains a POSIX timestamp |
+| 24 | 8 | | Storage media size |
+| 32 | 1 | | Number of cluster block bits |
+| 33 | 1 | | Number of level 2 table bits |
+| 34 | 2 | | [yellow-background]*Unknown (empty values)* |
+| 36 | 4 | | Encryption method |
+| 40 | 8 | | Level 1 table offset |
 
 The cluster block size is calculated as:
 
-```
+```python
 cluster block size = 1 << number of cluster block bits
 ```
 
 The level table 2 size is calculated as:
 
-```
-level table 2 size = ( 1 << number of level 2 table bits ) * 8
+```python
+level table 2 size = (1 << number of level 2 table bits) * 8
 ```
 
 The level 1 table size is calculated as:
 
-```
-level 1 table size = cluster block size * ( 1 << number of level 2 table bits )
+```python
+level 1 table entry size = cluster block size * (1 << number of level 2 table bits)
 
-if( media size % level 1 table size != 0 )
-{
-    level 1 table size = ( media size / level 1 table size ) + 1
-}
-else
-{
-    level 1 table size = media size / level 1 table size
-}
+level 1 table size = media size / level 1 table entry size
+if media size % level 1 table entry size != 0:
+    level 1 table size += 1
+
 level 1 table size *= 8
 ```
 
@@ -130,43 +126,43 @@ after the file header.
 
 The file header - version 2 is 72 bytes in size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier)
-| 4 | 4 | 2 | Format version
-| 8 | 8 | | Backing file name offset
-| 16 | 4 | | Backing file name size
-| 20 | 4 | | Number of cluster block bits
-| 24 | 8 | | Storage media size
-| 32 | 4 | | Encryption method
-| 36 | 4 | | Number of level 1 table references
-| 40 | 8 | | Level 1 table offset
-| 48 | 8 | | Reference count table offset
-| 56 | 4 | | Reference count table clusters
-| 60 | 4 | | Number of snapshots
-| 64 | 8 | | Snapshots offset
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier) |
+| 4 | 4 | 2 | Format version |
+| 8 | 8 | | Backing file name offset |
+| 16 | 4 | | Backing file name size |
+| 20 | 4 | | Number of cluster block bits |
+| 24 | 8 | | Storage media size |
+| 32 | 4 | | Encryption method |
+| 36 | 4 | | Number of level 1 table references |
+| 40 | 8 | | Level 1 table offset |
+| 48 | 8 | | Reference count table offset |
+| 56 | 4 | | Reference count table clusters |
+| 60 | 4 | | Number of snapshots |
+| 64 | 8 | | Snapshots offset |
 
 The cluster block size is calculated as:
 
-```
+```python
 cluster block size = 1 << number of cluster block bits
 ```
 
 The number of level 2 table bits is calculated as:
 
-```
+```python
 number of level 2 table bits = number of cluster block bits - 3
 ```
 
 The level table 2 size is calculated as:
 
-```
-level table 2 size = ( 1 << number of level 2 table bits ) * 8
+```python
+level table 2 size = (1 << number of level 2 table bits) * 8
 ```
 
 The level 1 table size is calculated as:
 
-```
+```python
 level 1 table size = number of level 1 table references * 8
 ```
 
@@ -177,51 +173,55 @@ after the file header.
 
 The file header - version 3 is 104 or 112 bytes in size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier)
-| 4 | 4 | 3 | Format version
-| 8 | 8 | | Backing file name offset
-| 16 | 4 | | Backing file name size
-| 20 | 4 | | Number of cluster block bits
-| 24 | 8 | | Storage media size
-| 32 | 4 | | Encryption method
-| 36 | 4 | | Number of level 1 table references
-| 40 | 8 | | Level 1 table offset
-| 48 | 8 | | Reference count table offset
-| 56 | 4 | | Reference count table clusters
-| 60 | 4 | | Number of snapshots
-| 64 | 8 | | Snapshots offset
-| 72 | 8 | | Incompatible feature flags
-| 80 | 8 | | Compatible feature flags
-| 88 | 8 | | Auto-clear feature flags
-| 96 | 4 | | Reference count order
-| 100 | 4 | 104 or 112 | File header size, which contains the size of the file header, this value does not include the size of the file header extensions
-| <td colspan="4">*If file header size equals 112*</td>
-| 104 | 1 | | Compression method
-| 105 | 7 | | Unknown (padding)
+<!-- rumdl-disable MD033 MD056 -->
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier) |
+| 4 | 4 | 3 | Format version |
+| 8 | 8 | | Backing file name offset |
+| 16 | 4 | | Backing file name size |
+| 20 | 4 | | Number of cluster block bits |
+| 24 | 8 | | Storage media size |
+| 32 | 4 | | Encryption method |
+| 36 | 4 | | Number of level 1 table references |
+| 40 | 8 | | Level 1 table offset |
+| 48 | 8 | | Reference count table offset |
+| 56 | 4 | | Reference count table clusters |
+| 60 | 4 | | Number of snapshots |
+| 64 | 8 | | Snapshots offset |
+| 72 | 8 | | Incompatible feature flags |
+| 80 | 8 | | Compatible feature flags |
+| 88 | 8 | | Auto-clear feature flags |
+| 96 | 4 | | Reference count order |
+| 100 | 4 | 104 or 112 | File header size, which contains the size of the file header, this value does not include the size of the file header extensions |
+| <td colspan="4">*If file header size equals 112*</td> |
+| 104 | 1 | | Compression method |
+| 105 | 7 | | Unknown (padding) |
+
+<!-- rumdl-enable MD033 MD056 -->
 
 The cluster block size is calculated as:
 
-```
+```python
 cluster block size = 1 << number of cluster block bits
 ```
 
 The number of level 2 table bits is calculated as:
 
-```
+```python
 number of level 2 table bits = number of cluster block bits - 3
 ```
 
 The level table 2 size is calculated as:
 
-```
-level table 2 size = ( 1 << number of level 2 table bits ) * 8
+```python
+level table 2 size = (1 << number of level 2 table bits) * 8
 ```
 
 The level 1 table size is calculated as:
 
-```
+```python
 level 1 table size = number of level 1 table references * 8
 ```
 
@@ -230,40 +230,40 @@ after the file header.
 
 ### Encryption methods
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0 | QCOW_CRYPT_NONE | No encryption
-| 1 | QCOW_CRYPT_AES | AES-CBC 128-bits encryption
-| 2 | QCOW_CRYPT_LUKS | Linux Unified Key Setup (LUKS) encryption
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0 | QCOW_CRYPT_NONE | No encryption |
+| 1 | QCOW_CRYPT_AES | AES-CBC 128-bits encryption |
+| 2 | QCOW_CRYPT_LUKS | Linux Unified Key Setup (LUKS) encryption |
 
 ### Incompatible feature flags
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00000001 | QCOW2_INCOMPAT_DIRTY |
-| 0x00000002 | QCOW2_INCOMPAT_CORRUPT |
-| 0x00000004 | QCOW2_INCOMPAT_DATA_FILE |
-| 0x00000008 | QCOW2_INCOMPAT_COMPRESSION |
-| 0x00000010 | QCOW2_INCOMPAT_EXTL2 |
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00000001 | QCOW2_INCOMPAT_DIRTY | |
+| 0x00000002 | QCOW2_INCOMPAT_CORRUPT | |
+| 0x00000004 | QCOW2_INCOMPAT_DATA_FILE | |
+| 0x00000008 | QCOW2_INCOMPAT_COMPRESSION | |
+| 0x00000010 | QCOW2_INCOMPAT_EXTL2 | |
 
 ### Compatible feature flags
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00000001 | QCOW2_COMPAT_LAZY_REFCOUNTS |
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00000001 | QCOW2_COMPAT_LAZY_REFCOUNTS | |
 
 ### Auto-clear feature flags
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x00000001 | QCOW2_AUTOCLEAR_BITMAPS |
-| 0x00000002 | QCOW2_AUTOCLEAR_DATA_FILE_RAW |
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x00000001 | QCOW2_AUTOCLEAR_BITMAPS | |
+| 0x00000002 | QCOW2_AUTOCLEAR_DATA_FILE_RAW | |
 
 ### Compression methods
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0 | | ZLIB compression
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0 | | ZLIB compression |
 
 ### File header extensions
 
@@ -276,29 +276,29 @@ A file header extension consist of:
 
 The file header extension header is 8 bytes in size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | The extension type (signature)
-| 4 | 4 | | The extension data size
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | The extension type (signature) |
+| 4 | 4 | | The extension data size |
 
 #### File header extension types
 
-| Value | Identifier | Description
-| --- | --- | ---
-| 0x0537be77 | QCOW2_EXT_MAGIC_CRYPTO_HEADER | Crypto header
-| 0x23852875 | QCOW2_EXT_MAGIC_BITMAPS | Bitmaps
-| 0x44415441 or "DATA" | QCOW2_EXT_MAGIC_DATA_FILE | Data-file
-| 0x6803f857 | QCOW2_EXT_MAGIC_FEATURE_TABLE | Feature table
-| 0xe2792aca | QCOW2_EXT_MAGIC_BACKING_FORMAT | Backing format
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x0537be77 | QCOW2_EXT_MAGIC_CRYPTO_HEADER | Crypto header |
+| 0x23852875 | QCOW2_EXT_MAGIC_BITMAPS | Bitmaps |
+| 0x44415441 or "DATA" | QCOW2_EXT_MAGIC_DATA_FILE | Data-file |
+| 0x6803f857 | QCOW2_EXT_MAGIC_FEATURE_TABLE | Feature table |
+| 0xe2792aca | QCOW2_EXT_MAGIC_BACKING_FORMAT | Backing format |
 
 #### Backing format file header extension
 
 The backing format file header extension header is of variable size and consist
 of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | ... | | Backing format identifier, which contains an UTF-8 string without end-of-string character
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | ... | | Backing format identifier, which contains an UTF-8 string without end-of-string character |
 
 #### Bitmaps file header extension
 
@@ -309,18 +309,18 @@ TODO: complete section
 The crypto header file header extension header is 16 bytes in size and consist
 of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 8 | | The crypto data offset
-| 8 | 8 | | The crypto data size
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 8 | | The crypto data offset |
+| 8 | 8 | | The crypto data size |
 
 #### Data-file file header extension
 
 The data-file file header extension header is of variable size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | ... | | Data-file file name, which contains an UTF-8 string without end-of-string character
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | ... | | Data-file file name, which contains an UTF-8 string without end-of-string character |
 
 #### Feature table file header extension
 
@@ -337,20 +337,20 @@ sparse or stored in a corresponding backing file.
 
 The level 2 table reference is 8-bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0.0 | 63 bits | | Level 2 table offset, which contains an offset relative from the start of the file
-| 7.7 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 63 bits | | Level 2 table offset, which contains an offset relative from the start of the file |
+| 7.7 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag |
 
 ### Level 2 table reference – version 2 or 3
 
 The level 2 table reference is 8-bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0.0 | 62 bits | | Level 2 table offset, which contains an offset relative from the start of the file
-| 7.6 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag
-| 7.7 | 1 bit | QCOW_OFLAG_COPIED | Is copied flag
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 62 bits | | Level 2 table offset, which contains an offset relative from the start of the file |
+| 7.6 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag |
+| 7.7 | 1 bit | QCOW_OFLAG_COPIED | Is copied flag |
 
 The is copied flag indicates that the reference count of the corresponding
 level 2 table is exactly one.
@@ -361,8 +361,8 @@ The level 2 table contains cluster block references.
 
 The level 2 table size is calculated as:
 
-```
-level 2 table size = ( 1 << number of level 2 table bits ) * 8
+```python
+level 2 table size = (1 << number of level 2 table bits) * 8
 ```
 
 A reference value of 0 represents unused or unallocated and is considered as
@@ -372,20 +372,20 @@ sparse or stored in a corresponding backing file.
 
 The cluster block reference - version 1 is 8-bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0.0 | 63 bits | | Cluster block offset, which contains an offset relative to the start of the cluster block
-| 7.7 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 63 bits | | Cluster block offset, which contains an offset relative to the start of the cluster block |
+| 7.7 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag |
 
 ### Cluster block reference – version 2 or 3
 
 The cluster block reference - version 2 or 3 is 8-bytes in size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0.0 | 62 bits | | Cluster block offset, which contains an offset relative to the start of the cluster block
-| 7.6 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag
-| 7.7 | 1 bit | QCOW_OFLAG_COPIED | Is copied flag
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0.0 | 62 bits | | Cluster block offset, which contains an offset relative to the start of the cluster block |
+| 7.6 | 1 bit | QCOW_OFLAG_COMPRESSED | Is compressed flag |
+| 7.7 | 1 bit | QCOW_OFLAG_COPIED | Is copied flag |
 
 The is copied flag indicates that the reference count of the corresponding
 cluster block is exactly one.
@@ -402,7 +402,7 @@ TODO: complete section
 
 ### Notes
 
-```
+```text
 reference count cluster block offset = cluster data block offset /
 reference count table offset = cluster data block /
 
@@ -426,20 +426,20 @@ To retrieve a cluster data block corresponding a certain storage media offset:
 
 Determine the level 1 table index from the offset:
 
-```
+```python
 level 1 table index bit shift = number of cluster block bits + number of level 2 table bits
 ```
 
 For version 1:
 
-```
-level 1 table index = ( offset & 0x7fffffffffffffffULL ) >> level 1 table index bit shift
+```python
+level 1 table index = (offset & 0x7fffffffffffffff) >> level 1 table index bit shift
 ```
 
 For version 2 and 3:
 
-```
-level 1 table index = ( offset & 0x3fffffffffffffffULL ) >> level 1 table index bit shift
+```python
+level 1 table index = (offset & 0x3fffffffffffffff) >> level 1 table index bit shift
 ```
 
 Retrieve the level 2 table offset from the level 1 table. If the level table 2
@@ -450,12 +450,12 @@ Read the corresponding level 2 table.
 
 Determine the level 2 table index from the offset:
 
-```
-level 2 table index bit mask = ~( 0xffffffffffffffffULL << number of level 2 table bits )
+```python
+level 2 table index bit mask = ~(0xffffffffffffffff << number of level 2 table bits)
 ```
 
-```
-level 2 table index = ( offset >> number of cluster block bits ) >> level 2 table index bit mask
+```python
+level 2 table index = (offset >> number of cluster block bits) >> level 2 table index bit mask
 ```
 
 Retrieve the cluster block offset from the level 2 table. If the cluster block
@@ -466,12 +466,12 @@ in the backing file otherwise the cluster block is considered sparse.
 
 If the is compressed flag (QCOW_OFLAG_COMPRESSED) is not set:
 
-```
-cluster block bit mask = ~( 0xffffffffffffffffULL << number of cluster block bits )
+```python
+cluster block bit mask = ~(0xffffffffffffffff << number of cluster block bits)
 ```
 
-```
-cluster block data offset = ( offset & cluster block bit mask ) + cluster block offset
+```python
+cluster block data offset = (offset & cluster block bit mask) + cluster block offset
 ```
 
 Note that in version 2 or 3 the last cluster block in the file can be smaller than
@@ -491,29 +491,31 @@ The compressed data uses a DEFLATE (inflate) window bits value of -12
 
 #### Compressed chunk data block – version 1
 
-```
+```python
 compressed size bit shift = 63 - number of cluster block bits
 ```
 
-```
-compressed block size = ( ( cluster block offset & 0x7fffffffffffffffULL ) >> compressed size bit shift
+```python
+compressed block size = (
+    (cluster block offset & 0x7fffffffffffffff) >> compressed size bit shift)
 ```
 
-```
-compressed block offset &= ~( 0xffffffffffffffffULL << compressed size bit shift )
+```python
+compressed block offset &= ~(0xffffffffffffffff << compressed size bit shift)
 ```
 
 #### Compressed chunk data block – version 2 or 3
 
-```
-compressed size bit shift = 62 - ( number of cluster block bits – 8 )
+```python
+compressed size bit shift = 62 - (number of cluster block bits – 8)
 ```
 
 According to "the QCOW2 Image Format" the compressed block size is calculated
 as following:
 
-```
-compressed block size = ( ( ( cluster block offset & 0x3fffffffffffffffULL ) >> compressed size bit shift ) + 1 ) * 512
+```python
+compressed block size = (
+    (((cluster block offset & 0x3fffffffffffffff) >> compressed size bit shift) + 1) * 512)
 ```
 
 Since the compressed block size is stored in 512 byte sectors this value does
@@ -522,8 +524,8 @@ sometimes lacks the size of the last partially filled sector and one sector
 should be added if possible within the bounds of the cluster blocks size and
 the file size.
 
-```
-cluster block offset &= ~( 0xffffffffffffffffULL << compressed size bit shift )
+```python
+cluster block offset &= ~(0xffffffffffffffff << compressed size bit shift)
 ```
 
 ## Snapshots
@@ -541,20 +543,20 @@ referenced by the L1 table.
 
 The snapshot header is of variable size and consists of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 8 | | Level 1 table offset
-| 8 | 4 | | Level 1 size
-| 12 | 2 | | Identifier string size
-| 14 | 2 | | Name size
-| 16 | 4 | | Date in seconds
-| 20 | 4 | | Date in nano seconds
-| 24 | 8 | | VM clock in nano seconds
-| 32 | 4 | | VM state size
-| 36 | 4 | | Extra data size
-| 40 | ...  | | Extra data
-| ...  | ...  | | Identifier string size
-| ...  | ...  | | Name
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 8 | | Level 1 table offset |
+| 8 | 4 | | Level 1 size |
+| 12 | 2 | | Identifier string size |
+| 14 | 2 | | Name size |
+| 16 | 4 | | Date in seconds |
+| 20 | 4 | | Date in nano seconds |
+| 24 | 8 | | VM clock in nano seconds |
+| 32 | 4 | | VM state size |
+| 36 | 4 | | Extra data size |
+| 40 | ...  | | Extra data |
+| ...  | ...  | | Identifier string size |
+| ...  | ...  | | Name |
 
 TODO: complete section
 

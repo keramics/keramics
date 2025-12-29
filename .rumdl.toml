@@ -1,0 +1,22 @@
+[global]
+flavor = "commonmark"
+include = [
+    "docs/*/src/*.md",
+    "keramics-*/README.md",
+    "README.md"
+]
+respect-gitignore = true
+
+[MD004]
+style = "asterisk"
+
+[MD007]
+indent = 2
+
+[MD013]
+line-length = 100
+reflow = true
+tables = false
+
+[MD055]
+style = "leading_and_trailing"

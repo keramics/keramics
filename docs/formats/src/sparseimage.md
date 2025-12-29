@@ -12,11 +12,11 @@ A sparse disk image consists of:
 
 ### Characteristics
 
-| Characteristics | Description
-| --- | ---
-| Byte order | big-endian
-| Date and time values | N/A
-| Character strings | N/A
+| Characteristics | Description |
+| --- | --- |
+| Byte order | big-endian |
+| Date and time values | N/A |
+| Character strings | N/A |
 
 The number of bytes per sector is 512.
 
@@ -32,16 +32,16 @@ The header data is 4096 bytes in size and consist of:
 
 The file header is 64 bytes in size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | "sprs" | Signature
-| 4 | 4 | | Unknown (format version?), seen 3
-| 8 | 4 | | Number of sectors per band
-| 12 | 4 | | Unknown, seen 1
-| 16 | 4 | | The media data size in sectors
-| 20 | 12 | 0 | Unknown (0-byte values)
-| 32 | 4 | | Unknown
-| 36 | 28 | 0 | Unknown (0-byte values)
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | "sprs" | Signature |
+| 4 | 4 | | Unknown (format version?), seen 3 |
+| 8 | 4 | | Number of sectors per band |
+| 12 | 4 | | Unknown, seen 1 |
+| 16 | 4 | | The media data size in sectors |
+| 20 | 12 | 0 | Unknown (0-byte values) |
+| 32 | 4 | | Unknown |
+| 36 | 28 | 0 | Unknown (0-byte values) |
 
 ### Band numbers array
 
@@ -53,20 +53,20 @@ The band numbers array consists of:
 
 A band number is 4 bytes in size and consist of:
 
-| Offset | Size | Value | Description
-| --- | --- | --- | ---
-| 0 | 4 | | Band number, where 0 indicates a sparse range and any other value refers to a location in the media data.
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Band number, where 0 indicates a sparse range and any other value refers to a location in the media data |
 
 Where the corresponding media offset can be calculated as following:
 
-```
-media_offset = ( band_number - 1 ) * sectors_per_band * 512
+```python
+media_offset = (band_number - 1) * sectors_per_band * 512
 ```
 
 The offset of band data can be calculated as following:
 
-```
-band_data_offset = 4096 + ( array_index * sectors_per_band * 512 )
+```python
+band_data_offset = 4096 + (array_index * sectors_per_band * 512)
 ```
 
 For example if the first array entry contains a band number of 4, then the

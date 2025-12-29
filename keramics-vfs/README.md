@@ -1,4 +1,4 @@
-# `keramics-vfs`
+# keramics-vfs
 
 Virtual File System (VFS) for Keramics.
 

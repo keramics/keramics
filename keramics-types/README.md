@@ -1,4 +1,4 @@
-# `keramics-types`
+# keramics-types
 
 Data types for Keramics.
 

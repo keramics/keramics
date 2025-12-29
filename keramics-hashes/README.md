@@ -1,4 +1,4 @@
-# `keramics-hashes`
+# keramics-hashes
 
 Digest hash calculation methods for Keramics.
 

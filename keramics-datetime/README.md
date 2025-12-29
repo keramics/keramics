@@ -1,4 +1,4 @@
-# `keramics-datetime`
+# keramics-datetime
 
 Date and time types for Keramics.
 

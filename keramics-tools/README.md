@@ -1,4 +1,4 @@
-# `keramics-tools`
+# keramics-tools
 
 Tools for analysis of data formats using Keramics.
 

@@ -1,4 +1,4 @@
-# `keramics-core`
+# keramics-core
 
 Core functionality for Keramics.
 

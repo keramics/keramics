@@ -17,11 +17,11 @@ containing:
 
 ### Characteristics
 
-| Characteristics | Description
-| --- | ---
-| Byte order | N/A
-| Date and time values | N/A
-| Character strings | N/A
+| Characteristics | Description |
+| --- | --- |
+| Byte order | N/A |
+| Date and time values | N/A |
+| Character strings | N/A |
 
 ## Info.plist and Info.bckup files
 
@@ -30,13 +30,13 @@ The Info.plist and its backup (Info.bckup) contain a [XML plist](plist.md).
 This plist is also referred to as "Information Property List" and contains a
 single dictionary with the following key-value pairs.
 
-| Identifier | Value | Description
-| --- | --- | ---
-| CFBundleInfoDictionaryVersion | "6.0" | The information property list format version
-| band-size | | The maximum size of a band file in bytes
-| bundle-backingstore-version | 1 | Unknown
-| diskimage-bundle-type | "com.apple.diskimage.sparsebundle" | The bundle type
-| size | | The media size in bytes
+| Identifier | Value | Description |
+| --- | --- | --- |
+| CFBundleInfoDictionaryVersion | "6.0" | The information property list format version |
+| band-size | | The maximum size of a band file in bytes |
+| bundle-backingstore-version | 1 | Unknown |
+| diskimage-bundle-type | "com.apple.diskimage.sparsebundle" | The bundle type |
+| size | | The media size in bytes |
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>

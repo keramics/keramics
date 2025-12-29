@@ -1,4 +1,4 @@
-# `keramics-compression`
+# keramics-compression
 
 Decompression methods for Keramics.
 
