@@ -16,6 +16,7 @@
   * [VMWare Virtual Disk Format (VMDK)](vmdk.md)
 * [Volume system formats](volume_system.md)
   * [Apple Partition Map (APM)](apm.md)
+  * [BSD disklabel](disklabel.md)
   * [Core Storage](core_storage.md)
   * [GUID Partition Table (GPT)](gpt.md)
   * [Linux Logical Volume Manager (LVM)](linuxlvm.md)

@@ -8,6 +8,7 @@ Although related, a volume is a different concept as a partition.
 ## Formats
 
 * [Apple Partition Map (APM)](apm.md)
+* [BSD disklabel](disklabel.md)
 * [GUID Partition Table (GPT)](gpt.md)
 * [Linux Logical Volume Manager (LVM)](linuxlvm.md)
 * [Master Boot Record (MBR)](mbr.md)
