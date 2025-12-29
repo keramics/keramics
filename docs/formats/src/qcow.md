@@ -98,25 +98,25 @@ The file header - version 1 is 48 bytes in size and consist of:
 The cluster block size is calculated as:
 
 ```python
-cluster block size = 1 << number of cluster block bits
+cluster_block_size = 1 << number_of_cluster_block_bits
 ```
 
-The level table 2 size is calculated as:
+The level 2 table size is calculated as:
 
 ```python
-level table 2 size = (1 << number of level 2 table bits) * 8
+level2_table_size = (1 << number_of_level2_table_bits) * 8
 ```
 
 The level 1 table size is calculated as:
 
 ```python
-level 1 table entry size = cluster block size * (1 << number of level 2 table bits)
+level1_table_entry_size = cluster_block_size * (1 << number_of_level2_table_bits)
 
-level 1 table size = media size / level 1 table entry size
-if media size % level 1 table entry size != 0:
-    level 1 table size += 1
+level1_table_size = media_size / level1_table_entry_size
+if media_size % level1_table_entry_size != 0:
+    level1_table_size += 1
 
-level 1 table size *= 8
+level1_table_size *= 8
 ```
 
 The backing file name is set in snapshot image files and is normally stored
@@ -145,25 +145,25 @@ The file header - version 2 is 72 bytes in size and consist of:
 The cluster block size is calculated as:
 
 ```python
-cluster block size = 1 << number of cluster block bits
+cluster_block_size = 1 << number_of_cluster_block_bits
 ```
 
 The number of level 2 table bits is calculated as:
 
 ```python
-number of level 2 table bits = number of cluster block bits - 3
+number_of_level2_table_bits = number_of_cluster_block_bits - 3
 ```
 
-The level table 2 size is calculated as:
+The level 2 table size is calculated as:
 
 ```python
-level table 2 size = (1 << number of level 2 table bits) * 8
+level_table2_size = (1 << number_of_level2_table_bits) * 8
 ```
 
 The level 1 table size is calculated as:
 
 ```python
-level 1 table size = number of level 1 table references * 8
+level1_table_size = number_of_level1_table_references * 8
 ```
 
 The backing file name is set in snapshot image files and is normally stored
@@ -204,25 +204,25 @@ The file header - version 3 is 104 or 112 bytes in size and consist of:
 The cluster block size is calculated as:
 
 ```python
-cluster block size = 1 << number of cluster block bits
+cluster_block_size = 1 << number_of_cluster_block_bits
 ```
 
 The number of level 2 table bits is calculated as:
 
 ```python
-number of level 2 table bits = number of cluster block bits - 3
+number_of_level2_table_bits = number_of_cluster_block_bits - 3
 ```
 
-The level table 2 size is calculated as:
+The level 2 table size is calculated as:
 
 ```python
-level table 2 size = (1 << number of level 2 table bits) * 8
+level_table2_size = (1 << number_of_level2_table_bits) * 8
 ```
 
 The level 1 table size is calculated as:
 
 ```python
-level 1 table size = number of level 1 table references * 8
+level1_table_size = number_of_level1_table_references * 8
 ```
 
 The backing file name is set in snapshot image files and is normally stored
@@ -362,7 +362,7 @@ The level 2 table contains cluster block references.
 The level 2 table size is calculated as:
 
 ```python
-level 2 table size = (1 << number of level 2 table bits) * 8
+level2_table_size = (1 << number_of_level2_table_bits) * 8
 ```
 
 A reference value of 0 represents unused or unallocated and is considered as
@@ -427,22 +427,22 @@ To retrieve a cluster data block corresponding a certain storage media offset:
 Determine the level 1 table index from the offset:
 
 ```python
-level 1 table index bit shift = number of cluster block bits + number of level 2 table bits
+level1_table_index_bit_shift = number_of_cluster_block_bits + number_of_level2_table_bits
 ```
 
 For version 1:
 
 ```python
-level 1 table index = (offset & 0x7fffffffffffffff) >> level 1 table index bit shift
+level1_table_index = (offset & 0x7fffffffffffffff) >> level1_table_index_bit_shift
 ```
 
 For version 2 and 3:
 
 ```python
-level 1 table index = (offset & 0x3fffffffffffffff) >> level 1 table index bit shift
+level1_table_index = (offset & 0x3fffffffffffffff) >> level1_table_index_bit_shift
 ```
 
-Retrieve the level 2 table offset from the level 1 table. If the level table 2
+Retrieve the level 2 table offset from the level 1 table. If the level 2 table
 offset is 0 and the image has a backing file the cluster data block is stored
 in the backing file otherwise the cluster block is considered sparse.
 
@@ -451,11 +451,11 @@ Read the corresponding level 2 table.
 Determine the level 2 table index from the offset:
 
 ```python
-level 2 table index bit mask = ~(0xffffffffffffffff << number of level 2 table bits)
+level2_table_index_bit_mask = ~(0xffffffffffffffff << number_of_level2_table_bits)
 ```
 
 ```python
-level 2 table index = (offset >> number of cluster block bits) >> level 2 table index bit mask
+level2_table_index = (offset >> number_of_cluster_block_bits) >> level2_table_index_bit_mask
 ```
 
 Retrieve the cluster block offset from the level 2 table. If the cluster block
@@ -467,11 +467,11 @@ in the backing file otherwise the cluster block is considered sparse.
 If the is compressed flag (QCOW_OFLAG_COMPRESSED) is not set:
 
 ```python
-cluster block bit mask = ~(0xffffffffffffffff << number of cluster block bits)
+cluster_block_bit_mask = ~(0xffffffffffffffff << number_of_cluster_block_bits)
 ```
 
 ```python
-cluster block data offset = (offset & cluster block bit mask) + cluster block offset
+cluster_block_data_offset = (offset & cluster_block_bit_mask) + cluster_block_offset
 ```
 
 Note that in version 2 or 3 the last cluster block in the file can be smaller than
@@ -492,30 +492,30 @@ The compressed data uses a DEFLATE (inflate) window bits value of -12
 #### Compressed chunk data block – version 1
 
 ```python
-compressed size bit shift = 63 - number of cluster block bits
+compressed_size_bit_shift = 63 - number_of_cluster_block_bits
 ```
 
 ```python
-compressed block size = (
-    (cluster block offset & 0x7fffffffffffffff) >> compressed size bit shift)
+compressed_block_size = (
+    (cluster_block_offset & 0x7fffffffffffffff) >> compressed_size_bit_shift)
 ```
 
 ```python
-compressed block offset &= ~(0xffffffffffffffff << compressed size bit shift)
+compressed_block_offset &= ~(0xffffffffffffffff << compressed_size_bit_shift)
 ```
 
 #### Compressed chunk data block – version 2 or 3
 
 ```python
-compressed size bit shift = 62 - (number of cluster block bits – 8)
+compressed_size_bit_shift = 62 - (number_of_cluster_block_bits – 8)
 ```
 
 According to "the QCOW2 Image Format" the compressed block size is calculated
 as following:
 
 ```python
-compressed block size = (
-    (((cluster block offset & 0x3fffffffffffffff) >> compressed size bit shift) + 1) * 512)
+compressed_block_size = (
+    (((cluster_block_offset & 0x3fffffffffffffff) >> compressed_size_bit_shift) + 1) * 512)
 ```
 
 Since the compressed block size is stored in 512 byte sectors this value does
@@ -525,7 +525,7 @@ should be added if possible within the bounds of the cluster blocks size and
 the file size.
 
 ```python
-cluster block offset &= ~(0xffffffffffffffff << compressed size bit shift)
+cluster_block_offset &= ~(0xffffffffffffffff << compressed_size_bit_shift)
 ```
 
 ## Snapshots
