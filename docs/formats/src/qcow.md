@@ -83,7 +83,7 @@ The file header - version 1 is 48 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier) |
+| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature |
 | 4 | 4 | 1 | Format version |
 | 8 | 8 | | Backing file name offset |
 | 16 | 4 | | Backing file name size |
@@ -128,7 +128,7 @@ The file header - version 2 is 72 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier) |
+| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature |
 | 4 | 4 | 2 | Format version |
 | 8 | 8 | | Backing file name offset |
 | 16 | 4 | | Backing file name size |
@@ -177,7 +177,7 @@ The file header - version 3 is 104 or 112 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature (or magic identifier) |
+| 0 | 4 | "QFI\xfb" or "\x51\x46\x49\xfb" | The signature |
 | 4 | 4 | 3 | Format version |
 | 8 | 8 | | Backing file name offset |
 | 16 | 4 | | Backing file name size |
