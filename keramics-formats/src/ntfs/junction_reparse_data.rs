@@ -24,7 +24,7 @@ use keramics_types::{Ucs2String, bytes_to_u16_le};
         member(field(name = "display_name_offset", data_type = "u16")),
         member(field(name = "display_name_size", data_type = "u16")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) junction reparse data.
 pub struct NtfsJunctionReparseData {

@@ -26,7 +26,7 @@ use super::constants::*;
         field(name = "number_of_entries", data_type = "u32"),
         field(name = "unknown1", data_type = "[u8; 4]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) region table header.
 pub struct VhdxRegionTableHeader {

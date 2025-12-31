@@ -27,7 +27,7 @@ const POSIX_EPOCH: Epoch = Epoch {
 /// 32-bit POSIX timestamp (time_t).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PosixTime32 {
-    /// Number of seconds since January 1, 1970 (UTC) (POSIX epoch).
+    /// Number of seconds since January 1, 1970 (POSIX epoch).
     /// Negative values represent date and times predating the epoch.
     pub timestamp: i32,
 }
@@ -77,7 +77,7 @@ impl fmt::Display for PosixTime32 {
 /// 64-bit POSIX timestamp in nanoseconds (struct timespec).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PosixTime64Ns {
-    /// Number of seconds since January 1, 1970 (UTC) (POSIX epoch).
+    /// Number of seconds since January 1, 1970 (POSIX epoch).
     /// Negative values represent date and times predating the epoch.
     pub timestamp: i64,
 

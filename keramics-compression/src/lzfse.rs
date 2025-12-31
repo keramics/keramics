@@ -206,7 +206,7 @@ impl<'a> Bitstream for LzfseBitstream<'a> {
         field(name = "m_value_state", data_type = "u16"),
         field(name = "d_value_state", data_type = "u16"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// LZFSE version 1 block header.
 struct LzfseBlockV1Header {}
@@ -270,7 +270,7 @@ impl LzfseBlockV1Header {
         field(name = "d_value_state", data_type = "BitField64<10>"),
         field(name = "unknown3", data_type = "BitField64<2>"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// LZFSE version 2 block header.
 struct LzfseBlockV2Header {

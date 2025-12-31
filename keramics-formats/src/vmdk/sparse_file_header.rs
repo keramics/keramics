@@ -37,8 +37,7 @@ use super::constants::*;
         field(name = "compression_method", data_type = "u16"),
         field(name = "unknown1", data_type = "[u8; 433]"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// VMware Virtual Disk (VMDK) sparse file header.
 pub struct VmdkSparseFileHeader {

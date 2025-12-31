@@ -22,7 +22,7 @@ use keramics_types::bytes_to_u32_le;
         field(name = "start_sector", data_type = "u32"),
         field(name = "number_of_sectors", data_type = "u32"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Expert Witness Compression Format (EWF) error2 entry.
 pub struct EwfError2Entry {

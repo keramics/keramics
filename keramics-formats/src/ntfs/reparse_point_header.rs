@@ -23,7 +23,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
         member(field(name = "data_size", data_type = "u16")),
         member(field(name = "unknown1", data_type = "[u8; 2]")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) reparse point ($REPARSE_POINT) header.
 pub struct NtfsReparsePointHeader {

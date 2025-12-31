@@ -24,7 +24,7 @@ use keramics_types::bytes_to_u32_le;
         member(field(name = "index_entry_size", data_type = "u32")),
         member(field(name = "number_of_cluster_blocks_per_index_entry", data_type = "u32")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) index root header.
 pub struct NtfsIndexRootHeader {

@@ -1,17 +1,17 @@
 # File Allocation Table (FAT) file system format
 
-The File Allocation Table (FAT) is widely used a file sytem.
+The File Allocation Table (FAT) is widely used a file sytem and is
+the default file system for DOS and Windows.
 
-## Overview
-
-The File Allocation Table (FAT) is widely used a file sytem. There are multiple
-known variants or derivatives of FAT, such as:
+There are multiple known variants or derivatives of FAT, such as:
 
 * (original) 8-bit FAT
 * FAT-12
 * FAT-16
 * FAT-32
 * [exFAT](exfat.md)
+
+## Overview
 
 A FAT file system consists of:
 

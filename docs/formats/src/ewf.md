@@ -1,14 +1,14 @@
 # Expert Witness Compression Format (EWF)
 
-EWF is short for Expert Witness Compression Format. It is a file type used to
-store storage media images for digital forensic purposes. It is currently
-widely used in the field of computer forensics in proprietary tooling like
-EnCase en FTK. The [original specification](http://www.asrdata.com/whitepaper-html)
-of the format was provided by ASR Data for the SMART application
+EWF is short for Expert Witness Compression Format. It is a file type used to store storage media
+images for digital forensic purposes. It is currently widely used in the field of computer
+forensics in proprietary tooling like EnCase en FTK. The
+[original specification](http://www.asrdata.com/whitepaper-html) of the format was provided by ASR
+Data for the SMART application.
 
-The EWF format was succeeded by the [Expert Witness Compression Format version 2](ewf2.md)
-in EnCase 7 (EWF2-Ex01 and EWF2-Lx01). EnCase 7 also uses a different version
-of EWF-L01 then its predecessors.
+The EWF format was succeeded by the [Expert Witness Compression Format version 2](ewf2.md) in
+EnCase 7 (EWF2-Ex01 and EWF2-Lx01). EnCase 7 also uses a different version of EWF-L01 then its
+predecessors.
 
 ## Overview
 
@@ -18,39 +18,34 @@ The Expert Witness Compression Format (EWF) is used to store:
 * individual volumes or partitions
 * "physical" RAM and process memory
 
-EWF can store data compressed or uncompressed, in a single image in one or more
-segment files. Each segment file consist of a standard header, followed by
-multiple sections. A single section cannot span multiple files. Sections are
-arranged back-to-back.
+EWF can store data compressed or uncompressed, in a single image in one or more segment files. Each
+segment file consist of a standard header, followed by multiple sections. A single section cannot
+span multiple files. Sections are arranged back-to-back.
 
 ### Terminology
 
-In this document when referred to the EWF format it refers to the original
-specification by ASR Data. The newer formats like that of EnCase are deducted
-from the original specification and will be referred to as the EWF-E01, because
-of the default file extension. Whereas the Logical File Evidence (LVF) format
-introduced in EnCase 5, which is also stored in the EWF format will be referred
-to as EWF-L01. The SMART format is viewed separately to allow for discussion if
-the implementation differs from the specification by ASR Data and will be
-referred to as the EWF-S01, because of the default file extension.
+In this document when referred to the EWF format it refers to the original specification by ASR
+Data. The newer formats like that of EnCase are deducted from the original specification and will
+be referred to as the EWF-E01, because of the default file extension. Whereas the Logical File
+Evidence (LVF) format introduced in EnCase 5, which is also stored in the EWF format will be
+referred to as EWF-L01. The SMART format is viewed separately to allow for discussion if the
+implementation differs from the specification by ASR Data and will be referred to as the EWF-S01,
+because of the default file extension.
 
-All offsets are relative to the beginning of an individual section, unless
-otherwise noted. EnCase allows a maximum size of a segment file to be 2000 MiB.
-This has to do with the size of the offset of the chunk of media data. This is
-a 32 bit value where the most significant bit (MSB) is used as a compression
-flag. Therefore the maximum offset size (31 bit) can address about 2048 MiB. In
-EnCase 6.7 an addition was made to the table value to provide for a base offset
-to allow for segment files greater than 2048 MiB.
+All offsets are relative to the beginning of an individual section, unless otherwise noted. EnCase
+allows a maximum size of a segment file to be 2000 MiB. This has to do with the size of the offset
+of the chunk of media data. This is a 32 bit value where the most significant bit (MSB) is used as
+a compression flag. Therefore the maximum offset size (31 bit) can address about 2048 MiB. In
+EnCase 6.7 an addition was made to the table value to provide for a base offset to allow for
+segment files greater than 2048 MiB.
 
-A chunk is defined as the sector size (per default 512 bytes) multiplied by the
-block size, the number of sectors per chunk (block) (per default 64 sectors).
-The data within the EWF format is stored in little-endian. The terms block and
-chunk are used intermittently.
+A chunk is defined as the sector size (per default 512 bytes) multiplied by the block size, the
+number of sectors per chunk (block) (per default 64 sectors). The data within the EWF format is
+stored in little-endian. The terms block and chunk are used intermittently.
 
 ## Segment file
 
-EWF stores data in one or more segment files (or segments). Each segment file
-consists of:
+EWF stores data in one or more segment files (or segments). Each segment file consists of:
 
 * A file header.
 * One or more sections.
@@ -66,8 +61,8 @@ EWF defines that the file header consists of 2 parts, namely:
 
 #### EWF, EWF-E01 and SMART (EWF-S01)
 
-The file header, used by both the EWF-E01 and SMART (EWF-S01) formats, is 13
-bytes in size and consists of:
+The file header, used by both the EWF-E01 and SMART (EWF-S01) formats, is 13 bytes in size and
+consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -76,16 +71,14 @@ bytes in size and consists of:
 | 9 | 2 | | Segment number, which must be 1 or higher |
 | 11 | 2 | 0x0000 | End of fields |
 
-The segment number contains a number which refers to the number of the segment
-file, starting with 1 for the first file.
+The segment number contains a number which refers to the number of the segment file, starting with
+1 for the first file.
 
-> Note this means there could only be a maximum of 65535 (0xffff) files, if it
-> is an unsigned value.
+> Note this means there could only be a maximum of 65535 (0xffff) files, if it is an unsigned value.
 
 #### EWF-L01
 
-The file header, used by the EWF-L01 format, is 13 bytes in size and consists
-of:
+The file header, used by the EWF-L01 format, is 13 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -94,16 +87,14 @@ of:
 | 9 | 2 | | Segment number, which must be 1 or higher |
 | 11 | 2 | 0x0000 | End of fields |
 
-The segment number contains a number which refers to the number of the segment
-file, starting with 1 for the first file.
+The segment number contains a number which refers to the number of the segment file, starting with
+1 for the first file.
 
-> Note this means there could only be a maximum of 65535 (0xffff) files, if it
-> is an unsigned value.
+> Note this means there could only be a maximum of 65535 (0xffff) files, if it is an unsigned value.
 
 ### Segment file extensions
 
-The SMART (EWF-S01) and the EWF-E01 formats use a different naming convention
-for the segment files.
+The SMART (EWF-S01) and the EWF-E01 formats use a different naming convention for the segment files.
 
 #### SMART (EWF-S01)
 
@@ -162,28 +153,24 @@ Keramics supports extensions up to .ZZZ
 ### Segment file set identifier GUID
 
 Segment file sets do not have a strict unique identifier. However the
-[volume section](#volume_section) contains a GUID that can be used for this
-purpose. Where:
+[volume section](#volume_section) contains a GUID that can be used for this purpose. Where:
 
 * linen 5 to 6 use a time and MAC address based version (1) of the GUID
 * EnCase 5 to 7 and linen 6 to 7 use a random based version (4) of the GUID
 
-> Note that in linen 6 the switch from a version 1 to 4 GUID was somewhere made
-> between version 6.01 and 6.19.
+> Note that in linen 6 the switch from a version 1 to 4 GUID was somewhere made between version
+> 6.01 and 6.19.
 
 See RFC4122 for more information about the different GUID versions.
 
 ## The sections
 
-The remainder of the segment file consists of sections. Every section starts
-with the same data this will be referred to as the section header. The section
-header could also be referred as the section header, but this allows for
-unnecessary confusion with the [header section](#header_section).
+The remainder of the segment file consists of sections. Every section starts with the same data
+this will be referred to as the section header.
 
 ### Section header
 
-The section header consist of 76 bytes, it contains information about a
-specific section.
+The section header consist of 76 bytes, it contains information about a specific section.
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -193,8 +180,7 @@ specific section.
 | 32 | 40 | 0x00 | Unknown (Padding) |
 | 72 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the section header |
 
-Some sections contain additional data, refer to paragraph section types for
-more information.
+Some sections contain additional data, refer to paragraph section types for more information.
 
 <!-- rumdl-disable MD028 -->
 
@@ -234,8 +220,8 @@ The following sections type were found analyzing more recent EnCase files (EWF-L
 
 ### Header2 section
 
-The header2 section is identified in the section data type field as "header2".
-Some aspects of this section are:
+The header2 section is identified in the section data type field as "header2". Some aspects of this
+section are:
 
 * Found in EWF-E01 in EnCase 4 to 7, and EWF-L01 in EnCase 5 to 7
 * Found at the start of the first segment file. Not found in subsequent segment files.
@@ -247,9 +233,9 @@ The additional data this section contains is the following:
 | --- | --- | --- | --- |
 | 76 (0x4c) | (variable) | | Information about the acquired media |
 
-The information about the acquired media consists of [zlib compressed data](zlib.md).
-It contains text in UTF16 format specifying information about the acquired
-media. The text multiple lines separated by an end of line character(s).
+The information about the acquired media consists of [zlib compressed data](zlib.md). It contains
+text in UTF16 format specifying information about the acquired media. The text multiple lines
+separated by an end of line character(s).
 
 The first 2 bytes of the UTF16 string are the byte order mark (BOM):
 
@@ -260,8 +246,8 @@ In the next paragraphs the various variants of the header2 section are described
 
 #### EnCase 4 (EWF-E01)
 
-In EnCase 4 (EWF-E01) the header2 information consist of 5 lines, and contains
-the equivalent information as the [header section](#header_section).
+In EnCase 4 (EWF-E01) the header2 information consist of 5 lines, and contains the equivalent
+information as the [header section](#header_section).
 
 | Line number | Value | Description |
 | --- | --- | --- |
@@ -296,8 +282,7 @@ Also see [header2 values](#header2_values)
 
 #### EnCase 5 to 7 (EWF-E01)
 
-In EnCase 5 to 7 (EWF-E01) the header2 information consist of 17 lines, and
-contains:
+In EnCase 5 to 7 (EWF-E01) the header2 information consist of 17 lines, and contains:
 
 | Line number | Value | Description |
 | --- | --- | --- |
@@ -325,8 +310,7 @@ The end of line character(s) is a newline (0x0a).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values.
 
-> Note the actual values in this category are dependent on the version of
-> EnCase.
+> Note the actual values in this category are dependent on the version of EnCase.
 
 | Identifier number | Character in 3rd line | Value in 4th line |
 | --- | --- | --- |
@@ -351,20 +335,18 @@ Also see [header2 values](#header2_values)
 
 <!-- rumdl-disable MD028 -->
 
-> Note that both the acquiry and system date and time are empty in a file
-> created by winen.
+> Note that both the acquiry and system date and time are empty in a file created by winen.
 
 <!-- rumdl-disable MD064 -->
 
-> Note that the date values in the [header section](#header_section) (not the
-> header2 section) are set to: "Thu Jan  1 00:00:00 1970". Where the time is
-> dependent on the time zone and daylight savings.
+> Note that the date values in the [header section](#header_section) (not the header2 section) are
+> set to: "Thu Jan  1 00:00:00 1970". Where the time is dependent on the time zone and daylight
+> savings.
 
 <!-- rumdl-enable MD064 -->
 
-> Note that in a Logicube Dossier generated header2 section an additional emtpy
-> value in the 4th line was observed. The number of values in the 3rd and 4th
-> can differ.
+> Note that in a Logicube Dossier generated header2 section an additional emtpy value in the 4th
+> line was observed. The number of values in the 3rd and 4th can differ.
 
 <!-- rumdl-enable MD028 -->
 
@@ -376,8 +358,9 @@ TODO: describe what a source is in the context of EnCase.
 
 Line 7 consists of 2 values, namely the values are "0 1".
 
-The 8th line consist of the following tab (0x09) separated values. Note that
-the actual values in this category are dependent on the version of EnCase.
+The 8th line consist of the following tab (0x09) separated values.
+
+> Note that the actual values in this category are dependent on the version of EnCase.
 
 | Identifier number | Character in 8rd line | Meaning |
 | --- | --- | --- |
@@ -401,9 +384,9 @@ Line 10 contains the values defined by line 8.
 > Note the default values of some of these values has changed around EnCase
 > 6.12.
 
-If the "ha" value contains "00000000000000000000000000000000" this means the
-MD5 hash is not set. The same applies for the "sha" value when it contains
-"0000000000000000000000000000000000000000" the SHA1 has is not set.
+If the "ha" value contains "00000000000000000000000000000000" this means the MD5 hash is not set.
+The same applies for the "sha" value when it contains "0000000000000000000000000000000000000000"
+the SHA1 has is not set.
 
 ##### Subjects category {#subjects_category1}
 
@@ -426,13 +409,14 @@ The 14th line consist of the following tab (0x09) separated values.
 
 Line 15 consists of 2 values, namely the values are "0 0".
 
-Line 16 contains the values defined by line 14. Note that the default values of
-some of these values has changed around EnCase 6.12.
+Line 16 contains the values defined by line 14.
+
+> Note that the default values of some of these values has changed around EnCase 6.12.
 
 #### EnCase 5 to 7 (EWF-L01)
 
-The EnCase 5 to 7 (EWF-E01) header2 section specification also applies to the
-EnCase 5 to 7 (EWF-L01) format. However:
+The EnCase 5 to 7 (EWF-E01) header2 section specification also applies to the EnCase 5 to 7
+(EWF-L01) format. However:
 
 * both the acquired and system date and time are not set
 
@@ -457,8 +441,8 @@ EnCase 5 to 7 (EWF-L01) format. However:
 | t | Notes | Free form string. EnCase limits this string to 3000 - 1 characters |
 | u | System date and time | String containing POSIX 32-bit epoch timestamp, e.g. "1142163845" which represents the date: March 12 2006, 11:44:05 |
 
-> Note the restrictions were tested with EnCase 7.02.01, older versions could
-> have a restriction of 40 characters instead of 3000 characters.
+> Note the restrictions were tested with EnCase 7.02.01, older versions could have a restriction of
+> 40 characters instead of 3000 characters.
 
 ##### Extents header value
 
@@ -471,8 +455,8 @@ entries that consist of: S <1> <2> <3>
 
 ### Header section {#header_section}
 
-The header section is identified in the section data type field as "header".
-Some aspects of this section are:
+The header section is identified in the section data type field as "header". Some aspects of this
+section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
@@ -487,12 +471,12 @@ The additional data this section contains is the following:
 | --- | --- | --- |
 | 76 (0x4c) | (variable) | Information about the acquired media |
 
-The information about the acquired media consists of [zlib compressed data](zlib.md).
-It contains text in ASCII format specifying information about the acquired
-media. The text multiple lines separated by an end of line character(s).
+The information about the acquired media consists of [zlib compressed data](zlib.md). It contains
+text in ASCII format specifying information about the acquired media. The text multiple lines
+separated by an end of line character(s).
 
-In the next paragraphs the various variants of the header section are
-described. In all cases the information consists of at least 4 lines:
+In the next paragraphs the various variants of the header section are described. In all cases the
+information consists of at least 4 lines:
 
 | Line number | Value | Description |
 | --- | --- | --- |
@@ -863,23 +847,22 @@ compression level.
 
 ##### Notes
 
-There should not be a tab, carriage return and newline characters within the
-text in the 4th line. Or is there a method to escape these characters?
+There should not be a tab, carriage return and newline characters within the text in the 4th line.
+Or is there a method to escape these characters?
 
-[ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
-states that these characters should not be used in the free form text. Need to
-confirm this, the specification only speaks of a newline character.
+[ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) states that these
+characters should not be used in the free form text. Need to confirm this, the specification only
+speaks of a newline character.
 
-Currently the password has no a additional value than allow an application
-check it. The data itself is not protected using the password. The password
-hashing algorithm is unknown. Need to find out. And does the algorithm differ
-per EnCase version? probably not. The algorithm does not differ in EnCase
-1 to 7. FTK Imager does not bother with a password.
+Currently the password has no a additional value than allow an application check it. The data
+itself is not protected using the password. The password hashing algorithm is unknown. Need to find
+out. And does the algorithm differ per EnCase version? probably not. The algorithm does not differ
+in EnCase 1 to 7. FTK Imager does not bother with a password.
 
 ### Volume section {#volume_section}
 
-The volume section is identified in the section data type field as "volume".
-Some aspects of this section are:
+The volume section is identified in the section data type field as "volume". Some aspects of this
+section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
@@ -906,20 +889,20 @@ The volume section data is 94 bytes in size and consists of:
 | 85 | 5 | | Signature, which contains the EWF file header signature |
 | 90 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the volume section data |
 
-The number of chunks is a 32-bit value this means it maximum of addressable
-chunks would be: 4294967295 (= 2^32 - 1). For a chunk size of 32768 x 4294967295 = about 127 TiB.
-The maximum segment file amount is 2^16 - 1 = 65535. This allows for an equal
-number of storage if a segment file is filled to its maximum number of chunks.
+The number of chunks is a 32-bit value this means it maximum of addressable chunks would be:
+4294967295 (= 2^32 - 1). For a chunk size of 32768 x 4294967295 = about 127 TiB. The maximum
+segment file amount is 2^16 - 1 = 65535. This allows for an equal number of storage if a segment
+file is filled to its maximum number of chunks.
 
-However Keramics is restricted at 14295 segment files, due to the extension
-naming schema of the segment files.
+However Keramics is restricted at 14295 segment files, due to the extension naming schema of the
+segment files.
 
 #### SMART (EWF-S01)
 
 The SMART format uses the EWF specification for this section.
 
-In SMART the signature (reverse) value is the string "SMART" (0x53 0x4d 0x41
-0x52 0x54) instead of the file header signature.
+In SMART the signature (reverse) value is the string "SMART" (0x53 0x4d 0x41 0x52 0x54) instead of
+the file header signature.
 
 #### FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01)
 
@@ -995,8 +978,8 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 | 0x04 | | Fastbloc write blocker used |
 | 0x08 | | Tableau write blocker used. This was added in EnCase 6.13 |
 
-> Note that if both the the Fastbloc and Tableau write blocker media flags are
-> set EnCase only shows the Fastbloc.
+> Note that if both the the Fastbloc and Tableau write blocker media flags are set EnCase only
+> shows the Fastbloc.
 
 #### Compression level {#compression_level}
 
@@ -1010,24 +993,23 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 
 ### Disk section
 
-The disk section is identified in the section data type field as "disk". Some
-aspects of this section are:
+The disk section is identified in the section data type field as "disk". Some aspects of this
+section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * Not found in SMART (EWF-S01).
 
-With a disk section in an FTK Imager 2.3 (EWF-E01) image it was confirmed that
-the disk section is the same as the volume section.
+With a disk section in an FTK Imager 2.3 (EWF-E01) image it was confirmed that the disk section is
+the same as the volume section.
 
-> Note that the disk section was found only in FTK Imager 2.3 when acquiring a
-> physical disk not a floppy. This requires additional research, it is currently
-> assumed that the disk section some old method to differentiate between a
-> partition (volume) image or a physical disk image.
+> Note that the disk section was found only in FTK Imager 2.3 when acquiring a physical disk not a
+> floppy. This requires additional research, it is currently assumed that the disk section some old
+> method to differentiate between a partition (volume) image or a physical disk image.
 
 ### Data section
 
-The data section is identified in the section data type field as "data". Some
-aspects of this section are:
+The data section is identified in the section data type field as "data". Some aspects of this
+section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, and EWF-L01 in EnCase 5 to 7.
@@ -1042,9 +1024,8 @@ The data section is a copy of the [volume section](#volume_section).
 
 #### FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01)
 
-> Note that in Logicube products (Talon (firmware predating April 2013) and
-> Forensic dossier (before version 3.3.3RC16)) the checksum is not calculated
-> and set to 0.
+> Note that in Logicube products (Talon (firmware predating April 2013) and Forensic dossier
+> (before version 3.3.3RC16)) the checksum is not calculated and set to 0.
 
 ### Sectors section
 
@@ -1068,13 +1049,12 @@ The sectors section contains the actual chunks of media data.
 
 #### Data chunk
 
-The first chunk is often located directly after the section header, although
-the format does not require this.
+The first chunk is often located directly after the section header, although the format does not
+require this.
 
-When the data is compressed and the compressed data (with checksum) is larger
-than the uncompressed data (without the checksum) the data chunk is stored
-uncompressed. The default size of a chunk is 32768 bytes of data (64 standard
-sectors).
+When the data is compressed and the compressed data (with checksum) is larger than the uncompressed
+data (without the checksum) the data chunk is stored uncompressed. The default size of a chunk is
+32768 bytes of data (64 standard sectors).
 
 An uncompressed data chunk is of variable size and consists of:
 
@@ -1083,13 +1063,13 @@ An uncompressed data chunk is of variable size and consists of:
 | 0 | ... | | Uncompressed chunk data |
 | ... | 4 | | Checksum, which contains an Adler-32 of the chunk data |
 
-The compressed data chunk consist of [zlib compressed data](zlib.md). The
-checksum of the compressed data chunk is part the zlib compressed data format.
+The compressed data chunk consist of [zlib compressed data](zlib.md). The checksum of the
+compressed data chunk is part the zlib compressed data format.
 
 #### Optical disc images
 
-For a MODE‑1 CD-ROM optical disc image EnCase only seems to support 2048 bytes
-per sector (the data).
+For a MODE-1 CD-ROM optical disc image EnCase only seems to support 2048 bytes per sector (the
+data).
 
 The raw sector size of a MODE-1 CD-ROM is 2352 bytes in size and consists of:
 
@@ -1105,8 +1085,8 @@ TODO: add information about Mode-2 and Mode-XA
 
 ### Table section
 
-The table section is identified in the section data type field as "table". Some
-aspects of this section are:
+The table section is identified in the section data type field as "table". Some aspects of this
+section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
@@ -1155,32 +1135,29 @@ The table entry is 4 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 4 | | Chunk data offset |
 
-The most significant bit (MSB) in the chunk data offset indicates if the chunk
-is compressed (1) or uncompressed (0).
+The most significant bit (MSB) in the chunk data offset indicates if the chunk is compressed (1) or
+uncompressed (0).
 
-A chunk data offset points to the start of the chunk of media data, which
-resides in the same table section within the segment file. The offset contains
-a value relative to the start of the file.
+A chunk data offset points to the start of the chunk of media data, which resides in the same table
+section within the segment file. The offset contains a value relative to the start of the file.
 
 ##### Data chunk
 
-The first chunk is often located directly after the last table entry, although
-the format does not require this.
+The first chunk is often located directly after the last table entry, although the format does not
+require this.
 
-A data chunk is always compressed even when no compression is required. This
-approach provides a checksum for each chunk. The default size of a chunk is
-32768 bytes of data (64 standard sectors). The resulting size of the
-"compressed" chunk can therefore be larger than the default chunk size.
+A data chunk is always compressed even when no compression is required. This approach provides a
+checksum for each chunk. The default size of a chunk is 32768 bytes of data (64 standard sectors).
+The resulting size of the "compressed" chunk can therefore be larger than the default chunk size.
 
 > Note that this was deducted from the behavior of FTK Imager for SMART (EWF-S01).
 
-The compressed data chunk consist of [zlib compressed data](zlib.md). The
-checksum of the compressed data chunk is part the zlib compressed data format.
+The compressed data chunk consist of [zlib compressed data](zlib.md). The checksum of the
+compressed data chunk is part the zlib compressed data format.
 
 #### SMART (EWF-S01)
 
-The table section in the SMART (EWF-S01) format is equivalent to that of the
-EWF specification.
+The table section in the SMART (EWF-S01) format is equivalent to that of the EWF specification.
 
 #### EnCase 1 (EWF-E01)
 
@@ -1218,12 +1195,11 @@ The table entry is 4 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 4 | | Chunk data offset |
 
-The most significant bit (MSB) in the chunk data offset indicates if the chunk
-is compressed (1) or uncompressed (0).
+The most significant bit (MSB) in the chunk data offset indicates if the chunk is compressed (1) or
+uncompressed (0).
 
-A chunk data offset points to the start of the chunk of media data, which
-resides in the same table section within the segment file. The offset contains
-a value relative to the start of the file.
+A chunk data offset points to the start of the chunk of media data, which resides in the same table
+section within the segment file. The offset contains a value relative to the start of the file.
 
 ##### Table footer
 
@@ -1235,13 +1211,12 @@ The table footer is 4 bytes in size and consists of:
 
 ##### Data chunk
 
-The first chunk is often located directly after the table footer, although the
-format does not require this.
+The first chunk is often located directly after the table footer, although the format does not
+require this.
 
-When the data is compressed and the compressed data (with checksum) is larger
-than the uncompressed data (without the checksum) the data chunk is stored
-uncompressed. The default size of a chunk is 32768 bytes of data (64 standard
-sectors).
+When the data is compressed and the compressed data (with checksum) is larger than the uncompressed
+data (without the checksum) the data chunk is stored uncompressed. The default size of a chunk is
+32768 bytes of data (64 standard sectors).
 
 An uncompressed data chunk is of variable size and consists of:
 
@@ -1250,8 +1225,8 @@ An uncompressed data chunk is of variable size and consists of:
 | 0 | ... | | Uncompressed chunk data |
 | ... | 4 | | Checksum, which contains an Adler-32 of the chunk data |
 
-The compressed data chunk consist of [zlib compressed data](zlib.md). The
-checksum of the compressed data chunk is part the zlib compressed data format.
+The compressed data chunk consist of [zlib compressed data](zlib.md). The checksum of the
+compressed data chunk is part the zlib compressed data format.
 
 #### FTK Imager and EnCase 2 to 5 and linen 5 (EWF-E01)
 
@@ -1278,10 +1253,10 @@ The sector table header is 24 bytes in size and consists of:
 | 4 | 16 | 0x00 | Unknown (Padding) |
 | 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data |
 
-The table section can hold 16375 entries. A new table section should be created
-to hold more entries. Both FTK Imager and EnCase 5 can handle more than 16375,
-FTK 1 cannot. To contain more than 16375 chunks new sectors, table and table2
-sections need to be created after the table2 section.
+The table section can hold 16375 entries. A new table section should be created to hold more
+entries. Both FTK Imager and EnCase 5 can handle more than 16375, FTK 1 cannot. To contain more
+than 16375 chunks new sectors, table and table2 sections need to be created after the table2
+section.
 
 ##### Table entry
 
@@ -1291,12 +1266,12 @@ The table entry is 4 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 4 | | Chunk data offset |
 
-The most significant bit (MSB) in the chunk data offset indicates if the chunk
-is compressed (1) or uncompressed (0).
+The most significant bit (MSB) in the chunk data offset indicates if the chunk is compressed (1) or
+uncompressed (0).
 
-A chunk data offset points to the start of the chunk of media data, which
-resides in the preceding sectors section within the segment file. The offset
-contains a value relative to the start of the file.
+A chunk data offset points to the start of the chunk of media data, which resides in the preceding
+sectors section within the segment file. The offset contains a value relative to the start of the
+file.
 
 ##### Table footer
 
@@ -1333,8 +1308,8 @@ The sector table header is 24 bytes in size and consists of:
 | 16 | 4 | 0x00 | Unknown (Padding) |
 | 20 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the table header data |
 
-As of EnCase 6 the number of entries is no longer restricted to 16375 entries.
-The new limit seems to be 65534.
+As of EnCase 6 the number of entries is no longer restricted to 16375 entries. The new limit seems
+to be 65534.
 
 ##### Table entry
 
@@ -1344,20 +1319,18 @@ The table entry is 4 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 4 | | Chunk data offset |
 
-The most significant bit (MSB) in the chunk data offset indicates if the chunk
-is compressed (1) or uncompressed (0).
+The most significant bit (MSB) in the chunk data offset indicates if the chunk is compressed (1) or
+uncompressed (0).
 
-A chunk data offset points to the start of the chunk of media data, which
-resides in the preceding sectors section within the segment file. The offset
-contains a value relative to the table base offset.
+A chunk data offset points to the start of the chunk of media data, which resides in the preceding
+sectors section within the segment file. The offset contains a value relative to the table base
+offset.
 
-In EnCase 6.7.1 the sectors section can be larger than 2048Mb. The table
-entries offsets are 31 bit values in EnCase6 the offset in a table entry value
-will actually use *the full 32 bit* if the 2048Mb has been exceeded. This
-behavior is no longer present in EnCase 6.8 so it is assumed to be a bug.
-Libewf currently assumes that the if the 31 bit value overflows the following
-chunks are uncompressed. This allows EnCase 6.7.1 faulty EWF files to be
-converted by Keramics.
+In EnCase 6.7.1 the sectors section can be larger than 2048Mb. The table entries offsets are 31 bit
+values in EnCase6 the offset in a table entry value will actually use *the full 32 bit* if the
+2048Mb has been exceeded. This behavior is no longer present in EnCase 6.8 so it is assumed to be a
+bug.  Libewf currently assumes that the if the 31 bit value overflows the following chunks are
+uncompressed. This allows EnCase 6.7.1 faulty EWF files to be converted.
 
 ##### Table footer
 
@@ -1373,8 +1346,8 @@ The EWF-L01 format uses the EnCase 6 to 7 (EWF-E01) table section specification.
 
 ### Table2 section
 
-The table2 section is identified in the section data type field as "table2".
-Some aspects of this section are:
+The table2 section is identified in the section data type field as "table2". Some aspects of this
+section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * Found in EWF-E01 in EnCase 2 to 7, or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7. Not
@@ -1393,8 +1366,8 @@ The EWF-L01 format uses the EWF-E01 table2 section specification.
 
 ### Next section
 
-The next section is identified in the section data type field as "next". Some
-aspects of this section are:
+The next section is identified in the section data type field as "next". Some aspects of this
+section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * Found in EWF-E01 in EnCase 1 to 7 or linen 5 to 7 or FTK Imager, EWF-L01 in EnCase 5 to 7, and
@@ -1410,14 +1383,14 @@ It resides after the table or table2 section.
 
 #### FTK Imager, EnCase and linen (EWF-E01)
 
-It resides after the data section in a single segment file or for multiple
-segment files after the table2 section.
+It resides after the data section in a single segment file or for multiple segment files after the
+table2 section.
 
-In the EnCase (EWF-E01) format the size in the section header is 0 instead of
-76 (the size of the section header).
+In the EnCase (EWF-E01) format the size in the section header is 0 instead of 76 (the size of the
+section header).
 
-> Note that FTK imager versions before 2.9 sets the section size to 76. At the
-> moment it is unknown in which version this behavior was changed.
+> Note that FTK imager versions before 2.9 sets the section size to 76. At the moment it is unknown
+> in which version this behavior was changed.
 
 ### Ltypes section
 

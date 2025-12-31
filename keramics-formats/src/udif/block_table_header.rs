@@ -31,7 +31,7 @@ use super::constants::*;
         field(name = "checksum", data_type = "[u8; 128]"),
         field(name = "number_of_entries", data_type = "u32"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Universal Disk Image Format (UDIF) block table header.
 pub struct UdifBlockTableHeader {

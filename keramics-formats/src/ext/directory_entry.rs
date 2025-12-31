@@ -25,7 +25,7 @@ use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
         field(name = "name_size", data_type = "u8"),
         field(name = "file_type", data_type = "u8"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext) directory entry.
 pub struct ExtDirectoryEntry {

@@ -24,7 +24,7 @@ use keramics_types::bytes_to_u32_le;
         member(field(name = "allocated_size", data_type = "u32")),
         member(field(name = "flags", data_type = "u32", format = "hex")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) index node header.
 pub struct NtfsIndexNodeHeader {

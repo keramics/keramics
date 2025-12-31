@@ -24,7 +24,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
         member(field(name = "key_data_size", data_type = "u16")),
         member(field(name = "flags", data_type = "u32", format = "hex")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) index value.
 pub struct NtfsIndexValue {

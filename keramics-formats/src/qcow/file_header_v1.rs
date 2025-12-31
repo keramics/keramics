@@ -34,7 +34,7 @@ use super::file_header::QcowFileHeader;
         field(name = "encryption_method", data_type = "u32"),
         field(name = "level1_table_offset", data_type = "u64"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// QEMU Copy-On-Write (QCOW) file header version 1.
 pub struct QcowFileHeaderV1 {}

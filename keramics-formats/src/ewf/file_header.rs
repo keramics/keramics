@@ -26,8 +26,7 @@ use super::constants::*;
         field(name = "segment_number", data_type = "u16"),
         field(name = "fields_end", data_type = "[u8; 2]", format = "hex"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Expert Witness Compression Format (EWF) file header.
 pub struct EwfFileHeader {

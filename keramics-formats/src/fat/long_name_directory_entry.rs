@@ -27,7 +27,7 @@ use keramics_types::Ucs2String;
         field(name = "unknown2", data_type = "[u8; 2]", format = "hex"),
         field(name = "name_segment3", data_type = "Ucs2String<2>"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// File Allocation Table (FAT) long name directory entry.
 pub struct FatLongNameDirectoryEntry {

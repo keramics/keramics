@@ -605,7 +605,7 @@ mod tests {
         file_system.read_data_stream(&data_stream)?;
 
         assert_eq!(file_system.bytes_per_sector, 512);
-        assert!(file_system.format == FatFormat::Fat12);
+        assert_eq!(file_system.format, FatFormat::Fat12);
         assert_eq!(file_system.volume_serial_number, 0x56f30d5b);
         assert_eq!(
             file_system.volume_label,
@@ -627,7 +627,7 @@ mod tests {
         file_system.read_metadata(&data_stream)?;
 
         assert_eq!(file_system.bytes_per_sector, 512);
-        assert!(file_system.format == FatFormat::Fat12);
+        assert_eq!(file_system.format, FatFormat::Fat12);
         assert_eq!(file_system.volume_serial_number, 0x56f30d5b);
         assert_eq!(
             file_system.volume_label,

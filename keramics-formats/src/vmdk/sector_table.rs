@@ -24,7 +24,7 @@ use keramics_types::bytes_to_u32_le;
         byte_order = "little",
         field(name = "entry", data_type = "u32", format = "hex")
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// VMware Virtual Disk (VMDK) sector table entry.
 pub struct VmdkSectorTableEntry {

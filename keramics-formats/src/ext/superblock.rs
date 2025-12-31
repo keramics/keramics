@@ -133,8 +133,7 @@ use super::constants::*;
         field(name = "padding3", data_type = "[u8; 376]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Extended File System (ext) superblock.
 pub struct ExtSuperblock {

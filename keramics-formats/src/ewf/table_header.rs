@@ -26,7 +26,7 @@ use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
         field(name = "padding2", data_type = "[u8; 4]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Expert Witness Compression Format (EWF) table header.
 pub struct EwfTableHeader {

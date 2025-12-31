@@ -27,7 +27,7 @@ use super::mft_attribute::NtfsMftAttribute;
         member(field(name = "minor_format_version", data_type = "u8")),
         member(field(name = "volume_flags", data_type = "u16")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) volume information ($VOLUME_INFORMATION).
 pub struct NtfsVolumeInformation {

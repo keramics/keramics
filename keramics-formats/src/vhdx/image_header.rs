@@ -34,8 +34,7 @@ use super::constants::*;
         field(name = "log_offset", data_type = "u64", format = "hex"),
         field(name = "unknown1", data_type = "[u8; 4016]"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Virtual Hard Disk version 2 (VHDX) image header.
 pub struct VhdxImageHeader {

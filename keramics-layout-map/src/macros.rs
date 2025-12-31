@@ -14,8 +14,11 @@
 use std::slice::Iter;
 
 use darling::{FromDeriveInput, FromMeta};
-
 use quote::quote;
+use syn::parse::{Parse, ParseStream};
+use syn::punctuated::Punctuated;
+use syn::token::Comma;
+use syn::{LitStr, Meta, parse2};
 
 use crate::bitmap::BitmapLayout;
 use crate::enums::{BitOrder, ByteOrder, DataType, Format};
@@ -133,6 +136,7 @@ impl FieldOptions {
             "i16" | "int16" | "SignedInteger16Bit" => DataType::SignedInteger16Bit,
             "i32" | "int32" | "SignedInteger32Bit" => DataType::SignedInteger32Bit,
             "i64" | "int64" | "SignedInteger64Bit" => DataType::SignedInteger64Bit,
+            "HfsTime" => DataType::HfsTime,
             "PosixTime32" => DataType::PosixTime32,
             "u8" | "uint8" | "UnsignedInteger8Bit" => DataType::UnsignedInteger8Bit,
             "u16" | "uint16" | "UnsignedInteger16Bit" => DataType::UnsignedInteger16Bit,
@@ -233,6 +237,51 @@ struct MethodOptions {
     name: String,
 }
 
+#[derive(Debug, Default)]
+struct MethodsOptions {
+    /// names.
+    names: Vec<String>,
+}
+
+impl MethodsOptions {
+    /// Determines if the options are empty.
+    pub fn is_empty(&self) -> bool {
+        self.names.is_empty()
+    }
+}
+
+impl Parse for MethodsOptions {
+    /// Parses the options from the input.
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let names: Vec<String> = Punctuated::<LitStr, Comma>::parse_terminated(input)?
+            .iter()
+            .map(|lit_str| lit_str.value())
+            .collect();
+
+        Ok(Self { names })
+    }
+}
+
+impl FromMeta for MethodsOptions {
+    /// Creates the options from the meta item.
+    fn from_meta(item: &Meta) -> darling::Result<Self> {
+        match item {
+            Meta::List(meta_list) => match parse2::<Self>(meta_list.tokens.clone()) {
+                Ok(methods_options) => Ok(methods_options),
+                Err(error) => {
+                    return Err(darling::Error::custom(format!(
+                        "Unable to parse LayoutMap methods with error: {}",
+                        error
+                    )));
+                }
+            },
+            _ => Err(darling::Error::custom(
+                "LayoutMap methods requires one or more strings",
+            )),
+        }
+    }
+}
+
 #[derive(Debug, FromMeta)]
 #[darling(default)]
 enum StructureMember {
@@ -246,6 +295,7 @@ enum StructureMember {
 }
 
 impl Default for StructureMember {
+    /// Creates a new default structure member.
     fn default() -> Self {
         StructureMember::Field(FieldOptions::default())
     }
@@ -289,17 +339,22 @@ impl StructureOptions {
 #[derive(Debug, FromDeriveInput)]
 #[darling(attributes(layout_map), supports(struct_named))]
 struct LayoutMapOptions {
-    /// Bitmap option.
+    /// Bitmap.
     #[darling(default)]
     pub bitmap: BitmapOptions,
 
-    /// Structure option.
+    /// Structure.
     #[darling(default)]
     pub structure: StructureOptions,
 
-    /// Method option.
+    // TODO: remove, has been deprecated in favor of methods
+    /// Method list.
     #[darling(default, multiple, rename = "method")]
-    methods: Vec<MethodOptions>,
+    method_list: Vec<MethodOptions>,
+
+    /// Methods.
+    #[darling(default)]
+    methods: MethodsOptions,
 }
 
 /// Parses a bitmap layout.
@@ -365,13 +420,12 @@ fn parse_structure_layout_bitfield(
             )));
         }
     };
-    let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
+    Ok(StructureLayoutBitField::new(
         &field_options.name,
         number_of_elements,
         &field_options.modifier,
         format,
-    );
-    Ok(bitfield)
+    ))
 }
 
 /// Parses a structure layout field.
@@ -412,14 +466,13 @@ fn parse_structure_layout_field(
             )));
         }
     };
-    let field: StructureLayoutField = StructureLayoutField::new(
+    Ok(StructureLayoutField::new(
         &field_options.name,
         data_type,
         byte_order,
         &field_options.modifier,
         format,
-    );
-    Ok(field)
+    ))
 }
 
 /// Parses a structure layout member.
@@ -518,9 +571,7 @@ fn parse_structure_layout_sequence(
         &field_options.modifier,
         format,
     );
-    let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, number_of_elements);
-
-    Ok(sequence)
+    Ok(StructureLayoutSequence::new(field, number_of_elements))
 }
 
 /// Parses a structure layout group.
@@ -709,7 +760,10 @@ pub fn process_input(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
         let syn::DataStruct { fields, .. } = data_struct;
 
         if !options.bitmap.is_empty() && !options.structure.is_empty() {
-            panic!("LayoutMap cannot combine bitmap and structure definitions");
+            panic!("LayoutMap does not support combined bitmap and structure definitions");
+        }
+        if !options.method_list.is_empty() && !options.methods.is_empty() {
+            panic!("LayoutMap does not support combined method and methods definitions");
         }
         let mut methods = quote!();
 
@@ -726,12 +780,29 @@ pub fn process_input(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
                     Ok(structure_layout) => structure_layout,
                     Err(error) => panic!("{error:}"),
                 };
-            for method_option in options.methods.iter() {
+            let method_names: Vec<&str> = if !options.methods.is_empty() {
+                options
+                    .methods
+                    .names
+                    .iter()
+                    .map(|string| string.as_str())
+                    .collect()
+            } else {
+                options
+                    .method_list
+                    .iter()
+                    .map(|method_option| method_option.name.as_str())
+                    .collect()
+            };
+            for method_name in method_names.iter() {
                 // TODO: check if read_at_position is used without debug_read_data.
-                let generated_code = match method_option.name.as_str() {
+                let generated_code = match *method_name {
                     "debug_read_data" => structure_layout.generate_debug_read_data(),
                     "read_at_position" => structure_layout.generate_read_at_position(),
-                    _ => panic!("Unsupported method in layout map of {}", ident),
+                    _ => panic!(
+                        "Unsupported method: {} in layout map of {}",
+                        method_name, ident
+                    ),
                 };
                 methods.extend(generated_code);
             }
@@ -760,6 +831,23 @@ mod tests {
         LayoutMapOptions::from_derive_input(&parse_quote! {
             #[derive(LayoutMap)]
             #[layout_map()]
+            struct MyStruct {}
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_derive_structure_with_bitfields() {
+        LayoutMapOptions::from_derive_input(&parse_quote! {
+            #[derive(LayoutMap)]
+            #[layout_map(
+                structure(
+                    byte_order = "little",
+                    field(name = "block_size", data_type = "BitField16<12>", modifier = "+ 1"),
+                    field(name = "signature", data_type = "BitField16<3>"),
+                    field(name = "is_compressed_flag", data_type = "BitField16<1>"),
+                )
+            )]
             struct MyStruct {}
         })
         .unwrap();

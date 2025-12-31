@@ -25,8 +25,7 @@ use keramics_types::bytes_to_u32_le;
         field(name = "padding1", data_type = "[u8; 40]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Expert Witness Compression Format (EWF) digest.
 pub struct EwfDigest {

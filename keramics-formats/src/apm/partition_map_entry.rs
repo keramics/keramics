@@ -42,8 +42,7 @@ use super::constants::*;
         field(name = "processor_type", data_type = "ByteString<16>"),
         field(name = "unknown4", data_type = "[u8; 376]"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Apple Partition Map (APM) partition map entry.
 pub struct ApmPartitionMapEntry {

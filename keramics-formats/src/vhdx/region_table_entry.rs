@@ -24,7 +24,7 @@ use keramics_types::{Uuid, bytes_to_u32_le, bytes_to_u64_le};
         field(name = "data_size", data_type = "u32"),
         field(name = "is_required_flag", data_type = "u32"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) region table entry.
 pub struct VhdxRegionTableEntry {

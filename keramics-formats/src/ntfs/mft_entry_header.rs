@@ -36,7 +36,7 @@ use super::constants::*;
         member(field(name = "unknown1", data_type = "[u8; 2]")),
         member(field(name = "mft_entry_number", data_type = "u32")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) Master File Table (MFT) entry header.
 pub struct NtfsMftEntryHeader {

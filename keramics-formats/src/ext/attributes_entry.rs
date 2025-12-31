@@ -27,7 +27,7 @@ use keramics_types::{ByteString, bytes_to_u16_le, bytes_to_u32_le};
         field(name = "value_data_size", data_type = "u32"),
         field(name = "attribute_hash", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext) attributes entry.
 pub struct ExtAttributesEntry {

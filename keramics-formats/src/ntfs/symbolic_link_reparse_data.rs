@@ -25,7 +25,7 @@ use keramics_types::{Ucs2String, bytes_to_u16_le};
         member(field(name = "display_name_size", data_type = "u16")),
         member(field(name = "symbolic_link_flags", data_type = "u32")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) symbolic link reparse data.
 pub struct NtfsSymbolicLinkReparseData {

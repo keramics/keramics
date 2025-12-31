@@ -24,7 +24,7 @@ use keramics_types::bytes_to_u32_le;
         field(name = "unknown1", data_type = "[u8; 512]", format = "hex"),
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Expert Witness Compression Format (EWF) error2 header.
 pub struct EwfError2Header {

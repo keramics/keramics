@@ -26,7 +26,7 @@ use keramics_types::{Utf16String, Uuid, bytes_to_u64_le};
         field(name = "attribute_flags", data_type = "u64", format = "hex"),
         field(name = "name", data_type = "Utf16String<36>"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// GUID Partition Table (GPT) partition entry.
 pub struct GptPartitionEntry {

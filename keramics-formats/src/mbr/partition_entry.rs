@@ -26,7 +26,7 @@ use keramics_types::bytes_to_u32_le;
         field(name = "start_address_lba", data_type = "u32"),
         field(name = "number_of_sectors", data_type = "u32"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Master Boot Record (MBR) partition entry.
 pub struct MbrPartitionEntry {

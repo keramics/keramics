@@ -36,7 +36,7 @@ use super::file_header::QcowFileHeader;
         field(name = "number_of_snapshots", data_type = "u32"),
         field(name = "snapshots_offset", data_type = "u64"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// QEMU Copy-On-Write (QCOW) file header version 2.
 pub struct QcowFileHeaderV2 {}

@@ -30,7 +30,7 @@ use super::constants::*;
         field(name = "unknown4", data_type = "[u8; 4]"),
         field(name = "unknown5", data_type = "[u8; 28]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Mac OS sparse image (.sparseimage) file header.
 pub struct SparseImageFileHeader {

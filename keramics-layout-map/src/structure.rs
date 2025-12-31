@@ -219,6 +219,7 @@ impl StructureLayoutField {
             DataType::FatTimeDate => Some(4),
             DataType::FatTimeDate10Ms => Some(5),
             DataType::Filetime => Some(8),
+            DataType::HfsTime => Some(4),
             DataType::PosixTime32 => Some(4),
             DataType::SignedInteger8Bit => Some(1),
             DataType::SignedInteger16Bit => Some(2),
@@ -395,6 +396,15 @@ impl StructureLayoutField {
             DataType::Filetime => {
                 quote!(keramics_datetime::Filetime::from_bytes(&data[#data_offset..#data_offset + 8]))
             }
+            DataType::HfsTime => match *byte_order {
+                ByteOrder::BigEndian => {
+                    quote!(keramics_datetime::HfsTime::from_be_bytes(&data[#data_offset..#data_offset + 4]))
+                }
+                ByteOrder::LittleEndian => {
+                    quote!(keramics_datetime::HfsTime::from_le_bytes(&data[#data_offset..#data_offset + 4]))
+                }
+                _ => panic!("Unsupported byte order"),
+            },
             DataType::PosixTime32 => match *byte_order {
                 ByteOrder::BigEndian => {
                     quote!(keramics_datetime::PosixTime32::from_be_bytes(&data[#data_offset..#data_offset + 4]))
@@ -493,6 +503,7 @@ impl StructureLayoutField {
             DataType::FatTimeDate => quote!(keramics_datetime::FatTimeDate),
             DataType::FatTimeDate10Ms => quote!(keramics_datetime::FatTimeDate10Ms),
             DataType::Filetime => quote!(keramics_datetime::Filetime),
+            DataType::HfsTime => quote!(keramics_datetime::HfsTime),
             DataType::PosixTime32 => quote!(keramics_datetime::PosixTime32),
             DataType::SignedInteger8Bit => quote!(i8),
             DataType::SignedInteger16Bit => quote!(i16),

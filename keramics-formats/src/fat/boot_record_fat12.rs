@@ -45,7 +45,7 @@ use super::constants::*;
         member(field(name = "bootcode", data_type = "[u8; 448]", format = "hex")),
         member(field(name = "boot_signature", data_type = "[u8; 2]", format = "hex")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// File Allocation Table (FAT-12 or FAT-16) boot record.
 pub struct Fat12BootRecord {}

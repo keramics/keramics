@@ -19,7 +19,10 @@ A file system format is used to manage the storage of files.
 
 ## Formats
 
+* [Apple File System (APFS)](apfs.md)
 * [Extended File System (ext)](ext.md)
 * [Extensible File Allocation Table (exFAT)](exfat.md)
 * [File Allocation Table (FAT)](fat.md)
+* [Hierarchical File System (HFS)](hfs.md)
+* [Macintosh File System (MFS)](mfs.md)
 * [New Technologies File System (NTFS)](ntfs.md)

@@ -21,7 +21,7 @@ use keramics_types::bytes_to_u32_le;
         byte_order = "little",
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext) extents footer.
 pub struct ExtExtentsFooter {

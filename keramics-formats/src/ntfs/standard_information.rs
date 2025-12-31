@@ -36,7 +36,7 @@ use super::mft_attribute::NtfsMftAttribute;
         member(field(name = "quota_charged", data_type = "[u8; 8]")),
         member(field(name = "update_sequence_number", data_type = "u64")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) standard information ($STANDARD_INFORMATION).
 pub struct NtfsStandardInformation {

@@ -25,7 +25,7 @@ use super::constants::*;
         field(name = "unknown1", data_type = "[u8; 2]"),
         field(name = "number_of_entries", data_type = "u16"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) parent locator header.
 pub struct VhdxParentLocatorHeader {

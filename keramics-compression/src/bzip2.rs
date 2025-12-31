@@ -146,7 +146,7 @@ impl<'a> Bitstream for Bzip2Bitstream<'a> {
         field(name = "format_version", data_type = "u8"),
         field(name = "compression_level", data_type = "u8", format = "char"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Stream header used by bzip2 compressed data.
 struct Bzip2StreamHeader {}

@@ -28,7 +28,7 @@ use super::constants::*;
         field(name = "checksum", data_type = "u32", format = "hex"),
         field(name = "unknown2", data_type = "[u8; 12]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext) attributes block header.
 pub struct ExtAttributesBlockHeader {}

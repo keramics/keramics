@@ -33,8 +33,7 @@ use super::partition_entry::MbrPartitionEntry;
         )),
         member(field(name = "boot_signature", data_type = "[u8; 2]", format = "hex")),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Master Boot Record (MBR).
 pub struct MbrMasterBootRecord {

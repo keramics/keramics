@@ -29,7 +29,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u64_le};
         member(field(name = "data_size", data_type = "u64")),
         member(field(name = "valid_data_size", data_type = "u64")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) Master File Table (MFT) non-resident attribute.
 pub struct NtfsMftAttributeNonResident {

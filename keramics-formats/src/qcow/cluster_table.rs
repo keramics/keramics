@@ -24,7 +24,7 @@ use keramics_types::bytes_to_u64_be;
         byte_order = "big",
         field(name = "reference", data_type = "u64", format = "hex")
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// QEMU Copy-On-Write (QCOW) cluster table entry.
 pub struct QcowClusterTableEntry {

@@ -24,7 +24,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
         field(name = "key_data_size", data_type = "u16"),
         field(name = "value_data_size", data_type = "u16"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) parent locator entry.
 pub struct VhdxParentLocatorEntry {

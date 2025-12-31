@@ -34,7 +34,7 @@ use super::short_name_directory_entry::FatShortNameDirectoryEntry;
         field(name = "data_start_cluster", data_type = "u16"),
         field(name = "data_size", data_type = "u32"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// File Allocation Table (FAT-12 or FAT-16) short name directory entry.
 pub struct Fat12ShortNameDirectoryEntry {}

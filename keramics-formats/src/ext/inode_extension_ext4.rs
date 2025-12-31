@@ -34,7 +34,7 @@ use super::inode::ExtInode;
         member(field(name = "version_upper", data_type = "u32")),
         member(field(name = "unknown3", data_type = "[u8; 4]")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext4) inode extension.
 pub struct Ext4InodeExtension {}

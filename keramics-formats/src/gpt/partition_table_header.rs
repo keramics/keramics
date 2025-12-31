@@ -38,8 +38,7 @@ use super::constants::*;
         field(name = "entry_data_size", data_type = "u32"),
         field(name = "entries_data_checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// GUID Partition Table (GPT) partition table header.
 pub struct GptPartitionTableHeader {

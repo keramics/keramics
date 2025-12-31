@@ -35,8 +35,7 @@ use super::constants::*;
         field(name = "parent_locator_entries", data_type = "[u8; 192]"),
         field(name = "unknown2", data_type = "[u8; 256]")
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Virtual Hard Disk (VHD) dynamic disk header.
 pub struct VhdDynamicDiskHeader {

@@ -24,7 +24,7 @@ use keramics_types::bytes_to_u32_le;
         member(field(name = "unknown1", data_type = "[u8; 4]")),
         member(field(name = "compression_method", data_type = "u32")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) Windows Overlay Filter (WOF) reparse data.
 pub struct NtfsWofReparseData {

@@ -24,7 +24,7 @@ use keramics_types::{Uuid, bytes_to_u32_le};
         field(name = "item_size", data_type = "u32"),
         field(name = "unknown1", data_type = "[u8; 8]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) metadata table entry.
 pub struct VhdxMetadataTableEntry {

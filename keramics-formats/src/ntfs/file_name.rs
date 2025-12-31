@@ -35,7 +35,7 @@ use super::mft_attribute::NtfsMftAttribute;
         member(field(name = "name_size", data_type = "u8")),
         member(field(name = "name_space", data_type = "u8")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) file name ($FILE_NAME).
 pub struct NtfsFileName {

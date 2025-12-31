@@ -26,7 +26,7 @@ use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
         field(name = "data_offset", data_type = "u64", format = "hex"),
         field(name = "data_size", data_type = "u64"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Universal Disk Image Format (UDIF) block table entry.
 pub struct UdifBlockTableEntry {

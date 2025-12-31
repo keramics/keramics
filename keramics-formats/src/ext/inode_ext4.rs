@@ -47,7 +47,7 @@ use crate::ext::inode::ExtInode;
         member(field(name = "checksum_lower", data_type = "u16", format = "hex")),
         member(field(name = "unknown2", data_type = "[u8; 2]")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext4) inode.
 pub struct Ext4Inode {}

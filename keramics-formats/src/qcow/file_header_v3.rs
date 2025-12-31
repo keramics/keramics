@@ -43,7 +43,7 @@ use super::file_header::QcowFileHeader;
         field(name = "compression_method", data_type = "u8"),
         field(name = "unknown1", data_type = "[u8; 7]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// QEMU Copy-On-Write (QCOW) file header version 3.
 pub struct QcowFileHeaderV3 {}

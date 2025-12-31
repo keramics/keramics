@@ -33,8 +33,7 @@ use super::constants::*;
         field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "features_start_sector", data_type = "u64"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Parallels Disk Image (PDI) sparse file header.
 pub struct PdiSparseFileHeader {

@@ -46,8 +46,7 @@ use super::constants::*;
         field(name = "number_of_sectors", data_type = "u64"),
         field(name = "unknown4", data_type = "[u8; 12]"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Universal Disk Image Format (UDIF) file footer.
 pub struct UdifFileFooter {

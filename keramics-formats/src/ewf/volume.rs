@@ -43,8 +43,7 @@ use keramics_types::{Uuid, bytes_to_u32_le};
         field(name = "signature", data_type = "[u8; 5]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Expert Witness Compression Format (EWF-E01) volume.
 pub struct EwfE01Volume {
@@ -139,8 +138,7 @@ impl EwfE01Volume {
         field(name = "signature", data_type = "[u8; 5]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Expert Witness Compression Format (EWF-S01) volume.
 pub struct EwfS01Volume {

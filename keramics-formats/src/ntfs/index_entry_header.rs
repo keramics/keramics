@@ -27,7 +27,7 @@ use super::constants::*;
         member(field(name = "journal_sequence_number", data_type = "u64")),
         member(field(name = "vcn", data_type = "u64")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) index entry header.
 pub struct NtfsIndexEntryHeader {

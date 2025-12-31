@@ -26,7 +26,7 @@ use keramics_types::bytes_to_u64_le;
         field(name = "unknown1", data_type = "BitField64<17>", format = "hex"),
         field(name = "block_offset", data_type = "BitField64<44>", format = "hex"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) block allocation table entry.
 pub struct VhdxBlockAllocationTableEntry {

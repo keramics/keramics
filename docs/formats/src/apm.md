@@ -1,8 +1,7 @@
 # Apple Partition Map (APM) format
 
-The Apple Partition Map (APM) format is used on Motorola based Macintosh
-computers. On Intel based Macintosh computers the [GUID Partition Table (GPT) format](gpt.md)
-is used.
+The Apple Partition Map (APM) format is used on Motorola based Macintosh computers. On Intel based
+Macintosh computers the [GUID Partition Table (GPT) format](gpt.md) is used.
 
 ## Overview
 
@@ -29,13 +28,12 @@ An Apple Partition Map (APM) consists of:
 
 ## The drive descriptor
 
-The driver descriptor identifies the device drivers installed on a storage
-medium. The driver descriptor can contain refer to multiple device drivers.
-Every device driver is stored in a separate partition.
+The driver descriptor identifies the device drivers installed on a storage medium. The driver
+descriptor can contain refer to multiple device drivers. Every device driver is stored in a
+separate partition.
 
-The drive descriptor is situated in the first block of the storage medium. This
-block is referred to as the device driver block. The driver descriptor block is
-not considered part of any partition.
+The drive descriptor is situated in the first block of the storage medium. This block is referred
+to as the device driver block. The driver descriptor block is not considered part of any partition.
 
 The drive descriptor is 512 bytes in size and consists of:
 
@@ -63,10 +61,9 @@ The device driver descriptor is 8 bytes in size and consists of:
 
 ## The partition map
 
-The partition map is stored after the drive descriptor. The partition map
-consists of multiple entries that must be stored continuously. The partition
-map itself is considered a partition therefore the first entry in the partition
-map describes the partition map itself.
+The partition map is stored after the drive descriptor. The partition map consists of multiple
+entries that must be stored continuously. The partition map itself is considered a partition
+therefore the first entry in the partition map describes the partition map itself.
 
 ### The partition map entry
 

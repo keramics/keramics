@@ -24,7 +24,7 @@ pub enum ByteOrder {
     NotSet,
 }
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum DataType {
     BitField8,
     BitField16,
@@ -35,6 +35,7 @@ pub enum DataType {
     FatTimeDate,
     FatTimeDate10Ms,
     Filetime,
+    HfsTime,
     PosixTime32,
     SignedInteger8Bit,
     SignedInteger16Bit,
@@ -48,38 +49,6 @@ pub enum DataType {
     UnsignedInteger32Bit,
     UnsignedInteger64Bit,
     Uuid,
-}
-
-impl Clone for DataType {
-    fn clone(&self) -> DataType {
-        match self {
-            DataType::BitField8 => DataType::BitField8,
-            DataType::BitField16 => DataType::BitField16,
-            DataType::BitField32 => DataType::BitField32,
-            DataType::BitField64 => DataType::BitField64,
-            DataType::ByteString => DataType::ByteString,
-            DataType::FatDate => DataType::FatDate,
-            DataType::FatTimeDate => DataType::FatTimeDate,
-            DataType::FatTimeDate10Ms => DataType::FatTimeDate10Ms,
-            DataType::Filetime => DataType::Filetime,
-            DataType::PosixTime32 => DataType::PosixTime32,
-            DataType::SignedInteger8Bit => DataType::SignedInteger8Bit,
-            DataType::SignedInteger16Bit => DataType::SignedInteger16Bit,
-            DataType::SignedInteger32Bit => DataType::SignedInteger32Bit,
-            DataType::SignedInteger64Bit => DataType::SignedInteger64Bit,
-            DataType::Struct { name, size } => DataType::Struct {
-                name: name.to_string(),
-                size: *size,
-            },
-            DataType::Ucs2String => DataType::Ucs2String,
-            DataType::Utf16String => DataType::Utf16String,
-            DataType::UnsignedInteger8Bit => DataType::UnsignedInteger8Bit,
-            DataType::UnsignedInteger16Bit => DataType::UnsignedInteger16Bit,
-            DataType::UnsignedInteger32Bit => DataType::UnsignedInteger32Bit,
-            DataType::UnsignedInteger64Bit => DataType::UnsignedInteger64Bit,
-            DataType::Uuid => DataType::Uuid,
-        }
-    }
 }
 
 #[derive(Clone, PartialEq)]

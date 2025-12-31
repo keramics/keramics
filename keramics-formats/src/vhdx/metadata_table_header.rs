@@ -26,7 +26,7 @@ use super::constants::*;
         field(name = "number_of_entries", data_type = "u16"),
         field(name = "unknown2", data_type = "[u8; 20]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk version 2 (VHDX) metadata table header.
 pub struct VhdxMetadataTableHeader {

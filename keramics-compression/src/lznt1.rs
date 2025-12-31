@@ -28,7 +28,7 @@ use keramics_types::bytes_to_u16_le;
         field(name = "signature", data_type = "BitField16<3>"),
         field(name = "is_compressed_flag", data_type = "BitField16<1>"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// LZNT1 block header.
 struct Lznt1BlockHeader {

@@ -21,7 +21,7 @@ use keramics_types::bytes_to_u32_be;
 #[derive(LayoutMap)]
 #[layout_map(
     structure(byte_order = "big", field(name = "sector_number", data_type = "u32")),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Virtual Hard Disk (VHD) block allocation table entry.
 pub struct VhdBlockAllocationTableEntry {

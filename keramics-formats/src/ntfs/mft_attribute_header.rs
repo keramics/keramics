@@ -27,7 +27,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
         member(field(name = "data_flags", data_type = "u16", format = "hex")),
         member(field(name = "identifier", data_type = "u16")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// New Technologies File System (NTFS) Master File Table (MFT) attribute header.
 pub struct NtfsMftAttributeHeader {

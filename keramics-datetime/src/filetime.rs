@@ -18,20 +18,20 @@ use keramics_types::bytes_to_u32_le;
 use super::epoch::Epoch;
 use super::util::{get_date_values, get_time_values};
 
-const FILETIME_EPOCH: Epoch = Epoch {
-    year: 1601,
-    month: 1,
-    day_of_month: 1,
-};
-
 /// Windows FILETIME timestamp.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Filetime {
-    /// Number of 100th nanoseconds since January 1, 1601 (UTC).
+    /// Number of 100th nanoseconds since January 1, 1601.
     pub timestamp: u64,
 }
 
 impl Filetime {
+    const EPOCH: Epoch = Epoch {
+        year: 1601,
+        month: 1,
+        day_of_month: 1,
+    };
+
     /// Creates a new timestamp.
     pub fn new(timestamp: u64) -> Self {
         Self { timestamp }
@@ -55,7 +55,7 @@ impl Filetime {
         let number_of_seconds: u64 = self.timestamp / 10000000;
         let (days, hours, minutes, seconds): (i64, u8, u8, u8) =
             get_time_values(number_of_seconds as i64);
-        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &FILETIME_EPOCH);
+        let (year, month, day_of_month): (i16, u8, u8) = get_date_values(days, &Self::EPOCH);
         format!(
             "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:07}",
             year, month, day_of_month, hours, minutes, seconds, fraction
@@ -81,7 +81,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_filetime_from_bytes() {
+    fn test_from_bytes() {
         let test_data: [u8; 8] = [0xce, 0x17, 0x0a, 0x3d, 0x62, 0x3a, 0xcb, 0x01];
 
         let test_struct: Filetime = Filetime::from_bytes(&test_data);
@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[test]
-    fn test_filetime_to_iso8601_string() {
+    fn test_to_iso8601_string() {
         let test_struct: Filetime = Filetime::new(0x01cb3a623d0a17ce);
 
         let string: String = test_struct.to_iso8601_string();

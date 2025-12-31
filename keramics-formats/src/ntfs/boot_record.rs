@@ -51,8 +51,7 @@ const SUPPORTED_CLUSTER_BLOCK_SIZE: [u32; 14] = [
         member(field(name = "bootcode", data_type = "[u8; 426]", format = "hex")),
         member(field(name = "boot_signature", data_type = "[u8; 2]", format = "hex")),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// New Technologies File System (NTFS) boot record.
 pub struct NtfsBootRecord {

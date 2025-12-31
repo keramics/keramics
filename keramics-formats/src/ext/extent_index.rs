@@ -24,7 +24,7 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
         field(name = "physical_block_number_upper", data_type = "u16"),
         field(name = "unknown1", data_type = "[u8; 2]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext) extent index.
 pub struct ExtExtentIndex {

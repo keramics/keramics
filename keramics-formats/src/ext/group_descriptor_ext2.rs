@@ -30,7 +30,7 @@ use super::group_descriptor::ExtGroupDescriptor;
         field(name = "padding1", data_type = "[u8; 2]"),
         field(name = "unknown1", data_type = "[u8; 12]"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext2 and ext3) group descriptor.
 pub struct Ext2GroupDescriptor {}

@@ -42,8 +42,7 @@ use super::constants::*;
         field(name = "saved_state", data_type = "u8"),
         field(name = "unknown1", data_type = "[u8; 427]")
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Virtual Hard Disk (VHD) file footer.
 pub struct VhdFileFooter {

@@ -26,7 +26,7 @@ use super::constants::*;
         field(name = "maximum_number_of_entries", data_type = "u16"),
         field(name = "depth", data_type = "u16"),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext) extents header.
 pub struct ExtExtentsHeader {

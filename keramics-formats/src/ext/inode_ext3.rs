@@ -47,7 +47,7 @@ use crate::ext::inode::ExtInode;
         member(field(name = "group_identifier_upper", data_type = "u16")),
         member(field(name = "unknown2", data_type = "[u8; 4]")),
     ),
-    method(name = "debug_read_data")
+    methods("debug_read_data")
 )]
 /// Extended File System (ext3) inode.
 pub struct Ext3Inode {}

@@ -39,8 +39,7 @@ use super::constants::*;
         field(name = "is_dirty", data_type = "u32"),
         field(name = "unknown3", data_type = "[u8; 396]"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// VMware Virtual Disk (VMDK) sparse Copy-On-Write Disk (COWD) file header.
 pub struct VmdkSparseCowdFileHeader {

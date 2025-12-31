@@ -22,8 +22,7 @@ use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
         field(name = "logical_sector_number", data_type = "u64"),
         field(name = "compressed_data_size", data_type = "u32"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// VMware Virtual Disk (VMDK) compressed grain header.
 pub struct VmdkCompressedGrainHeader {

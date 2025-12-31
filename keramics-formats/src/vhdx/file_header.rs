@@ -24,8 +24,7 @@ use super::constants::*;
         field(name = "creator_application", data_type = "Ucs2String<256>"),
         field(name = "unknown1", data_type = "[u8; 65016]"),
     ),
-    method(name = "debug_read_data"),
-    method(name = "read_at_position")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Virtual Hard Disk version 2 (VHDX) file header.
 pub struct VhdxFileHeader {}
@@ -39,14 +38,10 @@ impl VhdxFileHeader {
     /// Reads the file header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 65536 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != VHDX_FILE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         Ok(())
     }
