@@ -15,6 +15,7 @@ use std::time::SystemTime;
 
 use super::fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
 use super::filetime::Filetime;
+use super::hfs::HfsTime;
 use super::posix::{PosixTime32, PosixTime64Ns};
 
 #[derive(Clone, Debug, PartialEq)]
@@ -24,7 +25,7 @@ pub enum DateTime {
     FatTimeDate(FatTimeDate),
     FatTimeDate10Ms(FatTimeDate10Ms),
     Filetime(Filetime),
-    HfsTime,
+    HfsTime(HfsTime),
     NotSet,
     PosixTime32(PosixTime32),
     PosixTime64Ns(PosixTime64Ns),
