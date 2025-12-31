@@ -1329,7 +1329,7 @@ offset.
 In EnCase 6.7.1 the sectors section can be larger than 2048Mb. The table entries offsets are 31 bit
 values in EnCase6 the offset in a table entry value will actually use *the full 32 bit* if the
 2048Mb has been exceeded. This behavior is no longer present in EnCase 6.8 so it is assumed to be a
-bug.  Libewf currently assumes that the if the 31 bit value overflows the following chunks are
+bug. Libewf currently assumes that the if the 31 bit value overflows the following chunks are
 uncompressed. This allows EnCase 6.7.1 faulty EWF files to be converted.
 
 ##### Table footer

@@ -18,7 +18,7 @@ jobs:
     - name: Install dependencies
       run: |
         sudo apt-get update &&
-        sudo apt-get install -y attr genisoimage hfsutils qemu-utils
+        sudo apt-get install -y attr genisoimage hfsprogs hfsutils qemu-utils
     - name: Generate test data
       run: |
         ./scripts/generate_fat_test_data_linux.sh
