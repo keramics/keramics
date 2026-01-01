@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -11,26 +11,23 @@
  * under the License.
  */
 
-use std::slice::Iter;
-
 use darling::{FromDeriveInput, FromMeta};
 use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::punctuated::Punctuated;
-use syn::token::Comma;
-use syn::{LitStr, Meta, parse2};
 
-use crate::bitmap::BitmapLayout;
-use crate::enums::{BitOrder, ByteOrder, DataType, Format};
-use crate::errors::ParseError;
-use crate::structure::{
+use super::bitmap::BitmapLayout;
+use super::enums::{BitOrder, ByteOrder, DataType};
+use super::errors::ParseError;
+use super::options::{ByteOrderOption, FieldOptions, GroupOptions};
+use super::structure::{
     StructureLayout, StructureLayoutBitField, StructureLayoutBitFieldsGroup, StructureLayoutField,
     StructureLayoutGroup, StructureLayoutMember, StructureLayoutSequence,
 };
 
 // TODO: add ondemand vector type
 
-#[derive(Debug, Default, FromMeta)]
+#[derive(Default, FromMeta)]
 #[darling(default)]
 struct BitmapOptions {
     /// Bit order.
@@ -79,165 +76,14 @@ impl BitmapOptions {
     }
 }
 
-#[derive(Debug, Default, FromMeta)]
-#[darling(default)]
-struct FieldOptions {
-    /// Byte order.
-    byte_order: String,
-
-    /// Data type.
-    data_type: String,
-
-    /// Format.
-    format: String,
-
-    /// Modifier.
-    modifier: String,
-
-    /// Name.
-    name: String,
-}
-
-impl FieldOptions {
-    /// Parses the byte order.
-    pub fn parse_byte_order(&self) -> Result<ByteOrder, ParseError> {
-        match self.byte_order.as_str() {
-            "be" | "big" | "BigEndian" => Ok(ByteOrder::BigEndian),
-            "le" | "little" | "LittleEndian" => Ok(ByteOrder::LittleEndian),
-            "" => Ok(ByteOrder::NotSet),
-            _ => Err(ParseError::new(format!(
-                "Unsupported byte order: {}",
-                self.byte_order
-            ))),
-        }
-    }
-
-    /// Parses the data type.
-    fn parse_data_type(&self) -> Result<(DataType, usize), ParseError> {
-        if self.data_type.is_empty() {
-            return Err(ParseError::new(String::from("Missing data type")));
-        }
-        let mut data_type_str: &str = self.data_type.as_str();
-        let mut number_of_elements_str: &str = "";
-
-        if data_type_str.starts_with("[") && data_type_str.ends_with("]") {
-            data_type_str = data_type_str.strip_prefix("[").unwrap();
-            data_type_str = data_type_str.strip_suffix("]").unwrap();
-            (data_type_str, number_of_elements_str) = data_type_str.rsplit_once(";").unwrap();
-            data_type_str = data_type_str.trim();
-            number_of_elements_str = number_of_elements_str.trim();
-        }
-        let data_type: DataType = match data_type_str {
-            "FatDate" => DataType::FatDate,
-            "FatTimeDate" => DataType::FatTimeDate,
-            "FatTimeDate10Ms" => DataType::FatTimeDate10Ms,
-            "Filetime" => DataType::Filetime,
-            "i8" | "int8" | "SignedInteger8Bit" => DataType::SignedInteger8Bit,
-            "i16" | "int16" | "SignedInteger16Bit" => DataType::SignedInteger16Bit,
-            "i32" | "int32" | "SignedInteger32Bit" => DataType::SignedInteger32Bit,
-            "i64" | "int64" | "SignedInteger64Bit" => DataType::SignedInteger64Bit,
-            "HfsTime" => DataType::HfsTime,
-            "PosixTime32" => DataType::PosixTime32,
-            "u8" | "uint8" | "UnsignedInteger8Bit" => DataType::UnsignedInteger8Bit,
-            "u16" | "uint16" | "UnsignedInteger16Bit" => DataType::UnsignedInteger16Bit,
-            "u32" | "uint32" | "UnsignedInteger32Bit" => DataType::UnsignedInteger32Bit,
-            "u64" | "uint64" | "UnsignedInteger64Bit" => DataType::UnsignedInteger64Bit,
-            "uuid" | "Uuid" => DataType::Uuid,
-            _ => {
-                if data_type_str.starts_with("BitField8<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("BitField8<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::BitField8
-                } else if data_type_str.starts_with("BitField16<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("BitField16<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::BitField16
-                } else if data_type_str.starts_with("BitField32<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("BitField32<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::BitField32
-                } else if data_type_str.starts_with("BitField64<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("BitField64<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::BitField64
-                } else if data_type_str.starts_with("ByteString<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("ByteString<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::ByteString
-                } else if data_type_str.starts_with("Struct<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("Struct<").unwrap();
-                    data_type_str = data_type_str.strip_suffix(">").unwrap();
-                    let (struct_name_str, struct_size_str) = data_type_str.split_once(";").unwrap();
-                    DataType::Struct {
-                        name: struct_name_str.trim().to_string(),
-                        size: struct_size_str.trim().parse::<usize>().unwrap(),
-                    }
-                } else if data_type_str.starts_with("Ucs2String<") && data_type_str.ends_with(">") {
-                    data_type_str = data_type_str.strip_prefix("Ucs2String<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::Ucs2String
-                } else if data_type_str.starts_with("Utf16String<") && data_type_str.ends_with(">")
-                {
-                    data_type_str = data_type_str.strip_prefix("Utf16String<").unwrap();
-                    number_of_elements_str = data_type_str.strip_suffix(">").unwrap();
-                    DataType::Utf16String
-                } else {
-                    return Err(ParseError::new(format!(
-                        "Unsupported data type: {}",
-                        data_type_str
-                    )));
-                }
-            }
-        };
-        let mut number_of_elements: usize = 1;
-
-        if !number_of_elements_str.is_empty() {
-            number_of_elements = match number_of_elements_str.parse::<usize>() {
-                Ok(value) => value,
-                Err(_) => {
-                    return Err(ParseError::new(format!(
-                        "Unsupported number of elements: {} in data type: {}",
-                        number_of_elements_str, data_type_str
-                    )));
-                }
-            }
-        }
-        Ok((data_type, number_of_elements))
-    }
-
-    /// Parses the format.
-    pub fn parse_format(&self) -> Result<Format, ParseError> {
-        match self.format.as_str() {
-            "char" | "Character" => Ok(Format::Character),
-            "hex" | "Hexadecimal" => Ok(Format::Hexadecimal),
-            "" => Ok(Format::NotSet),
-            _ => Err(ParseError::new(format!(
-                "Unsupported format: {}",
-                self.format
-            ))),
-        }
-    }
-}
-
-#[derive(Debug, Default, FromMeta)]
-#[darling(default)]
-struct GroupOptions {
-    /// Size condition.
-    size_condition: String,
-
-    /// Fields.
-    #[darling(default, multiple, rename = "field")]
-    fields: Vec<FieldOptions>,
-}
-
-#[derive(Debug, Default, FromMeta)]
+#[derive(Default, FromMeta)]
 #[darling(default)]
 struct MethodOptions {
     /// Name.
     name: String,
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 struct MethodsOptions {
     /// names.
     names: Vec<String>,
@@ -253,10 +99,11 @@ impl MethodsOptions {
 impl Parse for MethodsOptions {
     /// Parses the options from the input.
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let names: Vec<String> = Punctuated::<LitStr, Comma>::parse_terminated(input)?
-            .iter()
-            .map(|lit_str| lit_str.value())
-            .collect();
+        let names: Vec<String> =
+            Punctuated::<syn::LitStr, syn::token::Comma>::parse_terminated(input)?
+                .iter()
+                .map(|lit_str| lit_str.value())
+                .collect();
 
         Ok(Self { names })
     }
@@ -264,9 +111,9 @@ impl Parse for MethodsOptions {
 
 impl FromMeta for MethodsOptions {
     /// Creates the options from the meta item.
-    fn from_meta(item: &Meta) -> darling::Result<Self> {
+    fn from_meta(item: &syn::Meta) -> darling::Result<Self> {
         match item {
-            Meta::List(meta_list) => match parse2::<Self>(meta_list.tokens.clone()) {
+            syn::Meta::List(meta_list) => match syn::parse2::<Self>(meta_list.tokens.clone()) {
                 Ok(methods_options) => Ok(methods_options),
                 Err(error) => {
                     return Err(darling::Error::custom(format!(
@@ -276,67 +123,229 @@ impl FromMeta for MethodsOptions {
                 }
             },
             _ => Err(darling::Error::custom(
-                "LayoutMap methods requires one or more strings",
+                "Unsupported item type for LayoutMap methods",
             )),
         }
     }
 }
 
-#[derive(Debug, FromMeta)]
-#[darling(default)]
 enum StructureMember {
-    /// Field.
-    #[darling(rename = "field")]
+    BitField(FieldOptions),
     Field(FieldOptions),
-
-    /// Group.
-    #[darling(rename = "group")]
     Group(GroupOptions),
 }
 
-impl Default for StructureMember {
-    /// Creates a new default structure member.
-    fn default() -> Self {
-        StructureMember::Field(FieldOptions::default())
-    }
-}
+impl Parse for StructureMember {
+    /// Parses the options from the input.
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if let Ok(ident) = input.fork().parse::<syn::Ident>() {
+            let identifier: String = ident.to_string();
 
-#[derive(Debug, Default, FromMeta)]
-#[darling(default)]
-struct StructureOptions {
-    /// Byte order.
-    byte_order: String,
+            match identifier.as_str() {
+                "field" => {
+                    let meta_list: syn::MetaList = input.parse()?;
 
-    /// Fields.
-    #[darling(default, multiple, rename = "field")]
-    fields: Vec<FieldOptions>,
+                    match syn::parse2::<FieldOptions>(meta_list.tokens.clone()) {
+                        Ok(field_options) => {
+                            let structure_member: StructureMember = match &field_options.data_type {
+                                DataType::BitField8
+                                | DataType::BitField16
+                                | DataType::BitField32
+                                | DataType::BitField64 => StructureMember::BitField(field_options),
+                                _ => StructureMember::Field(field_options),
+                            };
+                            Ok(structure_member)
+                        }
+                        Err(error) => Err(syn::Error::new(
+                            ident.span(),
+                            format!(
+                                "Unable to parse LayoutMap member field with error: {}",
+                                error
+                            ),
+                        )),
+                    }
+                }
+                "group" => {
+                    let meta_list: syn::MetaList = input.parse()?;
 
-    /// Members.
-    #[darling(default, multiple, rename = "member")]
-    members: Vec<StructureMember>,
-}
-
-impl StructureOptions {
-    /// Determines if the options are empty.
-    pub fn is_empty(&self) -> bool {
-        self.byte_order.is_empty() && (self.fields.is_empty() || self.members.is_empty())
-    }
-
-    /// Parses the byte order.
-    pub fn parse_byte_order(&self) -> Result<ByteOrder, ParseError> {
-        match self.byte_order.as_str() {
-            "be" | "big" | "BigEndian" => Ok(ByteOrder::BigEndian),
-            "le" | "little" | "LittleEndian" => Ok(ByteOrder::LittleEndian),
-            "" => Ok(ByteOrder::NotSet),
-            _ => Err(ParseError::new(format!(
-                "Unsupported byte order: {}",
-                self.byte_order
-            ))),
+                    match syn::parse2::<GroupOptions>(meta_list.tokens.clone()) {
+                        Ok(group_options) => Ok(StructureMember::Group(group_options)),
+                        Err(error) => Err(syn::Error::new(
+                            ident.span(),
+                            format!(
+                                "Unable to parse LayoutMap member group with error: {}",
+                                error
+                            ),
+                        )),
+                    }
+                }
+                _ => {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        format!("Unsupported LayoutMap member attribute: {}", identifier),
+                    ));
+                }
+            }
+        } else {
+            Err(syn::Error::new(
+                input.span(),
+                "Unsupported LayoutMap member definition",
+            ))
         }
     }
 }
 
-#[derive(Debug, FromDeriveInput)]
+struct StructureOptions {
+    /// Byte order.
+    byte_order: ByteOrder,
+
+    /// Members.
+    members: Vec<StructureMember>,
+}
+
+impl StructureOptions {
+    /// Creates new options.
+    pub fn new() -> Self {
+        Self {
+            byte_order: ByteOrder::NotSet,
+            members: Vec::new(),
+        }
+    }
+
+    /// Determines if the options are empty.
+    pub fn is_empty(&self) -> bool {
+        self.members.is_empty()
+    }
+}
+
+impl Default for StructureOptions {
+    /// Creates new options.
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Parse for StructureOptions {
+    /// Parses the options from the input.
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let mut options: Self = Self::new();
+
+        while !input.is_empty() {
+            if let Ok(ident) = input.fork().parse::<syn::Ident>() {
+                let identifier: String = ident.to_string();
+
+                match identifier.as_str() {
+                    "byte_order" => {
+                        input.parse::<syn::Ident>()?;
+                        input.parse::<syn::token::Eq>()?;
+
+                        options.byte_order = input.parse::<ByteOrderOption>()?.value();
+                    }
+                    "field" => {
+                        let meta_list: syn::MetaList = input.parse()?;
+
+                        match syn::parse2::<FieldOptions>(meta_list.tokens.clone()) {
+                            Ok(field_options) => {
+                                let structure_member: StructureMember =
+                                    match &field_options.data_type {
+                                        DataType::BitField8
+                                        | DataType::BitField16
+                                        | DataType::BitField32
+                                        | DataType::BitField64 => {
+                                            StructureMember::BitField(field_options)
+                                        }
+                                        _ => StructureMember::Field(field_options),
+                                    };
+                                options.members.push(structure_member);
+                            }
+                            Err(error) => {
+                                return Err(syn::Error::new(
+                                    ident.span(),
+                                    format!(
+                                        "Unable to parse LayoutMap structure field with error: {}",
+                                        error
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                    "group" => {
+                        let meta_list: syn::MetaList = input.parse()?;
+
+                        match syn::parse2::<GroupOptions>(meta_list.tokens.clone()) {
+                            Ok(group_options) => {
+                                options.members.push(StructureMember::Group(group_options))
+                            }
+                            Err(error) => {
+                                return Err(syn::Error::new(
+                                    ident.span(),
+                                    format!(
+                                        "Unable to parse LayoutMap structure group with error: {}",
+                                        error
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                    // TODO: remove, member has been deprecated
+                    "member" => {
+                        let meta_list: syn::MetaList = input.parse()?;
+
+                        match syn::parse2::<StructureMember>(meta_list.tokens.clone()) {
+                            Ok(structure_member) => options.members.push(structure_member),
+                            Err(error) => {
+                                return Err(syn::Error::new(
+                                    ident.span(),
+                                    format!(
+                                        "Unable to parse LayoutMap structure member with error: {}",
+                                        error
+                                    ),
+                                ));
+                            }
+                        }
+                    }
+                    _ => {
+                        return Err(syn::Error::new(
+                            ident.span(),
+                            format!("Unsupported LayoutMap structure attribute: {}", identifier),
+                        ));
+                    }
+                }
+            } else {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "Unsupported LayoutMap structure definition",
+                ));
+            }
+            if !input.is_empty() {
+                input.parse::<syn::token::Comma>()?;
+            }
+        }
+        Ok(options)
+    }
+}
+
+impl FromMeta for StructureOptions {
+    /// Creates the options from the meta item.
+    fn from_meta(item: &syn::Meta) -> darling::Result<Self> {
+        match item {
+            syn::Meta::List(meta_list) => match syn::parse2::<Self>(meta_list.tokens.clone()) {
+                Ok(methods_options) => Ok(methods_options),
+                Err(error) => {
+                    return Err(darling::Error::custom(format!(
+                        "Unable to parse LayoutMap structure with error: {}",
+                        error
+                    )));
+                }
+            },
+            _ => Err(darling::Error::custom(
+                "Unsupported item type for LayoutMap structure",
+            )),
+        }
+    }
+}
+
+#[derive(FromDeriveInput)]
 #[darling(attributes(layout_map), supports(struct_named))]
 struct LayoutMapOptions {
     /// Bitmap.
@@ -391,105 +400,12 @@ fn parse_bitmap_layout(
     // Ok(bitmap_layout)
 }
 
-/// Parses a structure layout bitfield.
-fn parse_structure_layout_bitfield(
-    name: &String,
-    field_options: &FieldOptions,
-) -> Result<StructureLayoutBitField, ParseError> {
-    if field_options.name.is_empty() {
-        return Err(ParseError::new(format!(
-            "Name missing in field in layout map of {}",
-            name
-        )));
-    }
-    let (_, number_of_elements): (DataType, usize) = match field_options.parse_data_type() {
-        Ok(value) => value,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    let format: Format = match field_options.parse_format() {
-        Ok(format) => format,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    Ok(StructureLayoutBitField::new(
-        &field_options.name,
-        number_of_elements,
-        &field_options.modifier,
-        format,
-    ))
-}
-
-/// Parses a structure layout field.
-fn parse_structure_layout_field(
-    name: &String,
-    field_options: &FieldOptions,
-) -> Result<StructureLayoutField, ParseError> {
-    if field_options.name.is_empty() {
-        return Err(ParseError::new(format!(
-            "Name missing in field in layout map of {}",
-            name
-        )));
-    }
-    let (data_type, _): (DataType, usize) = match field_options.parse_data_type() {
-        Ok(value) => value,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    let byte_order: ByteOrder = match field_options.parse_byte_order() {
-        Ok(byte_order) => byte_order,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    let format: Format = match field_options.parse_format() {
-        Ok(format) => format,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    Ok(StructureLayoutField::new(
-        &field_options.name,
-        data_type,
-        byte_order,
-        &field_options.modifier,
-        format,
-    ))
-}
-
 /// Parses a structure layout member.
 fn parse_structure_layout_member(
     name: &String,
     field_options: &FieldOptions,
 ) -> Result<StructureLayoutMember, ParseError> {
-    let (data_type, number_of_elements): (DataType, usize) = match field_options.parse_data_type() {
-        Ok(value) => value,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    match data_type {
+    match &field_options.data_type {
         DataType::BitField8
         | DataType::BitField16
         | DataType::BitField32
@@ -505,10 +421,20 @@ fn parse_structure_layout_member(
             Ok(StructureLayoutMember::Sequence(sequence))
         }
         _ => {
-            if number_of_elements == 1 {
-                let field: StructureLayoutField =
-                    parse_structure_layout_field(name, field_options)?;
-
+            if field_options.number_of_elements == 1 {
+                if field_options.name.is_empty() {
+                    return Err(ParseError::new(format!(
+                        "Name missing in field in layout map of {}",
+                        name
+                    )));
+                }
+                let field: StructureLayoutField = StructureLayoutField::new(
+                    &field_options.name,
+                    &field_options.data_type,
+                    &field_options.byte_order,
+                    &field_options.modifier,
+                    &field_options.format,
+                );
                 Ok(StructureLayoutMember::Field(field))
             } else {
                 let sequence: StructureLayoutSequence =
@@ -537,41 +463,17 @@ fn parse_structure_layout_sequence(
             field_options.name, name
         )));
     }
-    let (data_type, number_of_elements): (DataType, usize) = match field_options.parse_data_type() {
-        Ok(value) => value,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    let byte_order: ByteOrder = match field_options.parse_byte_order() {
-        Ok(byte_order) => byte_order,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
-    let format: Format = match field_options.parse_format() {
-        Ok(format) => format,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in field: {}",
-                error, field_options.name
-            )));
-        }
-    };
     let field: StructureLayoutField = StructureLayoutField::new(
         &field_options.name,
-        data_type,
-        byte_order,
+        &field_options.data_type,
+        &field_options.byte_order,
         &field_options.modifier,
-        format,
+        &field_options.format,
     );
-    Ok(StructureLayoutSequence::new(field, number_of_elements))
+    Ok(StructureLayoutSequence::new(
+        field,
+        field_options.number_of_elements,
+    ))
 }
 
 /// Parses a structure layout group.
@@ -585,19 +487,31 @@ fn parse_structure_layout_group(
             name
         )));
     }
-    let condition: String = if !group_options.size_condition.is_empty() {
-        format!("data.len() {}", group_options.size_condition)
-    } else {
-        return Err(ParseError::new(format!(
-            "Missing condition in group in layout map of {}",
-            name
-        )));
+    let condition: &String = match group_options.size_condition.as_ref() {
+        Some(string) => string,
+        None => {
+            return Err(ParseError::new(format!(
+                "Missing condition in group in layout map of {}",
+                name
+            )));
+        }
     };
-    let mut group: StructureLayoutGroup = StructureLayoutGroup::new(&condition);
+    let mut group: StructureLayoutGroup = StructureLayoutGroup::new(condition);
 
     for field_options in group_options.fields.iter() {
-        let field: StructureLayoutField = parse_structure_layout_field(name, field_options)?;
-
+        if field_options.name.is_empty() {
+            return Err(ParseError::new(format!(
+                "Name missing in field in layout map of {}",
+                name
+            )));
+        }
+        let field: StructureLayoutField = StructureLayoutField::new(
+            &field_options.name,
+            &field_options.data_type,
+            &field_options.byte_order,
+            &field_options.modifier,
+            &field_options.format,
+        );
         group.fields.push(field);
     }
     Ok(group)
@@ -611,135 +525,95 @@ fn parse_structure_layout(
 ) -> Result<StructureLayout, ParseError> {
     let name: String = struct_ident.to_string();
 
-    let byte_order: ByteOrder = match options.structure.parse_byte_order() {
-        Ok(byte_order) => byte_order,
-        Err(error) => {
-            return Err(ParseError::new(format!(
-                "{} in layout map of {}",
-                error, name
-            )));
-        }
-    };
-    if !options.structure.fields.is_empty() && !options.structure.members.is_empty() {
-        return Err(ParseError::new(format!(
-            "Structure cannot combine fields and member in layout map of {}",
-            name
-        )));
-    }
-    let mut structure_layout: StructureLayout = StructureLayout::new(&name, byte_order);
+    let mut structure_layout: StructureLayout =
+        StructureLayout::new(&name, &options.structure.byte_order);
 
-    if !options.structure.fields.is_empty() {
-        let mut fields_iterator: Iter<FieldOptions> = options.structure.fields.iter();
-
-        while let Some(mut field_options) = fields_iterator.next() {
-            let (data_type, _): (DataType, usize) = match field_options.parse_data_type() {
-                Ok(value) => value,
-                Err(error) => {
+    for structure_member in options.structure.members.iter() {
+        match structure_member {
+            StructureMember::BitField(field_options) => {
+                if field_options.name.is_empty() {
                     return Err(ParseError::new(format!(
-                        "{} in field: {}",
-                        error, field_options.name
+                        "Name missing in field in layout map of {}",
+                        name
                     )));
                 }
-            };
-            match data_type {
-                DataType::BitField8
-                | DataType::BitField16
-                | DataType::BitField32
-                | DataType::BitField64 => {
-                    let number_of_bits: usize = match data_type {
-                        DataType::BitField8 => 8,
-                        DataType::BitField16 => 16,
-                        DataType::BitField32 => 32,
-                        DataType::BitField64 => 64,
-                        _ => {
-                            return Err(ParseError::new(format!(
-                                "Unsupported data type of field: {}",
-                                field_options.name
-                            )));
-                        }
-                    };
-                    let byte_order: ByteOrder = match field_options.parse_byte_order() {
-                        Ok(byte_order) => byte_order,
-                        Err(error) => {
-                            return Err(ParseError::new(format!(
-                                "{} in field: {}",
-                                error, field_options.name
-                            )));
-                        }
-                    };
-                    let mut bitfields_group: StructureLayoutBitFieldsGroup =
-                        StructureLayoutBitFieldsGroup::new(data_type, byte_order);
-
-                    let mut bit_offset: usize = 0;
-
-                    loop {
-                        let bitfield: StructureLayoutBitField =
-                            parse_structure_layout_bitfield(&name, field_options)?;
-                        bit_offset += bitfield.number_of_bits;
-
-                        bitfields_group.bitfields.push(bitfield);
-
-                        if bit_offset >= number_of_bits {
-                            break;
-                        }
-                        field_options = match fields_iterator.next() {
-                            Some(field_options) => {
-                                match field_options.parse_data_type() {
-                                    Ok((data_type, _)) => {
-                                        if data_type != bitfields_group.data_type {
-                                            return Err(ParseError::new(format!(
-                                                "Unsupported data type of field: {} expected BitField{}",
-                                                field_options.name, number_of_bits
-                                            )));
-                                        }
-                                    }
-                                    Err(error) => {
-                                        return Err(ParseError::new(format!(
-                                            "{} in field: {}",
-                                            error, field_options.name
-                                        )));
-                                    }
-                                };
-                                field_options
-                            }
-                            None => break,
-                        }
+                let new_bitfield_group: bool = match structure_layout.members.last() {
+                    Some(StructureLayoutMember::BitFields(bitfields_group)) => {
+                        bitfields_group.is_full()
                     }
-                    if bit_offset != number_of_bits {
-                        return Err(ParseError::new(format!(
-                            "BitField{} mismatch in number of bits: {} after field: {}",
-                            number_of_bits, bit_offset, field_options.name
-                        )));
-                    }
+                    _ => true,
+                };
+                if new_bitfield_group {
+                    let bitfields_group: StructureLayoutBitFieldsGroup =
+                        StructureLayoutBitFieldsGroup::new(
+                            &field_options.data_type,
+                            &field_options.byte_order,
+                        );
                     structure_layout
                         .members
                         .push(StructureLayoutMember::BitFields(bitfields_group));
                 }
-                _ => {
-                    let field_member: StructureLayoutMember =
-                        parse_structure_layout_member(&name, field_options)?;
-
-                    structure_layout.members.push(field_member);
+                match structure_layout.members.last_mut() {
+                    Some(StructureLayoutMember::BitFields(bitfields_group)) => {
+                        if !bitfields_group.bitfields.is_empty() {
+                            if field_options.data_type != bitfields_group.data_type {
+                                return Err(ParseError::new(format!(
+                                    "Unsupported data type of field: {} expected BitField{}",
+                                    field_options.name, bitfields_group.size
+                                )));
+                            }
+                        }
+                        let bitfield: StructureLayoutBitField = StructureLayoutBitField::new(
+                            &field_options.name,
+                            field_options.number_of_elements,
+                            &field_options.modifier,
+                            &field_options.format,
+                        );
+                        if bitfield.number_of_bits > bitfields_group.get_available_size() {
+                            return Err(ParseError::new(format!(
+                                "Size of field: {} exceeds size of BitField{}",
+                                field_options.name, bitfields_group.size
+                            )));
+                        }
+                        bitfields_group.add_bitfield(bitfield);
+                    }
+                    _ => {
+                        return Err(ParseError::new(String::from(
+                            "Unable to retrieve last bitfields group",
+                        )));
+                    }
                 }
             }
-        }
-    } else if !options.structure.members.is_empty() {
-        for structure_member in options.structure.members.iter() {
-            match structure_member {
-                StructureMember::Field(field_options) => {
-                    let field_member: StructureLayoutMember =
-                        parse_structure_layout_member(&name, field_options)?;
-
-                    structure_layout.members.push(field_member);
+            StructureMember::Field(field_options) => {
+                if field_options.name.is_empty() {
+                    return Err(ParseError::new(format!(
+                        "Name missing in field in layout map of {}",
+                        name
+                    )));
                 }
-                StructureMember::Group(group_options) => {
-                    let group: StructureLayoutGroup =
-                        parse_structure_layout_group(&name, group_options)?;
-
-                    structure_layout
-                        .members
-                        .push(StructureLayoutMember::Group(group));
+                match structure_layout.members.last() {
+                    Some(StructureLayoutMember::BitFields(bitfields_group)) => {
+                        if !bitfields_group.is_full() {
+                            return Err(ParseError::new(format!(
+                                "Incomplete bitfields group before field: {} in layout map of: {}",
+                                field_options.name, name
+                            )));
+                        }
+                    }
+                    _ => {},
                 }
+                let field_member: StructureLayoutMember =
+                    parse_structure_layout_member(&name, &field_options)?;
+
+                structure_layout.members.push(field_member);
+            }
+            StructureMember::Group(group_options) => {
+                let group: StructureLayoutGroup =
+                    parse_structure_layout_group(&name, group_options)?;
+
+                structure_layout
+                    .members
+                    .push(StructureLayoutMember::Group(group));
             }
         }
     }
@@ -869,6 +743,7 @@ mod tests {
         .unwrap();
     }
 
+    // TODO: remove, member has been deprecated
     #[test]
     fn test_derive_structure_with_members() {
         LayoutMapOptions::from_derive_input(&parse_quote! {
@@ -879,7 +754,7 @@ mod tests {
                     member(field(name = "format_version", data_type = "u16")),
                     member(field(name = "number_of_elements", data_type = "u32")),
                     member(group(
-                        size_condition = ">= 128",
+                        size_condition = ">= 8",
                         field(name = "extra_size", data_type = "u16")
                     )),
                 )

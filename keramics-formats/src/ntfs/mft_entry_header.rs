@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -21,20 +21,20 @@ use super::constants::*;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "signature", data_type = "ByteString<4>")),
-        member(field(name = "fixup_values_offset", data_type = "u16")),
-        member(field(name = "number_of_fixup_values", data_type = "u16")),
-        member(field(name = "journal_sequence_number", data_type = "u64")),
-        member(field(name = "sequence_number", data_type = "u16")),
-        member(field(name = "reference_count", data_type = "u16")),
-        member(field(name = "attributes_offset", data_type = "u16")),
-        member(field(name = "flags", data_type = "u16")),
-        member(field(name = "used_size", data_type = "u32")),
-        member(field(name = "mft_entry_size", data_type = "u32")),
-        member(field(name = "base_record_file_reference", data_type = "u64")),
-        member(field(name = "first_available_attribute_identifier", data_type = "u16")),
-        member(field(name = "unknown1", data_type = "[u8; 2]")),
-        member(field(name = "mft_entry_number", data_type = "u32")),
+        field(name = "signature", data_type = "ByteString<4>"),
+        field(name = "fixup_values_offset", data_type = "u16"),
+        field(name = "number_of_fixup_values", data_type = "u16"),
+        field(name = "journal_sequence_number", data_type = "u64"),
+        field(name = "sequence_number", data_type = "u16"),
+        field(name = "reference_count", data_type = "u16"),
+        field(name = "attributes_offset", data_type = "u16"),
+        field(name = "flags", data_type = "u16"),
+        field(name = "used_size", data_type = "u32"),
+        field(name = "mft_entry_size", data_type = "u32"),
+        field(name = "base_record_file_reference", data_type = "u64"),
+        field(name = "first_available_attribute_identifier", data_type = "u16"),
+        field(name = "unknown1", data_type = "[u8; 2]"),
+        field(name = "mft_entry_number", data_type = "u32"),
     ),
     methods("debug_read_data")
 )]

@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -20,14 +20,14 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u64_le};
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "data_first_vcn", data_type = "u64")),
-        member(field(name = "data_last_vcn", data_type = "u64")),
-        member(field(name = "data_runs_offset", data_type = "u16")),
-        member(field(name = "compression_unit_size", data_type = "u16")),
-        member(field(name = "unknown1", data_type = "[u8; 4]")),
-        member(field(name = "allocated_data_size", data_type = "u64")),
-        member(field(name = "data_size", data_type = "u64")),
-        member(field(name = "valid_data_size", data_type = "u64")),
+        field(name = "data_first_vcn", data_type = "u64"),
+        field(name = "data_last_vcn", data_type = "u64"),
+        field(name = "data_runs_offset", data_type = "u16"),
+        field(name = "compression_unit_size", data_type = "u16"),
+        field(name = "unknown1", data_type = "[u8; 4]"),
+        field(name = "allocated_data_size", data_type = "u64"),
+        field(name = "data_size", data_type = "u64"),
+        field(name = "valid_data_size", data_type = "u64"),
     ),
     methods("debug_read_data")
 )]

@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -24,15 +24,15 @@ use super::inode::ExtInode;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "extra_size", data_type = "u16")),
-        member(field(name = "checksum_upper", data_type = "u16", format = "hex")),
-        member(field(name = "change_time_extra_precision", data_type = "u32")),
-        member(field(name = "modification_time_extra_precision", data_type = "u32")),
-        member(field(name = "access_time_extra_precision", data_type = "u32")),
-        member(field(name = "creation_time", data_type = "PosixTime32")),
-        member(field(name = "creation_time_extra_precision", data_type = "u32")),
-        member(field(name = "version_upper", data_type = "u32")),
-        member(field(name = "unknown3", data_type = "[u8; 4]")),
+        field(name = "extra_size", data_type = "u16"),
+        field(name = "checksum_upper", data_type = "u16", format = "hex"),
+        field(name = "change_time_extra_precision", data_type = "u32"),
+        field(name = "modification_time_extra_precision", data_type = "u32"),
+        field(name = "access_time_extra_precision", data_type = "u32"),
+        field(name = "creation_time", data_type = "PosixTime32"),
+        field(name = "creation_time_extra_precision", data_type = "u32"),
+        field(name = "version_upper", data_type = "u32"),
+        field(name = "unknown3", data_type = "[u8; 4]"),
     ),
     methods("debug_read_data")
 )]

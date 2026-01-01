@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -11,13 +11,12 @@
  * under the License.
  */
 
+mod bitmap;
 mod enums;
 mod errors;
-
-mod bitmap;
-mod structure;
-
 mod macros;
+mod options;
+mod structure;
 
 #[proc_macro_derive(LayoutMap, attributes(layout_map))]
 pub fn layout_map(input: proc_macro::TokenStream) -> proc_macro::TokenStream {

@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -23,29 +23,29 @@ use crate::ext::inode::ExtInode;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "file_mode", data_type = "u16")),
-        member(field(name = "owner_identifier_lower", data_type = "u16")),
-        member(field(name = "data_size_lower", data_type = "u32")),
-        member(field(name = "access_time", data_type = "PosixTime32")),
-        member(field(name = "change_time", data_type = "PosixTime32")),
-        member(field(name = "modification_time", data_type = "PosixTime32")),
-        member(field(name = "deletion_time", data_type = "PosixTime32")),
-        member(field(name = "group_identifier_lower", data_type = "u16")),
-        member(field(name = "number_of_links", data_type = "u16")),
-        member(field(name = "number_of_blocks_lower", data_type = "u32")),
-        member(field(name = "flags", data_type = "u32", format = "hex")),
-        member(field(name = "version_lower", data_type = "u32")),
-        member(field(name = "data_reference", data_type = "[u8; 60]")),
-        member(field(name = "nfs_generation_number", data_type = "u32")),
-        member(field(name = "file_acl_block_number_lower", data_type = "u32")),
-        member(field(name = "data_size_upper", data_type = "u32")),
-        member(field(name = "fragment_block_address", data_type = "u32")),
-        member(field(name = "number_of_blocks_upper", data_type = "u16")),
-        member(field(name = "file_acl_block_number_upper", data_type = "u16")),
-        member(field(name = "owner_identifier_upper", data_type = "u16")),
-        member(field(name = "group_identifier_upper", data_type = "u16")),
-        member(field(name = "checksum_lower", data_type = "u16", format = "hex")),
-        member(field(name = "unknown2", data_type = "[u8; 2]")),
+        field(name = "file_mode", data_type = "u16"),
+        field(name = "owner_identifier_lower", data_type = "u16"),
+        field(name = "data_size_lower", data_type = "u32"),
+        field(name = "access_time", data_type = "PosixTime32"),
+        field(name = "change_time", data_type = "PosixTime32"),
+        field(name = "modification_time", data_type = "PosixTime32"),
+        field(name = "deletion_time", data_type = "PosixTime32"),
+        field(name = "group_identifier_lower", data_type = "u16"),
+        field(name = "number_of_links", data_type = "u16"),
+        field(name = "number_of_blocks_lower", data_type = "u32"),
+        field(name = "flags", data_type = "u32", format = "hex"),
+        field(name = "version_lower", data_type = "u32"),
+        field(name = "data_reference", data_type = "[u8; 60]"),
+        field(name = "nfs_generation_number", data_type = "u32"),
+        field(name = "file_acl_block_number_lower", data_type = "u32"),
+        field(name = "data_size_upper", data_type = "u32"),
+        field(name = "fragment_block_address", data_type = "u32"),
+        field(name = "number_of_blocks_upper", data_type = "u16"),
+        field(name = "file_acl_block_number_upper", data_type = "u16"),
+        field(name = "owner_identifier_upper", data_type = "u16"),
+        field(name = "group_identifier_upper", data_type = "u16"),
+        field(name = "checksum_lower", data_type = "u16", format = "hex"),
+        field(name = "unknown2", data_type = "[u8; 2]"),
     ),
     methods("debug_read_data")
 )]

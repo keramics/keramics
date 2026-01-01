@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -19,9 +19,9 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "tag", data_type = "u32", format = "hex")),
-        member(field(name = "data_size", data_type = "u16")),
-        member(field(name = "unknown1", data_type = "[u8; 2]")),
+        field(name = "tag", data_type = "u32", format = "hex"),
+        field(name = "data_size", data_type = "u16"),
+        field(name = "unknown1", data_type = "[u8; 2]"),
     ),
     methods("debug_read_data")
 )]

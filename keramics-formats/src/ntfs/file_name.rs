@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -23,17 +23,17 @@ use super::mft_attribute::NtfsMftAttribute;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "parent_file_reference", data_type = "u64", format = "hex")),
-        member(field(name = "creation_time", data_type = "Filetime")),
-        member(field(name = "modification_time", data_type = "Filetime")),
-        member(field(name = "entry_modification_time", data_type = "Filetime")),
-        member(field(name = "access_time", data_type = "Filetime")),
-        member(field(name = "allocated_data_size", data_type = "u64")),
-        member(field(name = "data_size", data_type = "u64")),
-        member(field(name = "file_attribute_flags", data_type = "u32", format = "hex")),
-        member(field(name = "extended_data", data_type = "[u8; 4]")),
-        member(field(name = "name_size", data_type = "u8")),
-        member(field(name = "name_space", data_type = "u8")),
+        field(name = "parent_file_reference", data_type = "u64", format = "hex"),
+        field(name = "creation_time", data_type = "Filetime"),
+        field(name = "modification_time", data_type = "Filetime"),
+        field(name = "entry_modification_time", data_type = "Filetime"),
+        field(name = "access_time", data_type = "Filetime"),
+        field(name = "allocated_data_size", data_type = "u64"),
+        field(name = "data_size", data_type = "u64"),
+        field(name = "file_attribute_flags", data_type = "u32", format = "hex"),
+        field(name = "extended_data", data_type = "[u8; 4]"),
+        field(name = "name_size", data_type = "u8"),
+        field(name = "name_space", data_type = "u8"),
     ),
     methods("debug_read_data")
 )]

@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -19,10 +19,10 @@ use keramics_types::bytes_to_u32_le;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "verion", data_type = "u32")),
-        member(field(name = "provider", data_type = "u32")),
-        member(field(name = "unknown1", data_type = "[u8; 4]")),
-        member(field(name = "compression_method", data_type = "u32")),
+        field(name = "verion", data_type = "u32"),
+        field(name = "provider", data_type = "u32"),
+        field(name = "unknown1", data_type = "[u8; 4]"),
+        field(name = "compression_method", data_type = "u32"),
     ),
     methods("debug_read_data")
 )]

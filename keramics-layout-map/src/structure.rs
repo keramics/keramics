@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -36,12 +36,12 @@ pub(crate) struct StructureLayoutBitField {
 
 impl StructureLayoutBitField {
     /// Creates a new bitfield.
-    pub fn new(name: &str, number_of_bits: usize, modifier: &str, format: Format) -> Self {
+    pub fn new(name: &str, number_of_bits: usize, modifier: &str, format: &Format) -> Self {
         Self {
             name: name.to_string(),
             number_of_bits,
             modifier: modifier.to_string(),
-            format,
+            format: format.clone(),
         }
     }
 
@@ -79,16 +79,42 @@ pub(crate) struct StructureLayoutBitFieldsGroup {
 
     /// Bitfields.
     pub bitfields: Vec<StructureLayoutBitField>,
+
+    /// Number of bits.
+    pub number_of_bits: usize,
+
+    /// Size.
+    pub size: usize,
 }
 
 impl StructureLayoutBitFieldsGroup {
     /// Creates a new group.
-    pub fn new(data_type: DataType, byte_order: ByteOrder) -> Self {
+    pub fn new(data_type: &DataType, byte_order: &ByteOrder) -> Self {
+        let size: usize = match data_type {
+            DataType::BitField8 => 8,
+            DataType::BitField16 => 16,
+            DataType::BitField32 => 32,
+            DataType::BitField64 => 64,
+            _ => 0,
+        };
         Self {
-            data_type,
-            byte_order,
+            data_type: data_type.clone(),
+            byte_order: byte_order.clone(),
             bitfields: Vec::new(),
+            number_of_bits: 0,
+            size,
         }
+    }
+
+    /// Adds a bitfield.
+    pub fn add_bitfield(&mut self, bitfield: StructureLayoutBitField) {
+        self.number_of_bits += bitfield.number_of_bits;
+        self.bitfields.push(bitfield);
+    }
+
+    /// Retrieves the available size in bits.
+    pub fn get_available_size(&self) -> usize {
+        self.size - self.number_of_bits
     }
 
     /// Retrieves the byte order.
@@ -162,6 +188,11 @@ impl StructureLayoutBitFieldsGroup {
             _ => panic!("Unsupported data type"),
         }
     }
+
+    /// Determines if the group is full.
+    pub fn is_full(&self) -> bool {
+        self.number_of_bits == self.size
+    }
 }
 
 /// Structure layout field.
@@ -186,17 +217,17 @@ impl StructureLayoutField {
     /// Creates a new field.
     pub fn new(
         name: &str,
-        data_type: DataType,
-        byte_order: ByteOrder,
+        data_type: &DataType,
+        byte_order: &ByteOrder,
         modifier: &str,
-        format: Format,
+        format: &Format,
     ) -> Self {
         Self {
             name: name.to_string(),
-            data_type,
-            byte_order,
+            data_type: data_type.clone(),
+            byte_order: byte_order.clone(),
             modifier: modifier.to_string(),
-            format,
+            format: format.clone(),
         }
     }
 
@@ -637,10 +668,10 @@ pub(crate) struct StructureLayout {
 
 impl StructureLayout {
     /// Creates a new layout.
-    pub fn new(name: &str, byte_order: ByteOrder) -> Self {
+    pub fn new(name: &str, byte_order: &ByteOrder) -> Self {
         Self {
             name: name.to_string(),
-            byte_order,
+            byte_order: byte_order.clone(),
             members: Vec::new(),
         }
     }
@@ -897,14 +928,14 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::UnsignedInteger8Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -912,10 +943,10 @@ mod tests {
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field2",
-            DataType::UnsignedInteger16Bit,
-            ByteOrder::LittleEndian,
+            &DataType::UnsignedInteger16Bit,
+            &ByteOrder::LittleEndian,
             "- 7",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -947,14 +978,14 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_sequence_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::UnsignedInteger64Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger64Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -962,10 +993,10 @@ mod tests {
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field2",
-            DataType::UnsignedInteger8Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 64);
         structure_layout
@@ -1002,14 +1033,14 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_string_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::UnsignedInteger64Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger64Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -1017,10 +1048,10 @@ mod tests {
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field2",
-            DataType::ByteString,
-            ByteOrder::NotSet,
+            &DataType::ByteString,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 32);
         structure_layout
@@ -1053,17 +1084,17 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_bit_fields() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::LittleEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
 
         let mut group: StructureLayoutBitFieldsGroup =
-            StructureLayoutBitFieldsGroup::new(DataType::BitField32, ByteOrder::NotSet);
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField32, &ByteOrder::NotSet);
 
         let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new("field1", 9, "", Format::NotSet);
+            StructureLayoutBitField::new("field1", 9, "", &Format::NotSet);
         group.bitfields.push(bitfield);
 
         let bitfield: StructureLayoutBitField =
-            StructureLayoutBitField::new("field2", 23, "", Format::NotSet);
+            StructureLayoutBitField::new("field2", 23, "", &Format::NotSet);
         group.bitfields.push(bitfield);
 
         structure_layout
@@ -1106,14 +1137,14 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_group() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::UnsignedInteger64Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger64Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -1123,10 +1154,10 @@ mod tests {
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field2",
-            DataType::UnsignedInteger32Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger32Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         group.fields.push(field);
 
@@ -1161,14 +1192,14 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_struct_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::UnsignedInteger32Bit,
-            ByteOrder::LittleEndian,
+            &DataType::UnsignedInteger32Bit,
+            &ByteOrder::LittleEndian,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -1176,13 +1207,13 @@ mod tests {
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field2",
-            DataType::Struct {
+            &DataType::Struct {
                 name: String::from("MyStruct"),
                 size: 7,
             },
-            ByteOrder::NotSet,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -1215,14 +1246,14 @@ mod tests {
     #[test]
     fn test_generate_debug_read_data_with_struct_sequence_field() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::SignedInteger32Bit,
-            ByteOrder::LittleEndian,
+            &DataType::SignedInteger32Bit,
+            &ByteOrder::LittleEndian,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         structure_layout
             .members
@@ -1230,13 +1261,13 @@ mod tests {
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field2",
-            DataType::Struct {
+            &DataType::Struct {
                 name: String::from("MyStruct"),
                 size: 5,
             },
-            ByteOrder::NotSet,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 10);
         structure_layout
@@ -1275,14 +1306,14 @@ mod tests {
     #[test]
     fn test_read_at_position() {
         let mut structure_layout: StructureLayout =
-            StructureLayout::new("TestStruct", ByteOrder::BigEndian);
+            StructureLayout::new("TestStruct", &ByteOrder::BigEndian);
 
         let field: StructureLayoutField = StructureLayoutField::new(
             "field1",
-            DataType::UnsignedInteger8Bit,
-            ByteOrder::NotSet,
+            &DataType::UnsignedInteger8Bit,
+            &ByteOrder::NotSet,
             "",
-            Format::NotSet,
+            &Format::NotSet,
         );
         let sequence: StructureLayoutSequence = StructureLayoutSequence::new(field, 16);
         structure_layout

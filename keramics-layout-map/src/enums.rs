@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -17,14 +17,14 @@ pub enum BitOrder {
     LeastSignificantBit,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ByteOrder {
     BigEndian,
     LittleEndian,
     NotSet,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum DataType {
     BitField8,
     BitField16,
@@ -36,6 +36,7 @@ pub enum DataType {
     FatTimeDate10Ms,
     Filetime,
     HfsTime,
+    NotSet,
     PosixTime32,
     SignedInteger8Bit,
     SignedInteger16Bit,
@@ -51,7 +52,7 @@ pub enum DataType {
     Uuid,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Format {
     Character,
     Hexadecimal,

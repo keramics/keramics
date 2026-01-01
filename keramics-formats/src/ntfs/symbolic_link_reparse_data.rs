@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -19,11 +19,11 @@ use keramics_types::{Ucs2String, bytes_to_u16_le};
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "substitute_name_offset", data_type = "u16")),
-        member(field(name = "substitute_name_size", data_type = "u16")),
-        member(field(name = "display_name_offset", data_type = "u16")),
-        member(field(name = "display_name_size", data_type = "u16")),
-        member(field(name = "symbolic_link_flags", data_type = "u32")),
+        field(name = "substitute_name_offset", data_type = "u16"),
+        field(name = "substitute_name_size", data_type = "u16"),
+        field(name = "display_name_offset", data_type = "u16"),
+        field(name = "display_name_size", data_type = "u16"),
+        field(name = "symbolic_link_flags", data_type = "u32"),
     ),
     methods("debug_read_data")
 )]

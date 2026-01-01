@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -23,18 +23,18 @@ use super::mft_attribute::NtfsMftAttribute;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "creation_time", data_type = "Filetime")),
-        member(field(name = "modification_time", data_type = "Filetime")),
-        member(field(name = "entry_modification_time", data_type = "Filetime")),
-        member(field(name = "access_time", data_type = "Filetime")),
-        member(field(name = "file_attribute_flags", data_type = "u32", format = "hex")),
-        member(field(name = "maximum_number_of_versions", data_type = "u32")),
-        member(field(name = "version_number", data_type = "u32")),
-        member(field(name = "class_identifier", data_type = "u32")),
-        member(field(name = "owner_identifier", data_type = "u32")),
-        member(field(name = "security_descriptor_identifier", data_type = "u32")),
-        member(field(name = "quota_charged", data_type = "[u8; 8]")),
-        member(field(name = "update_sequence_number", data_type = "u64")),
+        field(name = "creation_time", data_type = "Filetime"),
+        field(name = "modification_time", data_type = "Filetime"),
+        field(name = "entry_modification_time", data_type = "Filetime"),
+        field(name = "access_time", data_type = "Filetime"),
+        field(name = "file_attribute_flags", data_type = "u32", format = "hex"),
+        field(name = "maximum_number_of_versions", data_type = "u32"),
+        field(name = "version_number", data_type = "u32"),
+        field(name = "class_identifier", data_type = "u32"),
+        field(name = "owner_identifier", data_type = "u32"),
+        field(name = "security_descriptor_identifier", data_type = "u32"),
+        field(name = "quota_charged", data_type = "[u8; 8]"),
+        field(name = "update_sequence_number", data_type = "u64"),
     ),
     methods("debug_read_data")
 )]

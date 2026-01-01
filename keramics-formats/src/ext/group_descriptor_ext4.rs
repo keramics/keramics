@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -21,28 +21,28 @@ use super::group_descriptor::ExtGroupDescriptor;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "block_bitmap_block_number_lower", data_type = "u32")),
-        member(field(name = "inode_bitmap_block_number_lower", data_type = "u32")),
-        member(field(name = "inode_table_block_number_lower", data_type = "u32")),
-        member(field(name = "number_of_unallocated_blocks_lower", data_type = "u16")),
-        member(field(name = "number_of_unallocated_inodes_lower", data_type = "u16")),
-        member(field(name = "number_of_directories_lower", data_type = "u16")),
-        member(field(name = "block_group_flags", data_type = "u16", format = "hex")),
-        member(field(name = "exclude_bitmap_block_number", data_type = "u32")),
-        member(field(
+        field(name = "block_bitmap_block_number_lower", data_type = "u32"),
+        field(name = "inode_bitmap_block_number_lower", data_type = "u32"),
+        field(name = "inode_table_block_number_lower", data_type = "u32"),
+        field(name = "number_of_unallocated_blocks_lower", data_type = "u16"),
+        field(name = "number_of_unallocated_inodes_lower", data_type = "u16"),
+        field(name = "number_of_directories_lower", data_type = "u16"),
+        field(name = "block_group_flags", data_type = "u16", format = "hex"),
+        field(name = "exclude_bitmap_block_number", data_type = "u32"),
+        field(
             name = "block_bitmap_checksum_lower",
             data_type = "u16",
             format = "hex"
-        )),
-        member(field(
+        ),
+        field(
             name = "inode_bitmap_checksum_lower",
             data_type = "u16",
             format = "hex"
-        )),
-        member(field(name = "number_of_unused_inodes_lower", data_type = "u16")),
-        member(field(name = "checksum", data_type = "u16", format = "hex")),
-        member(group(
-            size_condition = "> 32",
+        ),
+        field(name = "number_of_unused_inodes_lower", data_type = "u16"),
+        field(name = "checksum", data_type = "u16", format = "hex"),
+        group(
+            size_condition = ">= 68",
             field(name = "block_bitmap_block_number_upper", data_type = "u32"),
             field(name = "inode_bitmap_block_number_upper", data_type = "u32"),
             field(name = "inode_table_block_number_upper", data_type = "u32"),
@@ -62,7 +62,7 @@ use super::group_descriptor::ExtGroupDescriptor;
                 format = "hex"
             ),
             field(name = "padding1", data_type = "[u8; 4]"),
-        )),
+        ),
     ),
     methods("debug_read_data")
 )]

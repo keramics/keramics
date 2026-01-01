@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -22,10 +22,10 @@ use super::mft_attribute::NtfsMftAttribute;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "unknown1", data_type = "[u8; 8]")),
-        member(field(name = "major_format_version", data_type = "u8")),
-        member(field(name = "minor_format_version", data_type = "u8")),
-        member(field(name = "volume_flags", data_type = "u16")),
+        field(name = "unknown1", data_type = "[u8; 8]"),
+        field(name = "major_format_version", data_type = "u8"),
+        field(name = "minor_format_version", data_type = "u8"),
+        field(name = "volume_flags", data_type = "u16"),
     ),
     methods("debug_read_data")
 )]

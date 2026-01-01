@@ -1,4 +1,4 @@
-/* Copyright 2024-2025 Joachim Metz <joachim.metz@gmail.com>
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License. You may
@@ -24,14 +24,14 @@ use super::partition_entry::MbrPartitionEntry;
 #[layout_map(
     structure(
         byte_order = "little",
-        member(field(name = "boot_loader", data_type = "[u8; 440]", format = "hex")),
-        member(field(name = "disk_identity", data_type = "u32", format = "hex")),
-        member(field(name = "unknown1", data_type = "[u8; 2]", format = "hex")),
-        member(field(
+        field(name = "boot_loader", data_type = "[u8; 440]", format = "hex"),
+        field(name = "disk_identity", data_type = "u32", format = "hex"),
+        field(name = "unknown1", data_type = "[u8; 2]", format = "hex"),
+        field(
             name = "partition_entries",
             data_type = "[Struct<MbrPartitionEntry; 16>; 4]"
-        )),
-        member(field(name = "boot_signature", data_type = "[u8; 2]", format = "hex")),
+        ),
+        field(name = "boot_signature", data_type = "[u8; 2]", format = "hex"),
     ),
     methods("debug_read_data", "read_at_position")
 )]
