@@ -600,7 +600,7 @@ fn parse_structure_layout(
                             )));
                         }
                     }
-                    _ => {},
+                    _ => {}
                 }
                 let field_member: StructureLayoutMember =
                     parse_structure_layout_member(&name, &field_options)?;
