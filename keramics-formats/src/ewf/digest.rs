@@ -48,9 +48,7 @@ impl EwfDigest {
     /// Reads the digest from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 80 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF digest data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 76);
 

@@ -54,9 +54,7 @@ impl NtfsVolumeInformation {
     /// Reads the volume information from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 12 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS volume information data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.major_format_version = data[8];
         self.minor_format_version = data[9];

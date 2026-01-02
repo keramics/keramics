@@ -16,8 +16,7 @@
 //! Provides decompression support for ZLIB compressed data (RFC 1950).
 
 use keramics_checksums::Adler32Context;
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
 use super::deflate::{DeflateBitstream, DeflateContext};
@@ -36,8 +35,7 @@ impl ZlibDataHeader {
 
     /// Reads the data header for debugging.
     pub fn debug_read_data(data: &[u8]) -> String {
-        let mut string_parts: Vec<String> = Vec::new();
-        string_parts.push(String::from("ZlibDataHeader {\n"));
+        let mut string_parts: Vec<String> = vec![String::from("ZlibDataHeader {\n")];
 
         let compression_data: u8 = data[0];
 
@@ -74,9 +72,7 @@ impl ZlibDataHeader {
     /// Reads the data header.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 2 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported zlib data header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let compression_data: u8 = data[0];
 
@@ -103,9 +99,7 @@ impl ZlibDataHeader {
 
         if flags & 0x20 != 0 {
             if data.len() < 6 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported zlib data header data size"
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
             self.header_size += 4;
         }
@@ -115,9 +109,6 @@ impl ZlibDataHeader {
 
 /// Context for decompressing ZLIB compressed data.
 pub struct ZlibContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -126,7 +117,6 @@ impl ZlibContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -137,35 +127,49 @@ impl ZlibContext {
         compressed_data: &[u8],
         uncompressed_data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
+        if compressed_data.len() < 2 {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        let header_size: usize = if compressed_data[1] & 0x20 == 0 { 2 } else { 6 };
+
+        DebugTrace::print_data_and_structure(
+            ZlibDataHeader::debug_read_data,
+            "ZlibDataHeader",
+            0,
+            &compressed_data[0..header_size],
+            header_size,
+            true,
+        );
         let mut data_header: ZlibDataHeader = ZlibDataHeader::new();
 
-        if self.mediator.debug_output {
-            let header_size: usize = if compressed_data[1] & 0x20 == 0 { 2 } else { 6 };
-
-            self.mediator.debug_print(format!(
-                "ZlibDataHeader data of size: {} at offset: 0 (0x00000000)\n",
-                header_size,
-            ));
-            self.mediator
-                .debug_print_data(&compressed_data[0..header_size], true);
-            self.mediator
-                .debug_print(ZlibDataHeader::debug_read_data(compressed_data));
+        match data_header.read_data(compressed_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read data header");
+                return Err(error);
+            }
         }
-        data_header.read_data(compressed_data)?;
+        let mut deflate_context: DeflateContext = DeflateContext::new();
 
         let mut bitstream: DeflateBitstream =
             DeflateBitstream::new(compressed_data, data_header.header_size);
-        let mut deflate_context: DeflateContext = DeflateContext::new();
-        deflate_context.decompress_bitstream(&mut bitstream, uncompressed_data)?;
 
+        match deflate_context.decompress_bitstream(&mut bitstream, uncompressed_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
+                return Err(error);
+            }
+        }
         bitstream.unread_data();
 
-        if 4 < bitstream.data_size - bitstream.data_offset {
-            let stored_checksum: u32 = bytes_to_u32_be!(compressed_data, bitstream.data_offset);
-
+        // TODO: change to >= 4
+        if bitstream.data_size - bitstream.data_offset > 4 {
             let mut adler32_context: Adler32Context = Adler32Context::new(1);
             adler32_context.update(uncompressed_data);
+
             let calculated_checksum: u32 = adler32_context.finalize();
+            let stored_checksum: u32 = bytes_to_u32_be!(compressed_data, bitstream.data_offset);
 
             if stored_checksum != calculated_checksum {
                 return Err(keramics_core::error_trace_new!(format!(

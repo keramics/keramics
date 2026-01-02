@@ -134,19 +134,18 @@ impl SignatureTable {
             result = Some(self.smallest_pattern_offset);
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from(
-                "SignatureTable::get_most_significant_pattern_offset {\n",
-            ));
+            self.mediator
+                .debug_print("SignatureTable::get_most_significant_pattern_offset {\n");
             if result.is_none() {
                 self.mediator
-                    .debug_print(String::from("    most_significant_pattern_offset: N/A\n"));
+                    .debug_print("    most_significant_pattern_offset: N/A\n");
             } else {
                 self.mediator.debug_print(format!(
                     "    most_significant_pattern_offset: {}\n",
                     result.unwrap(),
                 ));
             }
-            self.mediator.debug_print(String::from("}\n\n"));
+            self.mediator.debug_print("}\n\n");
         }
         result
     }
@@ -154,12 +153,11 @@ impl SignatureTable {
     /// Retrieves the pattern offset based on the byte value weights.
     fn get_pattern_offset_by_byte_value_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from(
-                "SignatureTable::get_pattern_offset_by_byte_value_weights {\n",
-            ));
+            self.mediator
+                .debug_print("SignatureTable::get_pattern_offset_by_byte_value_weights {\n");
             if self.byte_value_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(String::from("    largest_byte_value_weight: N/A\n"));
+                    .debug_print("    largest_byte_value_weight: N/A\n");
             } else {
                 self.mediator.debug_print(format!(
                     "    largest_byte_value_weight: {}\n",
@@ -176,7 +174,7 @@ impl SignatureTable {
             };
             self.mediator
                 .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets,));
-            self.mediator.debug_print(String::from("}\n\n"));
+            self.mediator.debug_print("}\n\n");
         }
         self.byte_value_weights
             .offset_groups
@@ -187,12 +185,11 @@ impl SignatureTable {
     /// Retrieves the pattern offset based on the occurrence weights.
     fn get_pattern_offset_by_occurrence_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from(
-                "SignatureTable::get_pattern_offset_by_occurrence_weights {\n",
-            ));
+            self.mediator
+                .debug_print("SignatureTable::get_pattern_offset_by_occurrence_weights {\n");
             if self.occurrence_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(String::from("    largest_occurrence_weight: N/A\n"));
+                    .debug_print("    largest_occurrence_weight: N/A\n");
             } else {
                 self.mediator.debug_print(format!(
                     "    largest_occurrence_weight: {}\n",
@@ -233,7 +230,7 @@ impl SignatureTable {
                             "        byte_value_weight: {},\n",
                             byte_value_weight
                         ));
-                        self.mediator.debug_print(String::from("    },\n"));
+                        self.mediator.debug_print("    },\n");
                     }
                 }
                 if self.mediator.debug_output {
@@ -243,13 +240,13 @@ impl SignatureTable {
                         "    largest_byte_value_weight: {},\n",
                         largest_byte_value_weight
                     ));
-                    self.mediator.debug_print(String::from("}\n\n"));
+                    self.mediator.debug_print("}\n\n");
                 }
                 Some(pattern_offset)
             }
             None => {
                 if self.mediator.debug_output {
-                    self.mediator.debug_print(String::from("}\n\n"));
+                    self.mediator.debug_print("}\n\n");
                 }
                 self.get_pattern_offset_by_byte_value_weights()
             }
@@ -259,12 +256,11 @@ impl SignatureTable {
     /// Retrieves the pattern offset based on the similarity weights.
     fn get_pattern_offset_by_similarity_weights(&self) -> Option<usize> {
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from(
-                "SignatureTable::get_pattern_offset_by_similarity_weights {\n",
-            ));
+            self.mediator
+                .debug_print("SignatureTable::get_pattern_offset_by_similarity_weights {\n");
             if self.similarity_weights.largest_weight == 0 {
                 self.mediator
-                    .debug_print(String::from("    largest_similarity_weight: N/A\n"));
+                    .debug_print("    largest_similarity_weight: N/A\n");
             } else {
                 self.mediator.debug_print(format!(
                     "    largest_similarity_weight: {}\n",
@@ -320,7 +316,7 @@ impl SignatureTable {
                             "        byte_value_weight: {},\n",
                             byte_value_weight
                         ));
-                        self.mediator.debug_print(String::from("    },\n"));
+                        self.mediator.debug_print("    },\n");
                     }
                 }
                 if self.mediator.debug_output {
@@ -334,13 +330,13 @@ impl SignatureTable {
                         "    largest_byte_value_weight: {},\n",
                         largest_byte_value_weight
                     ));
-                    self.mediator.debug_print(String::from("}\n\n"));
+                    self.mediator.debug_print("}\n\n");
                 }
                 Some(pattern_offset)
             }
             None => {
                 if self.mediator.debug_output {
-                    self.mediator.debug_print(String::from("}\n\n"));
+                    self.mediator.debug_print("}\n\n");
                 }
                 self.get_pattern_offset_by_occurrence_weights()
             }

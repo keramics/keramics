@@ -55,9 +55,7 @@ impl VhdxParentLocatorEntry {
     /// Reads the parent locator entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 12 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX parent locator entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.key_data_offset = bytes_to_u32_le!(data, 0);
         self.value_data_offset = bytes_to_u32_le!(data, 4);

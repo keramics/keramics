@@ -79,14 +79,10 @@ impl NtfsMftEntryHeader {
     /// Reads the MFT entry header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 42 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported MFT entry header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != NTFS_MFT_ENTRY_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported MFT entry signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.fixup_values_offset = bytes_to_u16_le!(data, 4);
         self.number_of_fixup_values = bytes_to_u16_le!(data, 6);

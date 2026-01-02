@@ -14,18 +14,16 @@
 use std::collections::BTreeMap;
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::ByteString;
+
+use crate::util::calculate_alignment_padding;
 
 use super::attributes_block_header::ExtAttributesBlockHeader;
 use super::attributes_entry::ExtAttributesEntry;
 
 /// Extended File System (ext) attributes block.
 pub struct ExtAttributesBlock {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Base offset.
     base_offset: usize,
 }
@@ -33,10 +31,7 @@ pub struct ExtAttributesBlock {
 impl ExtAttributesBlock {
     /// Creates a new attributes block.
     pub fn new(base_offset: usize) -> Self {
-        Self {
-            mediator: Mediator::current(),
-            base_offset,
-        }
+        Self { base_offset }
     }
 
     /// Reads the attributes block from a buffer.
@@ -66,14 +61,12 @@ impl ExtAttributesBlock {
             if data_end_offset >= data_size {
                 break;
             }
+            DebugTrace::print_structure(
+                ExtAttributesEntry::debug_read_data,
+                &data[entry_data_offset..data_end_offset],
+            );
             let mut entry: ExtAttributesEntry = ExtAttributesEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(ExtAttributesEntry::debug_read_data(
-                        &data[entry_data_offset..data_end_offset],
-                    ));
-            }
             match entry.read_data(&data[entry_data_offset..data_end_offset]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -90,10 +83,7 @@ impl ExtAttributesBlock {
                     return Err(error);
                 }
             };
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    attribute_name: {},\n", name.to_string()));
-            }
+            DebugTrace::print_value("ExtAttributesBlock: attribute name", &name);
             entry_data_offset += entry.name_size as usize;
 
             if entry.value_data_inode_number == 0 && entry.value_data_size > 0 {
@@ -105,40 +95,36 @@ impl ExtAttributesBlock {
                         "Invalid value data offset value out of bounds"
                     ));
                 }
-                let value_data_end_offset: usize =
-                    value_data_offset + (entry.value_data_size as usize);
+                let value_data_size: usize = entry.value_data_size as usize;
+                let value_data_end_offset: usize = value_data_offset + value_data_size;
 
                 if value_data_end_offset > data_size {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid value data size value out of bounds"
                     ));
                 }
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(String::from("    attribute_value_data:\n"));
-                    self.mediator
-                        .debug_print_data(&data[value_data_offset..value_data_end_offset], true);
-                }
-                entry.value_data = Vec::from(&data[value_data_offset..value_data_end_offset]);
+                let value_data: &[u8] = &data[value_data_offset..value_data_end_offset];
+
+                DebugTrace::print_data(
+                    "ExtAttributesBlock: attribute value",
+                    value_data_offset as u64,
+                    value_data,
+                    value_data_size,
+                    true,
+                );
+                entry.value_data = Vec::from(value_data);
             }
             entries.insert(name, entry);
 
-            let mut alignment_padding_size: usize = entry_data_offset % 4;
-            if alignment_padding_size != 0 {
-                alignment_padding_size = 4 - alignment_padding_size;
-            }
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                "ExtAttributesBlock: alignment padding data of size: {} at offset: {} (0x{:08x})\n",
+            let alignment_padding_size: usize = calculate_alignment_padding(entry_data_offset, 4);
+
+            DebugTrace::print_data(
+                "ExtAttributesBlock: alignment padding",
+                entry_data_offset as u64,
+                &data[entry_data_offset..entry_data_offset + alignment_padding_size],
                 alignment_padding_size,
-                entry_data_offset,
-                entry_data_offset
-            ));
-                self.mediator.debug_print_data(
-                    &data[entry_data_offset..entry_data_offset + alignment_padding_size],
-                    true,
-                );
-            }
+                true,
+            );
             entry_data_offset += alignment_padding_size;
         }
         Ok(())
@@ -162,21 +148,12 @@ impl ExtAttributesBlock {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtAttributesBlock data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        DebugTrace::print_data("ExtAttributesBlock", offset, &data, data_size, true);
+        DebugTrace::print_structure(ExtAttributesBlockHeader::debug_read_data, &data[0..32]);
+
         let mut header: ExtAttributesBlockHeader = ExtAttributesBlockHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(ExtAttributesBlockHeader::debug_read_data(&data[0..32]));
-        }
         match header.read_data(&data[0..32]) {
             Ok(_) => {}
             Err(mut error) => {

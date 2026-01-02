@@ -82,14 +82,10 @@ impl ApmPartitionMapEntry {
     /// Reads the partition map entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported partition map entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if data[0..2] != APM_PARTITION_MAP_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported partition map entry signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.number_of_entries = bytes_to_u32_be!(data, 4);
         self.start_sector = bytes_to_u32_be!(data, 8);

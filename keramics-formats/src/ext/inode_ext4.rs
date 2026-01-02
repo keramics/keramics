@@ -56,9 +56,7 @@ impl Ext4Inode {
     /// Reads the inode from a buffer.
     pub fn read_data(inode: &mut ExtInode, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 128 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported inode data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         inode.file_mode = bytes_to_u16_le!(data, 0);
 

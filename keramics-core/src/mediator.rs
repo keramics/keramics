@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::fmt::Display;
 use std::sync::{Arc, RwLock};
 
 use super::formatters::format_as_hexdump;
@@ -30,7 +31,7 @@ impl Mediator {
     }
 
     /// Retrieves the current mediator.
-    pub fn current() -> MediatorReference {
+    pub fn current() -> Arc<Mediator> {
         CURRENT_MEDIATOR.with(|mediator| mediator.read().unwrap().clone())
     }
 
@@ -40,8 +41,7 @@ impl Mediator {
     }
 
     /// Prints a string for debugging.
-    // TODO: Change text to &str
-    pub fn debug_print(&self, text: String) {
+    pub fn debug_print<T: Display>(&self, text: T) {
         if self.debug_output {
             print!("{}", text);
         }
@@ -65,8 +65,8 @@ mod tests {
 
     #[test]
     fn test_debug_print() {
-        let mediator: MediatorReference = Mediator::current();
+        let mediator: Arc<Mediator> = Mediator::current();
 
-        mediator.debug_print(String::from("test"));
+        mediator.debug_print("test");
     }
 }

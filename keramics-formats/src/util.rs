@@ -11,26 +11,27 @@
  * under the License.
  */
 
-mod data_stream;
-mod debug_trace;
-mod enums;
-mod errors;
-mod fake_data_stream;
-pub mod formatters;
-pub mod macros;
-pub mod mediator;
-mod os_data_stream;
+/// Calculates the size of alignment padding.
+#[inline(always)]
+pub fn calculate_alignment_padding(data_offset: usize, alignment_size: usize) -> usize {
+    let padding_size: usize = data_offset % alignment_size;
 
-pub use data_stream::{DataStream, DataStreamReference};
-pub use debug_trace::DebugTrace;
-pub use enums::ByteOrder;
-pub use errors::ErrorTrace;
-pub use fake_data_stream::{FakeDataStream, open_fake_data_stream};
-pub use os_data_stream::open_os_data_stream;
+    if padding_size == 0 {
+        return 0;
+    }
+    alignment_size - padding_size
+}
 
 #[cfg(test)]
 mod tests {
-    pub fn get_test_data_path(path: &str) -> String {
-        format!("../test_data/{}", path)
+    use super::*;
+
+    #[test]
+    fn test_calculate_alignment_padding() {
+        let alignment_padding: usize = calculate_alignment_padding(8, 4);
+        assert_eq!(alignment_padding, 0);
+
+        let alignment_padding: usize = calculate_alignment_padding(7, 4);
+        assert_eq!(alignment_padding, 1);
     }
 }

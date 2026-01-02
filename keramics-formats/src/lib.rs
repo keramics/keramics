@@ -21,6 +21,7 @@ mod os_file_resolver;
 mod path;
 mod path_component;
 mod scanner;
+mod util;
 
 // Data formats used in other formats.
 mod plist;

@@ -51,9 +51,7 @@ impl VhdxMetadataTableEntry {
     /// Reads the metadata table entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX metadata table entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.item_identifier = Uuid::from_le_bytes(&data[0..16]);
         self.item_offset = bytes_to_u32_le!(data, 16);

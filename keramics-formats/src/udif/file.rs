@@ -116,9 +116,7 @@ impl UdifFile {
             self.media_size = file_footer.data_fork_size;
         } else {
             if file_footer.plist_size == 0 || file_footer.plist_size > 65536 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported plist data size"
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
             let mut data: Vec<u8> = vec![0; file_footer.plist_size as usize];
 

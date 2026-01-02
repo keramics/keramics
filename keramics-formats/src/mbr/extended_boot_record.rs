@@ -51,14 +51,10 @@ impl MbrExtendedBootRecord {
     /// Reads the extended boot record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported MBR extended boot record data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[510..512] != MBR_BOOT_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported MBR extended boot record signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.disk_identity = bytes_to_u32_le!(data, 440);
 

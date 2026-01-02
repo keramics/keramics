@@ -51,9 +51,7 @@ impl NtfsIndexRootHeader {
     /// Reads the index root header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS index root header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.attribute_type = bytes_to_u32_le!(data, 0);
         self.collation_type = bytes_to_u32_le!(data, 4);

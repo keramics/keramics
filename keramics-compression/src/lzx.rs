@@ -16,10 +16,10 @@
 //! Provides decompression support for LZX compressed data.
 
 use std::cmp::min;
+use std::fmt;
 
-use keramics_core::ErrorTrace;
 use keramics_core::formatters::debug_format_array;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le};
 
 use super::huffman::HuffmanTree;
@@ -179,11 +179,59 @@ impl<'a> Bitstream for LzxBitstream<'a> {
     }
 }
 
+/// Block header used by LZX compressed data.
+struct LzxBlockHeader {
+    /// Block type.
+    pub block_type: u32,
+
+    /// Block size.
+    pub block_size: u32,
+}
+
+impl LzxBlockHeader {
+    /// Creates a new block header.
+    pub fn new() -> Self {
+        Self {
+            block_type: 0,
+            block_size: 0,
+        }
+    }
+
+    /// Reads the block header from a bitstream.
+    pub fn read_from_bitstream(&mut self, bitstream: &mut LzxBitstream) -> Result<(), ErrorTrace> {
+        self.block_type = bitstream.get_value(3);
+
+        self.block_size = if bitstream.get_value(1) == 0 {
+            bitstream.get_value(16)
+        } else {
+            32768
+        };
+        Ok(())
+    }
+}
+
+impl fmt::Display for LzxBlockHeader {
+    /// Formats the block header for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let block_type_string: &str = match self.block_type {
+            1 => "verbatim",
+            2 => "aligned",
+            3 => "uncompressed",
+            _ => "unknown",
+        };
+        writeln!(formatter, "LzxBlockHeader {{")?;
+        writeln!(
+            formatter,
+            "    block_type: {} ({}),",
+            block_type_string, self.block_type
+        )?;
+        writeln!(formatter, "    block_size: {},", self.block_size)?;
+        writeln!(formatter, "}}\n")
+    }
+}
+
 /// Context for decompressing LZX compressed data.
 pub struct LzxContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -192,9 +240,43 @@ impl LzxContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
+    }
+
+    /// Builds aligned offsets Huffman tree from the bitstream.
+    fn build_aligned_offsets_huffman_trees(
+        &mut self,
+        bitstream: &mut LzxBitstream,
+        huffman_tree: &mut HuffmanTree,
+    ) -> Result<(), ErrorTrace> {
+        let mut aligned_offsets_code_sizes: [u8; 8] = [0; 8];
+
+        for code_size_entry in &mut aligned_offsets_code_sizes {
+            *code_size_entry = bitstream.get_value(3) as u8;
+        }
+        DebugTrace::print_start("LzxAlignedOffsets");
+        // TODO: create optimized debug_format_array_decimals
+        DebugTrace::print_field(
+            "code_sizes",
+            debug_format_array(
+                &aligned_offsets_code_sizes
+                    .iter()
+                    .map(|&element| element.to_string())
+                    .collect::<Vec<String>>()
+                    .as_slice(),
+            ),
+        );
+        DebugTrace::print_end();
+
+        match huffman_tree.build(&aligned_offsets_code_sizes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build Huffman tree");
+                return Err(error);
+            }
+        }
+        Ok(())
     }
 
     /// Decompress data.
@@ -208,7 +290,6 @@ impl LzxContext {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
-        let mut aligned_offsets_code_sizes: [u8; 8] = [0; 8];
         // 256 literals and 240 matches.
         let mut literals_code_sizes: [u8; 496] = [0; 496];
         let mut match_sizes_code_sizes: [u8; 249] = [0; 249];
@@ -218,72 +299,102 @@ impl LzxContext {
             if uncompressed_data_offset >= uncompressed_data_size {
                 break;
             }
-            let block_type: u32 = bitstream.get_value(3);
-            let block_size: u32 = if bitstream.get_value(1) == 0 {
-                bitstream.get_value(16)
-            } else {
-                32768
-            };
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(String::from("LzxBlockHeader {\n"));
+            let mut block_header: LzxBlockHeader = LzxBlockHeader::new();
 
-                let block_type_string: &str = match block_type {
-                    1 => "verbatim",
-                    2 => "aligned",
-                    3 => "uncompressed",
-                    _ => "unknown",
-                };
-                self.mediator.debug_print(format!(
-                    "    block_type: {} ({})\n",
-                    block_type_string, block_type
-                ));
-                self.mediator
-                    .debug_print(format!("    block_size: {}\n", block_size));
-                self.mediator.debug_print(String::from("}\n\n"));
+            match block_header.read_from_bitstream(&mut bitstream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                    return Err(error);
+                }
             }
-            match block_type {
+            DebugTrace::print(&block_header);
+
+            let aligned_offsets_huffman_tree: Option<HuffmanTree> = if block_header.block_type == 2
+            {
+                let mut huffman_tree: HuffmanTree = HuffmanTree::new(256, 16);
+
+                match self.build_aligned_offsets_huffman_trees(&mut bitstream, &mut huffman_tree) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to build aligned offsets Huffman tree"
+                        );
+                        return Err(error);
+                    }
+                }
+                Some(huffman_tree)
+            } else {
+                None
+            };
+            match block_header.block_type {
                 1 | 2 => {
-                    let aligned_offsets_huffman_tree: Option<HuffmanTree> = if block_type == 2 {
-                        for code_size_entry in &mut aligned_offsets_code_sizes {
-                            *code_size_entry = bitstream.get_value(3) as u8;
-                        }
-                        if self.mediator.debug_output {
-                            self.mediator
-                                .debug_print(String::from("LzxAlignedOffsets {\n"));
-
-                            // TODO: create optimized debug_format_array_decimals
-                            let array_parts: Vec<String> = aligned_offsets_code_sizes
-                                .iter()
-                                .map(|&element| element.to_string())
-                                .collect();
-                            self.mediator.debug_print(format!(
-                                "    code_sizes: {},",
-                                debug_format_array(&array_parts),
-                            ));
-                            self.mediator.debug_print(String::from("}\n\n"));
-                        }
-                        let mut huffman_tree: HuffmanTree = HuffmanTree::new(256, 16);
-                        huffman_tree.build(&aligned_offsets_code_sizes)?;
-
-                        Some(huffman_tree)
-                    } else {
-                        None
-                    };
-                    self.read_code_sizes(&mut bitstream, &mut literals_code_sizes[0..256], 256)?;
-                    self.read_code_sizes(&mut bitstream, &mut literals_code_sizes[256..496], 240)?;
-
-                    let mut literals_huffman_tree: HuffmanTree = HuffmanTree::new(256 + 240, 16);
-                    literals_huffman_tree.build(&literals_code_sizes)?;
-
-                    self.read_code_sizes(&mut bitstream, &mut match_sizes_code_sizes, 249)?;
-
-                    let mut match_sizes_huffman_tree: HuffmanTree = HuffmanTree::new(249, 16);
-                    match_sizes_huffman_tree.build(&match_sizes_code_sizes)?;
-
-                    self.decompress_huffmann_encoded_block(
+                    match self.read_code_sizes(
                         &mut bitstream,
-                        block_size,
+                        &mut literals_code_sizes[0..256],
+                        256,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read literals code sizes"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match self.read_code_sizes(
+                        &mut bitstream,
+                        &mut literals_code_sizes[256..496],
+                        240,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read literals code sizes"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    let mut literals_huffman_tree: HuffmanTree = HuffmanTree::new(256 + 240, 16);
+
+                    match literals_huffman_tree.build(&literals_code_sizes) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to build literals Huffman tree"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match self.read_code_sizes(&mut bitstream, &mut match_sizes_code_sizes, 249) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read match sizes code sizes"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    let mut match_sizes_huffman_tree: HuffmanTree = HuffmanTree::new(249, 16);
+
+                    match match_sizes_huffman_tree.build(&match_sizes_code_sizes) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to build match sizes Huffman tree"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match self.decompress_huffmann_encoded_block(
+                        &mut bitstream,
+                        block_header.block_size,
                         &literals_huffman_tree,
                         &match_sizes_huffman_tree,
                         aligned_offsets_huffman_tree.as_ref(),
@@ -291,10 +402,19 @@ impl LzxContext {
                         uncompressed_data,
                         &mut uncompressed_data_offset,
                         uncompressed_data_size,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to decompress dynamic Huffman encoded block"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 3 => {
-                    if 12 > bitstream.data_size - bitstream.data_offset {
+                    if bitstream.data_size - bitstream.data_offset < 12 {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid compressed data value too small"
                         ));
@@ -317,36 +437,49 @@ impl LzxContext {
                     if recent_distances[2] == 0 {
                         return Err(keramics_core::error_trace_new!("Unsupported R2 value"));
                     }
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(format!("    R0: 0x{:08x}\n", recent_distances[0]));
-                        self.mediator
-                            .debug_print(format!("    R1: 0x{:08x}\n", recent_distances[1]));
-                        self.mediator
-                            .debug_print(format!("    R2: 0x{:08x}\n", recent_distances[2]));
-                    }
+                    DebugTrace::print_start("LzxContextRecentDistances");
+                    DebugTrace::print_field("R0", format!("0x{:08x}", recent_distances[0]));
+                    DebugTrace::print_field("R1", format!("0x{:08x}", recent_distances[1]));
+                    DebugTrace::print_field("R2", format!("0x{:08x}", recent_distances[2]));
+                    DebugTrace::print_end();
+
                     let uncompressed_block_size: usize = min(
-                        block_size as usize,
+                        block_header.block_size as usize,
                         bitstream.data_size - bitstream.data_offset,
                     );
-                    bitstream.copy_bytes(
+                    match bitstream.copy_bytes(
                         uncompressed_block_size,
                         uncompressed_data,
                         uncompressed_data_offset,
                         uncompressed_data_size,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to copy uncompressed block data"
+                            );
+                            return Err(error);
+                        }
+                    }
                     uncompressed_data_offset += uncompressed_block_size;
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported block type: {}",
-                        block_type
+                        block_header.block_type
                     )));
                 }
             };
         }
-        self.decompress_adjust_call_instructions(uncompressed_data, uncompressed_data_offset)?;
-
+        match self.decompress_adjust_call_instructions(uncompressed_data, uncompressed_data_offset)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to adjust call instructions");
+                return Err(error);
+            }
+        }
         self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())
@@ -405,13 +538,18 @@ impl LzxContext {
         let mut data_offset: usize = *uncompressed_data_offset;
         let data_end_offset: usize = data_offset + (block_size as usize);
 
-        while data_offset < data_end_offset {
-            let symbol: u16 = literals_huffman_tree.decode_symbol(bitstream)?;
+        DebugTrace::print_start("LzxHuffmannEncodedBlock");
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    symbol: {}\n", symbol));
-            }
+        while data_offset < data_end_offset {
+            let symbol: u16 = match literals_huffman_tree.decode_symbol(bitstream) {
+                Ok(symbol) => symbol,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                    return Err(error);
+                }
+            };
+            DebugTrace::print_field("symbol", symbol);
+
             if symbol < 256 {
                 if data_offset >= uncompressed_data_size {
                     return Err(keramics_core::error_trace_new!(
@@ -426,7 +564,18 @@ impl LzxContext {
                 let mut match_size: u32 = (symbol % 8) as u32;
 
                 if match_size == 7 {
-                    match_size += match_sizes_huffman_tree.decode_symbol(bitstream)? as u32;
+                    let extended_match_size: u16 =
+                        match match_sizes_huffman_tree.decode_symbol(bitstream) {
+                            Ok(symbol) => symbol,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to decode extended match size"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    match_size += extended_match_size as u32;
                 }
                 match_size += 2;
 
@@ -441,21 +590,25 @@ impl LzxContext {
                     if aligned_offsets_huffman_tree.is_some() && distance_slot >= 8 {
                         number_of_bits -= 3;
                     }
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(format!("    number_of_bits: {}\n", number_of_bits));
-                    }
+                    DebugTrace::print_field("number_of_bits", number_of_bits);
+
                     distance = bitstream.get_value(number_of_bits as usize);
 
                     if let Some(huffman_tree) = aligned_offsets_huffman_tree
                         && distance_slot >= 8
                     {
-                        let aligned_offset: u16 = huffman_tree.decode_symbol(bitstream)?;
+                        let aligned_offset: u16 = match huffman_tree.decode_symbol(bitstream) {
+                            Ok(symbol) => symbol,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to decode aligned offset"
+                                );
+                                return Err(error);
+                            }
+                        };
+                        DebugTrace::print_field("aligned_offset", aligned_offset);
 
-                        if self.mediator.debug_output {
-                            self.mediator
-                                .debug_print(format!("    aligned_offset: {}\n", aligned_offset));
-                        }
                         distance <<= 3;
                         distance |= aligned_offset as u32;
                     }
@@ -467,18 +620,11 @@ impl LzxContext {
                 }
                 recent_distances[0] = distance;
 
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    compressed_data_offset: {} (0x{:08x}),\n",
-                        bitstream.data_offset, bitstream.data_offset
-                    ));
-                    self.mediator
-                        .debug_print(format!("    distance: {},\n", distance));
-                    self.mediator
-                        .debug_print(format!("    match_size: {},\n", match_size));
-                    self.mediator
-                        .debug_print(format!("    uncompressed_data_offset: {},\n", data_offset));
-                }
+                DebugTrace::print_field("compressed_data_offset", bitstream.data_offset);
+                DebugTrace::print_field("distance", distance);
+                DebugTrace::print_field("match_size", match_size);
+                DebugTrace::print_field("uncompressed_data_offset", data_offset);
+
                 if distance as usize > data_offset {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid distance value exceeds uncompressed data offset"
@@ -498,15 +644,15 @@ impl LzxContext {
                     match_end_offset += 1;
                     data_offset += 1;
                 }
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    match_offset: {}\n", match_offset));
-                    self.mediator.debug_print(String::from("    match_data:\n"));
-                    self.mediator
-                        .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
-                }
+                DebugTrace::print_field("match_offset", match_offset);
+                DebugTrace::print_data_field(
+                    "match_data",
+                    &uncompressed_data[match_offset..match_end_offset],
+                );
             }
         }
+        DebugTrace::print_end();
+
         *uncompressed_data_offset = data_offset;
 
         Ok(())
@@ -524,53 +670,57 @@ impl LzxContext {
         for code_size_entry in &mut pre_code_sizes {
             *code_size_entry = bitstream.get_value(4) as u8;
         }
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("LzxPreCodeSizes {\n"));
+        DebugTrace::print_start("LzxPreCodeSizes");
+        DebugTrace::print_field(
+            "code_sizes",
+            debug_format_array(
+                &pre_code_sizes
+                    .iter()
+                    .map(|&element| element.to_string())
+                    .collect::<Vec<String>>()
+                    .as_slice(),
+            ),
+        );
+        DebugTrace::print_end();
 
-            // TODO: create optimized debug_format_array_decimals
-            let array_parts: Vec<String> = pre_code_sizes
-                .iter()
-                .map(|&element| element.to_string())
-                .collect();
-            self.mediator.debug_print(format!(
-                "    code_sizes: {},",
-                debug_format_array(&array_parts),
-            ));
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
         let mut codes_huffman_tree: HuffmanTree = HuffmanTree::new(20, 15);
-        codes_huffman_tree.build(&pre_code_sizes)?;
 
+        match codes_huffman_tree.build(&pre_code_sizes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build codes Huffman tree");
+                return Err(error);
+            }
+        }
         let mut code_size_index: usize = 0;
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("LzxCodeSizes {\n"));
-        }
-        while code_size_index < number_of_code_sizes {
-            let symbol: u16 = codes_huffman_tree.decode_symbol(bitstream)?;
+        DebugTrace::print_start("LzxCodeSizes");
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "    code_size: {} symbol: {}\n",
-                    code_size_index, symbol
-                ));
-            }
+        while code_size_index < number_of_code_sizes {
+            let symbol: u16 = match codes_huffman_tree.decode_symbol(bitstream) {
+                Ok(symbol) => symbol,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                    return Err(error);
+                }
+            };
+            DebugTrace::print(format!(
+                "    code_size: {} symbol: {}\n",
+                code_size_index, symbol
+            ));
             if symbol < 17 {
                 let mut code_size: i32 = (code_sizes[code_size_index] as i32) - (symbol as i32);
                 if code_size < 0 {
                     code_size += 17;
                 }
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    code_size: {} value: {}\n",
-                        code_size_index, code_size
-                    ));
-                }
+                DebugTrace::print(format!(
+                    "    code_size: {} value: {}\n",
+                    code_size_index, code_size
+                ));
                 code_sizes[code_size_index] = code_size as u8;
                 code_size_index += 1;
             } else {
-                let mut times_to_repeat: u32 = match symbol {
+                let times_to_repeat: u32 = match symbol {
                     17 => bitstream.get_value(4) + 4,
                     18 => bitstream.get_value(5) + 20,
                     19 => bitstream.get_value(1) + 4,
@@ -581,17 +731,18 @@ impl LzxContext {
                         )));
                     }
                 };
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    code_size: {} times_to_repeat: {}\n",
-                        code_size_index, times_to_repeat
-                    ));
-                }
-                let code_size: i32 = if symbol != 19 {
-                    0
-                } else {
-                    let symbol: u16 = codes_huffman_tree.decode_symbol(bitstream)?;
-
+                DebugTrace::print(format!(
+                    "    code_size: {} times_to_repeat: {}\n",
+                    code_size_index, times_to_repeat
+                ));
+                let code_size: i32 = if symbol == 19 {
+                    let symbol: u16 = match codes_huffman_tree.decode_symbol(bitstream) {
+                        Ok(symbol) => symbol,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                            return Err(error);
+                        }
+                    };
                     if symbol > 17 {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Unsupported symbol: {}",
@@ -603,29 +754,24 @@ impl LzxContext {
                         code_size += 17;
                     }
                     code_size
+                } else {
+                    0
                 };
-                if (times_to_repeat as usize) > number_of_code_sizes - code_size_index {
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(String::from("times to repeat value out of bounds.\n"));
-                    }
-                    times_to_repeat = (number_of_code_sizes - code_size_index) as u32;
-                }
-                for _ in 0..times_to_repeat {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    code_size: {} value: {}\n",
-                            code_size_index, code_size
-                        ));
-                    }
+                for _ in 0..min(
+                    times_to_repeat as usize,
+                    number_of_code_sizes - code_size_index,
+                ) {
+                    DebugTrace::print(format!(
+                        "    code_size: {} value: {}\n",
+                        code_size_index, code_size
+                    ));
                     code_sizes[code_size_index] = code_size as u8;
                     code_size_index += 1;
                 }
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         Ok(())
     }
 }

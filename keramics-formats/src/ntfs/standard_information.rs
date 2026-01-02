@@ -85,9 +85,7 @@ impl NtfsStandardInformation {
         let data_size: usize = data.len();
 
         if data_size < 48 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS standard information data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let filetime: Filetime = Filetime::from_bytes(&data);
 

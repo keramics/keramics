@@ -70,12 +70,12 @@ impl Signature {
         };
         let mediator: MediatorReference = Mediator::current();
         if mediator.debug_output {
-            mediator.debug_print(String::from("Signature::scan_buffer {\n"));
+            mediator.debug_print("Signature::scan_buffer {\n");
             mediator.debug_print(format!(
                 "    scanning at offset: {} (0x{:08x}) for signature: {} of size: {}\n",
                 pattern_offset, pattern_offset, self.identifier, self.pattern_size,
             ));
-            mediator.debug_print(String::from("}\n\n"));
+            mediator.debug_print("}\n\n");
         }
         if pattern_offset < data_offset {
             return false;

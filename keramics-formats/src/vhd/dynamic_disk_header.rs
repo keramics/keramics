@@ -70,14 +70,10 @@ impl VhdDynamicDiskHeader {
     /// Reads the dynamic disk header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 1024 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported dynamic disk header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != VHD_DYNAMIC_DISK_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported dynamic disk header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 24);
 

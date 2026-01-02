@@ -45,14 +45,10 @@ impl VhdxMetadataTableHeader {
     /// Reads the metadata table header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 32 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX metadata table header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if data[0..8] != VHDX_METADATA_TABLE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX metadata table header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.number_of_entries = bytes_to_u16_le!(data, 10);
 

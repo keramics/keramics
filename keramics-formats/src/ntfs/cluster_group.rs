@@ -64,14 +64,14 @@ impl NtfsClusterGroup {
             // TODO: move into NtfsDataRun
             let mediator: MediatorReference = Mediator::current();
             if mediator.debug_output {
-                mediator.debug_print(String::from("NtfsDataRun {\n"));
+                mediator.debug_print("NtfsDataRun {\n");
                 mediator.debug_print(format!("    block_number: {},\n", data_run.block_number));
                 mediator.debug_print(format!(
                     "    number_of_blocks: {},\n",
                     data_run.number_of_blocks
                 ));
                 mediator.debug_print(format!("    run_type: {:#?},\n", data_run.run_type));
-                mediator.debug_print(String::from("}\n\n"));
+                mediator.debug_print("}\n\n");
             }
             match &data_run.run_type {
                 NtfsDataRunType::EndOfList => break,

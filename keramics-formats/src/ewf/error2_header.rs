@@ -43,9 +43,7 @@ impl EwfError2Header {
     /// Reads the error2 header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 520 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF error2 header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 516);
 

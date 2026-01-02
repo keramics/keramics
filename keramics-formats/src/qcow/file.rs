@@ -232,7 +232,7 @@ impl QcowFile {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("QcowFile {\n"));
+            self.mediator.debug_print("QcowFile {\n");
             self.mediator.debug_print(format!(
                 "    level1_table_number_of_references: {}\n",
                 level1_table_number_of_references,
@@ -245,7 +245,7 @@ impl QcowFile {
                 "    cluster_block_size: {}\n",
                 self.cluster_block_size,
             ));
-            self.mediator.debug_print(String::from("}\n\n"));
+            self.mediator.debug_print("}\n\n");
         }
         self.level1_cluster_table.set_range(
             file_header.level1_table_offset,

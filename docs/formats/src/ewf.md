@@ -231,7 +231,7 @@ The additional data this section contains is the following:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 76 (0x4c) | (variable) | | Information about the acquired media |
+| 76 (0x4c) | ... | | Information about the acquired media |
 
 The information about the acquired media consists of [zlib compressed data](zlib.md). It contains
 text in UTF16 format specifying information about the acquired media. The text multiple lines
@@ -467,9 +467,9 @@ section are:
 
 The additional data this section contains is the following:
 
-| Offset | Number of bytes | Description |
-| --- | --- | --- |
-| 76 (0x4c) | (variable) | Information about the acquired media |
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 76 (0x4c) | ... | | Information about the acquired media |
 
 The information about the acquired media consists of [zlib compressed data](zlib.md). It contains
 text in ASCII format specifying information about the acquired media. The text multiple lines

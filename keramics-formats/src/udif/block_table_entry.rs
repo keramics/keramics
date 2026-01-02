@@ -61,9 +61,7 @@ impl UdifBlockTableEntry {
     /// Reads the block table entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 40 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported UDIF block table entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.entry_type = bytes_to_u32_be!(data, 0);
         self.start_sector = bytes_to_u64_be!(data, 8);

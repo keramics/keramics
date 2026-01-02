@@ -58,14 +58,10 @@ impl UdifBlockTableHeader {
     /// Reads the block table header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 204 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported UDIF block table header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != UDIF_BLOCK_TABLE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported UDIF block table header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 4);
 

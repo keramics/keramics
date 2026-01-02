@@ -17,8 +17,7 @@
 
 use std::cmp::min;
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 
 use super::huffman::HuffmanTree;
@@ -132,9 +131,6 @@ impl<'a> Bitstream for LzxpressBitstream<'a> {
 
 /// Context for decompressing LZXPRESS (LZ77 + DIRECT2) compressed data.
 pub struct LzxpressContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -143,7 +139,6 @@ impl LzxpressContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -160,10 +155,8 @@ impl LzxpressContext {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("LzxpressContext::decompress {\n"));
-        }
+        DebugTrace::print_start("LzxpressContext");
+
         let mut shared_compression_byte_offset: usize = 0;
 
         while compressed_data_offset < compressed_data_size {
@@ -177,16 +170,9 @@ impl LzxpressContext {
             }
             let compression_flags: u32 = bytes_to_u32_le!(compressed_data, compressed_data_offset);
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "    compressed_data_offset: {} (0x{:08x}),\n",
-                    compressed_data_offset, compressed_data_offset
-                ));
-                self.mediator.debug_print(format!(
-                    "    compression_flags: 0x{:08x},\n",
-                    compression_flags
-                ));
-            }
+            DebugTrace::print_field("compressed_data_offset", compressed_data_offset);
+            DebugTrace::print_field("compression_flags", format!("0x{:08x}", compression_flags));
+
             compressed_data_offset += 4;
 
             let mut compression_flags_mask = 0x80000000;
@@ -255,24 +241,15 @@ impl LzxpressContext {
                     // The match size value is stored as size - 3.
                     match_size += 3;
 
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    compressed_data_offset: {} (0x{:08x}),\n",
-                            compressed_data_offset, compressed_data_offset
-                        ));
-                        self.mediator.debug_print(format!(
-                            "    compression_tuple: 0x{:04x},\n",
-                            compression_tuple,
-                        ));
-                        self.mediator
-                            .debug_print(format!("    distance: {},\n", distance));
-                        self.mediator
-                            .debug_print(format!("    match_size: {},\n", match_size));
-                        self.mediator.debug_print(format!(
-                            "    uncompressed_data_offset: {},\n",
-                            uncompressed_data_offset
-                        ));
-                    }
+                    DebugTrace::print_field("compressed_data_offset", compressed_data_offset);
+                    DebugTrace::print_field(
+                        "compression_tuple",
+                        format!("0x{:04x}", compression_tuple),
+                    );
+                    DebugTrace::print_field("distance", distance);
+                    DebugTrace::print_field("match_size", match_size);
+                    DebugTrace::print_field("uncompressed_data_offset", uncompressed_data_offset);
+
                     if distance as usize > uncompressed_data_offset {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid distance value exceeds uncompressed data offset"
@@ -298,15 +275,11 @@ impl LzxpressContext {
                         match_end_offset += 1;
                         uncompressed_data_offset += 1;
                     }
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(format!("    match_offset: {}\n", match_offset));
-                        self.mediator.debug_print(String::from("    match_data:\n"));
-                        self.mediator.debug_print_data(
-                            &uncompressed_data[match_offset..match_end_offset],
-                            true,
-                        );
-                    }
+                    DebugTrace::print_field("match_offset", match_offset);
+                    DebugTrace::print_data_field(
+                        "match_data",
+                        &uncompressed_data[match_offset..match_end_offset],
+                    );
                 } else {
                     if compressed_data_offset >= compressed_data_size {
                         return Err(keramics_core::error_trace_new!(
@@ -327,9 +300,8 @@ impl LzxpressContext {
                 compression_flags_mask >>= 1;
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())
@@ -338,9 +310,6 @@ impl LzxpressContext {
 
 /// Context for decompressing LZXPRESS Huffman compressed data.
 pub struct LzxpressHuffmanContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -349,7 +318,6 @@ impl LzxpressHuffmanContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -369,12 +337,21 @@ impl LzxpressHuffmanContext {
             if uncompressed_data_offset >= uncompressed_data_size {
                 break;
             }
-            self.decompress_block(
+            match self.decompress_block(
                 &mut bitstream,
                 uncompressed_data,
                 &mut uncompressed_data_offset,
                 uncompressed_data_size,
-            )?;
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to decompress Huffman encoded block"
+                    );
+                    return Err(error);
+                }
+            }
         }
         self.uncompressed_data_size = uncompressed_data_offset;
 
@@ -406,42 +383,43 @@ impl LzxpressHuffmanContext {
             code_sizes[code_size_index + 1] = value_8bit >> 4;
         }
         let mut huffman_tree: HuffmanTree = HuffmanTree::new(512, 15);
-        huffman_tree.build(&code_sizes)?;
 
+        match huffman_tree.build(&code_sizes) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build Huffman tree");
+                return Err(error);
+            }
+        }
         // Fill the bitstream buffer with 32-bits.
         bitstream.number_of_bits = 0;
         bitstream.read_data(32);
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("LzxpressHuffmanContext::decompress_block {\n"));
-        }
+        DebugTrace::print_start("LzxpressHuffmannEncodedBlock");
+
         let end_of_block_uncompressed_data_offset: usize = min(
             safe_uncompressed_data_offset + 65536,
             uncompressed_data_size,
         );
         while bitstream.data_offset < bitstream.data_size || bitstream.number_of_bits > 0 {
             if safe_uncompressed_data_offset >= end_of_block_uncompressed_data_offset {
-                self.mediator.debug_print(format!(
-                    "    end-of-output at uncompressed_data_offset: {} (0x{:08x}),\n",
-                    safe_uncompressed_data_offset, safe_uncompressed_data_offset
-                ));
+                DebugTrace::print_field(
+                    "end-of-output at uncompressed_data_offset",
+                    safe_uncompressed_data_offset,
+                );
                 break;
             }
-            let mut symbol: u16 = huffman_tree.decode_symbol(bitstream)?;
+            let mut symbol: u16 = match huffman_tree.decode_symbol(bitstream) {
+                Ok(symbol) => symbol,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                    return Err(error);
+                }
+            };
+            DebugTrace::print_field("compressed_data_offset", bitstream.data_offset);
+            DebugTrace::print_field("number_of_bits", bitstream.number_of_bits);
+            DebugTrace::print_field("symbol", symbol);
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "    compressed_data_offset: {} (0x{:08x}),\n",
-                    bitstream.data_offset, bitstream.data_offset
-                ));
-                self.mediator.debug_print(format!(
-                    "    number_of_bits: {},\n",
-                    bitstream.number_of_bits
-                ));
-                self.mediator
-                    .debug_print(format!("    symbol: 0x{:04x},\n", symbol));
-            }
             // Ensure the bitstream buffer contains at least 16-bits.
             bitstream.read_data(16);
 
@@ -455,15 +433,16 @@ impl LzxpressHuffmanContext {
 
                 safe_uncompressed_data_offset += 1;
             } else {
-                // Symbol 256 indicates the end of the block, if the compressed data has been fully read.
+                // Symbol 256 indicates the end of the block only if the compressed data has been fully read.
                 if symbol == 256
                     && bitstream.data_offset >= bitstream.data_size
                     && bitstream.bits == 0
                 {
-                    self.mediator.debug_print(format!(
-                        "    end-of-block at compressed_data_offset: {} (0x{:08x}),\n",
-                        bitstream.data_offset, bitstream.data_offset
-                    ));
+                    DebugTrace::print_field(
+                        "end-of-block at compressed_data_offset",
+                        bitstream.data_offset,
+                    );
+
                     break;
                 }
                 symbol -= 256;
@@ -512,20 +491,11 @@ impl LzxpressHuffmanContext {
                 }
                 match_size += 3;
 
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "    compressed_data_offset: {} (0x{:08x}),\n",
-                        bitstream.data_offset, bitstream.data_offset
-                    ));
-                    self.mediator
-                        .debug_print(format!("    distance: {},\n", distance));
-                    self.mediator
-                        .debug_print(format!("    match_size: {},\n", match_size));
-                    self.mediator.debug_print(format!(
-                        "    uncompressed_data_offset: {},\n",
-                        safe_uncompressed_data_offset
-                    ));
-                }
+                DebugTrace::print_field("compressed_data_offset", bitstream.data_offset);
+                DebugTrace::print_field("distance", distance);
+                DebugTrace::print_field("match_size", match_size);
+                DebugTrace::print_field("uncompressed_data_offset", safe_uncompressed_data_offset);
+
                 if distance as usize > safe_uncompressed_data_offset {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid distance value exceeds uncompressed data offset"
@@ -546,20 +516,18 @@ impl LzxpressHuffmanContext {
                     match_end_offset += 1;
                     safe_uncompressed_data_offset += 1;
                 }
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    match_offset: {}\n", match_offset));
-                    self.mediator.debug_print(String::from("    match_data:\n"));
-                    self.mediator
-                        .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
-                }
+                DebugTrace::print_field("match_offset", match_offset);
+                DebugTrace::print_data_field(
+                    "match_data",
+                    &uncompressed_data[match_offset..match_end_offset],
+                );
+
                 // Ensure the bitstream buffer contains at least 16-bits.
                 bitstream.read_data(16);
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         *uncompressed_data_offset = safe_uncompressed_data_offset;
 
         Ok(())

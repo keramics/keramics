@@ -98,7 +98,7 @@ impl HuffmanTree {
         }
         */
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("HuffmanTree {\n"));
+            self.mediator.debug_print("HuffmanTree {\n");
         }
         // Calculate the offsets to sort the symbols per code size.
         let mut symbol_offsets: Vec<isize> = Vec::new();
@@ -136,7 +136,7 @@ impl HuffmanTree {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
+            self.mediator.debug_print("}\n\n");
         }
         Ok(())
     }

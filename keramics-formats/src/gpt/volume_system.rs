@@ -183,9 +183,9 @@ impl GptVolumeSystem {
                 Ok(read_count) => read_count,
                 Err(_) => {
                     if self.mediator.debug_output {
-                        self.mediator.debug_print(String::from(
+                        self.mediator.debug_print(
                             "Invalid backup partition table block number falling back to last block"
-                        ));
+                        );
                     }
                     match backup_partition_table_header.read_at_position(
                         data_stream,

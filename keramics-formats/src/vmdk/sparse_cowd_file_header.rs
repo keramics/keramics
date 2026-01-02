@@ -66,14 +66,10 @@ impl VmdkSparseCowdFileHeader {
     /// Reads the file header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 2048 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != VMDK_SPARSE_COWD_FILE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.sectors_per_grain = bytes_to_u32_le!(data, 16);
         self.grain_directory_start_sector = bytes_to_u32_le!(data, 20);

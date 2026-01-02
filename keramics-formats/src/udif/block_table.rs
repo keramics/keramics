@@ -43,9 +43,7 @@ impl UdifBlockTable {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         if data_size < 204 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported block table data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let mut block_table_header: UdifBlockTableHeader = UdifBlockTableHeader::new();
 

@@ -41,9 +41,7 @@ impl QcowClusterTableEntry {
     /// Reads the cluster table entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported cluster table entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.reference = bytes_to_u64_be!(data, 0);
 

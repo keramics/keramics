@@ -95,9 +95,7 @@ impl NtfsFileName {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         if data_size < 66 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS file name data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.parent_file_reference = bytes_to_u64_le!(data, 0);
 
@@ -142,9 +140,7 @@ impl NtfsFileName {
             let data_end_offset: usize = 66 + (self.name_size as usize) * 2;
 
             if data_end_offset > data_size {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported NTFS file name data size"
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
             self.name.read_data_le(&data[66..data_end_offset]);
         }

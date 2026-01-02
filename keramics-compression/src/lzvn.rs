@@ -15,8 +15,7 @@
 //!
 //! Provides decompression support for LZVN compressed data.
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 
 /// LZVN oppcode type.
 #[derive(Clone, PartialEq)]
@@ -296,9 +295,6 @@ const LZVN_OPPCODE_TYPES: [LzvnOppcodeType; 256] = [
 
 /// Context for decompressing LZVN compressed data.
 pub struct LzvnContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -307,7 +303,6 @@ impl LzvnContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -324,9 +319,8 @@ impl LzvnContext {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("LzvnContext {\n"));
-        }
+        DebugTrace::print_start("LzvnContext");
+
         // Note that distance can be reused by subsequent oppcodes.
         let mut distance: u16 = 0;
 
@@ -342,10 +336,8 @@ impl LzvnContext {
             let oppcode: u8 = compressed_data[compressed_data_offset];
             compressed_data_offset += 1;
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    oppcode: 0x{:02x}\n", oppcode));
-            }
+            DebugTrace::print_field("oppcode", format!("0x{:02x}", oppcode));
+
             let mut literal_size: u16 = 0;
             let mut match_size: u16 = 0;
 
@@ -437,14 +429,10 @@ impl LzvnContext {
                     )));
                 }
             };
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    literal_size: {}\n", literal_size));
-                self.mediator
-                    .debug_print(format!("    match_size: {}\n", match_size));
-                self.mediator
-                    .debug_print(format!("    distance: {}\n", distance));
-            }
+            DebugTrace::print_field("literal_size", literal_size);
+            DebugTrace::print_field("distance", distance);
+            DebugTrace::print_field("match_size", match_size);
+
             if literal_size > 0 {
                 if literal_size as usize > compressed_data_size - compressed_data_offset {
                     return Err(keramics_core::error_trace_new!(
@@ -461,14 +449,10 @@ impl LzvnContext {
                 let uncompressed_data_end_offset: usize =
                     uncompressed_data_offset + literal_size as usize;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(String::from("    literal data:\n"));
-                    self.mediator.debug_print_data(
-                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                        true,
-                    );
-                }
+                DebugTrace::print_data_field(
+                    "literal_data",
+                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                );
                 uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
                     .copy_from_slice(
                         &compressed_data[compressed_data_offset..compressed_data_end_offset],
@@ -498,18 +482,15 @@ impl LzvnContext {
                     match_end_offset += 1;
                     uncompressed_data_offset += 1;
                 }
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    match offset: {}\n", match_offset));
-                    self.mediator.debug_print(String::from("    match data:\n"));
-                    self.mediator
-                        .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
-                }
+                DebugTrace::print_field("match_offset", match_offset);
+                DebugTrace::print_data_field(
+                    "match_data",
+                    &uncompressed_data[match_offset..match_end_offset],
+                );
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())

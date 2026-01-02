@@ -73,14 +73,10 @@ impl VhdFileFooter {
     /// Reads the file footer from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 512 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file footer data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != VHD_FILE_FOOTER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file footer signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         let format_version: u32 = bytes_to_u32_be!(data, 12);
 

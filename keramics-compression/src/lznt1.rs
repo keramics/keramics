@@ -15,8 +15,7 @@
 //!
 //! Provides decompression support for LZNT1 compressed data.
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u16_le;
 
@@ -51,9 +50,7 @@ impl Lznt1BlockHeader {
     /// Reads the block header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 2 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported LZNT1 block header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let bit_fields1: u16 = bytes_to_u16_le!(data, 0);
 
@@ -66,9 +63,6 @@ impl Lznt1BlockHeader {
 
 /// Context for decompressing LZNT1 compressed data.
 pub struct Lznt1Context {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -77,7 +71,6 @@ impl Lznt1Context {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -108,52 +101,49 @@ impl Lznt1Context {
             if compressed_data[compressed_data_offset..compressed_data_end_offset] == [0; 2] {
                 break;
             }
+            DebugTrace::print_data_and_structure(
+                Lznt1BlockHeader::debug_read_data,
+                "Lznt1BlockHeader",
+                compressed_data_offset as u64,
+                &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                2,
+                true,
+            );
             let mut block_header: Lznt1BlockHeader = Lznt1BlockHeader::new();
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "Lznt1BlockHeader data of size: 2 at offset: {} (0x{:08x})\n",
-                    compressed_data_offset, compressed_data_offset
-                ));
-                self.mediator.debug_print_data(
-                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                    true,
-                );
-                self.mediator.debug_print(Lznt1BlockHeader::debug_read_data(
-                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                ));
+            match block_header
+                .read_data(&compressed_data[compressed_data_offset..compressed_data_end_offset])
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                    return Err(error);
+                }
             }
-            block_header
-                .read_data(&compressed_data[compressed_data_offset..compressed_data_end_offset])?;
             compressed_data_offset = compressed_data_end_offset;
 
             if block_header.is_compressed {
-                let write_count: usize = self.decompress_block(
+                match self.decompress_block(
                     block_header.block_size as usize,
                     compressed_data,
                     &mut compressed_data_offset,
                     compressed_data_size,
-                    &mut uncompressed_data[uncompressed_data_offset..],
-                    uncompressed_data_size - uncompressed_data_offset,
-                )?;
-                uncompressed_data_offset += write_count;
+                    uncompressed_data,
+                    &mut uncompressed_data_offset,
+                    uncompressed_data_size,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decompress block");
+                        return Err(error);
+                    }
+                }
             } else {
                 let compressed_data_end_offset: usize =
                     compressed_data_offset + block_header.block_size as usize;
                 let uncompressed_data_end_offset: usize =
                     uncompressed_data_offset + block_header.block_size as usize;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(String::from("Lznt1Context::decompress {\n"));
-                    self.mediator
-                        .debug_print(String::from("    literal data:\n"));
-                    self.mediator.debug_print_data(
-                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                        true,
-                    );
-                    self.mediator.debug_print(String::from("}\n\n"));
-                }
                 if compressed_data_end_offset > compressed_data_size {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid compressed data value too small"
@@ -164,6 +154,13 @@ impl Lznt1Context {
                         "Invalid uncompressed data value too small"
                     ));
                 }
+                DebugTrace::print_start("Lznt1UncompressedBlock");
+                DebugTrace::print_data_field(
+                    "literal_data",
+                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                );
+                DebugTrace::print_end();
+
                 uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
                     .copy_from_slice(
                         &compressed_data[compressed_data_offset..compressed_data_end_offset],
@@ -186,19 +183,19 @@ impl Lznt1Context {
         compressed_data_offset: &mut usize,
         compressed_data_size: usize,
         uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
-    ) -> Result<usize, ErrorTrace> {
+    ) -> Result<(), ErrorTrace> {
         let mut safe_compressed_data_offset: usize = *compressed_data_offset;
-        let mut uncompressed_data_offset: usize = 0;
+        let mut safe_uncompressed_data_offset: usize = *uncompressed_data_offset;
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("Lznt1Context::decompress_block {\n"));
-        }
         let compressed_data_end_offset: usize = safe_compressed_data_offset + block_size;
         let mut compression_tuple_threshold: usize = 16;
         let mut compression_tuple_distance_shift: u16 = 12;
         let mut compression_tuple_match_size_mask: u16 = 0x0fff;
+        let mut uncompressed_block_offset: usize = 0;
+
+        DebugTrace::print_start("Lznt1CompressedBlock");
 
         while safe_compressed_data_offset < compressed_data_end_offset {
             if safe_compressed_data_offset >= compressed_data_size {
@@ -206,16 +203,9 @@ impl Lznt1Context {
             }
             let mut compression_flags: u8 = compressed_data[safe_compressed_data_offset];
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "    compressed_data_offset: {} (0x{:08x}),\n",
-                    safe_compressed_data_offset, safe_compressed_data_offset
-                ));
-                self.mediator.debug_print(format!(
-                    "    compression_flags: 0x{:02x},\n",
-                    compression_flags
-                ));
-            }
+            DebugTrace::print_field("compressed_data_offset", safe_compressed_data_offset);
+            DebugTrace::print_field("compression_flags", format!("0x{:02x}", compression_flags));
+
             safe_compressed_data_offset += 1;
 
             for _ in 0..8 {
@@ -233,79 +223,77 @@ impl Lznt1Context {
                     let match_size: u16 =
                         (compression_tuple & compression_tuple_match_size_mask) + 3;
 
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    compressed_data_offset: {} (0x{:08x}),\n",
-                            safe_compressed_data_offset, safe_compressed_data_offset
-                        ));
-                        self.mediator.debug_print(format!(
-                            "    compression_tuple: 0x{:04x} (shift: {}, mask: 0x{:04x}),\n",
+                    DebugTrace::print_field("compressed_data_offset", safe_compressed_data_offset);
+                    DebugTrace::print_field(
+                        "compression_tuple",
+                        format!(
+                            "0x{:04x} (shift: {}, mask: 0x{:04x}),\n",
                             compression_tuple,
                             compression_tuple_distance_shift,
                             compression_tuple_match_size_mask
-                        ));
-                        self.mediator
-                            .debug_print(format!("    distance: {},\n", distance));
-                        self.mediator
-                            .debug_print(format!("    match_size: {},\n", match_size));
-                        self.mediator.debug_print(format!(
-                            "    uncompressed_data_offset: {},\n",
-                            uncompressed_data_offset
-                        ));
-                    }
-                    if distance as usize > uncompressed_data_offset {
+                        ),
+                    );
+                    DebugTrace::print_field("distance", distance);
+                    DebugTrace::print_field("match_size", match_size);
+                    DebugTrace::print_field(
+                        "uncompressed_data_offset",
+                        safe_uncompressed_data_offset,
+                    );
+
+                    if distance as usize > safe_uncompressed_data_offset {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid distance value exceeds uncompressed data offset"
                         ));
                     }
-                    if match_size as usize > uncompressed_data_size - uncompressed_data_offset {
+                    if match_size as usize > uncompressed_data_size - safe_uncompressed_data_offset
+                    {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid match size value exceeds uncompressed data size"
                         ));
                     }
-                    let match_offset: usize = uncompressed_data_offset - distance as usize;
+                    let match_offset: usize = safe_uncompressed_data_offset - distance as usize;
                     let mut match_end_offset: usize = match_offset;
 
                     for _ in 0..match_size {
-                        uncompressed_data[uncompressed_data_offset] =
+                        uncompressed_data[safe_uncompressed_data_offset] =
                             uncompressed_data[match_end_offset];
 
                         match_end_offset += 1;
-                        uncompressed_data_offset += 1;
+                        safe_uncompressed_data_offset += 1;
                     }
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(format!("    match offset: {}\n", match_offset));
-                        self.mediator.debug_print(String::from("    match data:\n"));
-                        self.mediator.debug_print_data(
-                            &uncompressed_data[match_offset..match_end_offset],
-                            true,
-                        );
-                    }
+                    uncompressed_block_offset += match_size as usize;
+
+                    DebugTrace::print_field("match_offset", match_offset);
+                    DebugTrace::print_data_field(
+                        "match_data",
+                        &uncompressed_data[match_offset..match_end_offset],
+                    );
                 } else {
                     if safe_compressed_data_offset >= compressed_data_size {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid compressed data value too small"
                         ));
                     }
-                    if uncompressed_data_offset >= uncompressed_data_size {
+                    if safe_uncompressed_data_offset >= uncompressed_data_size {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid uncompressed data value too small"
                         ));
                     }
-                    uncompressed_data[uncompressed_data_offset] =
+                    uncompressed_data[safe_uncompressed_data_offset] =
                         compressed_data[safe_compressed_data_offset];
 
                     safe_compressed_data_offset += 1;
-                    uncompressed_data_offset += 1;
+                    safe_uncompressed_data_offset += 1;
+
+                    uncompressed_block_offset += 1;
                 }
                 compression_flags >>= 1;
 
                 if safe_compressed_data_offset >= compressed_data_end_offset {
                     break;
                 }
-                // The compression tuple match size mask and distance shift are dependent on the uncompressed data offset.
-                while uncompressed_data_offset > compression_tuple_threshold {
+                // The compression tuple match size mask and distance shift are dependent on the uncompressed block offset.
+                while uncompressed_block_offset > compression_tuple_threshold {
                     if compression_tuple_distance_shift == 0 {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid compression tuple offset shift value out of bounds"
@@ -317,12 +305,12 @@ impl Lznt1Context {
                 }
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
-        *compressed_data_offset = compressed_data_end_offset;
+        DebugTrace::print_end();
 
-        Ok(uncompressed_data_offset)
+        *compressed_data_offset = compressed_data_end_offset;
+        *uncompressed_data_offset = safe_uncompressed_data_offset;
+
+        Ok(())
     }
 }
 

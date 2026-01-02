@@ -224,14 +224,10 @@ impl ExtSuperblock {
     /// Reads the superblock from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 1024 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported superblock data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[56..58] != EXT_SUPERBLOCK_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported superblock signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.format_revision = bytes_to_u32_le!(data, 76);
 

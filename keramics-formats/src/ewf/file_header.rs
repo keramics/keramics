@@ -43,14 +43,10 @@ impl EwfFileHeader {
     /// Reads the file header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 13 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF file header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != EWF_FILE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF file header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         if data[8] != 1 {
             return Err(keramics_core::error_trace_new!(

@@ -70,13 +70,11 @@ impl GptPartitionTableHeader {
     /// Reads the partition table header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 92 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported GPT partition table header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != GPT_PARTITION_TABLE_SIGNATURE {
             return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported GPT partition table header signature"
+                "Unsupported signature"
             )));
         }
         let format_version: u32 = bytes_to_u32_le!(data, 8);

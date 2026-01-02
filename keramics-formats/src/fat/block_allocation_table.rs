@@ -112,7 +112,7 @@ impl FatBlockAllocationTable {
         };
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(String::from("FatBlockAllocationTableEntry: {\n"));
+                .debug_print("FatBlockAllocationTableEntry: {\n");
             self.mediator
                 .debug_print(format!("    entry_index: {},\n", entry_index));
             self.mediator.debug_print(format!(
@@ -122,7 +122,7 @@ impl FatBlockAllocationTable {
             ));
             self.mediator
                 .debug_print(format!("    cluster_block_number: {},\n", entry));
-            self.mediator.debug_print(String::from("}\n"));
+            self.mediator.debug_print("}\n");
         }
         Ok(entry)
     }

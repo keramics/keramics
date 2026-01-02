@@ -53,14 +53,10 @@ impl SparseImageFileHeader {
     /// Reads the file header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 64 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != SPARSEIMAGE_FILE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.sectors_per_band = bytes_to_u32_be!(data, 8);
         self.number_of_sectors = bytes_to_u32_be!(data, 16);

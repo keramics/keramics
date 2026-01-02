@@ -41,9 +41,7 @@ impl EwfHash {
     /// Reads the hash from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 36 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF hash data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 32);
 

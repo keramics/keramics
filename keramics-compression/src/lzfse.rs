@@ -220,9 +220,7 @@ impl LzfseBlockV1Header {
     /// Reads the block header from a buffer.
     pub fn read_data(&mut self, data: &[u8], decoder: &mut LzfseDecoder) -> Result<(), ErrorTrace> {
         if data.len() != 42 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported LZFSE version 1 block header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         decoder.number_of_literals = bytes_to_u32_le!(data, 4);
         decoder.number_of_lmd_values = bytes_to_u32_le!(data, 8);
@@ -286,9 +284,7 @@ impl LzfseBlockV2Header {
     /// Reads the block header from a buffer.
     pub fn read_data(&mut self, data: &[u8], decoder: &mut LzfseDecoder) -> Result<(), ErrorTrace> {
         if data.len() < 24 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported LZFSE version 2 block header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let bit_fields1: u64 = bytes_to_u64_le!(data, 0);
         let bit_fields2: u64 = bytes_to_u64_le!(data, 8);
@@ -713,8 +709,7 @@ impl LzfseContext {
                         uncompressed_data_offset + uncompressed_block_size as usize;
 
                     if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(String::from("    uncompressed block data:\n"));
+                        self.mediator.debug_print("    uncompressed block data:\n");
                         self.mediator.debug_print_data(
                             &compressed_data[compressed_data_offset..compressed_data_end_offset],
                             true,
@@ -918,9 +913,8 @@ impl LzfseContext {
             ));
             self.mediator
                 .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-            self.mediator
-                .debug_print(String::from("LzfseFrequencyTable {\n"));
-            self.mediator.debug_print(String::from("    values: [\n"));
+            self.mediator.debug_print("LzfseFrequencyTable {\n");
+            self.mediator.debug_print("    values: [\n");
         }
         let mut data_offset: usize = 42;
 
@@ -944,8 +938,8 @@ impl LzfseContext {
             *frequency_table_entry = frequency_value;
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("    ],\n"));
-            self.mediator.debug_print(String::from("}\n"));
+            self.mediator.debug_print("    ],\n");
+            self.mediator.debug_print("}\n");
         }
         *compressed_data_offset = data_offset;
 
@@ -1002,9 +996,8 @@ impl LzfseContext {
                 ));
                 self.mediator
                     .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-                self.mediator
-                    .debug_print(String::from("LzfseFrequencyTable {\n"));
-                self.mediator.debug_print(String::from("    values: [\n"));
+                self.mediator.debug_print("LzfseFrequencyTable {\n");
+                self.mediator.debug_print("    values: [\n");
             }
             // TODO: use bitstream to read compressed data
             let mut number_of_bits: usize = 0;
@@ -1044,8 +1037,8 @@ impl LzfseContext {
                 number_of_bits -= frequency_value_size as usize;
             }
             if self.mediator.debug_output {
-                self.mediator.debug_print(String::from("\n    ],\n"));
-                self.mediator.debug_print(String::from("}\n"));
+                self.mediator.debug_print("\n    ],\n");
+                self.mediator.debug_print("}\n");
             }
         }
         *compressed_data_offset = data_offset;
@@ -1121,7 +1114,7 @@ impl LzfseContext {
             }
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("\n"));
+            self.mediator.debug_print("\n");
         }
         Ok(())
     }
@@ -1288,7 +1281,7 @@ impl LzfseContext {
             remaining_data_size -= m_value as usize;
         }
         if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("\n"));
+            self.mediator.debug_print("\n");
         }
         *uncompressed_data_offset = data_offset;
 

@@ -77,17 +77,13 @@ impl NtfsMftAttributeNonResident {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
         if data_size < 48 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported MFT non-resident attribute data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let compression_unit_size: u16 = bytes_to_u16_le!(data, 18);
 
         if compression_unit_size > 0 {
             if data_size < 56 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported MFT non-resident attribute data size"
-                ));
+                return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
             // The size is calculated as: 2 ^ value
             if compression_unit_size > 31 {

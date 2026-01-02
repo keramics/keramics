@@ -61,14 +61,10 @@ impl VhdxImageHeader {
     /// Reads the image header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 4096 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX image header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != VHDX_IMAGE_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported VHDX image header signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         let stored_checksum: u32 = bytes_to_u32_le!(data, 4);
 

@@ -50,9 +50,7 @@ impl FatLongNameDirectoryEntry {
     /// Reads the directory entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 32 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported directory entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.sequence_number = data[0];
 

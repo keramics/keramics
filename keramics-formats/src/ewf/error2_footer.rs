@@ -38,9 +38,7 @@ impl EwfError2Footer {
     /// Reads the error2 footer from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 4 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF error2 footer data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.checksum = bytes_to_u32_le!(data, 0);
 

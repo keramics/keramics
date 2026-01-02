@@ -341,7 +341,7 @@ impl NtfsWofCompressedStream {
         }
         if self.mediator.debug_output {
             self.mediator
-                .debug_print(String::from("NtfsWofCompressedBlockOffsets {\n"));
+                .debug_print("NtfsWofCompressedBlockOffsets {\n");
             self.mediator.debug_print(
                 self.block_offsets
                     .iter()
@@ -349,7 +349,7 @@ impl NtfsWofCompressedStream {
                     .collect::<Vec<String>>()
                     .join("\n"),
             );
-            self.mediator.debug_print(String::from("\n}\n\n"));
+            self.mediator.debug_print("\n}\n\n");
         }
         Ok(())
     }

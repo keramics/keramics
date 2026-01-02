@@ -15,15 +15,11 @@
 //!
 //! Provides decompression support for ADC compressed data.
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 use keramics_types::bytes_to_u16_be;
 
 /// Context for decompressing ADC compressed data.
 pub struct AdcContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -32,7 +28,6 @@ impl AdcContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -49,9 +44,8 @@ impl AdcContext {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("AdcContext {\n"));
-        }
+        DebugTrace::print_start("AdcContext");
+
         while compressed_data_offset < compressed_data_size {
             if uncompressed_data_offset >= uncompressed_data_size {
                 break;
@@ -64,10 +58,8 @@ impl AdcContext {
             let oppcode: u8 = compressed_data[compressed_data_offset];
             compressed_data_offset += 1;
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    oppcode: {}\n", oppcode));
-            }
+            DebugTrace::print_field("oppcode", oppcode);
+
             if (oppcode & 0x80) != 0 {
                 let literal_size: u8 = (oppcode & 0x7f) + 1;
 
@@ -86,14 +78,10 @@ impl AdcContext {
                 let uncompressed_data_end_offset: usize =
                     uncompressed_data_offset + literal_size as usize;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(String::from("    literal data:\n"));
-                    self.mediator.debug_print_data(
-                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                        true,
-                    );
-                }
+                DebugTrace::print_data_field(
+                    "literal_data",
+                    &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                );
                 uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
                     .copy_from_slice(
                         &compressed_data[compressed_data_offset..compressed_data_end_offset],
@@ -127,6 +115,11 @@ impl AdcContext {
 
                     compressed_data_offset += 1;
                 }
+                DebugTrace::print_field("compressed_data_offset", compressed_data_offset);
+                DebugTrace::print_field("distance", distance);
+                DebugTrace::print_field("match_size", match_size);
+                DebugTrace::print_field("uncompressed_data_offset", uncompressed_data_offset);
+
                 if uncompressed_data_offset < 1 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid uncompressed data offset value out of bounds"
@@ -152,18 +145,15 @@ impl AdcContext {
                     match_end_offset += 1;
                     uncompressed_data_offset += 1;
                 }
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    match offset: {}\n", match_offset));
-                    self.mediator.debug_print(String::from("    match data:\n"));
-                    self.mediator
-                        .debug_print_data(&uncompressed_data[match_offset..match_end_offset], true);
-                }
+                DebugTrace::print_field("match_offset", match_offset);
+                DebugTrace::print_data_field(
+                    "match_data",
+                    &uncompressed_data[match_offset..match_end_offset],
+                );
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())

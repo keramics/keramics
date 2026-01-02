@@ -16,24 +16,24 @@
 //! Provides decompression support for bzip2 compressed data.
 
 use std::cmp::max;
+use std::fmt;
 
 use keramics_checksums::Crc32Context;
-use keramics_core::ErrorTrace;
 use keramics_core::formatters::debug_format_array;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 
 use super::huffman::HuffmanTree;
 use super::traits::Bitstream;
 
 /// Bzip2 data header signature.
-pub(super) const BZIP2_DATA_HEADER_SIGNATURE: [u8; 2] = [0x42, 0x5a]; // BZ
+const BZIP2_DATA_HEADER_SIGNATURE: &[u8] = b"BZ";
 
 /// Bzip2 block size;
-pub(super) const BZIP2_BLOCK_SIZE: usize = 100000;
+const BZIP2_BLOCK_SIZE: usize = 100000;
 
 /// Bitstream for bzip2 compressed data.
-pub(super) struct Bzip2Bitstream<'a> {
+struct Bzip2Bitstream<'a> {
     /// Byte steam.
     data: &'a [u8],
 
@@ -160,14 +160,10 @@ impl Bzip2StreamHeader {
     /// Reads the stream header.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 4 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported bzip2 stream header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if data[0..2] != BZIP2_DATA_HEADER_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported bzip2 header signature"
-            ));
+        if &data[0..2] != BZIP2_DATA_HEADER_SIGNATURE {
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         let compression_level: u8 = data[3];
 
@@ -213,47 +209,49 @@ impl Bzip2BlockHeader {
     ) -> Result<(), ErrorTrace> {
         self.signature = ((bitstream.get_value(24) as u64) << 24) | bitstream.get_value(24) as u64;
 
-        if self.signature == 0x177245385090 {
-            self.checksum = bitstream.get_value(32);
-            self.randomized_flag = 0;
-            self.origin_pointer = 0;
-        } else if self.signature == 0x314159265359 {
-            self.checksum = bitstream.get_value(32);
-            self.randomized_flag = bitstream.get_value(1);
-            self.origin_pointer = bitstream.get_value(24);
-        } else {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Unsupported bzip2 signature: 0x{:12x}",
-                self.signature
-            )));
-        }
-        let mediator: MediatorReference = Mediator::current();
-        if mediator.debug_output {
-            let mut string_parts: Vec<String> = Vec::new();
-            string_parts.push(String::from("Bzip2BlockHeader {\n"));
-            string_parts.push(format!("    signature: 0x{:012x},\n", self.signature));
-            string_parts.push(format!("    checksum: 0x{:08x},\n", self.checksum));
-
-            if self.signature == 0x314159265359 {
-                string_parts.push(format!("    randomized_flag: {},\n", self.randomized_flag));
-                string_parts.push(format!(
-                    "    origin_pointer: 0x{:06x},\n",
-                    self.origin_pointer
-                ));
+        match self.signature {
+            0x177245385090 => {
+                self.checksum = bitstream.get_value(32);
+                self.randomized_flag = 0;
+                self.origin_pointer = 0;
             }
-            string_parts.push(String::from("}\n\n"));
-
-            mediator.debug_print(string_parts.join(""));
+            0x314159265359 => {
+                self.checksum = bitstream.get_value(32);
+                self.randomized_flag = bitstream.get_value(1);
+                self.origin_pointer = bitstream.get_value(24);
+            }
+            _ => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported signature: 0x{:12x}",
+                    self.signature
+                )));
+            }
         }
         Ok(())
     }
 }
 
+impl fmt::Display for Bzip2BlockHeader {
+    /// Formats the block header for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "Bzip2BlockHeader {{")?;
+        writeln!(formatter, "    signature: 0x{:012x},", self.signature)?;
+        writeln!(formatter, "    checksum: 0x{:08x},", self.checksum)?;
+
+        if self.signature == 0x314159265359 {
+            writeln!(formatter, "    randomized_flag: {},", self.randomized_flag)?;
+            writeln!(
+                formatter,
+                "    origin_pointer: 0x{:06x},",
+                self.origin_pointer
+            )?;
+        }
+        writeln!(formatter, "}}\n")
+    }
+}
+
 /// Context for decompressing bzip2 compressed data.
 pub struct Bzip2Context {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Uncompressed data size.
     pub uncompressed_data_size: usize,
 }
@@ -262,7 +260,6 @@ impl Bzip2Context {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             uncompressed_data_size: 0,
         }
     }
@@ -280,29 +277,39 @@ impl Bzip2Context {
                 "Invalid compressed data value too small"
             ));
         }
-        let mut data_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
+        let header_size: usize = if compressed_data[0] & 0x20 == 0 { 2 } else { 6 };
 
-        if self.mediator.debug_output {
-            let header_size: usize = if compressed_data[0] & 0x20 == 0 { 2 } else { 6 };
+        DebugTrace::print_data_and_structure(
+            Bzip2StreamHeader::debug_read_data,
+            "Bzip2StreamHeader",
+            0,
+            &compressed_data[0..header_size],
+            header_size,
+            true,
+        );
+        let mut stream_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
 
-            self.mediator.debug_print(format!(
-                "Bzip2StreamHeader data of size: {} at offset: 0 (0x00000000)\n",
-                header_size,
-            ));
-            self.mediator.debug_print_data(compressed_data, true);
-            self.mediator
-                .debug_print(Bzip2StreamHeader::debug_read_data(compressed_data));
+        match stream_header.read_data(compressed_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read stream header");
+                return Err(error);
+            }
         }
-        data_header.read_data(compressed_data)?;
-
         let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(compressed_data, 4);
-        self.decompress_bitstream(&mut bitstream, uncompressed_data)?;
 
+        match self.decompress_bitstream(&mut bitstream, uncompressed_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
+                return Err(error);
+            }
+        }
         Ok(())
     }
 
     /// Decompress a bitstream.
-    pub(super) fn decompress_bitstream(
+    fn decompress_bitstream(
         &mut self,
         bitstream: &mut Bzip2Bitstream,
         uncompressed_data: &mut [u8],
@@ -314,8 +321,16 @@ impl Bzip2Context {
         let uncompressed_data_size: usize = uncompressed_data.len();
 
         let mut block_header: Bzip2BlockHeader = Bzip2BlockHeader::new();
+
         while bitstream.data_offset < bitstream.data_size {
-            block_header.read_from_bitstream(bitstream)?;
+            match block_header.read_from_bitstream(bitstream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                    return Err(error);
+                }
+            }
+            DebugTrace::print(&block_header);
 
             if block_header.signature == 0x177245385090 {
                 break;
@@ -326,39 +341,50 @@ impl Bzip2Context {
                     block_header.origin_pointer
                 )));
             }
-            let number_of_symbols: usize = self.read_symbol_stack(bitstream, &mut symbol_stack)?;
+            let number_of_symbols: usize =
+                match self.read_symbol_stack(bitstream, &mut symbol_stack) {
+                    Ok(number_of_symbols) => number_of_symbols,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read symbol stack");
+                        return Err(error);
+                    }
+                };
             let number_of_trees: u32 = bitstream.get_value(3);
             let number_of_selectors: u32 = bitstream.get_value(15);
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(String::from("Bzip2Bitstream {\n"));
-                self.mediator
-                    .debug_print(format!("    number_of_symbols: {}\n", number_of_symbols));
-                self.mediator
-                    .debug_print(format!("    number_of_trees: {}\n", number_of_trees));
-                self.mediator.debug_print(format!(
-                    "    number_of_selectors: {}\n",
-                    number_of_selectors
-                ));
-                self.mediator.debug_print(String::from("}\n\n"));
-            }
-            self.read_selectors(
+            DebugTrace::print_start("Bzip2Context");
+            DebugTrace::print_field("number_of_symbols", number_of_symbols);
+            DebugTrace::print_field("number_of_trees", number_of_trees);
+            DebugTrace::print_field("number_of_selectors", number_of_selectors);
+            DebugTrace::print_end();
+
+            match self.read_selectors(
                 bitstream,
                 &mut selectors,
                 number_of_selectors as usize,
                 number_of_trees as usize,
-            )?;
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read selectors");
+                    return Err(error);
+                }
+            }
             let mut huffman_trees: Vec<HuffmanTree> = Vec::new();
 
             for _ in 0..number_of_trees {
                 let mut huffman_tree: HuffmanTree = HuffmanTree::new(number_of_symbols, 20);
 
-                self.read_huffman_tree(bitstream, &mut huffman_tree, number_of_symbols)?;
-
+                match self.read_huffman_tree(bitstream, &mut huffman_tree, number_of_symbols) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read Huffman tree");
+                        return Err(error);
+                    }
+                }
                 huffman_trees.push(huffman_tree);
             }
-            let block_data_size: usize = self.read_block_data(
+            let block_data_size: usize = match self.read_block_data(
                 bitstream,
                 &huffman_trees,
                 number_of_trees as usize,
@@ -367,15 +393,27 @@ impl Bzip2Context {
                 &mut symbol_stack,
                 number_of_symbols,
                 &mut block_data,
-            )?;
-            self.reverse_burrows_wheeler_transform(
+            ) {
+                Ok(block_data_size) => block_data_size,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block data");
+                    return Err(error);
+                }
+            };
+            match self.reverse_burrows_wheeler_transform(
                 &block_data,
                 block_data_size,
                 block_header.origin_pointer,
                 uncompressed_data,
                 &mut uncompressed_data_offset,
                 uncompressed_data_size,
-            )?;
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to transform block data");
+                    return Err(error);
+                }
+            }
         }
         let mut crc32_context: Crc32Context = Crc32Context::new(0x04c11db7, 0);
         crc32_context.update(&uncompressed_data[0..uncompressed_data_offset]);
@@ -411,10 +449,8 @@ impl Bzip2Context {
         let mut symbol_index: usize = 0;
         let mut tree_index: usize = selectors[0] as usize;
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("Bzip2BlockData {\n"));
-        }
+        DebugTrace::print_start("Bzip2BlockData");
+
         loop {
             if tree_index >= number_of_trees {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -423,16 +459,20 @@ impl Bzip2Context {
                 )));
             }
             let huffman_tree: &HuffmanTree = &huffman_trees[tree_index];
-            let symbol: u16 = huffman_tree.decode_symbol(bitstream)?;
 
+            let symbol: u16 = match huffman_tree.decode_symbol(bitstream) {
+                Ok(symbol) => symbol,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                    return Err(error);
+                }
+            };
             if number_of_run_length_symbols != 0 && symbol > 1 {
                 let mut run_length: u64 =
                     ((1 << number_of_run_length_symbols) | run_length_value) - 1;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    0-byte run-length: {}\n", run_length,));
-                }
+                DebugTrace::print_field("0-byte run-length", run_length);
+
                 if (run_length as usize) > BZIP2_BLOCK_SIZE - block_data_offset {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid run length: {} value out of bounds",
@@ -452,20 +492,14 @@ impl Bzip2Context {
                 }
             }
             if symbol == end_of_block_symbol {
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    symbol: {}\n", symbol));
-                }
+                DebugTrace::print_field("symbol", symbol);
                 break;
             }
             if symbol == 0 || symbol == 1 {
                 run_length_value |= (symbol as u64) << number_of_run_length_symbols;
                 number_of_run_length_symbols += 1;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    symbol: {} (run-length)\n", symbol));
-                }
+                DebugTrace::print_field("symbol", format!("{} (run-length)", symbol));
             } else if symbol < end_of_block_symbol {
                 // Inverse move-to-front transform.
                 let stack_value_index: usize = (symbol as usize) - 1;
@@ -477,10 +511,7 @@ impl Bzip2Context {
                 }
                 symbol_stack[0] = stack_value;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    symbol: {} (MTF: {})\n", symbol, stack_value));
-                }
+                DebugTrace::print_field("symbol", format!("{} (MTF: {})", symbol, stack_value));
                 if block_data_offset >= BZIP2_BLOCK_SIZE {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid block data offset: {} value out of bounds",
@@ -510,9 +541,8 @@ impl Bzip2Context {
                 tree_index = selectors[selector_index] as usize;
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         Ok(block_data_offset)
     }
 
@@ -609,20 +639,19 @@ impl Bzip2Context {
 
             selector_index += 1;
         }
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("Bzip2Selectors {\n"));
+        DebugTrace::print_start("Bzip2Selectors");
+        DebugTrace::print_field(
+            "selectors",
+            debug_format_array(
+                selectors
+                    .iter()
+                    .map(|&element| element.to_string())
+                    .collect::<Vec<String>>()
+                    .as_slice(),
+            ),
+        );
+        DebugTrace::print_end();
 
-            let array_parts: Vec<String> = selectors
-                .iter()
-                .map(|&element| element.to_string())
-                .collect();
-            self.mediator.debug_print(format!(
-                "    selectors: {},",
-                debug_format_array(&array_parts),
-            ));
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
         Ok(())
     }
 
@@ -636,25 +665,17 @@ impl Bzip2Context {
         let mut level1_bitmask: u32 = 0x00008000;
         let mut symbol_index: usize = 0;
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(String::from("Bzip2SymbolStack {\n"));
-            self.mediator
-                .debug_print(format!("    level1_value: 0x{:04x},\n", level1_value,));
-            self.mediator
-                .debug_print(String::from("    level2_values: ["));
-        }
+        DebugTrace::print_start("Bzip2SymbolStack");
+        DebugTrace::print_field("level1_value", format!("0x{:04x}", level1_value));
+
         for level1_bit_index in 0..16 {
             if level1_value & level1_bitmask != 0 {
                 let level2_value: u32 = bitstream.get_value(16);
+
+                DebugTrace::print_field("level2_value", format!("0x{:04x}", level2_value));
+
                 let mut level2_bitmask: u32 = 0x00008000;
 
-                if self.mediator.debug_output {
-                    if level1_bit_index > 0 {
-                        self.mediator.debug_print(String::from(", "));
-                    }
-                    self.mediator.debug_print(format!("0x{:04x}", level2_value));
-                }
                 for level2_bit_index in 0..16 {
                     if level2_value & level2_bitmask != 0 {
                         if symbol_index > 256 {
@@ -672,17 +693,19 @@ impl Bzip2Context {
             }
             level1_bitmask >>= 1;
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(String::from("],\n"));
-            // TODO: move to a debug_format_array like function.
-            self.mediator
-                .debug_print(format!("    symbols: [0x{:02x}", symbol_stack[0]));
-            for symbol in &symbol_stack[1..symbol_index] {
-                self.mediator.debug_print(format!(", 0x{:02x}", symbol));
-            }
-            self.mediator.debug_print(String::from("],\n"));
-            self.mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_field(
+            "symbols",
+            debug_format_array(
+                symbol_stack
+                    .iter()
+                    .take(symbol_index)
+                    .map(|&element| format!("0x{:02x}", element))
+                    .collect::<Vec<String>>()
+                    .as_slice(),
+            ),
+        );
+        DebugTrace::print_end();
+
         Ok(symbol_index + 2)
     }
 
@@ -696,7 +719,7 @@ impl Bzip2Context {
         uncompressed_data_offset: &mut usize,
         uncompressed_data_size: usize,
     ) -> Result<(), ErrorTrace> {
-        let mut data_offset: usize = *uncompressed_data_offset;
+        let mut safe_uncompressed_data_offset: usize = *uncompressed_data_offset;
         let mut distributions: [usize; 256] = [0; 256];
         let mut last_byte_value: u8 = 0;
         let mut number_of_last_byte_values: u8 = 0;
@@ -723,15 +746,15 @@ impl Bzip2Context {
             let mut byte_value: u8 = block_data[permutation_value];
 
             if number_of_last_byte_values == 4 {
-                if byte_value as usize > uncompressed_data_size - data_offset {
+                if byte_value as usize > uncompressed_data_size - safe_uncompressed_data_offset {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid uncompressed data value too small"
                     ));
                 }
                 while byte_value > 0 {
-                    uncompressed_data[data_offset] = last_byte_value;
+                    uncompressed_data[safe_uncompressed_data_offset] = last_byte_value;
 
-                    data_offset += 1;
+                    safe_uncompressed_data_offset += 1;
                     byte_value -= 1;
                 }
                 last_byte_value = 0;
@@ -743,18 +766,18 @@ impl Bzip2Context {
                 last_byte_value = byte_value;
                 number_of_last_byte_values += 1;
 
-                if data_offset >= uncompressed_data_size {
+                if safe_uncompressed_data_offset >= uncompressed_data_size {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid uncompressed data value too small"
                     ));
                 }
-                uncompressed_data[data_offset] = byte_value;
+                uncompressed_data[safe_uncompressed_data_offset] = byte_value;
 
-                data_offset += 1;
+                safe_uncompressed_data_offset += 1;
             }
             permutation_value = permutations[permutation_value];
         }
-        *uncompressed_data_offset = data_offset;
+        *uncompressed_data_offset = safe_uncompressed_data_offset;
 
         Ok(())
     }

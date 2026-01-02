@@ -55,9 +55,7 @@ impl NtfsIndexValue {
     /// Reads the index value from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS index value data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.file_reference = bytes_to_u64_le!(data, 0);
         self.size = bytes_to_u16_le!(data, 8);

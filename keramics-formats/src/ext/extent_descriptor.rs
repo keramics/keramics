@@ -51,9 +51,7 @@ impl ExtExtentDescriptor {
     /// Reads the extent descriptor from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() != 12 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported extent descriptor data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.logical_block_number = bytes_to_u32_le!(data, 0);
         self.number_of_blocks = bytes_to_u16_le!(data, 4);

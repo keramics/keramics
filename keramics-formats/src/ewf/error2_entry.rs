@@ -45,9 +45,7 @@ impl EwfError2Entry {
     /// Reads the error2 entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported EWF error2 entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.start_sector = bytes_to_u32_le!(data, 0);
         self.number_of_sectors = bytes_to_u32_le!(data, 4);

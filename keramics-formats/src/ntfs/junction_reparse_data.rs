@@ -49,9 +49,7 @@ impl NtfsJunctionReparseData {
         let data_size = data.len();
 
         if data_size < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported junction reparse data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let substitute_name_offset: u16 = bytes_to_u16_le!(data, 0);
         let substitute_name_size: u16 = bytes_to_u16_le!(data, 2);

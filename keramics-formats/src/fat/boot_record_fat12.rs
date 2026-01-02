@@ -54,14 +54,10 @@ impl Fat12BootRecord {
     /// Reads the boot record from a buffer.
     pub fn read_data(boot_record: &mut FatBootRecord, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 512 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported boot record data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if data[510..512] != FAT_BOOT_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported boot record signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         boot_record.bytes_per_sector = bytes_to_u16_le!(data, 11);
 

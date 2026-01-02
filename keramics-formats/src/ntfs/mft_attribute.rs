@@ -224,9 +224,9 @@ impl NtfsMftAttribute {
                     && non_resident_attribute.compression_unit_size == 0
                     && non_resident_attribute.data_first_vcn == 0
                 {
-                    self.mediator.debug_print(String::from(
+                    self.mediator.debug_print(
                         "Attribute data flags set compression type but no compression unit size set\n",
-                    ));
+                    );
                 }
             }
             let non_resident_data_size: usize = if non_resident_attribute.compression_unit_size == 0

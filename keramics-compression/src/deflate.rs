@@ -15,8 +15,9 @@
 //!
 //! Provides decompression support for DEFLATE compressed data (RFC 1951).
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use std::fmt;
+
+use keramics_core::{DebugTrace, ErrorTrace};
 
 use super::huffman::HuffmanTree;
 use super::traits::Bitstream;
@@ -235,17 +236,17 @@ impl DeflateBlockHeader {
         self.last_block_flag = value_32bit & 0x00000001;
         self.block_type = value_32bit >> 1;
 
-        let mediator: MediatorReference = Mediator::current();
-        if mediator.debug_output {
-            let mut string_parts: Vec<String> = Vec::new();
-            string_parts.push(String::from("DeflateBlockHeader {\n"));
-            string_parts.push(format!("    last_block_flag: {},\n", self.last_block_flag));
-            string_parts.push(format!("    block_type: {},\n", self.block_type));
-            string_parts.push(String::from("}\n\n"));
-
-            mediator.debug_print(string_parts.join(""));
-        }
         Ok(())
+    }
+}
+
+impl fmt::Display for DeflateBlockHeader {
+    /// Formats the block header for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "DeflateBlockHeader {{")?;
+        writeln!(formatter, "    last_block_flag: {},", self.last_block_flag)?;
+        writeln!(formatter, "    block_type: {},", self.block_type)?;
+        writeln!(formatter, "}}\n")
     }
 }
 
@@ -277,7 +278,7 @@ impl DeflateContext {
         }
     }
 
-    /// Builds dynamic Huffman trees from the compressed data in the bitstream.
+    /// Builds dynamic Huffman trees from the bitstream.
     fn build_dynamic_huffman_trees(
         &mut self,
         bitstream: &mut DeflateBitstream,
@@ -310,28 +311,12 @@ impl DeflateContext {
 
         let number_of_code_sizes: usize = (value_32bit as usize) + 4;
 
-        let mediator: MediatorReference = Mediator::current();
-        if mediator.debug_output {
-            let mut string_parts: Vec<String> = Vec::new();
-            string_parts.push(String::from(
-                "DeflateContext::build_dynamic_huffman_trees {\n",
-            ));
-            string_parts.push(format!(
-                "    number_of_literal_codes: {},\n",
-                number_of_literal_codes
-            ));
-            string_parts.push(format!(
-                "    number_of_distance_codes: {},\n",
-                number_of_distance_codes
-            ));
-            string_parts.push(format!(
-                "    number_of_code_sizes: {},\n",
-                number_of_code_sizes
-            ));
-            string_parts.push(String::from("}\n\n"));
+        DebugTrace::print_start("DeflateDynamicHuffmanTrees");
+        DebugTrace::print_field("number_of_literal_codes", number_of_literal_codes);
+        DebugTrace::print_field("number_of_distance_codes", number_of_distance_codes);
+        DebugTrace::print_field("number_of_code_sizes", number_of_code_sizes);
+        DebugTrace::print_end();
 
-            mediator.debug_print(string_parts.join(""));
-        }
         for code_size_index in DEFLATE_CODE_SIZES_SEQUENCE
             .iter()
             .take(number_of_code_sizes)
@@ -345,14 +330,25 @@ impl DeflateContext {
             code_sizes[*code_size_index as usize] = 0;
         }
         let mut codes_huffman_tree: HuffmanTree = HuffmanTree::new(19, 15);
-        codes_huffman_tree.build(&code_sizes[0..19])?;
 
+        match codes_huffman_tree.build(&code_sizes[0..19]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to build codes Huffman tree");
+                return Err(error);
+            }
+        }
         let number_of_codes: usize = number_of_literal_codes + number_of_distance_codes;
         let mut code_size_index: usize = 0;
 
         while code_size_index < number_of_codes {
-            let symbol: u16 = codes_huffman_tree.decode_symbol(bitstream)?;
-
+            let symbol: u16 = match codes_huffman_tree.decode_symbol(bitstream) {
+                Ok(symbol) => symbol,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                    return Err(error);
+                }
+            };
             if symbol < 16 {
                 code_sizes[code_size_index] = symbol as u8;
 
@@ -402,9 +398,26 @@ impl DeflateContext {
                 "End-of-block code value missing in literal codes"
             ));
         }
-        literals_huffman_tree.build(&code_sizes[0..number_of_literal_codes])?;
-        distances_huffman_tree.build(&code_sizes[number_of_literal_codes..number_of_codes])?;
-
+        match literals_huffman_tree.build(&code_sizes[0..number_of_literal_codes]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build literals Huffman tree"
+                );
+                return Err(error);
+            }
+        }
+        match distances_huffman_tree.build(&code_sizes[number_of_literal_codes..number_of_codes]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build distances Huffman tree"
+                );
+                return Err(error);
+            }
+        }
         Ok(())
     }
 
@@ -425,10 +438,29 @@ impl DeflateContext {
                 *code_size_entry = 5;
             }
         }
-        self.fixed_literals_huffman_tree
-            .build(&code_sizes[0..288])?;
-        self.fixed_distances_huffman_tree
-            .build(&code_sizes[288..318])?;
+        match self.fixed_literals_huffman_tree.build(&code_sizes[0..288]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build literals Huffman tree"
+                );
+                return Err(error);
+            }
+        }
+        match self
+            .fixed_distances_huffman_tree
+            .build(&code_sizes[288..318])
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to distances literals Huffman tree"
+                );
+                return Err(error);
+            }
+        }
         self.build_fixed_huffman_trees = true;
 
         Ok(())
@@ -456,7 +488,15 @@ impl DeflateContext {
 
         while bitstream.data_offset < bitstream.data_size {
             let mut block_header: DeflateBlockHeader = DeflateBlockHeader::new();
-            block_header.read_from_bitstream(bitstream)?;
+
+            match block_header.read_from_bitstream(bitstream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                    return Err(error);
+                }
+            }
+            DebugTrace::print(&block_header);
 
             match block_header.block_type {
                 DEFLATE_BLOCK_TYPE_UNCOMPRESED => {
@@ -477,45 +517,90 @@ impl DeflateContext {
                         )));
                     }
                     if block_size > 0 {
-                        bitstream.copy_bytes(
+                        match bitstream.copy_bytes(
                             block_size,
                             uncompressed_data,
                             uncompressed_data_offset,
                             uncompressed_data_size,
-                        )?;
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to copy uncompressed block data"
+                                );
+                                return Err(error);
+                            }
+                        }
                         uncompressed_data_offset += block_size;
                     }
                 }
                 DEFLATE_BLOCK_TYPE_HUFFMAN_FIXED => {
                     if !self.build_fixed_huffman_trees {
-                        self.build_fixed_huffman_trees()?;
+                        match self.build_fixed_huffman_trees() {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to build fixed Huffman trees"
+                                );
+                                return Err(error);
+                            }
+                        }
                     }
-                    self.decompress_huffmann_encoded_block(
+                    match self.decompress_huffmann_encoded_block(
                         bitstream,
                         &self.fixed_literals_huffman_tree,
                         &self.fixed_distances_huffman_tree,
                         uncompressed_data,
                         &mut uncompressed_data_offset,
                         uncompressed_data_size,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to decompress fixed Huffman encoded block"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 DEFLATE_BLOCK_TYPE_HUFFMAN_DYNAMIC => {
                     let mut dynamic_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
                     let mut dynamic_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
 
-                    self.build_dynamic_huffman_trees(
+                    match self.build_dynamic_huffman_trees(
                         bitstream,
                         &mut dynamic_literals_huffman_tree,
                         &mut dynamic_distances_huffman_tree,
-                    )?;
-                    self.decompress_huffmann_encoded_block(
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to build dynamic Huffman trees"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match self.decompress_huffmann_encoded_block(
                         bitstream,
                         &dynamic_literals_huffman_tree,
                         &dynamic_distances_huffman_tree,
                         uncompressed_data,
                         &mut uncompressed_data_offset,
                         uncompressed_data_size,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to decompress dynamic Huffman encoded block"
+                            );
+                            return Err(error);
+                        }
+                    }
                 }
                 _ => {
                     return Err(keramics_core::error_trace_new!("Unsupported block type"));
@@ -542,19 +627,19 @@ impl DeflateContext {
     ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
 
-        let mediator: MediatorReference = Mediator::current();
-        if mediator.debug_output {
-            mediator.debug_print(String::from(
-                "DeflateContext::decompress_huffmann_encoded_block {\n",
-            ));
-        }
-        loop {
-            let mut symbol: u16 = literals_huffman_tree.decode_symbol(bitstream)?;
+        DebugTrace::print_start("DeflateHuffmannEncodedBlock");
 
-            if mediator.debug_output {
-                mediator.debug_print(format!("    uncompressed_data_offset: {},\n", data_offset));
-                mediator.debug_print(format!("    symbol: {},\n", symbol));
-            }
+        loop {
+            let mut symbol: u16 = match literals_huffman_tree.decode_symbol(bitstream) {
+                Ok(symbol) => symbol,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                    return Err(error);
+                }
+            };
+            DebugTrace::print_field("uncompressed_data_offset", data_offset);
+            DebugTrace::print_field("symbol", symbol);
+
             if symbol == 256 {
                 break;
             }
@@ -574,24 +659,26 @@ impl DeflateContext {
                     DEFLATE_LITERAL_CODES_NUMBER_OF_EXTRA_BITS[symbol as usize];
                 let extra_bits: u32 = bitstream.get_value(number_of_extra_bits as usize);
 
-                if mediator.debug_output {
-                    mediator.debug_print(format!("    extra_bits: 0x{:04x},\n", extra_bits));
-                }
+                DebugTrace::print_field("extra_bits", format!("0x{:04x}", extra_bits));
+
                 let compression_size: usize =
                     ((DEFLATE_LITERAL_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
 
-                symbol = distances_huffman_tree.decode_symbol(bitstream)?;
+                symbol = match distances_huffman_tree.decode_symbol(bitstream) {
+                    Ok(symbol) => symbol,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decode symbol");
+                        return Err(error);
+                    }
+                };
+                DebugTrace::print_field("symbol", symbol);
 
-                if mediator.debug_output {
-                    mediator.debug_print(format!("    symbol: {},\n", symbol));
-                }
                 let number_of_extra_bits: u16 =
                     DEFLATE_DISTANCE_CODES_NUMBER_OF_EXTRA_BITS[symbol as usize];
                 let extra_bits: u32 = bitstream.get_value(number_of_extra_bits as usize);
 
-                if mediator.debug_output {
-                    mediator.debug_print(format!("    extra_bits: 0x{:04x},\n", extra_bits));
-                }
+                DebugTrace::print_field("extra_bits", format!("0x{:04x}", extra_bits));
+
                 let compression_offset: usize =
                     ((DEFLATE_DISTANCE_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
 
@@ -607,18 +694,16 @@ impl DeflateContext {
                         compression_size
                     )));
                 }
-                if mediator.debug_output {
-                    mediator
-                        .debug_print(format!("    compression_offset: {},\n", compression_offset));
-                    mediator.debug_print(format!("    compression_size: {},\n", compression_size));
-                }
+                DebugTrace::print_field("compression_offset", compression_offset);
+                DebugTrace::print_field("compression_size", compression_size);
+
                 let mut compression_data_offset: usize = data_offset - compression_offset;
 
                 for _ in 0..compression_size {
                     uncompressed_data[data_offset] = uncompressed_data[compression_data_offset];
 
-                    data_offset += 1;
                     compression_data_offset += 1;
+                    data_offset += 1;
                 }
             } else {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -627,9 +712,8 @@ impl DeflateContext {
                 )));
             }
         }
-        if mediator.debug_output {
-            mediator.debug_print(String::from("}\n\n"));
-        }
+        DebugTrace::print_end();
+
         *uncompressed_data_offset = data_offset;
 
         Ok(())

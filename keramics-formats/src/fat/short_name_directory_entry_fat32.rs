@@ -46,9 +46,7 @@ impl Fat32ShortNameDirectoryEntry {
         data: &[u8],
     ) -> Result<(), ErrorTrace> {
         if data.len() < 32 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported directory entry data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         directory_entry.file_attribute_flags = data[11];
         directory_entry.flags = data[12];

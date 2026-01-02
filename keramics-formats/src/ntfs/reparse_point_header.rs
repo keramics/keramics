@@ -47,9 +47,7 @@ impl NtfsReparsePointHeader {
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size = data.len();
         if data_size < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported NTFS reparse point header data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.tag = bytes_to_u32_le!(data, 0);
         self.data_size = bytes_to_u16_le!(data, 4);

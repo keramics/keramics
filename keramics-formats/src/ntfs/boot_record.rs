@@ -94,14 +94,10 @@ impl NtfsBootRecord {
     /// Reads the boot record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 512 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported boot record data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[3..11] != NTFS_FILE_SYSTEM_SIGNATURE {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported file system signature"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.bytes_per_sector = bytes_to_u16_le!(data, 11);
 

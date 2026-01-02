@@ -42,9 +42,7 @@ impl Ext2GroupDescriptor {
         data: &[u8],
     ) -> Result<(), ErrorTrace> {
         if data.len() != 32 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported group descriptor data size"
-            ));
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         group_descriptor.inode_table_block_number = bytes_to_u32_le!(data, 8) as u64;
         group_descriptor.checksum = bytes_to_u16_le!(data, 30);
