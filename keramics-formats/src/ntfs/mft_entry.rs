@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
@@ -26,9 +25,6 @@ const END_OF_ATTRIBUTES_MARKER: [u8; 4] = [0xff; 4];
 
 /// New Technologies File System (NTFS) Master File Table (MFT) entry.
 pub struct NtfsMftEntry {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data.
     pub(super) data: Vec<u8>,
 
@@ -58,7 +54,6 @@ impl NtfsMftEntry {
     /// Creates a new MFT entry.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data: Vec::new(),
             sequence_number: 0,
             base_record_file_reference: 0,
@@ -123,13 +118,10 @@ impl NtfsMftEntry {
 
             return Ok(());
         }
-        let data_size: usize = data.len();
+        keramics_core::debug_trace_structure!(NtfsMftEntryHeader::debug_read_data(data));
+
         let mut mft_entry_header: NtfsMftEntryHeader = NtfsMftEntryHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(NtfsMftEntryHeader::debug_read_data(data));
-        }
         match mft_entry_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -137,6 +129,8 @@ impl NtfsMftEntry {
                 return Err(error);
             }
         }
+        let data_size: usize = data.len();
+
         if mft_entry_header.mft_entry_size as usize != data_size {
             return Err(keramics_core::error_trace_new!(format!(
                 "Mismatch between MFT entry size in header: {} and boot record: {}",
@@ -174,7 +168,7 @@ impl NtfsMftEntry {
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
         match apply_fixup_values(
             data,
-            mft_entry_header.fixup_values_offset,
+            mft_entry_header.fixup_values_offset as usize,
             mft_entry_header.number_of_fixup_values,
         ) {
             Ok(_) => {}
@@ -211,13 +205,9 @@ impl NtfsMftEntry {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "NtfsMftEntry data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("NtfsMftEntry", offset, &data, data_size);
+
         match self.read_data(&mut data) {
             Ok(_) => {}
             Err(mut error) => {

@@ -13,7 +13,7 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::mediator::Mediator;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
@@ -24,9 +24,6 @@ use super::file_header::SparseImageFileHeader;
 
 /// Mac OS sparse image (.sparseimage) file.
 pub struct SparseImageFile {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -50,7 +47,6 @@ impl SparseImageFile {
     /// Creates a file.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
             bytes_per_sector: 0,
@@ -86,16 +82,16 @@ impl SparseImageFile {
             &mut data,
             SeekFrom::Start(0)
         );
+        keramics_core::debug_trace_data_and_structure!(
+            "SparseImageFileHeader",
+            0,
+            &data[0..64],
+            64,
+            SparseImageFileHeader::debug_read_data(&data)
+        );
         let mut file_header: SparseImageFileHeader = SparseImageFileHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print("SparseImageFileHeader data of size: 64 at offset: 0 (0x00000000)\n");
-            self.mediator.debug_print_data(&data[0..64], true);
-            self.mediator
-                .debug_print(SparseImageFileHeader::debug_read_data(&data[0..64]));
-        }
-        match file_header.read_data(&data[0..64]) {
+        match file_header.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read file header");
@@ -112,17 +108,15 @@ impl SparseImageFile {
                 number_of_bands
             )));
         }
-        if self.mediator.debug_output {
-            let data_size: usize = (number_of_bands as usize) * 4;
-            let data_end_offset: usize = 64 + data_size;
+        let array_data_size: usize = (number_of_bands as usize) * 4;
+        let array_data_end_offset: usize = 64 + array_data_size;
 
-            self.mediator.debug_print(format!(
-                "SparseImageBandNumbersArray data of size: {} at offset: 64 (0x00000040)\n",
-                data_size,
-            ));
-            self.mediator
-                .debug_print_data(&data[64..data_end_offset], true);
-        }
+        keramics_core::debug_trace_data!(
+            "SparseImageBandNumbersArray",
+            64,
+            &data[64..array_data_end_offset],
+            array_data_size
+        );
         if file_header.sectors_per_band > u32::MAX / 512 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid sectors per band: {} value out of bounds",
@@ -142,22 +136,22 @@ impl SparseImageFile {
         );
         let mut data_offset: usize = 64;
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print("SparseImageBandNumbersArray {\n");
-            self.mediator.debug_print("    band_numbers: [\n");
+        let mediator = Mediator::current();
+        if mediator.debug_output {
+            mediator.debug_print("SparseImageBandNumbersArray {\n");
+            mediator.debug_print("    band_numbers: [\n");
         }
         for array_index in 0..number_of_bands {
             let band_number: u32 = bytes_to_u32_be!(data, data_offset);
             data_offset += 4;
 
-            if self.mediator.debug_output {
+            if mediator.debug_output {
                 if array_index % 16 == 0 {
-                    self.mediator
-                        .debug_print(format!("        {}", band_number));
+                    mediator.debug_print(format!("        {}", band_number));
                 } else if array_index % 16 == 15 {
-                    self.mediator.debug_print(format!(", {},\n", band_number));
+                    mediator.debug_print(format!(", {},\n", band_number));
                 } else {
-                    self.mediator.debug_print(format!(", {}", band_number));
+                    mediator.debug_print(format!(", {}", band_number));
                 }
             }
             if band_number == 0 {
@@ -181,12 +175,12 @@ impl SparseImageFile {
                 }
             };
         }
-        if self.mediator.debug_output {
+        if mediator.debug_output {
             if number_of_bands % 16 != 0 {
-                self.mediator.debug_print("\n");
+                mediator.debug_print("\n");
             }
-            self.mediator.debug_print("    ],\n");
-            self.mediator.debug_print("}\n\n");
+            mediator.debug_print("    ],\n");
+            mediator.debug_print("}\n\n");
         }
         Ok(())
     }

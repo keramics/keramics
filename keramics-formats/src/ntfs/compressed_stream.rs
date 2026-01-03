@@ -16,7 +16,6 @@ use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_compression::Lznt1Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
@@ -29,9 +28,6 @@ use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) compressed stream.
 pub struct NtfsCompressedStream {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// The data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -61,7 +57,6 @@ impl NtfsCompressedStream {
     /// Creates a new compressed stream.
     pub(super) fn new(cluster_block_size: u32) -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             cluster_block_size,
             block_tree: BlockTree::<NtfsCompressionRange>::new(0, 0, 0),
@@ -296,13 +291,12 @@ impl NtfsCompressedStream {
                                 &mut compressed_data,
                                 SeekFrom::Start(range_offset)
                             );
-                            if self.mediator.debug_output {
-                                self.mediator.debug_print(format!(
-                                    "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                                    range_size, range_offset, range_offset,
-                                ));
-                                self.mediator.debug_print_data(&compressed_data, true);
-                            }
+                            keramics_core::debug_trace_data!(
+                                "NtfsLznt1CompressedData",
+                                range_offset,
+                                &compressed_data,
+                                range_size
+                            );
                             let mut block_data: Vec<u8> = vec![0; self.compression_unit_size];
 
                             let mut lznt1_context: Lznt1Context = Lznt1Context::new();

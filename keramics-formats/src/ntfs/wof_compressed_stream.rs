@@ -241,13 +241,13 @@ impl NtfsWofCompressedStream {
             &mut compressed_data,
             SeekFrom::Start(block_offset)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                block_size, block_offset, block_offset,
-            ));
-            self.mediator.debug_print_data(&compressed_data, true);
-        }
+        keramics_core::debug_trace_data!(
+            "NtfsWofCompressedBlock",
+            block_offset,
+            &compressed_data,
+            block_size
+        );
+
         match self.compression_method {
             0 | 2 | 3 => {
                 let mut lzxpress_context: LzxpressHuffmanContext = LzxpressHuffmanContext::new();
@@ -314,13 +314,8 @@ impl NtfsWofCompressedStream {
             &mut data,
             SeekFrom::Start(0)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Block offsets data of size: {} at offset: 0 (0x00000000)\n",
-                data_size,
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+        keramics_core::debug_trace_data!("NtfsWofCompressedBlockOffsets", 0, &data, data_size);
+
         self.block_offsets.push(data_size as u64);
 
         for data_offset in (0..data_size).step_by(block_offset_data_size) {
@@ -339,18 +334,18 @@ impl NtfsWofCompressedStream {
             }
             self.block_offsets.push(block_offset);
         }
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print("NtfsWofCompressedBlockOffsets {\n");
-            self.mediator.debug_print(
-                self.block_offsets
-                    .iter()
-                    .map(|offset| format!("    offset: {} (0x{:08x}),", offset, offset))
-                    .collect::<Vec<String>>()
-                    .join("\n"),
-            );
-            self.mediator.debug_print("\n}\n\n");
-        }
+        keramics_core::debug_trace_structure!(format!(
+            concat!(
+                "NtfsWofCompressedBlockOffsets {{\n",
+                "    offsets: [{}],\n",
+                "}}\n\n"
+            ),
+            self.block_offsets
+                .iter()
+                .map(|offset| format!("{} (0x{:08x})", offset, offset))
+                .collect::<Vec<String>>()
+                .join(", ")
+        ));
         Ok(())
     }
 }

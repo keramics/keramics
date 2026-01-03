@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::mediator::Mediator;
 use keramics_types::Ucs2String;
 
 use super::cluster_group::NtfsClusterGroup;
@@ -23,9 +23,6 @@ use super::mft_attribute_resident::NtfsMftAttributeResident;
 
 /// New Technologies File System (NTFS) Master File Table (MFT) attribute.
 pub struct NtfsMftAttribute {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Attribute type.
     pub attribute_type: u32,
 
@@ -67,7 +64,6 @@ impl NtfsMftAttribute {
     /// Creates a new MFT attribute.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             attribute_type: 0,
             attribute_size: 0,
             name: None,
@@ -145,14 +141,10 @@ impl NtfsMftAttribute {
 
     /// Reads the MFT attribute from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
+        keramics_core::debug_trace_structure!(NtfsMftAttributeHeader::debug_read_data(data));
 
         let mut mft_attribute_header: NtfsMftAttributeHeader = NtfsMftAttributeHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(NtfsMftAttributeHeader::debug_read_data(data));
-        }
         match mft_attribute_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -185,12 +177,10 @@ impl NtfsMftAttribute {
             NtfsMftAttributeNonResident::new();
 
         if self.is_resident() {
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(NtfsMftAttributeResident::debug_read_data(
-                        &data[data_offset..],
-                    ));
-            }
+            keramics_core::debug_trace_structure!(NtfsMftAttributeResident::debug_read_data(
+                &data[data_offset..]
+            ));
+
             match resident_attribute.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -203,12 +193,10 @@ impl NtfsMftAttribute {
             }
             data_offset += 8;
         } else {
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(NtfsMftAttributeNonResident::debug_read_data(
-                        &data[data_offset..],
-                    ));
-            }
+            keramics_core::debug_trace_structure!(NtfsMftAttributeNonResident::debug_read_data(
+                &data[data_offset..]
+            ));
+
             match non_resident_attribute.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -219,24 +207,22 @@ impl NtfsMftAttribute {
                     return Err(error);
                 }
             }
-            if self.mediator.debug_output {
+            let mediator = Mediator::current();
+
+            if mediator.debug_output {
                 if self.is_compressed()
                     && non_resident_attribute.compression_unit_size == 0
                     && non_resident_attribute.data_first_vcn == 0
                 {
-                    self.mediator.debug_print(
+                    mediator.debug_print(
                         "Attribute data flags set compression type but no compression unit size set\n",
                     );
                 }
             }
-            let non_resident_data_size: usize = if non_resident_attribute.compression_unit_size == 0
-            {
-                48
-            } else {
-                56
-            };
-            data_offset += non_resident_data_size;
+            data_offset += non_resident_attribute.get_non_resident_data_size();
         }
+        let data_size: usize = data.len();
+
         if mft_attribute_header.name_size > 0 {
             let name_offset: usize = mft_attribute_header.name_offset as usize;
 
@@ -280,18 +266,13 @@ impl NtfsMftAttribute {
                         mft_attribute_header.name_size
                     )));
                 }
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(format!(
-                        "NtfsMftAttribute resident data of size: {} at offset: {} (0x{:08x})\n",
-                        resident_attribute.data_size,
-                        resident_attribute.data_offset,
-                        resident_attribute.data_offset,
-                    ));
-                    self.mediator.debug_print_data(
-                        &data[resident_data_offset..resident_data_end_offset],
-                        true,
-                    );
-                }
+                keramics_core::debug_trace_data!(
+                    "NtfsMftAttribute resident",
+                    resident_attribute.data_offset,
+                    &data[resident_data_offset..resident_data_end_offset],
+                    resident_attribute.data_size
+                );
+
                 self.resident_data = vec![0; resident_data_size];
                 self.resident_data
                     .copy_from_slice(&data[resident_data_offset..resident_data_end_offset]);
@@ -347,14 +328,13 @@ impl NtfsMftAttribute {
                 name_size
             )));
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "NtfsMftAttributeName data of size: {} at offset: {} (0x{:08x})\n",
-                name_size, name_offset, name_offset,
-            ));
-            self.mediator
-                .debug_print_data(&data[name_offset..name_end_offset], true);
-        }
+        keramics_core::debug_trace_data!(
+            "NtfsMftAttribute name",
+            name_offset,
+            &data[name_offset..name_end_offset],
+            name_size
+        );
+
         let name: Ucs2String = Ucs2String::from_le_bytes(&data[name_offset..name_end_offset]);
 
         self.name = Some(name);

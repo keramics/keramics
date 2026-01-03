@@ -113,11 +113,11 @@ impl ExtExtentsTree {
                     )));
                 }
                 keramics_core::debug_trace_structure!(ExtExtentIndex::debug_read_data(
-                    &data[data_offset..data_end_offset]
+                    &data[data_offset..]
                 ));
                 let mut entry: ExtExtentIndex = ExtExtentIndex::new();
 
-                match entry.read_data(&data[data_offset..data_end_offset]) {
+                match entry.read_data(&data[data_offset..]) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -162,11 +162,11 @@ impl ExtExtentsTree {
                     )));
                 }
                 keramics_core::debug_trace_structure!(ExtExtentDescriptor::debug_read_data(
-                    &data[data_offset..data_end_offset]
+                    &data[data_offset..]
                 ));
                 let mut entry: ExtExtentDescriptor = ExtExtentDescriptor::new();
 
-                match entry.read_data(&data[data_offset..data_end_offset]) {
+                match entry.read_data(&data[data_offset..]) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -214,14 +214,12 @@ impl ExtExtentsTree {
             }
         }
         if data_size - data_offset >= 4 {
-            let data_end_offset: usize = data_offset + 4;
-
             keramics_core::debug_trace_structure!(ExtExtentsFooter::debug_read_data(
-                &data[data_offset..data_end_offset]
+                &data[data_offset..]
             ));
             let mut extents_footer: ExtExtentsFooter = ExtExtentsFooter::new();
 
-            match extents_footer.read_data(&data[data_offset..data_end_offset]) {
+            match extents_footer.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read extents footer");

@@ -58,14 +58,13 @@ impl EwfTable {
 
         let mut data_offset: usize = 24;
         let footer_offset: usize = 24 + (table_header.number_of_entries as usize * 4);
-        let footer_end_offset: usize = footer_offset + 4;
 
         keramics_core::debug_trace_structure!(EwfTableFooter::debug_read_data(
-            &data[footer_offset..footer_end_offset]
+            &data[footer_offset..]
         ));
         let mut table_footer: EwfTableFooter = EwfTableFooter::new();
 
-        match table_footer.read_data(&data[footer_offset..footer_end_offset]) {
+        match table_footer.read_data(&data[footer_offset..]) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read table footer");
@@ -83,14 +82,12 @@ impl EwfTable {
             )));
         }
         for entry_index in 0..table_header.number_of_entries {
-            let data_end_offset: usize = data_offset + 4;
-
+            keramics_core::debug_trace_structure!(EwfTableEntry::debug_read_data(
+                &data[data_offset..]
+            ));
             let mut table_entry: EwfTableEntry = EwfTableEntry::new();
 
-            keramics_core::debug_trace_structure!(EwfTableEntry::debug_read_data(
-                &data[data_offset..data_end_offset]
-            ));
-            match table_entry.read_data(&data[data_offset..data_end_offset]) {
+            match table_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -100,7 +97,7 @@ impl EwfTable {
                     return Err(error);
                 }
             }
-            data_offset = data_end_offset;
+            data_offset += 4;
 
             self.entries.push(table_entry);
         }

@@ -12,26 +12,49 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_types::bytes_to_u16_le;
+
+struct NtfsFixupValues {}
+
+impl NtfsFixupValues {
+    /// Reads the fix-up values for debugging.
+    pub fn debug_read_data(data: &[u8]) -> String {
+        let placeholder_value: u16 = bytes_to_u16_le!(data, 0);
+
+        let fixup_values: Vec<String> = (2..data.len())
+            .step_by(2)
+            .map(|data_offset| format!("{}", bytes_to_u16_le!(data, data_offset)))
+            .collect::<Vec<String>>();
+
+        format!(
+            concat!(
+                "NtfsFixupValues {{\n",
+                "    placeholder_value: {},\n",
+                "    fixup_values: [{}],\n",
+                "}}\n\n"
+            ),
+            placeholder_value,
+            fixup_values.join(", ")
+        )
+    }
+}
 
 /// Applies the fix-up values to the buffer.
 pub fn apply_fixup_values(
     buffer: &mut [u8],
-    fixup_values_offset: u16,
+    fixup_values_offset: usize,
     number_of_fixup_values: u16,
 ) -> Result<(), ErrorTrace> {
     let buffer_size: usize = buffer.len();
 
-    if fixup_values_offset as usize >= buffer_size {
+    if fixup_values_offset >= buffer_size {
         return Err(keramics_core::error_trace_new!(format!(
             "Invalid fix-up values offset: {} value out of bounds",
             fixup_values_offset,
         )));
     }
-    let mut fixup_value_offset: usize = fixup_values_offset as usize;
     let fixup_values_size: usize = 2 + (number_of_fixup_values as usize) * 2;
-    let fixup_values_end_offset: usize = fixup_value_offset + fixup_values_size;
+    let fixup_values_end_offset: usize = fixup_values_offset + fixup_values_size;
 
     if fixup_values_end_offset > buffer_size {
         return Err(keramics_core::error_trace_new!(format!(
@@ -39,34 +62,17 @@ pub fn apply_fixup_values(
             number_of_fixup_values,
         )));
     }
-    let fixup_value_end_offset: usize = fixup_value_offset + 2;
-
+    keramics_core::debug_trace_data_and_structure!(
+        "NtfsFixupValues",
+        fixup_values_offset,
+        &buffer[fixup_values_offset..fixup_values_end_offset],
+        fixup_values_size,
+        NtfsFixupValues::debug_read_data(&buffer[fixup_values_offset..fixup_values_end_offset])
+    );
     let mut placeholder_value_data: [u8; 2] = [0; 2];
-    placeholder_value_data.copy_from_slice(&buffer[fixup_value_offset..fixup_value_end_offset]);
+    placeholder_value_data.clone_from_slice(&buffer[fixup_values_offset..fixup_values_offset + 2]);
 
-    let mediator: MediatorReference = Mediator::current();
-    if mediator.debug_output {
-        mediator.debug_print(format!(
-            "NtfsFixupValues data of size: {} at offset: {} (0x{:08x})\n",
-            fixup_values_size, fixup_values_offset, fixup_values_offset
-        ));
-        mediator.debug_print_data(&buffer[fixup_value_offset..fixup_values_end_offset], true);
-
-        mediator.debug_print("NtfsFixupValues {\n");
-
-        let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
-        mediator.debug_print(format!("    placeholder_value: {},\n", placeholder_value));
-
-        let fixup_values: Vec<String> = (fixup_value_end_offset..fixup_values_end_offset)
-            .step_by(2)
-            .map(|buffer_offset| format!("{}", bytes_to_u16_le!(buffer, buffer_offset)))
-            .collect::<Vec<String>>();
-
-        mediator.debug_print(format!("    fixup_values: [{}]\n", fixup_values.join(", ")));
-        mediator.debug_print("}\n\n");
-    }
-    fixup_value_offset = fixup_value_end_offset;
-
+    let mut fixup_value_offset: usize = fixup_values_offset + 2;
     let mut buffer_offset: usize = 510;
 
     for _ in 1..number_of_fixup_values {
@@ -74,7 +80,7 @@ pub fn apply_fixup_values(
         let buffer_end_offset: usize = buffer_offset + 2;
 
         if buffer_end_offset <= buffer_size {
-            if buffer[buffer_offset..buffer_end_offset] != placeholder_value_data {
+            if &buffer[buffer_offset..buffer_end_offset] != &placeholder_value_data {
                 // TODO: flag corruption
                 let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
                 let fixup_value: u16 = bytes_to_u16_le!(buffer, fixup_value_offset);

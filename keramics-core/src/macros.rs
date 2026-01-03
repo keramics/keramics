@@ -15,14 +15,14 @@
 #[macro_export]
 macro_rules! debug_trace_data {
     ( $description:expr, $offset:expr, $data:expr, $data_size:expr ) => {
-        if let (mediator) = $crate::mediator::Mediator::current() {
-            if mediator.debug_output {
-                mediator.debug_print(format!(
-                    "{} data of size: {} at offset: {} (0x{:08x})\n",
-                    $description, $data_size, $offset, $offset
-                ));
-                mediator.debug_print_data($data, true);
-            }
+        let mediator = $crate::mediator::Mediator::current();
+
+        if mediator.debug_output {
+            mediator.debug_print(format!(
+                "{} data of size: {} at offset: {} (0x{:08x})\n",
+                $description, $data_size, $offset, $offset
+            ));
+            mediator.debug_print_data($data, true);
         }
     };
 }
@@ -31,15 +31,15 @@ macro_rules! debug_trace_data {
 #[macro_export]
 macro_rules! debug_trace_data_and_structure {
     ( $description:expr, $offset:expr, $data:expr, $data_size:expr, $structure:expr ) => {
-        if let (mediator) = $crate::mediator::Mediator::current() {
-            if mediator.debug_output {
-                mediator.debug_print(format!(
-                    "{} data of size: {} at offset: {} (0x{:08x})\n",
-                    $description, $data_size, $offset, $offset
-                ));
-                mediator.debug_print_data($data, true);
-                mediator.debug_print($structure);
-            }
+        let mediator = $crate::mediator::Mediator::current();
+
+        if mediator.debug_output {
+            mediator.debug_print(format!(
+                "{} data of size: {} at offset: {} (0x{:08x})\n",
+                $description, $data_size, $offset, $offset
+            ));
+            mediator.debug_print_data($data, true);
+            mediator.debug_print($structure);
         }
     };
 }
@@ -48,10 +48,10 @@ macro_rules! debug_trace_data_and_structure {
 #[macro_export]
 macro_rules! debug_trace_structure {
     ( $structure:expr ) => {
-        if let (mediator) = $crate::mediator::Mediator::current() {
-            if mediator.debug_output {
-                mediator.debug_print($structure);
-            }
+        let mediator = $crate::mediator::Mediator::current();
+
+        if mediator.debug_output {
+            mediator.debug_print($structure);
         }
     };
 }

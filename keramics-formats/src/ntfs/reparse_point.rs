@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::mediator::Mediator;
 
 use super::constants::*;
 use super::junction_reparse_data::NtfsJunctionReparseData;
@@ -86,17 +86,13 @@ impl NtfsReparsePoint {
                 "Unsupported non-resident $REPARSE_POINT attribute"
             ));
         }
-        let mediator: MediatorReference = Mediator::current();
-        if mediator.debug_output {
-            mediator.debug_print(format!(
-                "NtfsReparsePoint data of size: {} at offset: 0 (0x00000000)\n",
-                mft_attribute.resident_data.len(),
-            ));
-            mediator.debug_print_data(&mft_attribute.resident_data, true);
-            mediator.debug_print(NtfsReparsePointHeader::debug_read_data(
-                &mft_attribute.resident_data[0..8],
-            ));
-        }
+        keramics_core::debug_trace_data_and_structure!(
+            "NtfsReparsePoint",
+            0,
+            &mft_attribute.resident_data,
+            mft_attribute.resident_data.len(),
+            NtfsReparsePointHeader::debug_read_data(&mft_attribute.resident_data)
+        );
         let mut reparse_point_header: NtfsReparsePointHeader = NtfsReparsePointHeader::new();
 
         match reparse_point_header.read_data(&mft_attribute.resident_data) {
@@ -106,6 +102,8 @@ impl NtfsReparsePoint {
                 return Err(error);
             }
         }
+        let mediator = Mediator::current();
+
         if mediator.debug_output {
             match reparse_point_header.tag {
                 0x80000017 => mediator.debug_print(NtfsWofReparseData::debug_read_data(

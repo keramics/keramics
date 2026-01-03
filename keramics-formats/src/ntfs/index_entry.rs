@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::fixup_values::apply_fixup_values;
@@ -21,9 +20,6 @@ use super::index_entry_header::NtfsIndexEntryHeader;
 
 /// New Technologies File System (NTFS) index entry.
 pub struct NtfsIndexEntry {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data.
     pub data: Vec<u8>,
 }
@@ -31,21 +27,15 @@ pub struct NtfsIndexEntry {
 impl NtfsIndexEntry {
     /// Creates a new index entry.
     pub fn new() -> Self {
-        Self {
-            mediator: Mediator::current(),
-            data: Vec::new(),
-        }
+        Self { data: Vec::new() }
     }
 
     /// Reads the index entry from a buffer.
     pub(super) fn read_data(&mut self, data: &mut [u8]) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
+        keramics_core::debug_trace_structure!(NtfsIndexEntryHeader::debug_read_data(data));
+
         let mut index_entry_header: NtfsIndexEntryHeader = NtfsIndexEntryHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(NtfsIndexEntryHeader::debug_read_data(data));
-        }
         match index_entry_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -53,6 +43,8 @@ impl NtfsIndexEntry {
                 return Err(error);
             }
         }
+        let data_size: usize = data.len();
+
         if index_entry_header.fixup_values_offset < 32
             || index_entry_header.fixup_values_offset as usize > data_size
         {
@@ -64,7 +56,7 @@ impl NtfsIndexEntry {
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
         match apply_fixup_values(
             data,
-            index_entry_header.fixup_values_offset,
+            index_entry_header.fixup_values_offset as usize,
             index_entry_header.number_of_fixup_values,
         ) {
             Ok(_) => {}
@@ -97,13 +89,9 @@ impl NtfsIndexEntry {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "NtfsIndexEntry data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("NtfsIndexEntry", offset, &data, data_size);
+
         match self.read_data(&mut data) {
             Ok(_) => {}
             Err(mut error) => {

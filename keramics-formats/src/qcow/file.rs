@@ -15,7 +15,6 @@ use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 
@@ -28,9 +27,6 @@ use super::file_header::QcowFileHeader;
 
 /// QEMU Copy-On-Write (QCOW) file.
 pub struct QcowFile {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -105,7 +101,6 @@ impl QcowFile {
     /// Creates a new file.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             format_version: 0,
             bytes_per_sector: 0,
@@ -231,27 +226,22 @@ impl QcowFile {
                 )));
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print("QcowFile {\n");
-            self.mediator.debug_print(format!(
-                "    level1_table_number_of_references: {}\n",
-                level1_table_number_of_references,
-            ));
-            self.mediator.debug_print(format!(
-                "    level2_table_number_of_references: {}\n",
-                self.level2_table_number_of_references,
-            ));
-            self.mediator.debug_print(format!(
-                "    cluster_block_size: {}\n",
-                self.cluster_block_size,
-            ));
-            self.mediator.debug_print("}\n\n");
-        }
+        keramics_core::debug_trace_structure!(format!(
+            concat!(
+                "QcowFile {{\n",
+                "    level1_table_number_of_references: {},\n",
+                "    level2_table_number_of_references: {},\n",
+                "    cluster_block_size: {},\n",
+                "}}\n\n"
+            ),
+            level1_table_number_of_references,
+            self.level2_table_number_of_references,
+            self.cluster_block_size,
+        ));
         self.level1_cluster_table.set_range(
             file_header.level1_table_offset,
             level1_table_number_of_references as u32,
         );
-
         let block_tree_data_size: u64 =
             self.media_size.div_ceil(self.cluster_block_size) * self.cluster_block_size;
         self.block_tree = BlockTree::<QcowBlockRange>::new(
@@ -310,15 +300,8 @@ impl QcowFile {
             &mut data,
             SeekFrom::Start(backing_file_name_offset)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "QcowBackingFile data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+        keramics_core::debug_trace_data!("QcowBackingFile", offset, &data, data.len());
+
         self.backing_file_name = Some(ByteString::from(data.as_slice()));
 
         Ok(())

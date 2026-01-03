@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::fake_file_resolver::FakeFileResolver;
@@ -24,9 +23,6 @@ use crate::plist::XmlPlist;
 
 /// Mac OS sparse bundle (.sparsebundle) storage media image.
 pub struct SparseBundleImage {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// File resolver.
     file_resolver: FileResolverReference,
 
@@ -47,7 +43,6 @@ impl SparseBundleImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             block_size: 0,
             band_file_cache: LruCache::new(16),
@@ -104,13 +99,8 @@ impl SparseBundleImage {
 
         keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "XML plist data of size: {} at offset: 0 (0x00000000)\n",
-                data_stream_size,
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+        keramics_core::debug_trace_data!("SparseBundleImageXmlPlist", 0, &data, data_stream_size);
+
         let string: String = match String::from_utf8(data) {
             Ok(string) => string,
             Err(error) => {

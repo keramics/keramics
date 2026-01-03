@@ -73,6 +73,15 @@ impl NtfsMftAttributeNonResident {
         }
     }
 
+    /// Retrieves the non-resident data size.
+    pub fn get_non_resident_data_size(&self) -> usize {
+        if self.compression_unit_size == 0 {
+            48
+        } else {
+            56
+        }
+    }
+
     /// Reads the MFT non-resident attribute from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();

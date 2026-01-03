@@ -296,7 +296,6 @@ impl FatFileSystem {
                 &data,
                 32
             );
-
             match FatDirectoryEntryType::read_data(&data) {
                 FatDirectoryEntryType::LongName => {
                     let mut long_name_entry: FatLongNameDirectoryEntry =
