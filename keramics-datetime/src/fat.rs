@@ -273,7 +273,8 @@ mod tests {
 
     #[test]
     fn test_fat_get_number_of_seconds_with_fraction() {
-        let (number_of_seconds, fraction): (u32, u32) = fat_get_number_of_seconds_with_fraction(0x3d0c, 0xa8d0, 0x7d);
+        let (number_of_seconds, fraction): (u32, u32) =
+            fat_get_number_of_seconds_with_fraction(0x3d0c, 0xa8d0, 0x7d);
         assert_eq!(number_of_seconds, 968792793);
         assert_eq!(fraction, 25);
     }
@@ -378,6 +379,9 @@ mod tests {
         let test_struct: FatTimeDate10Ms = FatTimeDate10Ms::new(0x3d0c, 0xa8d0, 0x7d);
 
         let string: String = test_struct.to_string();
-        assert_eq!(string.as_str(), "2010-08-12T21:06:33.25 (0x3d0c:0xa8d0:0x7d)");
+        assert_eq!(
+            string.as_str(),
+            "2010-08-12T21:06:33.25 (0x3d0c:0xa8d0:0x7d)"
+        );
     }
 }

@@ -101,6 +101,9 @@ mod tests {
         let test_struct: Filetime = Filetime::new(0x01cb3a623d0a17ce);
 
         let string: String = test_struct.to_string();
-        assert_eq!(string.as_str(), "2010-08-12T21:06:31.5468750 (0x01cb3a62:0x3d0a17ce)");
+        assert_eq!(
+            string.as_str(),
+            "2010-08-12T21:06:31.5468750 (0x01cb3a62:0x3d0a17ce)"
+        );
     }
 }

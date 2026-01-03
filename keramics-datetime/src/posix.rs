@@ -182,11 +182,17 @@ mod tests {
         let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591, 987654321);
 
         let string: String = test_struct.to_string();
-        assert_eq!(string.as_str(), "2010-08-12T20:06:31.987654321 (1281643591.987654321)");
+        assert_eq!(
+            string.as_str(),
+            "2010-08-12T20:06:31.987654321 (1281643591.987654321)"
+        );
 
         let test_struct: PosixTime64Ns = PosixTime64Ns::new(-1281643592, 12345679);
 
         let string: String = test_struct.to_string();
-        assert_eq!(string.as_str(), "1929-05-22T03:53:28.012345679 (-1281643592.12345679)");
+        assert_eq!(
+            string.as_str(),
+            "1929-05-22T03:53:28.012345679 (-1281643592.12345679)"
+        );
     }
 }
