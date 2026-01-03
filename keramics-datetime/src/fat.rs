@@ -263,7 +263,13 @@ impl fmt::Display for FatTimeDate10Ms {
 mod tests {
     use super::*;
 
-    // TODO: add tests for fat_get_date_values
+    #[test]
+    fn test_fat_get_date_values() {
+        let (year, month, day_of_month): (i16, u8, u8) = fat_get_date_values(0x3d0c);
+        assert_eq!(year, 2010);
+        assert_eq!(month, 8);
+        assert_eq!(day_of_month, 12);
+    }
 
     #[test]
     fn test_fat_get_number_of_seconds() {
@@ -279,8 +285,23 @@ mod tests {
         assert_eq!(fraction, 25);
     }
 
-    // TODO: add tests for fat_get_time_values
-    // TODO: add tests for fat_get_time_values_with_fraction
+    #[test]
+    fn test_fat_get_time_values() {
+        let (hours, minutes, seconds): (u8, u8, u8) = fat_get_time_values(0xa8d0);
+        assert_eq!(hours, 21);
+        assert_eq!(minutes, 6);
+        assert_eq!(seconds, 32);
+    }
+
+    #[test]
+    fn test_fat_get_time_values_with_fraction() {
+        let (hours, minutes, seconds, fraction): (u8, u8, u8, u8) =
+            fat_get_time_values_with_fraction(0xa8d0, 0x7d);
+        assert_eq!(hours, 21);
+        assert_eq!(minutes, 6);
+        assert_eq!(seconds, 33);
+        assert_eq!(fraction, 25);
+    }
 
     #[test]
     fn test_fat_date_from_bytes() {
