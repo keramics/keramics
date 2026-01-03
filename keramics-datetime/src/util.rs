@@ -247,15 +247,39 @@ mod tests {
     }
 
     #[test]
+    #[should_panic]
+    fn test_get_days_in_month_with_invalid_month() {
+        get_days_in_month(2000, 0);
+    }
+
+    #[test]
+    fn test_calculate_days_in_year_lookup_table() {
+        let days_in_year: [i16; 10000] = calculate_days_in_year_lookup_table();
+        assert_eq!(days_in_year[1999], 365);
+        assert_eq!(days_in_year[2000], 366);
+    }
+
+    #[test]
     fn test_get_days_in_year() {
         assert_eq!(get_days_in_year(1999), 365);
         assert_eq!(get_days_in_year(2000), 366);
+        assert_eq!(get_days_in_year(10001), 365);
+        assert_eq!(get_days_in_year(10004), 366);
+    }
+
+    #[test]
+    fn test_calculate_days_in_century_lookup_table() {
+        let days_in_century: [i32; 100] = calculate_days_in_century_lookup_table();
+        assert_eq!(days_in_century[1700 / 100], 36524);
+        assert_eq!(days_in_century[2000 / 100], 36525);
     }
 
     #[test]
     fn test_get_days_in_century() {
         assert_eq!(get_days_in_century(1700), 36524);
         assert_eq!(get_days_in_century(2000), 36525);
+        assert_eq!(get_days_in_century(20000), 36525);
+        assert_eq!(get_days_in_century(21000), 36524);
     }
 
     #[test]
@@ -288,9 +312,11 @@ mod tests {
 
         let test_epoch: Epoch = Epoch::new(1970, 1, 1);
         assert_eq!(get_date_values(0, &test_epoch), (1970, 1, 1));
-        assert_eq!(get_date_values(-1, &test_epoch), (1969, 12, 31));
         assert_eq!(get_date_values(364, &test_epoch), (1970, 12, 31));
         assert_eq!(get_date_values(1460, &test_epoch), (1973, 12, 31));
+        assert_eq!(get_date_values(-1, &test_epoch), (1969, 12, 31));
+        assert_eq!(get_date_values(-1460, &test_epoch), (1966, 1, 2));
+        assert_eq!(get_date_values(-62091, &test_epoch), (1800, 1, 1));
     }
 
     #[test]

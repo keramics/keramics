@@ -16,7 +16,6 @@ use keramics_types::ByteString;
 use super::enums::{VmdkDescriptorExtentAccessMode, VmdkDescriptorExtentType};
 
 /// VMware Virtual Disk (VMDK) descriptor extent.
-#[derive(Debug)]
 pub struct VmdkDescriptorExtent {
     /// Start sector.
     pub start_sector: u64,

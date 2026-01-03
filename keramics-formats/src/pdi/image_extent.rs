@@ -14,7 +14,6 @@
 use super::enums::PdiExtentType;
 
 /// Parallels Disk Image (PDI) image extent.
-#[derive(Debug)]
 pub(super) struct PdiImageExtent {
     /// Offset.
     pub offset: u64,

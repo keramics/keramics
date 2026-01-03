@@ -16,7 +16,6 @@ use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_compression::{LzxContext, LzxpressHuffmanContext};
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
@@ -27,9 +26,6 @@ use super::mft_attribute::NtfsMftAttribute;
 
 /// New Technologies File System (NTFS) Windows Overlay Filter (WOF) compressed stream.
 pub struct NtfsWofCompressedStream {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// The data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -62,7 +58,6 @@ impl NtfsWofCompressedStream {
     /// Creates a new compressed stream.
     pub(super) fn new(cluster_block_size: u32, compression_method: u32) -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             cluster_block_size,
             compression_method,

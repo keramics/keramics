@@ -152,6 +152,19 @@ mod tests {
     }
 
     #[test]
+    fn test_posix_time32_to_string() {
+        let test_struct: PosixTime32 = PosixTime32::new(1281643591);
+
+        let string: String = test_struct.to_string();
+        assert_eq!(string.as_str(), "2010-08-12T20:06:31 (1281643591)");
+
+        let test_struct: PosixTime32 = PosixTime32::new(-1281643591);
+
+        let string: String = test_struct.to_string();
+        assert_eq!(string.as_str(), "1929-05-22T03:53:29 (-1281643591)");
+    }
+
+    #[test]
     fn test_posix_time64_ns_to_iso8601_string() {
         let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591, 987654321);
 
@@ -162,5 +175,18 @@ mod tests {
 
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "1929-05-22T03:53:28.012345679");
+    }
+
+    #[test]
+    fn test_posix_time64_ns_to_string() {
+        let test_struct: PosixTime64Ns = PosixTime64Ns::new(1281643591, 987654321);
+
+        let string: String = test_struct.to_string();
+        assert_eq!(string.as_str(), "2010-08-12T20:06:31.987654321 (1281643591.987654321)");
+
+        let test_struct: PosixTime64Ns = PosixTime64Ns::new(-1281643592, 12345679);
+
+        let string: String = test_struct.to_string();
+        assert_eq!(string.as_str(), "1929-05-22T03:53:28.012345679 (-1281643592.12345679)");
     }
 }

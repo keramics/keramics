@@ -100,4 +100,12 @@ mod tests {
         let string: String = test_struct.to_iso8601_string();
         assert_eq!(string.as_str(), "2013-08-01T15:25:28");
     }
+
+    #[test]
+    fn test_to_string() {
+        let test_struct: HfsTime = HfsTime::new(3458215528);
+
+        let string: String = test_struct.to_string();
+        assert_eq!(string.as_str(), "2013-08-01T15:25:28 (3458215528)");
+    }
 }
