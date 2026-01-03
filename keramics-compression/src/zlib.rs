@@ -16,7 +16,7 @@
 //! Provides decompression support for ZLIB compressed data (RFC 1950).
 
 use keramics_checksums::Adler32Context;
-use keramics_core::{DebugTrace, ErrorTrace};
+use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u32_be;
 
 use super::deflate::{DeflateBitstream, DeflateContext};
@@ -132,13 +132,12 @@ impl ZlibContext {
         }
         let header_size: usize = if compressed_data[1] & 0x20 == 0 { 2 } else { 6 };
 
-        DebugTrace::print_data_and_structure(
-            ZlibDataHeader::debug_read_data,
+        keramics_core::debug_trace_data_and_structure!(
             "ZlibDataHeader",
             0,
             &compressed_data[0..header_size],
             header_size,
-            true,
+            ZlibDataHeader::debug_read_data(compressed_data)
         );
         let mut data_header: ZlibDataHeader = ZlibDataHeader::new();
 

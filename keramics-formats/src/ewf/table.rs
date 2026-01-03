@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_checksums::Adler32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::table_entry::EwfTableEntry;
@@ -23,9 +22,6 @@ use super::table_header::EwfTableHeader;
 
 /// Expert Witness Compression Format (EWF) table.
 pub struct EwfTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Base offset.
     pub base_offset: u64,
 
@@ -37,7 +33,6 @@ impl EwfTable {
     /// Creates a new table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             base_offset: 0,
             entries: Vec::new(),
         }
@@ -45,12 +40,10 @@ impl EwfTable {
 
     /// Reads the table from a buffer.
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        keramics_core::debug_trace_structure!(EwfTableHeader::debug_read_data(data));
+
         let mut table_header: EwfTableHeader = EwfTableHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(EwfTableHeader::debug_read_data(data));
-        }
         match table_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -67,13 +60,11 @@ impl EwfTable {
         let footer_offset: usize = 24 + (table_header.number_of_entries as usize * 4);
         let footer_end_offset: usize = footer_offset + 4;
 
+        keramics_core::debug_trace_structure!(EwfTableFooter::debug_read_data(
+            &data[footer_offset..footer_end_offset]
+        ));
         let mut table_footer: EwfTableFooter = EwfTableFooter::new();
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(EwfTableFooter::debug_read_data(
-                &data[footer_offset..footer_end_offset],
-            ));
-        }
         match table_footer.read_data(&data[footer_offset..footer_end_offset]) {
             Ok(_) => {}
             Err(mut error) => {
@@ -96,11 +87,9 @@ impl EwfTable {
 
             let mut table_entry: EwfTableEntry = EwfTableEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(EwfTableEntry::debug_read_data(
-                    &data[data_offset..data_end_offset],
-                ));
-            }
+            keramics_core::debug_trace_structure!(EwfTableEntry::debug_read_data(
+                &data[data_offset..data_end_offset]
+            ));
             match table_entry.read_data(&data[data_offset..data_end_offset]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -136,13 +125,9 @@ impl EwfTable {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "EwfTable data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("EwfTable", offset, &data, data_size);
+
         self.read_data(&data)
     }
 }

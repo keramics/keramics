@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::features::ExtFeatures;
@@ -22,9 +21,6 @@ use super::group_descriptor::ExtGroupDescriptor;
 
 /// Extended File System (ext) group descriptor table.
 pub struct ExtGroupDescriptorTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Format version.
     format_version: u8,
 
@@ -48,7 +44,6 @@ impl ExtGroupDescriptorTable {
     /// Creates a new group descriptor table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             format_version: 2,
             metadata_checksum_seed: None,
             group_descriptor_size: 32,
@@ -95,15 +90,11 @@ impl ExtGroupDescriptorTable {
             if &data[data_offset..data_end_offset] == &empty_group_descriptor {
                 break;
             }
-            if self.mediator.debug_output {
-                self.mediator.debug_print(
-                    group_descriptor
-                        .debug_read_data(self.format_version, &data[data_offset..data_end_offset]),
-                );
-            }
-            match group_descriptor
-                .read_data(self.format_version, &data[data_offset..data_end_offset])
-            {
+            keramics_core::debug_trace_structure!(ExtGroupDescriptor::debug_read_data(
+                self.format_version,
+                &data[data_offset..]
+            ));
+            match group_descriptor.read_data(self.format_version, &data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read group descriptor");
@@ -164,15 +155,9 @@ impl ExtGroupDescriptorTable {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtGroupDescriptorTable data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("ExtGroupDescriptorTable", offset, &data, data_size);
+
         self.read_data(&data)
     }
 }

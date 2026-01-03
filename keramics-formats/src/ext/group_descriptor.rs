@@ -35,7 +35,7 @@ impl ExtGroupDescriptor {
     }
 
     /// Reads the group descriptor for debugging.
-    pub fn debug_read_data(&self, format_version: u8, data: &[u8]) -> String {
+    pub fn debug_read_data(format_version: u8, data: &[u8]) -> String {
         if format_version == 4 {
             Ext4GroupDescriptor::debug_read_data(data)
         } else {
@@ -142,7 +142,7 @@ mod tests {
         let mut test_struct = ExtGroupDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data_ext4_64bit();
-        let result = test_struct.read_data(4, &test_data[0..63]);
+        let result = test_struct.read_data(4, &test_data[0..31]);
         assert!(result.is_err());
     }
 }

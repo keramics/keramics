@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::enums::EwfHeaderValueType;
@@ -23,17 +22,43 @@ use super::header_value::EwfHeaderValue;
 use super::object_storage::EwfByteObjectStorage;
 
 /// Expert Witness Compression Format (EWF) header.
-pub struct EwfHeader {
-    /// Mediator.
-    mediator: MediatorReference,
-}
+pub struct EwfHeader {}
 
 impl EwfHeader {
     /// Creates a new header.
     pub fn new() -> Self {
-        Self {
-            mediator: Mediator::current(),
+        Self {}
+    }
+
+    /// Reads the header from a compressed buffer.
+    pub fn read_compressed_data(
+        &mut self,
+        compressed_data: &[u8],
+        offset: u64,
+        header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
+    ) -> Result<(), ErrorTrace> {
+        let compressed_data_size: usize = compressed_data.len();
+
+        // On average the uncompressed header will be more than twice as large
+        // as the compressed header.
+        let mut data: Vec<u8> = vec![0; compressed_data_size * 4];
+
+        let mut zlib_context: ZlibContext = ZlibContext::new();
+
+        match zlib_context.decompress(compressed_data, &mut data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
+                return Err(error);
+            }
         }
+        keramics_core::debug_trace_data!(
+            "EwfHeader",
+            offset,
+            &data,
+            zlib_context.uncompressed_data_size
+        );
+        self.read_data(&data, header_values)
     }
 
     /// Reads the header from a buffer.
@@ -42,29 +67,7 @@ impl EwfHeader {
         data: &[u8],
         header_values: &mut HashMap<EwfHeaderValueType, EwfHeaderValue>,
     ) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
-
-        // On average the uncompressed header will be more than twice as large
-        // as the compressed header.
-        let mut header_data: Vec<u8> = vec![0; data_size * 4];
-
-        let mut zlib_context: ZlibContext = ZlibContext::new();
-
-        match zlib_context.decompress(data, &mut header_data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decompress header data");
-                return Err(error);
-            }
-        }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Uncompressed header data of size: {}\n",
-                zlib_context.uncompressed_data_size,
-            ));
-            self.mediator.debug_print_data(&header_data, true);
-        }
-        let mut object_storage: EwfByteObjectStorage = EwfByteObjectStorage::new(&header_data);
+        let mut object_storage: EwfByteObjectStorage = EwfByteObjectStorage::new(data);
 
         let number_of_categories: u8 = match object_storage.next_line().as_deref() {
             Some(b"1") => 1,
@@ -197,14 +200,8 @@ impl EwfHeader {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "EwfHeader data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
-        self.read_data(&data, header_values)
+
+        self.read_compressed_data(&data, offset, header_values)
     }
 }
 
@@ -214,7 +211,7 @@ mod tests {
 
     use keramics_core::open_fake_data_stream;
 
-    fn get_test_data() -> Vec<u8> {
+    fn get_test_compressed_data() -> Vec<u8> {
         return vec![
             0x78, 0x9c, 0x6d, 0xc8, 0xb1, 0x0d, 0xc4, 0x20, 0x0c, 0x05, 0xd0, 0xfa, 0x5b, 0xf2,
             0x0e, 0x8c, 0x80, 0x51, 0xee, 0x92, 0xec, 0x90, 0x25, 0x10, 0x71, 0xe1, 0x02, 0x13,
@@ -225,6 +222,33 @@ mod tests {
             0x8b, 0x14, 0xd3, 0x27, 0xec, 0x41, 0xd6, 0x20, 0x7b, 0x58, 0xbe, 0x41, 0xfe, 0x4c,
             0x64, 0x62, 0xfa, 0x01, 0x34, 0x99, 0x20, 0xff,
         ];
+    }
+
+    fn get_test_data() -> Vec<u8> {
+        return vec![
+            0x31, 0x0d, 0x0a, 0x6d, 0x61, 0x69, 0x6e, 0x0d, 0x0a, 0x63, 0x09, 0x6e, 0x09, 0x61,
+            0x09, 0x65, 0x09, 0x74, 0x09, 0x61, 0x76, 0x09, 0x6f, 0x76, 0x09, 0x6d, 0x09, 0x75,
+            0x09, 0x70, 0x0d, 0x0a, 0x63, 0x61, 0x73, 0x65, 0x09, 0x65, 0x76, 0x69, 0x64, 0x65,
+            0x6e, 0x63, 0x65, 0x09, 0x64, 0x65, 0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f,
+            0x6e, 0x09, 0x65, 0x78, 0x61, 0x6d, 0x69, 0x6e, 0x65, 0x72, 0x09, 0x6e, 0x6f, 0x74,
+            0x65, 0x73, 0x09, 0x32, 0x30, 0x31, 0x34, 0x30, 0x38, 0x31, 0x37, 0x09, 0x4c, 0x69,
+            0x6e, 0x75, 0x78, 0x09, 0x32, 0x30, 0x32, 0x35, 0x20, 0x39, 0x20, 0x31, 0x37, 0x20,
+            0x31, 0x39, 0x20, 0x34, 0x36, 0x20, 0x31, 0x09, 0x32, 0x30, 0x32, 0x35, 0x20, 0x39,
+            0x20, 0x31, 0x37, 0x20, 0x31, 0x39, 0x20, 0x34, 0x36, 0x20, 0x31, 0x09, 0x30, 0x0d,
+            0x0a, 0x0d, 0x0a,
+        ];
+    }
+
+    #[test]
+    fn test_read_compressed_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_compressed_data();
+
+        let mut test_struct = EwfHeader::new();
+        let mut header_values: HashMap<EwfHeaderValueType, EwfHeaderValue> = HashMap::new();
+        test_struct.read_compressed_data(&test_data, 0, &mut header_values)?;
+
+        assert_eq!(header_values.len(), 10);
+        Ok(())
     }
 
     #[test]
@@ -239,11 +263,9 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add test with invalid checksum.
-
     #[test]
     fn test_read_at_position() -> Result<(), ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data();
+        let test_data: Vec<u8> = get_test_compressed_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = EwfHeader::new();
@@ -253,4 +275,6 @@ mod tests {
         assert_eq!(header_values.len(), 10);
         Ok(())
     }
+
+    // TODO: add read_compressed_data test with invalid checksum.
 }

@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_checksums::Adler32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::error2_entry::EwfError2Entry;
@@ -23,9 +22,6 @@ use super::error2_header::EwfError2Header;
 
 /// Expert Witness Compression Format (EWF) error2.
 pub struct EwfError2 {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Entries.
     pub entries: Vec<EwfError2Entry>,
 }
@@ -34,19 +30,16 @@ impl EwfError2 {
     /// Creates a new error2.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             entries: Vec::new(),
         }
     }
 
     /// Reads the error2 from a buffer.
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        keramics_core::debug_trace_structure!(EwfError2Header::debug_read_data(data));
+
         let mut error2_header: EwfError2Header = EwfError2Header::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(EwfError2Header::debug_read_data(data));
-        }
         match error2_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -59,16 +52,13 @@ impl EwfError2 {
 
         let mut data_offset: usize = 520;
         let footer_offset: usize = 520 + (error2_header.number_of_entries as usize * 8);
-        let footer_end_offset: usize = footer_offset + 4;
 
+        keramics_core::debug_trace_structure!(EwfError2Footer::debug_read_data(
+            &data[footer_offset..]
+        ));
         let mut error2_footer: EwfError2Footer = EwfError2Footer::new();
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(EwfError2Footer::debug_read_data(
-                &data[footer_offset..footer_end_offset],
-            ));
-        }
-        match error2_footer.read_data(&data[footer_offset..footer_end_offset]) {
+        match error2_footer.read_data(&data[footer_offset..]) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read error2 footer");
@@ -86,16 +76,12 @@ impl EwfError2 {
             )));
         }
         for entry_index in 0..error2_header.number_of_entries {
-            let data_end_offset: usize = data_offset + 8;
-
+            keramics_core::debug_trace_structure!(EwfError2Entry::debug_read_data(
+                &data[data_offset..]
+            ));
             let mut error2_entry: EwfError2Entry = EwfError2Entry::new();
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(EwfError2Entry::debug_read_data(
-                    &data[data_offset..data_end_offset],
-                ));
-            }
-            match error2_entry.read_data(&data[data_offset..data_end_offset]) {
+            match error2_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -105,7 +91,7 @@ impl EwfError2 {
                     return Err(error);
                 }
             }
-            data_offset = data_end_offset;
+            data_offset += 8;
 
             self.entries.push(error2_entry);
         }
@@ -130,13 +116,9 @@ impl EwfError2 {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "EwfError2 data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("EwfError2", offset, &data, data_size);
+
         self.read_data(&data)
     }
 }

@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
@@ -75,21 +74,15 @@ impl FatShortNameDirectoryEntry {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 32];
 
-        let mediator: MediatorReference = Mediator::current();
-
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if mediator.debug_output {
-            mediator.debug_print(format!(
-                "FatShortNameDirectoryEntry data of size: 32 at offset: {} (0x{:08x})\n",
-                offset, offset
-            ));
-            mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("FatShortNameDirectoryEntry", offset, &data, 32);
+
         if format == &FatFormat::Fat32 {
-            if mediator.debug_output {
-                mediator.debug_print(Fat32ShortNameDirectoryEntry::debug_read_data(&data));
-            }
+            keramics_core::debug_trace_structure!(Fat32ShortNameDirectoryEntry::debug_read_data(
+                &data
+            ));
             match Fat32ShortNameDirectoryEntry::read_data(self, &data) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -101,9 +94,9 @@ impl FatShortNameDirectoryEntry {
                 }
             }
         } else {
-            if mediator.debug_output {
-                mediator.debug_print(Fat12ShortNameDirectoryEntry::debug_read_data(&data));
-            }
+            keramics_core::debug_trace_structure!(Fat12ShortNameDirectoryEntry::debug_read_data(
+                &data
+            ));
             match Fat12ShortNameDirectoryEntry::read_data(self, &data) {
                 Ok(_) => {}
                 Err(mut error) => {

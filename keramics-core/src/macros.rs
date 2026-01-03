@@ -11,6 +11,51 @@
  * under the License.
  */
 
+/// Debug print data.
+#[macro_export]
+macro_rules! debug_trace_data {
+    ( $description:expr, $offset:expr, $data:expr, $data_size:expr ) => {
+        if let (mediator) = $crate::mediator::Mediator::current() {
+            if mediator.debug_output {
+                mediator.debug_print(format!(
+                    "{} data of size: {} at offset: {} (0x{:08x})\n",
+                    $description, $data_size, $offset, $offset
+                ));
+                mediator.debug_print_data($data, true);
+            }
+        }
+    };
+}
+
+/// Debug print data and a structure representation.
+#[macro_export]
+macro_rules! debug_trace_data_and_structure {
+    ( $description:expr, $offset:expr, $data:expr, $data_size:expr, $structure:expr ) => {
+        if let (mediator) = $crate::mediator::Mediator::current() {
+            if mediator.debug_output {
+                mediator.debug_print(format!(
+                    "{} data of size: {} at offset: {} (0x{:08x})\n",
+                    $description, $data_size, $offset, $offset
+                ));
+                mediator.debug_print_data($data, true);
+                mediator.debug_print($structure);
+            }
+        }
+    };
+}
+
+/// Debug print a structure representation.
+#[macro_export]
+macro_rules! debug_trace_structure {
+    ( $structure:expr ) => {
+        if let (mediator) = $crate::mediator::Mediator::current() {
+            if mediator.debug_output {
+                mediator.debug_print($structure);
+            }
+        }
+    };
+}
+
 /// Determines the name of the current function.
 #[macro_export]
 macro_rules! error_trace_function {

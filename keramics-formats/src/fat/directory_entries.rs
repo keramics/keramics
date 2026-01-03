@@ -15,7 +15,6 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::SeekFrom;
 use std::sync::Arc;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, Ucs2String};
 
@@ -33,9 +32,6 @@ use super::short_name_directory_entry_fat32::Fat32ShortNameDirectoryEntry;
 
 /// File Allocation Table (FAT) directory entries.
 pub struct FatDirectoryEntries {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Format.
     pub format: FatFormat,
 
@@ -56,7 +52,6 @@ impl FatDirectoryEntries {
     /// Creates new directory entries.
     pub fn new(format: &FatFormat, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
         Self {
-            mediator: Mediator::current(),
             format: format.clone(),
             case_folding_mappings: case_folding_mappings.clone(),
             entries: BTreeMap::new(),
@@ -127,25 +122,20 @@ impl FatDirectoryEntries {
                     data_offset
                 )));
             }
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "FatDirectoryEntry data of size: 32 at offset: {} (0x{:08x})\n",
-                    directory_entry_offset, directory_entry_offset
-                ));
-                self.mediator
-                    .debug_print_data(&data[data_offset..data_end_offset], true);
-            }
+            keramics_core::debug_trace_data!(
+                "FatDirectoryEntry",
+                directory_entry_offset,
+                &data[data_offset..data_end_offset],
+                32
+            );
             match FatDirectoryEntryType::read_data(&data[data_offset..]) {
                 FatDirectoryEntryType::LongName => {
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(FatLongNameDirectoryEntry::debug_read_data(
-                                &data[data_offset..data_end_offset],
-                            ));
-                    }
+                    keramics_core::debug_trace_structure!(
+                        FatLongNameDirectoryEntry::debug_read_data(&data[data_offset..])
+                    );
                     let mut entry: FatLongNameDirectoryEntry = FatLongNameDirectoryEntry::new();
 
-                    match entry.read_data(&data[data_offset..data_end_offset]) {
+                    match entry.read_data(&data[data_offset..]) {
                         Ok(_) => {}
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
@@ -174,16 +164,12 @@ impl FatDirectoryEntries {
                     let mut entry: FatShortNameDirectoryEntry = FatShortNameDirectoryEntry::new();
 
                     if self.format == FatFormat::Fat32 {
-                        if self.mediator.debug_output {
-                            self.mediator.debug_print(
-                                Fat32ShortNameDirectoryEntry::debug_read_data(
-                                    &data[data_offset..data_end_offset],
-                                ),
-                            );
-                        }
+                        keramics_core::debug_trace_structure!(
+                            Fat32ShortNameDirectoryEntry::debug_read_data(&data[data_offset..])
+                        );
                         match Fat32ShortNameDirectoryEntry::read_data(
                             &mut entry,
-                            &data[data_offset..data_end_offset],
+                            &data[data_offset..],
                         ) {
                             Ok(_) => {}
                             Err(mut error) => {
@@ -195,16 +181,12 @@ impl FatDirectoryEntries {
                             }
                         }
                     } else {
-                        if self.mediator.debug_output {
-                            self.mediator.debug_print(
-                                Fat12ShortNameDirectoryEntry::debug_read_data(
-                                    &data[data_offset..data_end_offset],
-                                ),
-                            );
-                        }
+                        keramics_core::debug_trace_structure!(
+                            Fat12ShortNameDirectoryEntry::debug_read_data(&data[data_offset..])
+                        );
                         match Fat12ShortNameDirectoryEntry::read_data(
                             &mut entry,
-                            &data[data_offset..data_end_offset],
+                            &data[data_offset..],
                         ) {
                             Ok(_) => {}
                             Err(mut error) => {
@@ -280,13 +262,15 @@ impl FatDirectoryEntries {
                 &mut data,
                 SeekFrom::Start(offset)
             );
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "FatDirectoryEntries cluster block: {} data of size: {} at offset: {} (0x{:08x})\n",
-                    cluster_block_number, block_allocation_table.cluster_block_size, offset, offset
-                ));
-                self.mediator.debug_print_data(&data, true);
-            }
+            keramics_core::debug_trace_data!(
+                format!(
+                    "FatDirectoryEntries cluster block: {}",
+                    cluster_block_number
+                ),
+                offset,
+                &data,
+                block_allocation_table.cluster_block_size
+            );
             match self.read_data(
                 &data,
                 offset,
@@ -342,13 +326,9 @@ impl FatDirectoryEntries {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "FatDirectoryEntries data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("FatDirectoryEntries", offset, &data, data_size);
+
         let mut last_vfat_sequence_number: u8 = 0;
         let mut long_name_entries: Vec<FatLongNameDirectoryEntry> = Vec::new();
 

@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
@@ -23,9 +22,6 @@ use super::section_header::EwfSectionHeader;
 
 /// Expert Witness Compression Format (EWF) file.
 pub struct EwfFile {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -40,7 +36,6 @@ impl EwfFile {
     /// Creates a new file.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             segment_number: 0,
             sections: Vec::new(),
@@ -67,13 +62,12 @@ impl EwfFile {
             &mut compressed_data,
             SeekFrom::Start(chunk_offset)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                chunk_size, chunk_offset, chunk_offset,
-            ));
-            self.mediator.debug_print_data(&compressed_data, true);
-        }
+        keramics_core::debug_trace_data!(
+            "EwfCompressedChunk",
+            chunk_offset,
+            &compressed_data,
+            chunk_size
+        );
         let mut zlib_context: ZlibContext = ZlibContext::new();
 
         match zlib_context.decompress(&compressed_data, data) {
@@ -92,16 +86,15 @@ impl EwfFile {
         data: &mut [u8],
         position: SeekFrom,
     ) -> Result<u64, ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, data, position);
+        match self.data_stream.as_ref() {
+            Some(data_stream) => {
+                let offset: u64 =
+                    keramics_core::data_stream_read_exact_at_position!(data_stream, data, position);
 
-        Ok(offset)
+                Ok(offset)
+            }
+            None => Err(keramics_core::error_trace_new!("Missing data stream")),
+        }
     }
 
     /// Reads a data stream.

@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::io::SeekFrom;
 use std::sync::Arc;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 use keramics_types::constants::UCS2_CASE_MAPPINGS;
@@ -34,9 +33,6 @@ use super::short_name_directory_entry::FatShortNameDirectoryEntry;
 
 /// File Allocation Table (FAT) file system.
 pub struct FatFileSystem {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -81,7 +77,6 @@ impl FatFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             bytes_per_sector: 0,
             cluster_block_size: 0,
@@ -295,13 +290,13 @@ impl FatFileSystem {
                 &mut data,
                 SeekFrom::Start(directory_entry_offset)
             );
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "FatDirectoryEntry data of size: 32 at offset: {} (0x{:08x})\n",
-                    directory_entry_offset, directory_entry_offset
-                ));
-                self.mediator.debug_print_data(&data, true);
-            }
+            keramics_core::debug_trace_data!(
+                "FatDirectoryEntry",
+                directory_entry_offset,
+                &data,
+                32
+            );
+
             match FatDirectoryEntryType::read_data(&data) {
                 FatDirectoryEntryType::LongName => {
                     let mut long_name_entry: FatLongNameDirectoryEntry =

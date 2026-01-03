@@ -115,7 +115,7 @@ impl ExtInode {
     }
 
     /// Reads the inode for debugging.
-    pub fn debug_read_data(&self, format_version: u8, data: &[u8]) -> String {
+    pub fn debug_read_data(format_version: u8, data: &[u8]) -> String {
         let mut string_parts: Vec<String> = Vec::new();
 
         let string: String = match format_version {

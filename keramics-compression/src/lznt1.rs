@@ -101,19 +101,16 @@ impl Lznt1Context {
             if compressed_data[compressed_data_offset..compressed_data_end_offset] == [0; 2] {
                 break;
             }
-            DebugTrace::print_data_and_structure(
-                Lznt1BlockHeader::debug_read_data,
+            keramics_core::debug_trace_data_and_structure!(
                 "Lznt1BlockHeader",
                 compressed_data_offset as u64,
                 &compressed_data[compressed_data_offset..compressed_data_end_offset],
                 2,
-                true,
+                Lznt1BlockHeader::debug_read_data(&compressed_data[compressed_data_offset..])
             );
             let mut block_header: Lznt1BlockHeader = Lznt1BlockHeader::new();
 
-            match block_header
-                .read_data(&compressed_data[compressed_data_offset..compressed_data_end_offset])
-            {
+            match block_header.read_data(&compressed_data[compressed_data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read block header");

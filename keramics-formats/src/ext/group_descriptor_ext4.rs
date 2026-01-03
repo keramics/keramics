@@ -76,7 +76,7 @@ impl Ext4GroupDescriptor {
         data: &[u8],
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
-        if data_size != 32 && data_size != 64 {
+        if data_size < 32 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let lower_32bit: u32 = bytes_to_u32_le!(data, 8);
@@ -151,7 +151,7 @@ mod tests {
         let mut test_struct = ExtGroupDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data_64bit();
-        let result = Ext4GroupDescriptor::read_data(&mut test_struct, &test_data[0..63]);
+        let result = Ext4GroupDescriptor::read_data(&mut test_struct, &test_data[0..31]);
         assert!(result.is_err());
     }
 }

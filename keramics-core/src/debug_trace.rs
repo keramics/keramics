@@ -44,28 +44,6 @@ impl DebugTrace {
         }
     }
 
-    /// Prints data and a structure representation.
-    #[inline(always)]
-    pub fn print_data_and_structure(
-        debug_read_data: fn(&[u8]) -> String,
-        description: &str,
-        offset: u64,
-        data: &[u8],
-        data_size: usize,
-        group: bool,
-    ) {
-        let mediator: Arc<Mediator> = Mediator::current();
-
-        if mediator.debug_output {
-            mediator.debug_print(format!(
-                "{} data of size: {} at offset: {} (0x{:08x})\n",
-                description, data_size, offset, offset
-            ));
-            mediator.debug_print_data(&data, group);
-            mediator.debug_print(debug_read_data(data));
-        }
-    }
-
     /// Prints a data field.
     #[inline(always)]
     pub fn print_data_field(identifier: &str, data: &[u8]) {

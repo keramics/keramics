@@ -277,15 +277,12 @@ impl Bzip2Context {
                 "Invalid compressed data value too small"
             ));
         }
-        let header_size: usize = if compressed_data[0] & 0x20 == 0 { 2 } else { 6 };
-
-        DebugTrace::print_data_and_structure(
-            Bzip2StreamHeader::debug_read_data,
+        keramics_core::debug_trace_data_and_structure!(
             "Bzip2StreamHeader",
             0,
-            &compressed_data[0..header_size],
-            header_size,
-            true,
+            &compressed_data[0..4],
+            4,
+            Bzip2StreamHeader::debug_read_data(compressed_data)
         );
         let mut stream_header: Bzip2StreamHeader = Bzip2StreamHeader::new();
 

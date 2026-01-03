@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
@@ -24,9 +23,6 @@ use super::extents_header::ExtExtentsHeader;
 
 /// Extended File System (ext) extents tree.
 pub struct ExtExtentsTree {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Block size.
     block_size: u32,
 
@@ -38,7 +34,6 @@ impl ExtExtentsTree {
     /// Creates new extents tree.
     pub fn new(block_size: u32, number_of_blocks: u64) -> Self {
         Self {
-            mediator: Mediator::current(),
             block_size,
             number_of_blocks,
         }
@@ -87,14 +82,11 @@ impl ExtExtentsTree {
         block_ranges: &mut Vec<ExtBlockRange>,
         parent_depth: u16,
     ) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
+        keramics_core::debug_trace_structure!(ExtExtentsHeader::debug_read_data(data));
+
         let mut extents_header: ExtExtentsHeader = ExtExtentsHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(ExtExtentsHeader::debug_read_data(&data[0..12]));
-        }
-        match extents_header.read_data(&data[0..12]) {
+        match extents_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read extents header");
@@ -108,6 +100,7 @@ impl ExtExtentsTree {
             )));
         }
         let mut data_offset: usize = 12;
+        let data_size: usize = data.len();
 
         if extents_header.depth > 0 {
             for entry_index in 0..extents_header.number_of_entries {
@@ -119,13 +112,11 @@ impl ExtExtentsTree {
                         entry_index
                     )));
                 }
+                keramics_core::debug_trace_structure!(ExtExtentIndex::debug_read_data(
+                    &data[data_offset..data_end_offset]
+                ));
                 let mut entry: ExtExtentIndex = ExtExtentIndex::new();
 
-                if self.mediator.debug_output {
-                    self.mediator.debug_print(ExtExtentIndex::debug_read_data(
-                        &data[data_offset..data_end_offset],
-                    ));
-                }
                 match entry.read_data(&data[data_offset..data_end_offset]) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -170,14 +161,11 @@ impl ExtExtentsTree {
                         entry_index
                     )));
                 }
+                keramics_core::debug_trace_structure!(ExtExtentDescriptor::debug_read_data(
+                    &data[data_offset..data_end_offset]
+                ));
                 let mut entry: ExtExtentDescriptor = ExtExtentDescriptor::new();
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(ExtExtentDescriptor::debug_read_data(
-                            &data[data_offset..data_end_offset],
-                        ));
-                }
                 match entry.read_data(&data[data_offset..data_end_offset]) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -226,14 +214,13 @@ impl ExtExtentsTree {
             }
         }
         if data_size - data_offset >= 4 {
+            let data_end_offset: usize = data_offset + 4;
+
+            keramics_core::debug_trace_structure!(ExtExtentsFooter::debug_read_data(
+                &data[data_offset..data_end_offset]
+            ));
             let mut extents_footer: ExtExtentsFooter = ExtExtentsFooter::new();
 
-            let data_end_offset: usize = data_offset + 4;
-            if self.mediator.debug_output {
-                self.mediator.debug_print(ExtExtentsFooter::debug_read_data(
-                    &data[data_offset..data_end_offset],
-                ));
-            }
             match extents_footer.read_data(&data[data_offset..data_end_offset]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -258,13 +245,9 @@ impl ExtExtentsTree {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtExtentsTreeNode data of size: {} at offset: {} (0x{:08x})\n",
-                self.block_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("ExtExtentsTreeNode", offset, &data, self.block_size);
+
         self.read_node_data(
             &data,
             data_stream,

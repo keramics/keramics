@@ -14,7 +14,6 @@
 use std::collections::BTreeMap;
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_encodings::CharacterEncoding;
 use keramics_types::{ByteString, bytes_to_u32_le};
@@ -24,9 +23,6 @@ use super::directory_entry::ExtDirectoryEntry;
 
 /// Extended File System directory.
 pub struct ExtDirectoryTree {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Character encoding.
     encoding: CharacterEncoding,
 
@@ -38,7 +34,6 @@ impl ExtDirectoryTree {
     /// Creates a new directory tree.
     pub fn new(encoding: &CharacterEncoding, block_size: u32) -> Self {
         Self {
-            mediator: Mediator::current(),
             encoding: encoding.clone(),
             block_size,
         }
@@ -90,23 +85,19 @@ impl ExtDirectoryTree {
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtDirectoryTree inline data of size: {}\n",
-                data_size,
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+        keramics_core::debug_trace_data!("ExtDirectoryTreeInline", 0, &data, data_size);
+
         let parent_inode_number: u32 = bytes_to_u32_le!(data, 0);
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print("ExtDirectoryTree {\n");
-            self.mediator.debug_print(format!(
+        keramics_core::debug_trace_structure!(format!(
+            concat!(
+                "ExtDirectoryTreeInline {{\n",
                 "    parent_inode_number: {},\n",
-                parent_inode_number
-            ));
-            self.mediator.debug_print("}\n\n");
-        }
+                "}}\n\n"
+            ),
+            parent_inode_number
+        ));
+
         self.read_node_data(&data, 4, data_size, entries)
     }
 
@@ -119,12 +110,12 @@ impl ExtDirectoryTree {
         entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         while data_offset < data_size {
+            keramics_core::debug_trace_structure!(ExtDirectoryEntry::debug_read_data(
+                &data[data_offset..]
+            ));
+
             let mut entry: ExtDirectoryEntry = ExtDirectoryEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(ExtDirectoryEntry::debug_read_data(&data[data_offset..]));
-            }
             match entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -181,13 +172,9 @@ impl ExtDirectoryTree {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtDirectoryTreeNode data of size: {} at offset: {} (0x{:08x})\n",
-                self.block_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("ExtDirectoryTreeNode", offset, &data, self.block_size);
+
         self.read_node_data(&data, 0, self.block_size as usize, entries)
     }
 }

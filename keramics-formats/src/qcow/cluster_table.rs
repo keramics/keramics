@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u64_be;
@@ -93,20 +92,15 @@ impl QcowClusterTable {
             &mut data,
             SeekFrom::Start(entry_offset)
         );
+        keramics_core::debug_trace_data_and_structure!(
+            format!("QcowClusterTableEntry: {}", entry_index),
+            entry_offset,
+            &data,
+            8,
+            QcowClusterTableEntry::debug_read_data(&data)
+        );
         let mut entry: QcowClusterTableEntry = QcowClusterTableEntry::new();
 
-        let mediator: MediatorReference = Mediator::current();
-        if mediator.debug_output {
-            mediator.debug_print(format!(
-                "QcowClusterTableEntry: {} data of size: {} at offset: {} (0x{:08x})\n",
-                entry_index,
-                data.len(),
-                entry_offset,
-                entry_offset
-            ));
-            mediator.debug_print_data(&data, true);
-            mediator.debug_print(QcowClusterTableEntry::debug_read_data(&data));
-        }
         match entry.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {

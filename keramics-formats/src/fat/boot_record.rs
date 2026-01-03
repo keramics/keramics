@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::ByteString;
 
@@ -22,9 +21,6 @@ use super::boot_record_fat32::Fat32BootRecord;
 
 /// File Allocation Table (FAT) boot record.
 pub struct FatBootRecord {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Bytes per sector.
     pub bytes_per_sector: u16,
 
@@ -60,7 +56,6 @@ impl FatBootRecord {
     /// Creates a new boot record.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             bytes_per_sector: 0,
             sectors_per_cluster_block: 0,
             number_of_reserved_sectors: 0,
@@ -84,18 +79,12 @@ impl FatBootRecord {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "FatBootRecord data of size: 512 at offset: {} (0x{:08x})\n",
-                offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("FatBootRecord", offset, &data, 512);
+
         if data[17..21] == [0; 4] && data[22..24] == [0; 2] {
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(Fat32BootRecord::debug_read_data(&data));
-            }
+            keramics_core::debug_trace_structure!(Fat32BootRecord::debug_read_data(&data));
+
             match Fat32BootRecord::read_data(self, &data) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -107,10 +96,8 @@ impl FatBootRecord {
                 }
             }
         } else {
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(Fat12BootRecord::debug_read_data(&data));
-            }
+            keramics_core::debug_trace_structure!(Fat12BootRecord::debug_read_data(&data));
+
             match Fat12BootRecord::read_data(self, &data) {
                 Ok(_) => {}
                 Err(mut error) => {

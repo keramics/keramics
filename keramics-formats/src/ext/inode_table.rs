@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::features::ExtFeatures;
@@ -23,9 +22,6 @@ use super::inode::ExtInode;
 
 /// Extended File System (ext) inode table.
 pub struct ExtInodeTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Format version.
     pub format_version: u8,
 
@@ -55,7 +51,6 @@ impl ExtInodeTable {
     /// Creates a new inode table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             format_version: 2,
             metadata_checksum_seed: None,
             block_size: 0,
@@ -128,19 +123,15 @@ impl ExtInodeTable {
             &mut data,
             SeekFrom::Start(inode_data_offset)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtInode data of size: {} at offset: {} (0x{:08x})\n",
-                self.inode_size, inode_data_offset, inode_data_offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+        keramics_core::debug_trace_data_and_structure!(
+            "ExtInode",
+            inode_data_offset,
+            &data,
+            self.inode_size,
+            ExtInode::debug_read_data(self.format_version, &data)
+        );
         let mut inode: ExtInode = ExtInode::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(inode.debug_read_data(self.format_version, &data));
-        }
         match inode.read_data(self.format_version, &data) {
             Ok(_) => {}
             Err(mut error) => {

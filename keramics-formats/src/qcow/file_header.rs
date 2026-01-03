@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
@@ -24,9 +23,6 @@ use super::file_header_v3::QcowFileHeaderV3;
 
 /// QEMU Copy-On-Write (QCOW) file header.
 pub struct QcowFileHeader {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Format version.
     pub format_version: u32,
 
@@ -71,7 +67,6 @@ impl QcowFileHeader {
     /// Creates a new file header.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             format_version: 0,
             header_size: 0,
             level1_table_number_of_references: 0,
@@ -98,15 +93,9 @@ impl QcowFileHeader {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "QcowFileHeader data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("QcowFileHeader", offset, &data, 112);
+
         if &data[0..4] != QCOW_FILE_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
@@ -114,10 +103,7 @@ impl QcowFileHeader {
 
         match self.format_version {
             1 => {
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(QcowFileHeaderV1::debug_read_data(&data));
-                }
+                keramics_core::debug_trace_structure!(QcowFileHeaderV1::debug_read_data(&data));
                 match QcowFileHeaderV1::read_data(self, &data) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -131,10 +117,7 @@ impl QcowFileHeader {
                 self.header_size = 48;
             }
             2 => {
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(QcowFileHeaderV2::debug_read_data(&data));
-                }
+                keramics_core::debug_trace_structure!(QcowFileHeaderV2::debug_read_data(&data));
                 match QcowFileHeaderV2::read_data(self, &data) {
                     Ok(_) => {}
                     Err(mut error) => {
@@ -149,10 +132,7 @@ impl QcowFileHeader {
                 self.number_of_level2_table_bits = self.number_of_cluster_block_bits - 3;
             }
             3 => {
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(QcowFileHeaderV3::debug_read_data(&data));
-                }
+                keramics_core::debug_trace_structure!(QcowFileHeaderV3::debug_read_data(&data));
                 match QcowFileHeaderV3::read_data(self, &data) {
                     Ok(_) => {}
                     Err(mut error) => {
