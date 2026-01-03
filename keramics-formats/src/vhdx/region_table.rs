@@ -15,7 +15,6 @@ use std::collections::HashMap;
 use std::io::SeekFrom;
 
 use keramics_checksums::ReversedCrc32Context;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
@@ -24,9 +23,6 @@ use super::region_table_header::VhdxRegionTableHeader;
 
 /// Virtual Hard Disk version 2 (VHDX) region table.
 pub struct VhdxRegionTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Entries.
     pub entries: HashMap<Uuid, VhdxRegionTableEntry>,
 }
@@ -35,19 +31,16 @@ impl VhdxRegionTable {
     /// Creates a new region table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             entries: HashMap::new(),
         }
     }
 
     /// Reads the region table from a buffer.
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        keramics_core::debug_trace_structure!(VhdxRegionTableHeader::debug_read_data(data));
+
         let mut region_table_header: VhdxRegionTableHeader = VhdxRegionTableHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(VhdxRegionTableHeader::debug_read_data(data));
-        }
         match region_table_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -56,6 +49,7 @@ impl VhdxRegionTable {
             }
         }
         let mut data_offset: usize = 16;
+        let data_size: usize = data.len();
 
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
 
@@ -75,15 +69,19 @@ impl VhdxRegionTable {
         for _ in 0..region_table_header.number_of_entries {
             let data_end_offset: usize = data_offset + 32;
 
+            if data_end_offset > data_size {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid number of entries: {} value out of bounds",
+                    region_table_header.number_of_entries
+                )));
+            }
+            keramics_core::debug_trace_structure!(VhdxRegionTableEntry::debug_read_data(
+                &data[data_offset..]
+            ));
+
             let mut region_table_entry: VhdxRegionTableEntry = VhdxRegionTableEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(VhdxRegionTableEntry::debug_read_data(
-                        &data[data_offset..data_end_offset],
-                    ));
-            }
-            match region_table_entry.read_data(&data[data_offset..data_end_offset]) {
+            match region_table_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -113,15 +111,9 @@ impl VhdxRegionTable {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "VhdxRegionTable data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("VhdxRegionTable", offset, &data, 65536);
+
         self.read_data(&data)
     }
 }

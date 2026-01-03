@@ -255,13 +255,9 @@ impl ExtBlockNumbersTree {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "ExtBlockNumbersTreeNode data of size: {} at offset: {} (0x{:08x})\n",
-                self.block_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("ExtBlockNumbersTreeNode", offset, &data, self.block_size);
+
         self.read_node_data(
             &data,
             data_stream,

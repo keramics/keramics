@@ -102,7 +102,7 @@ impl VhdSectorBitmap {
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
 
         // TODO: debug print ranges.
-        keramics_core::debug_trace_data!("VhdSectorBitmap", offset, &data, data.len());
+        keramics_core::debug_trace_data!("VhdSectorBitmap", offset, &data, self.size);
 
         self.read_data(&data)
     }

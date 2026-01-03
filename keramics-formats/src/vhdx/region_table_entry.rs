@@ -54,7 +54,7 @@ impl VhdxRegionTableEntry {
 
     /// Reads the region table entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 32 {
+        if data.len() < 32 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         let is_required_flag: u32 = bytes_to_u32_le!(data, 28);

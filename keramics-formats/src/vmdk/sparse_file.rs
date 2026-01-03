@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_compression::ZlibContext;
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
@@ -28,9 +27,6 @@ use super::sparse_file_header::VmdkSparseFileHeader;
 
 /// VMware Virtual Disk (VMDK) sparse file.
 pub struct VmdkSparseFile {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     pub(super) data_stream: Option<DataStreamReference>,
 
@@ -57,7 +53,6 @@ impl VmdkSparseFile {
     /// Creates a new file.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             number_of_grain_table_entries: 0,
             sectors_per_grain: 0,
@@ -115,13 +110,12 @@ impl VmdkSparseFile {
             &mut compressed_data,
             SeekFrom::Start(grain_offset)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                compressed_grain_header.compressed_data_size, grain_offset, grain_offset,
-            ));
-            self.mediator.debug_print_data(&compressed_data, true);
-        }
+        keramics_core::debug_trace_data!(
+            "VmdkCompressedGrain",
+            grain_offset,
+            &compressed_data,
+            compressed_grain_header.compressed_data_size
+        );
         let mut zlib_context: ZlibContext = ZlibContext::new();
 
         match zlib_context.decompress(&compressed_data, data) {
