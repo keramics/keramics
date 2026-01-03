@@ -855,10 +855,8 @@ impl StructureLayout {
         let data_size: usize = self.get_data_size();
         let data_size_literal: Literal = Literal::usize_unsuffixed(data_size);
 
-        let format_string: String = format!(
-            "{} data of size: {{}} at offset: {{}} (0x{{:08x}})\n",
-            self.name
-        );
+        let name_string: String = format!("{}", self.name);
+
         quote! {
             pub(super) fn read_at_position(
                 &mut self,
@@ -872,16 +870,13 @@ impl StructureLayout {
                     &mut data,
                     position
                 );
-                let mediator = keramics_core::mediator::Mediator::current();
-                if mediator.debug_output {
-                    mediator.debug_print(format!(
-                        #format_string,
-                        data.len(),
-                        offset,
-                        offset));
-                    mediator.debug_print_data(&data, true);
-                    mediator.debug_print(#struct_name::debug_read_data(&data));
-                }
+                keramics_core::debug_trace_data_and_structure!(
+                    #name_string,
+                    offset,
+                    &data,
+                    data.len(),
+                    #struct_name::debug_read_data(&data)
+                );
                 self.read_data(&data)
             }
         }
@@ -1333,16 +1328,13 @@ mod tests {
                     &mut data,
                     position
                 );
-                let mediator = keramics_core::mediator::Mediator::current();
-                if mediator.debug_output {
-                    mediator.debug_print(format!(
-                        "TestStruct data of size: {} at offset: {} (0x{:08x})\n",
-                        data.len(),
-                        offset,
-                        offset));
-                    mediator.debug_print_data(&data, true);
-                    mediator.debug_print(TestStruct::debug_read_data(&data));
-                }
+                keramics_core::debug_trace_data_and_structure!(
+                    "TestStruct",
+                    offset,
+                    &data,
+                    data.len(),
+                    TestStruct::debug_read_data(&data)
+                );
                 self.read_data(&data)
             }
         };
