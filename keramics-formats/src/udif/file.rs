@@ -14,7 +14,6 @@
 use std::io::SeekFrom;
 
 use keramics_compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
@@ -30,9 +29,6 @@ const MAXIMUM_NUMBER_OF_SECTORS: u64 = u64::MAX / 512;
 
 /// Universal Disk Image Format (UDIF) file.
 pub struct UdifFile {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Data stream.
     data_stream: Option<DataStreamReference>,
 
@@ -65,7 +61,6 @@ impl UdifFile {
     /// Creates a file.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             data_stream: None,
             data_fork_offset: 0,
             has_block_ranges: false,
@@ -125,13 +120,12 @@ impl UdifFile {
                 &mut data,
                 SeekFrom::Start(file_footer.plist_offset)
             );
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "Plist data of size: {} at offset: {} (0x{:08x})\n",
-                    file_footer.plist_size, file_footer.plist_offset, file_footer.plist_offset,
-                ));
-                self.mediator.debug_print_data(&data, true);
-            }
+            keramics_core::debug_trace_data!(
+                "UdifFileXmlPlist",
+                file_footer.plist_offset,
+                &data,
+                file_footer.plist_size
+            );
             let string: String = match String::from_utf8(data) {
                 Ok(string) => string,
                 Err(error) => {
@@ -184,16 +178,9 @@ impl UdifFile {
                         )));
                     }
                 };
-                if self.mediator.debug_output {
-                    // TODO: determine data offset relative to start of plist
-                    self.mediator.debug_print(format!(
-                        "UdifBlockTable data of size: {} at offset: {} (0x{:08x})\n",
-                        data.len(),
-                        0,
-                        0,
-                    ));
-                    self.mediator.debug_print_data(&data, true);
-                }
+                // TODO: determine data offset relative to start of plist
+                keramics_core::debug_trace_data!("UdifBlockTable", 0, &data, data.len());
+
                 let mut block_table = UdifBlockTable::new();
 
                 match block_table.read_data(&data) {
@@ -459,13 +446,12 @@ impl UdifFile {
             &mut compressed_data,
             SeekFrom::Start(block_range.data_offset)
         );
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "Compressed data of size: {} at offset: {} (0x{:08x})\n",
-                block_range.compressed_data_size, block_range.data_offset, block_range.data_offset,
-            ));
-            self.mediator.debug_print_data(&compressed_data, true);
-        }
+        keramics_core::debug_trace_data!(
+            "UdifCompressedBlock",
+            block_range.data_offset,
+            &compressed_data,
+            block_range.compressed_data_size
+        );
         match self.compression_method {
             UdifCompressionMethod::Adc => {
                 let mut adc_context: AdcContext = AdcContext::new();

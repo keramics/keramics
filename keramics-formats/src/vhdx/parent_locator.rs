@@ -14,7 +14,6 @@
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Ucs2String;
 
@@ -23,9 +22,6 @@ use super::parent_locator_header::VhdxParentLocatorHeader;
 
 /// Virtual Hard Disk version 2 (VHDX) parent locator.
 pub struct VhdxParentLocator {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Entries.
     pub entries: HashMap<String, Ucs2String>,
 }
@@ -34,19 +30,16 @@ impl VhdxParentLocator {
     /// Creates a new parent locator.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             entries: HashMap::new(),
         }
     }
 
     /// Reads the parent locator from a buffer.
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        keramics_core::debug_trace_structure!(VhdxParentLocatorHeader::debug_read_data(data));
+
         let mut parent_locator_header: VhdxParentLocatorHeader = VhdxParentLocatorHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(VhdxParentLocatorHeader::debug_read_data(data));
-        }
         match parent_locator_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -62,21 +55,19 @@ impl VhdxParentLocator {
 
         for parent_locator_entry_index in 0..parent_locator_header.number_of_entries {
             let data_end_offset: usize = data_offset + 12;
+
             if data_end_offset > data_size {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid number of entries: {} value out of bounds",
                     parent_locator_header.number_of_entries
                 )));
             }
+            keramics_core::debug_trace_structure!(VhdxParentLocatorEntry::debug_read_data(
+                &data[data_offset..]
+            ));
             let mut parent_locator_entry: VhdxParentLocatorEntry = VhdxParentLocatorEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(VhdxParentLocatorEntry::debug_read_data(
-                        &data[data_offset..data_end_offset],
-                    ));
-            }
-            match parent_locator_entry.read_data(&data[data_offset..data_end_offset]) {
+            match parent_locator_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -127,16 +118,12 @@ impl VhdxParentLocator {
             let key_data_end_offset: usize =
                 key_data_offset + parent_locator_entry.key_data_size as usize;
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "VhdxParentLocatorKey data of size: {} at offset: {} (0x{:08x})\n",
-                    parent_locator_entry.key_data_size,
-                    parent_locator_entry.key_data_offset,
-                    parent_locator_entry.key_data_offset
-                ));
-                self.mediator
-                    .debug_print_data(&data[key_data_offset..key_data_end_offset], true);
-            }
+            keramics_core::debug_trace_data!(
+                "VhdxParentLocatorKey",
+                parent_locator_entry.key_data_offset,
+                &data[key_data_offset..key_data_end_offset],
+                parent_locator_entry.key_data_size
+            );
             let key: Ucs2String =
                 Ucs2String::from_le_bytes(&data[key_data_offset..key_data_end_offset]);
 
@@ -144,16 +131,12 @@ impl VhdxParentLocator {
             let value_data_end_offset: usize =
                 value_data_offset + parent_locator_entry.value_data_size as usize;
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "VhdxParentLocatorValue data of size: {} at offset: {} (0x{:08x})\n",
-                    parent_locator_entry.value_data_size,
-                    parent_locator_entry.value_data_offset,
-                    parent_locator_entry.value_data_offset
-                ));
-                self.mediator
-                    .debug_print_data(&data[value_data_offset..value_data_end_offset], true);
-            }
+            keramics_core::debug_trace_data!(
+                "VhdxParentLocatorValue",
+                parent_locator_entry.value_data_offset,
+                &data[value_data_offset..value_data_end_offset],
+                parent_locator_entry.value_data_size
+            );
             let value: Ucs2String =
                 Ucs2String::from_le_bytes(&data[value_data_offset..value_data_end_offset]);
 
@@ -180,13 +163,9 @@ impl VhdxParentLocator {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "VhdxParentLocator data of size: {} at offset: {} (0x{:08x})\n",
-                data_size, offset, offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("VhdxParentLocator", offset, &data, data_size);
+
         self.read_data(&data)
     }
 }

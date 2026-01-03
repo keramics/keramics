@@ -14,7 +14,6 @@
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
@@ -23,9 +22,6 @@ use super::metadata_table_header::VhdxMetadataTableHeader;
 
 /// Virtual Hard Disk version 2 (VHDX) metadata table.
 pub struct VhdxMetadataTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Entries.
     pub entries: HashMap<Uuid, VhdxMetadataTableEntry>,
 }
@@ -34,19 +30,16 @@ impl VhdxMetadataTable {
     /// Creates a new metadata table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             entries: HashMap::new(),
         }
     }
 
     /// Reads the metadata table from a buffer.
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        keramics_core::debug_trace_structure!(VhdxMetadataTableHeader::debug_read_data(data));
+
         let mut metadata_table_header: VhdxMetadataTableHeader = VhdxMetadataTableHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(VhdxMetadataTableHeader::debug_read_data(data));
-        }
         match metadata_table_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -58,19 +51,23 @@ impl VhdxMetadataTable {
             }
         }
         let mut data_offset: usize = 32;
+        let data_size: usize = data.len();
 
         for _ in 0..metadata_table_header.number_of_entries {
             let data_end_offset: usize = data_offset + 32;
 
+            if data_end_offset > data_size {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid number of entries: {} value out of bounds",
+                    metadata_table_header.number_of_entries
+                )));
+            }
+            keramics_core::debug_trace_structure!(VhdxMetadataTableEntry::debug_read_data(
+                &data[data_offset..],
+            ));
             let mut metadata_table_entry: VhdxMetadataTableEntry = VhdxMetadataTableEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(VhdxMetadataTableEntry::debug_read_data(
-                        &data[data_offset..data_end_offset],
-                    ));
-            }
-            match metadata_table_entry.read_data(&data[data_offset..data_end_offset]) {
+            match metadata_table_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -100,15 +97,9 @@ impl VhdxMetadataTable {
 
         let offset: u64 =
             keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "VhdxMetadataTable data of size: {} at offset: {} (0x{:08x})\n",
-                data.len(),
-                offset,
-                offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+
+        keramics_core::debug_trace_data!("VhdxMetadataTable", offset, &data, data.len());
+
         self.read_data(&data)
     }
 }

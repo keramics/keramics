@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u64_le;
@@ -62,9 +61,6 @@ impl VhdxBlockAllocationTableEntry {
 
 /// Virtual Hard Disk version 2 (VHDX) block allocation table.
 pub struct VhdxBlockAllocationTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Offset.
     offset: u64,
 
@@ -76,7 +72,6 @@ impl VhdxBlockAllocationTable {
     /// Creates a new block allocation table.
     pub fn new(offset: u64, number_of_entries: u32) -> Self {
         Self {
-            mediator: Mediator::current(),
             offset,
             number_of_entries,
         }
@@ -102,20 +97,15 @@ impl VhdxBlockAllocationTable {
             &mut data,
             SeekFrom::Start(entry_offset)
         );
+        keramics_core::debug_trace_data_and_structure!(
+            format!("VhdxBlockAllocationTableEntry: {}", entry_index),
+            entry_offset,
+            &data,
+            data.len(),
+            VhdxBlockAllocationTableEntry::debug_read_data(&data)
+        );
         let mut entry: VhdxBlockAllocationTableEntry = VhdxBlockAllocationTableEntry::new();
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "VhdxBlockAllocationTableEntry: {} data of size: {} at offset: {} (0x{:08x})\n",
-                entry_index,
-                data.len(),
-                entry_offset,
-                entry_offset
-            ));
-            self.mediator.debug_print_data(&data, true);
-            self.mediator
-                .debug_print(VhdxBlockAllocationTableEntry::debug_read_data(&data));
-        }
         match entry.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {

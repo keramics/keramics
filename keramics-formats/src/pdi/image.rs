@@ -15,7 +15,6 @@ use std::collections::{HashMap, HashSet};
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
@@ -33,9 +32,6 @@ use super::sparse_file_header::PdiSparseFileHeader;
 
 /// Parallels Disk Image (PDI).
 pub struct PdiImage {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// File resolver.
     file_resolver: FileResolverReference,
 
@@ -59,7 +55,6 @@ impl PdiImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             bytes_per_sector: 0,
             extents: Vec::new(),
@@ -143,13 +138,8 @@ impl PdiImage {
 
         keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "XML data of size: {} at offset: 0 (0x00000000)\n",
-                data_stream_size,
-            ));
-            self.mediator.debug_print_data(&data, true);
-        }
+        keramics_core::debug_trace_data!("PdiImageXml", 0, &data, data_stream_size);
+
         let string: String = match String::from_utf8(data) {
             Ok(string) => string,
             Err(error) => {
