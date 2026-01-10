@@ -16,7 +16,6 @@ use std::io::SeekFrom;
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use super::features::ExtFeatures;
 use super::group_descriptor::ExtGroupDescriptor;
 
 /// Extended File System (ext) group descriptor table.
@@ -42,39 +41,21 @@ pub struct ExtGroupDescriptorTable {
 
 impl ExtGroupDescriptorTable {
     /// Creates a new group descriptor table.
-    pub fn new() -> Self {
-        Self {
-            format_version: 2,
-            metadata_checksum_seed: None,
-            group_descriptor_size: 32,
-            first_group_number: 0,
-            number_of_group_descriptors: 0,
-            entries: Vec::new(),
-        }
-    }
-
-    /// Initializes the group descriptor table.
-    pub fn initialize(
-        &mut self,
-        features: &ExtFeatures,
+    pub fn new(
+        format_version: u8,
+        metadata_checksum_seed: Option<u32>,
+        group_descriptor_size: usize,
         first_group_number: u32,
         number_of_group_descriptors: u32,
-    ) -> Result<(), ErrorTrace> {
-        let group_descriptor_size: u32 = features.get_group_descriptor_size();
-
-        if group_descriptor_size == 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid group descriptor size: {} value out of bounds",
-                group_descriptor_size
-            )));
+    ) -> Self {
+        Self {
+            format_version,
+            metadata_checksum_seed,
+            group_descriptor_size,
+            first_group_number,
+            number_of_group_descriptors,
+            entries: Vec::new(),
         }
-        self.format_version = features.get_format_version();
-        self.metadata_checksum_seed = features.get_metadata_checksum_seed();
-        self.group_descriptor_size = group_descriptor_size as usize;
-        self.first_group_number = first_group_number;
-        self.number_of_group_descriptors = number_of_group_descriptors;
-
-        Ok(())
     }
 
     /// Reads the group descriptor table from a buffer.
@@ -178,9 +159,8 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let features: ExtFeatures = ExtFeatures::new();
-        let mut test_struct: ExtGroupDescriptorTable = ExtGroupDescriptorTable::new();
-        test_struct.initialize(&features, 0, 1)?;
+        let mut test_struct: ExtGroupDescriptorTable =
+            ExtGroupDescriptorTable::new(2, None, 32, 0, 1);
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.entries.len(), 1);

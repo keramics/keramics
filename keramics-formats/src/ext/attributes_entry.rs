@@ -79,12 +79,13 @@ impl ExtAttributesEntry {
 
     /// Reads the attributes entry name from a buffer.
     pub fn read_name(&self, data: &[u8]) -> Result<ByteString, ErrorTrace> {
-        let data_end_offset: usize = self.name_size as usize;
+        let name_end_offset: usize = 16 + (self.name_size as usize);
 
-        if data.len() < data_end_offset {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported attributes entry name size"
-            ));
+        if name_end_offset > data.len() {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid name size: {} value out of bounds",
+                self.name_size
+            )));
         }
         let name_prefix: &str = match self.name_index {
             0 => "",
@@ -104,7 +105,7 @@ impl ExtAttributesEntry {
         };
         let mut name: ByteString = ByteString::new_with_encoding(&CharacterEncoding::Ascii);
         name.read_data(name_prefix.as_bytes());
-        name.read_data(&data[0..data_end_offset]);
+        name.read_data(&data[16..name_end_offset]);
 
         Ok(name)
     }
@@ -153,10 +154,16 @@ mod tests {
         let mut test_struct = ExtAttributesEntry::new();
         test_struct.read_data(&test_data)?;
 
-        let name: ByteString = test_struct.read_name(&test_data[16..])?;
-
-        assert_eq!(name.to_string(), "user.myxattr");
-
+        let name: ByteString = test_struct.read_name(&test_data)?;
+        assert_eq!(
+            name,
+            ByteString {
+                encoding: CharacterEncoding::Ascii,
+                elements: vec![
+                    0x75, 0x73, 0x65, 0x72, 0x2e, 0x6d, 0x79, 0x78, 0x61, 0x74, 0x74, 0x72
+                ],
+            }
+        );
         Ok(())
     }
 }

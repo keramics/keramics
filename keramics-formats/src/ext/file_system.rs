@@ -128,7 +128,7 @@ impl ExtFileSystem {
         };
         if self.features.is_unsupported() {
             return Err(keramics_core::error_trace_new!(
-                "Ext file system has unsupported features"
+                "Unsupported file systems features"
             ));
         }
         let inode: ExtInode = match self.inode_table.get_inode(data_stream, inode_number) {
@@ -419,23 +419,22 @@ impl ExtFileSystem {
                 } else {
                     number_of_block_groups_per_meta_group
                 };
-                let mut group_descriptor_table: ExtGroupDescriptorTable =
-                    ExtGroupDescriptorTable::new();
+                let group_descriptor_size: u32 = self.features.get_group_descriptor_size();
 
-                match group_descriptor_table.initialize(
-                    &self.features,
-                    first_group_number,
-                    number_of_group_descriptors,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to initialize group descriptor table"
-                        );
-                        return Err(error);
-                    }
+                if group_descriptor_size == 0 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid group descriptor size: {} value out of bounds",
+                        group_descriptor_size
+                    )));
                 }
+                let mut group_descriptor_table: ExtGroupDescriptorTable =
+                    ExtGroupDescriptorTable::new(
+                        self.features.get_format_version(),
+                        self.features.get_metadata_checksum_seed(),
+                        group_descriptor_size as usize,
+                        first_group_number,
+                        number_of_group_descriptors,
+                    );
                 match group_descriptor_table
                     .read_at_position(data_stream, SeekFrom::Start(group_descriptor_offset))
                 {
@@ -481,7 +480,8 @@ impl ExtFileSystem {
         if number_of_inodes_per_block_group > 0 {
             match Arc::get_mut(&mut self.inode_table) {
                 Some(inode_table) => match inode_table.initialize(
-                    &self.features,
+                    self.features.get_format_version(),
+                    self.features.get_metadata_checksum_seed(),
                     self.block_size,
                     self.inode_size,
                     number_of_inodes_per_block_group,

@@ -113,12 +113,21 @@ impl Parse for FieldDataTypeOption {
             "HfsTime" => DataType::HfsTime,
             "PosixTime32" => DataType::PosixTime32,
             "Struct" => {
-                let (struct_name_str, struct_size_str) = extended_type_str.split_once(";").unwrap();
+                let (struct_name, struct_size): (&str, &str) =
+                    match extended_type_str.split_once(";") {
+                        Some((name, size)) => (name.trim(), size.trim()),
+                        None => {
+                            return Err(syn::Error::new(
+                                input.span(),
+                                format!("Unsupported Struct definition: {}", extended_type_str),
+                            ));
+                        }
+                    };
                 extended_type_str = "";
 
                 DataType::Struct {
-                    name: struct_name_str.trim().to_string(),
-                    size: struct_size_str.trim().parse::<usize>().unwrap(),
+                    name: struct_name.to_string(),
+                    size: struct_size.parse::<usize>().unwrap(),
                 }
             }
             "u8" | "uint8" | "UnsignedInteger8Bit" => DataType::UnsignedInteger8Bit,
@@ -329,10 +338,7 @@ impl Parse for GroupOptions {
                             Err(error) => {
                                 return Err(syn::Error::new(
                                     ident.span(),
-                                    format!(
-                                        "Unable to parse LayoutMap structure field with error: {}",
-                                        error
-                                    ),
+                                    format!("Unable to parse group field with error: {}", error),
                                 ));
                             }
                         }
@@ -340,14 +346,14 @@ impl Parse for GroupOptions {
                     _ => {
                         return Err(syn::Error::new(
                             ident.span(),
-                            format!("Unsupported LayoutMap group attribute: {}", identifier),
+                            format!("Unsupported group attribute: {}", identifier),
                         ));
                     }
                 }
             } else {
                 return Err(syn::Error::new(
                     input.span(),
-                    "Unsupported LayoutMap group definition",
+                    "Unsupported group definition",
                 ));
             }
             if !input.is_empty() {

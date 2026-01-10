@@ -108,6 +108,11 @@ impl DisplayPath {
                 })
                 .collect::<Vec<String>>()
                 .join(""),
+            PathComponent::Utf16String(utf16_string) => {
+                let string: String = utf16_string.to_string();
+
+                self.escape_string(string.as_str())
+            }
         }
     }
 

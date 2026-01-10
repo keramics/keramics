@@ -72,15 +72,16 @@ impl ExtDirectoryEntry {
         data: &[u8],
         encoding: &CharacterEncoding,
     ) -> Result<ByteString, ErrorTrace> {
-        let data_end_offset: usize = self.name_size as usize;
+        let name_end_offset: usize = 8 + (self.name_size as usize);
 
-        if data_end_offset > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported directory entry name size"
-            ));
+        if name_end_offset > data.len() {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid name size: {} value out of bounds",
+                self.name_size
+            )));
         }
         let mut name: ByteString = ByteString::new_with_encoding(encoding);
-        name.read_data(&data[0..data_end_offset]);
+        name.read_data(&data[8..name_end_offset]);
 
         Ok(name)
     }
@@ -128,8 +129,7 @@ mod tests {
         let mut test_struct = ExtDirectoryEntry::new();
         test_struct.read_data(&test_data)?;
 
-        let name: ByteString = test_struct.read_name(&test_data[8..], &CharacterEncoding::Utf8)?;
-
+        let name: ByteString = test_struct.read_name(&test_data, &CharacterEncoding::Utf8)?;
         assert_eq!(name, ByteString::from("file1"));
 
         Ok(())

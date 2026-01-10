@@ -30,36 +30,12 @@ impl FatString {
     pub fn new() -> Self {
         Self::Ucs2String(Ucs2String::new())
     }
-
-    /// Determines if the string is empty.
-    pub fn is_empty(&self) -> bool {
-        match self {
-            FatString::ByteString(byte_string) => byte_string.is_empty(),
-            FatString::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
-        }
-    }
-
-    /// Retrieves the length (or size) of the string.
-    pub fn len(&self) -> usize {
-        match self {
-            FatString::ByteString(byte_string) => byte_string.len(),
-            FatString::Ucs2String(ucs2_string) => ucs2_string.len(),
-        }
-    }
 }
 
 impl From<&str> for FatString {
     /// Converts a [`&str`] into a [`FatString`]
     #[inline(always)]
     fn from(string: &str) -> Self {
-        Self::Ucs2String(Ucs2String::from(string))
-    }
-}
-
-impl From<&String> for FatString {
-    /// Converts a [`&String`] into a [`FatString`]
-    #[inline(always)]
-    fn from(string: &String) -> Self {
         Self::Ucs2String(Ucs2String::from(string))
     }
 }
@@ -84,20 +60,23 @@ mod tests {
 
         assert_eq!(
             fat_string,
-            FatString::Ucs2String(Ucs2String::from("FAT string"))
+            FatString::Ucs2String(Ucs2String {
+                elements: vec![
+                    0x0046, 0x0041, 0x0054, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e, 0x0067,
+                ]
+            })
         );
     }
 
     #[test]
-    fn test_from_string() {
-        let test_string: String = String::from("FAT string");
-        let fat_string: FatString = FatString::from(&test_string);
+    fn test_to_string() {
+        let fat_string: FatString = FatString::Ucs2String(Ucs2String {
+            elements: vec![
+                0x0046, 0x0041, 0x0054, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069, 0x006e, 0x0067,
+            ],
+        });
 
-        assert_eq!(
-            fat_string,
-            FatString::Ucs2String(Ucs2String::from("FAT string"))
-        );
+        let string: String = fat_string.to_string();
+        assert_eq!(string, "FAT string");
     }
-
-    // TODO: add tests.
 }

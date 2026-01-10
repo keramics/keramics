@@ -11,12 +11,12 @@
  * under the License.
  */
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::io::SeekFrom;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_types::{ByteString, Ucs2String};
+use keramics_types::{ByteString, Ucs2CharacterMappings, Ucs2String};
 
 use crate::path_component::PathComponent;
 
@@ -36,7 +36,7 @@ pub struct FatDirectoryEntries {
     pub format: FatFormat,
 
     /// Case folding mappings.
-    pub case_folding_mappings: Arc<HashMap<u16, u16>>,
+    pub case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
     /// Entries.
     pub entries: BTreeMap<Ucs2String, FatDirectoryEntry>,
@@ -50,7 +50,7 @@ pub struct FatDirectoryEntries {
 
 impl FatDirectoryEntries {
     /// Creates new directory entries.
-    pub fn new(format: &FatFormat, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
+    pub fn new(format: &FatFormat, case_folding_mappings: &Arc<Ucs2CharacterMappings>) -> Self {
         Self {
             format: format.clone(),
             case_folding_mappings: case_folding_mappings.clone(),
@@ -409,13 +409,11 @@ mod tests {
     fn get_directory_entries() -> Result<FatDirectoryEntries, ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let case_folding_mappings: Arc<HashMap<u16, u16>> = Arc::new(
-            UCS2_CASE_MAPPINGS
-                .into_iter()
-                .collect::<HashMap<u16, u16>>(),
-        );
+        let mappings: Arc<Ucs2CharacterMappings> =
+            Arc::new(Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()));
+
         let mut directory_entries: FatDirectoryEntries =
-            FatDirectoryEntries::new(&FatFormat::Fat12, &case_folding_mappings);
+            FatDirectoryEntries::new(&FatFormat::Fat12, &mappings);
         let mut last_vfat_sequence_number: u8 = 0;
         let mut long_name_entries: Vec<FatLongNameDirectoryEntry> = Vec::new();
 
@@ -469,13 +467,11 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let case_folding_mappings: Arc<HashMap<u16, u16>> = Arc::new(
-            UCS2_CASE_MAPPINGS
-                .into_iter()
-                .collect::<HashMap<u16, u16>>(),
-        );
+        let mappings: Arc<Ucs2CharacterMappings> =
+            Arc::new(Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()));
+
         let mut test_struct: FatDirectoryEntries =
-            FatDirectoryEntries::new(&FatFormat::Fat12, &case_folding_mappings);
+            FatDirectoryEntries::new(&FatFormat::Fat12, &mappings);
 
         assert_eq!(test_struct.entries.len(), 0);
 
@@ -508,13 +504,11 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let case_folding_mappings: Arc<HashMap<u16, u16>> = Arc::new(
-            UCS2_CASE_MAPPINGS
-                .into_iter()
-                .collect::<HashMap<u16, u16>>(),
-        );
+        let mappings: Arc<Ucs2CharacterMappings> =
+            Arc::new(Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()));
+
         let mut test_struct: FatDirectoryEntries =
-            FatDirectoryEntries::new(&FatFormat::Fat12, &case_folding_mappings);
+            FatDirectoryEntries::new(&FatFormat::Fat12, &mappings);
 
         assert_eq!(test_struct.entries.len(), 0);
         assert_eq!(test_struct.is_read, false);

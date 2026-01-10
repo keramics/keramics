@@ -11,14 +11,13 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_encodings::{CharacterDecoder, CharacterEncoding};
-use keramics_types::{ByteString, Ucs2String};
+use keramics_encodings::CharacterEncoding;
+use keramics_types::{ByteString, Ucs2CharacterMappings, Ucs2String, Utf16String};
 
 /// Path component for file resolver.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
@@ -30,7 +29,7 @@ pub enum PathComponent {
     Root,
     String(String),
     Ucs2String(Ucs2String),
-    // TODO: add Utf16String support.
+    Utf16String(Utf16String),
 }
 
 impl PathComponent {
@@ -50,6 +49,9 @@ impl PathComponent {
             PathComponent::String(string) => Ok(Self::extension_from_string(string.as_str())),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::extension_from_ucs2_string(ucs2_string))
+            }
+            PathComponent::Utf16String(utf16_string) => {
+                Ok(Self::extension_from_utf16_string(utf16_string))
             }
         }
     }
@@ -131,6 +133,26 @@ impl PathComponent {
         }
     }
 
+    /// Retrieves the extension from a [`&Utf16String`] if available.
+    #[inline(always)]
+    fn extension_from_utf16_string(utf16_string: &Utf16String) -> Option<PathComponent> {
+        if utf16_string.is_empty() {
+            return None;
+        }
+        match utf16_string.elements[1..]
+            .iter()
+            .rposition(|value| *value == 0x002e)
+        {
+            Some(value_index) => {
+                let extension_string: Utf16String =
+                    Utf16String::from(&utf16_string.elements[value_index + 2..]);
+
+                Some(PathComponent::Utf16String(extension_string))
+            }
+            None => None,
+        }
+    }
+
     /// Retrieves the file stem if available.
     pub fn file_stem(&self) -> Result<Option<PathComponent>, ErrorTrace> {
         match self {
@@ -147,6 +169,9 @@ impl PathComponent {
             PathComponent::String(string) => Ok(Self::file_stem_from_string(string.as_str())),
             PathComponent::Ucs2String(ucs2_string) => {
                 Ok(Self::file_stem_from_ucs2_string(ucs2_string))
+            }
+            PathComponent::Utf16String(utf16_string) => {
+                Ok(Self::file_stem_from_utf16_string(utf16_string))
             }
         }
     }
@@ -223,6 +248,23 @@ impl PathComponent {
         }
     }
 
+    /// Retrieves the file stem from a [`&Utf16String`] if available.
+    #[inline(always)]
+    fn file_stem_from_utf16_string(utf16_string: &Utf16String) -> Option<PathComponent> {
+        if utf16_string.is_empty() {
+            return None;
+        }
+        match utf16_string.elements[1..]
+            .iter()
+            .rposition(|value| *value == 0x002e)
+        {
+            Some(value_index) => Some(PathComponent::Utf16String(Utf16String::from(
+                &utf16_string.elements[0..value_index + 1],
+            ))),
+            None => Some(PathComponent::Utf16String(utf16_string.clone())),
+        }
+    }
+
     /// Converts the path component to a `ByteString` with a specific encoding.
     pub fn to_byte_string(&self, encoding: &CharacterEncoding) -> Result<ByteString, ErrorTrace> {
         match self {
@@ -233,37 +275,40 @@ impl PathComponent {
                     Err(error)
                 }
             },
-            PathComponent::Current => ByteString::from_string_with_encoding(".", encoding),
+            PathComponent::Current => ByteString::from_string_with_encoding(encoding, "."),
             PathComponent::OsString(os_string) => {
                 let string: String = os_string.display().to_string();
 
-                ByteString::from_string_with_encoding(string.as_str(), encoding)
+                ByteString::from_string_with_encoding(encoding, string.as_str())
             }
-            PathComponent::Parent => ByteString::from_string_with_encoding("..", encoding),
+            PathComponent::Parent => ByteString::from_string_with_encoding(encoding, ".."),
             PathComponent::Root => Ok(ByteString::new_with_encoding(encoding)),
             PathComponent::String(string) => {
-                ByteString::from_string_with_encoding(string, encoding)
+                ByteString::from_string_with_encoding(encoding, string)
             }
             PathComponent::Ucs2String(ucs2_string) => {
-                let code_points: Vec<u32> = ucs2_string
-                    .elements
-                    .iter()
-                    .map(|element| *element as u32)
-                    .collect();
-
-                let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
-
-                match byte_string.extend_from_codepoints(&code_points) {
-                    Ok(_) => {}
+                match ByteString::from_ucs2_string_with_encoding(encoding, ucs2_string) {
+                    Ok(encoded_byte_string) => Ok(encoded_byte_string),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to encode byte string"
+                            "Unable to create byte string from UCS-2 string"
                         );
-                        return Err(error);
+                        Err(error)
                     }
                 }
-                Ok(byte_string)
+            }
+            PathComponent::Utf16String(utf16_string) => {
+                match ByteString::from_utf16_string_with_encoding(encoding, utf16_string) {
+                    Ok(encoded_byte_string) => Ok(encoded_byte_string),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to create byte string from UTF-16 string"
+                        );
+                        Err(error)
+                    }
+                }
             }
         }
     }
@@ -272,37 +317,16 @@ impl PathComponent {
     pub fn to_ucs2_string(&self) -> Result<Ucs2String, ErrorTrace> {
         let ucs2_string: Ucs2String = match &self {
             PathComponent::ByteString(byte_string) => {
-                let mut ucs2_string: Ucs2String = Ucs2String::new();
-
-                let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
-
-                while let Some(result) = character_decoder.next() {
-                    match result {
-                        Ok(code_points) => {
-                            for mut code_point in code_points {
-                                if code_point > 0xffff {
-                                    code_point -= 0x10000;
-                                    ucs2_string
-                                        .elements
-                                        .push(0xd800 + (code_point >> 10) as u16);
-                                    ucs2_string
-                                        .elements
-                                        .push(0xdc00 + (code_point & 0x03ff) as u16);
-                                } else {
-                                    ucs2_string.elements.push(code_point as u16);
-                                }
-                            }
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to decode byte string"
-                            );
-                            return Err(error);
-                        }
+                match Ucs2String::from_byte_string(byte_string) {
+                    Ok(ucs2_string) => ucs2_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to convert byte string to UCS-2 string"
+                        );
+                        return Err(error);
                     }
                 }
-                ucs2_string
             }
             PathComponent::Current => Ucs2String::from("."),
             PathComponent::OsString(os_string) => {
@@ -314,6 +338,18 @@ impl PathComponent {
             PathComponent::Root => Ucs2String::new(),
             PathComponent::String(string) => Ucs2String::from(string),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.clone(),
+            PathComponent::Utf16String(utf16_string) => {
+                match Ucs2String::from_utf16_string(utf16_string) {
+                    Ok(ucs2_string) => ucs2_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to convert UTF-16 string to UCS-2 string"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
         };
         Ok(ucs2_string)
     }
@@ -321,55 +357,62 @@ impl PathComponent {
     /// Converts the path component to a `Ucs2String` with case folding applied.
     pub fn to_ucs2_string_with_case_folding(
         &self,
-        case_folding_mappings: &HashMap<u16, u16>,
+        mappings: &Ucs2CharacterMappings,
     ) -> Result<Ucs2String, ErrorTrace> {
         let ucs2_string: Ucs2String = match &self {
             PathComponent::ByteString(byte_string) => {
-                let mut ucs2_string: Ucs2String = Ucs2String::new();
-
-                let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
-
-                while let Some(result) = character_decoder.next() {
-                    match result {
-                        Ok(code_points) => {
-                            for code_point in code_points {
-                                if code_point > 0xffff {
-                                    return Err(keramics_core::error_trace_new!(
-                                        "Unable to encode UCS-2 string - code point outside of supported range"
-                                    ));
-                                }
-                                let folded_code_point: u16 =
-                                    match case_folding_mappings.get(&(code_point as u16)) {
-                                        Some(folded_code_point) => *folded_code_point,
-                                        None => code_point as u16,
-                                    };
-                                ucs2_string.elements.push(folded_code_point);
-                            }
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to decode byte string"
-                            );
-                            return Err(error);
-                        }
+                match Ucs2String::from_byte_string_with_case_folding(&byte_string, mappings) {
+                    Ok(ucs2_string) => ucs2_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to convert byte string to UCS-2 string"
+                        );
+                        return Err(error);
                     }
                 }
-                ucs2_string
             }
             PathComponent::Current => Ucs2String::from("."),
             PathComponent::OsString(os_string) => {
                 let string: String = os_string.display().to_string();
 
-                Ucs2String::from_string_with_case_folding(string.as_str(), case_folding_mappings)
+                match Ucs2String::from_string_with_case_folding(string.as_str(), mappings) {
+                    Ok(ucs2_string) => ucs2_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to convert OS string to UCS-2 string"
+                        );
+                        return Err(error);
+                    }
+                }
             }
             PathComponent::Parent => Ucs2String::from(".."),
             PathComponent::Root => Ucs2String::new(),
             PathComponent::String(string) => {
-                Ucs2String::from_string_with_case_folding(string.as_str(), case_folding_mappings)
+                match Ucs2String::from_string_with_case_folding(string.as_str(), mappings) {
+                    Ok(ucs2_string) => ucs2_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to convert string to UCS-2 string"
+                        );
+                        return Err(error);
+                    }
+                }
             }
-            PathComponent::Ucs2String(ucs2_string) => {
-                ucs2_string.new_with_case_folding(case_folding_mappings)
+            PathComponent::Ucs2String(ucs2_string) => ucs2_string.new_with_case_folding(mappings),
+            PathComponent::Utf16String(utf16_string) => {
+                match Ucs2String::from_utf16_string_with_case_folding(utf16_string, mappings) {
+                    Ok(ucs2_string) => ucs2_string,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to convert UTF-16 string to UCS-2 string"
+                        );
+                        return Err(error);
+                    }
+                }
             }
         };
         Ok(ucs2_string)
@@ -499,6 +542,7 @@ impl PartialEq<&str> for PathComponent {
             PathComponent::Root => other.is_empty(),
             PathComponent::String(string) => String::eq(string, other),
             PathComponent::Ucs2String(ucs2_string) => Ucs2String::eq(ucs2_string, other),
+            PathComponent::Utf16String(utf16_string) => Utf16String::eq(utf16_string, other),
         }
     }
 }
@@ -514,6 +558,7 @@ impl fmt::Display for PathComponent {
             PathComponent::Root => write!(formatter, ""),
             PathComponent::String(string) => string.fmt(formatter),
             PathComponent::Ucs2String(ucs2_string) => ucs2_string.fmt(formatter),
+            PathComponent::Utf16String(utf16_string) => utf16_string.fmt(formatter),
         }
     }
 }
@@ -615,6 +660,30 @@ mod tests {
         assert_eq!(
             result,
             Some(PathComponent::Ucs2String(Ucs2String::from("txt")))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_extension_with_utf16_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from(""));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from("file"));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from(".file"));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent =
+            PathComponent::Utf16String(Utf16String::from("file.txt"));
+        let result: Option<PathComponent> = path_component.extension()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::Utf16String(Utf16String::from("txt")))
         );
         Ok(())
     }
@@ -736,6 +805,36 @@ mod tests {
     }
 
     #[test]
+    fn test_file_stem_with_utf16_string() -> Result<(), ErrorTrace> {
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from(""));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(result, None);
+
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from("file"));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::Utf16String(Utf16String::from("file")))
+        );
+
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from(".file"));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::Utf16String(Utf16String::from(".file")))
+        );
+
+        let path_component: PathComponent =
+            PathComponent::Utf16String(Utf16String::from("file.txt"));
+        let result: Option<PathComponent> = path_component.file_stem()?;
+        assert_eq!(
+            result,
+            Some(PathComponent::Utf16String(Utf16String::from("file")))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_to_byte_string() -> Result<(), ErrorTrace> {
         let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
         let byte_string: ByteString =
@@ -841,13 +940,11 @@ mod tests {
 
     #[test]
     fn test_to_ucs2_string_with_case_folding() -> Result<(), ErrorTrace> {
-        let case_folding_mappings: HashMap<u16, u16> = UCS2_CASE_MAPPINGS
-            .into_iter()
-            .collect::<HashMap<u16, u16>>();
+        let mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
 
         let path_component: PathComponent = PathComponent::ByteString(ByteString::from("test"));
-        let ucs2_string: Ucs2String =
-            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string_with_case_folding(&mappings)?;
         assert_eq!(
             ucs2_string,
             Ucs2String {
@@ -856,8 +953,7 @@ mod tests {
         );
 
         let path_component: PathComponent = PathComponent::OsString(OsString::from("test"));
-        let ucs2_string: Ucs2String =
-            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string_with_case_folding(&mappings)?;
         assert_eq!(
             ucs2_string,
             Ucs2String {
@@ -866,13 +962,11 @@ mod tests {
         );
 
         let path_component: PathComponent = PathComponent::Root;
-        let ucs2_string: Ucs2String =
-            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string_with_case_folding(&mappings)?;
         assert_eq!(ucs2_string, Ucs2String { elements: vec![] });
 
         let path_component: PathComponent = PathComponent::from("test");
-        let ucs2_string: Ucs2String =
-            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string_with_case_folding(&mappings)?;
         assert_eq!(
             ucs2_string,
             Ucs2String {
@@ -881,8 +975,7 @@ mod tests {
         );
 
         let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
-        let ucs2_string: Ucs2String =
-            path_component.to_ucs2_string_with_case_folding(&case_folding_mappings)?;
+        let ucs2_string: Ucs2String = path_component.to_ucs2_string_with_case_folding(&mappings)?;
         assert_eq!(
             ucs2_string,
             Ucs2String {
@@ -944,6 +1037,10 @@ mod tests {
         assert_eq!(string, "test");
 
         let path_component: PathComponent = PathComponent::Ucs2String(Ucs2String::from("test"));
+        let string: String = path_component.to_string();
+        assert_eq!(string, "test");
+
+        let path_component: PathComponent = PathComponent::Utf16String(Utf16String::from("test"));
         let string: String = path_component.to_string();
         assert_eq!(string, "test");
 

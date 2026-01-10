@@ -134,9 +134,7 @@ impl Path {
         for path_component in self.components.iter() {
             match path_component {
                 PathComponent::ByteString(byte_string) => {
-                    let string: String = byte_string.to_string();
-
-                    path_buf.push(string);
+                    path_buf.push(byte_string.to_string());
                 }
                 PathComponent::Current => path_buf.push("."),
                 PathComponent::OsString(os_string) => path_buf.push(os_string),
@@ -144,9 +142,10 @@ impl Path {
                 PathComponent::Root => path_buf.push(MAIN_SEPARATOR_STR),
                 PathComponent::String(string) => path_buf.push(string),
                 PathComponent::Ucs2String(ucs2_string) => {
-                    let string: String = ucs2_string.to_string();
-
-                    path_buf.push(string);
+                    path_buf.push(ucs2_string.to_string());
+                }
+                PathComponent::Utf16String(utf16_string) => {
+                    path_buf.push(utf16_string.to_string());
                 }
             }
         }

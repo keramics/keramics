@@ -116,6 +116,12 @@ impl NtfsMasterFileTable {
         data_stream: &DataStreamReference,
         entry_number: u64,
     ) -> Result<NtfsMftEntry, ErrorTrace> {
+        if entry_number >= self.number_of_entries {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid MFT entry number: {} value out of bounds",
+                entry_number
+            )));
+        }
         let virtual_cluster_offset: u64 = entry_number * (self.mft_entry_size as u64);
 
         let block_range: &NtfsBlockRange = match self.get_block_range(virtual_cluster_offset) {

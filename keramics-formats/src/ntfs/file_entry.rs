@@ -11,12 +11,12 @@
  * under the License.
  */
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
-use keramics_types::Ucs2String;
+use keramics_types::{Ucs2CharacterMappings, Ucs2String};
 
 use crate::path_component::PathComponent;
 
@@ -81,7 +81,7 @@ impl NtfsFileEntry {
     pub(super) fn new(
         data_stream: &DataStreamReference,
         mft: &Arc<NtfsMasterFileTable>,
-        case_folding_mappings: &Arc<HashMap<u16, u16>>,
+        case_folding_mappings: &Arc<Ucs2CharacterMappings>,
         mft_entry_number: u64,
         mft_entry: NtfsMftEntry,
         name: Option<Ucs2String>,

@@ -132,8 +132,6 @@ impl ExtDirectoryTree {
                     entry.size
                 )));
             }
-            data_offset += 8;
-
             let name: ByteString = match entry.read_name(&data[data_offset..], &self.encoding) {
                 Ok(name) => name,
                 Err(mut error) => {
@@ -144,7 +142,7 @@ impl ExtDirectoryTree {
                     return Err(error);
                 }
             };
-            data_offset += (entry.size as usize) - 8;
+            data_offset += entry.size as usize;
 
             // TODO: print trailing data
 

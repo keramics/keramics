@@ -16,7 +16,6 @@ use std::io::SeekFrom;
 use keramics_checksums::ReversedCrc32Context;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use super::features::ExtFeatures;
 use super::group_descriptor::ExtGroupDescriptor;
 use super::inode::ExtInode;
 
@@ -60,30 +59,6 @@ impl ExtInodeTable {
             group_descriptors: Vec::new(),
             number_of_inodes: 0,
         }
-    }
-
-    /// Initializes the inode table.
-    pub fn initialize(
-        &mut self,
-        features: &ExtFeatures,
-        block_size: u32,
-        inode_size: u16,
-        number_of_inodes_per_block_group: u32,
-        group_descriptors: Vec<ExtGroupDescriptor>,
-        number_of_inodes: u32,
-    ) -> Result<(), ErrorTrace> {
-        self.format_version = features.get_format_version();
-        self.metadata_checksum_seed = features.get_metadata_checksum_seed();
-        self.block_size = block_size;
-        self.inode_size = inode_size;
-        self.number_of_inodes_per_block_group = number_of_inodes_per_block_group;
-        self.group_size = (number_of_inodes_per_block_group as u64) * (inode_size as u64);
-        self.group_descriptors = group_descriptors;
-        self.number_of_inodes = number_of_inodes;
-
-        // TODO: sanity check self.number_of_inodes and size of inode table.
-
-        Ok(())
     }
 
     /// Retrieves a specific inode.
@@ -172,6 +147,31 @@ impl ExtInodeTable {
             None => {}
         }
         Ok(inode)
+    }
+
+    /// Initializes the inode table.
+    pub fn initialize(
+        &mut self,
+        format_version: u8,
+        metadata_checksum_seed: Option<u32>,
+        block_size: u32,
+        inode_size: u16,
+        number_of_inodes_per_block_group: u32,
+        group_descriptors: Vec<ExtGroupDescriptor>,
+        number_of_inodes: u32,
+    ) -> Result<(), ErrorTrace> {
+        self.format_version = format_version;
+        self.metadata_checksum_seed = metadata_checksum_seed;
+        self.block_size = block_size;
+        self.inode_size = inode_size;
+        self.number_of_inodes_per_block_group = number_of_inodes_per_block_group;
+        self.group_size = (number_of_inodes_per_block_group as u64) * (inode_size as u64);
+        self.group_descriptors = group_descriptors;
+        self.number_of_inodes = number_of_inodes;
+
+        // TODO: sanity check self.number_of_inodes and size of inode table.
+
+        Ok(())
     }
 }
 

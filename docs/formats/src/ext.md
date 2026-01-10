@@ -674,8 +674,8 @@ The ext2 inode is 128 bytes in size and consists of:
 | 2 | 2 | | Lower 16-bits of owner (or user) identifier (UID) |
 | 4 | 4 | | Data size |
 | 8 | 4 | | (last) access time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
-| 12 | 4 | | (last) inode change time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
-| 16 | 4 | | (last) modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
+| 12 | 4 | | (last) inode change (or modification) time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
+| 16 | 4 | | (last) content modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 20 | 4 | | Deletion time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 24 | 2 | | Lower 16-bits of group identifier (GID) |
 | 26 | 2 | | Number of (hard) links |
@@ -715,8 +715,8 @@ The ext3 inode is 132 bytes in size and consists of:
 | 2 | 2 | | Lower 16-bits of owner (or user) identifier (UID) |
 | 4 | 4 | | Data size |
 | 8 | 4 | | (last) access time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
-| 12 | 4 | | (last) inode change time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
-| 16 | 4 | | (last) modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
+| 12 | 4 | | (last) inode change (or modification) time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
+| 16 | 4 | | (last) content modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 20 | 4 | | Deletion time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | 24 | 2 | | Lower 16-bits of group identifier (GID) |
 | 26 | 2 | | Number of (hard) links |
@@ -762,8 +762,8 @@ The ext4 inode is 160 bytes in size and consists of:
 | 4 | 4 | | Lower 32-bits of data size |
 | <td colspan="4">*If EXT4_EA_INODE_FL is not set*</td> |
 | 8 | 4 | | (last) access time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
-| 12 | 4 | | (last) inode change time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
-| 16 | 4 | | (last) modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
+| 12 | 4 | | (last) inode change (or modification) time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
+| 16 | 4 | | (last) content modification time, which contains the number of seconds since January 1, 1970 00:00:00 UTC (POSIX epoch) |
 | <td colspan="4">*If EXT4_EA_INODE_FL is set*</td> |
 | 8 | 4 | | Unknown (extended attribute value data checksum) |
 | 12 | 4 | | Unknown (lower 32-bits of extended attribute reference count) |
@@ -802,8 +802,8 @@ The ext4 inode is 160 bytes in size and consists of:
 | <td colspan="4">*Extension (if inode size > 128)*</td> |
 | 128 | 2 | | Extended inode size, which can vary, values of 4, 28 and 32 have been observed |
 | 130 | 2 | | Upper 16-bits of checksum |
-| 132 | 4 | | (last) inode change time extra precision |
-| 136 | 4 | | (last) modification time extra precision |
+| 132 | 4 | | (last) inode change (or modification) time extra precision |
+| 136 | 4 | | (last) content modification time extra precision |
 | 140 | 4 | | (last) access time extra precision |
 | 144 | 4 | | Creation time |
 | 148 | 4 | | Creation time extra precision |

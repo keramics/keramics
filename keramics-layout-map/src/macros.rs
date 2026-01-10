@@ -117,14 +117,12 @@ impl FromMeta for MethodsOptions {
                 Ok(methods_options) => Ok(methods_options),
                 Err(error) => {
                     return Err(darling::Error::custom(format!(
-                        "Unable to parse LayoutMap methods with error: {}",
+                        "Unable to parse methods with error: {}",
                         error
                     )));
                 }
             },
-            _ => Err(darling::Error::custom(
-                "Unsupported item type for LayoutMap methods",
-            )),
+            _ => Err(darling::Error::custom("Unsupported item type for methods")),
         }
     }
 }
@@ -158,10 +156,7 @@ impl Parse for StructureMember {
                         }
                         Err(error) => Err(syn::Error::new(
                             ident.span(),
-                            format!(
-                                "Unable to parse LayoutMap member field with error: {}",
-                                error
-                            ),
+                            format!("Unable to parse member field with error: {}", error),
                         )),
                     }
                 }
@@ -172,24 +167,21 @@ impl Parse for StructureMember {
                         Ok(group_options) => Ok(StructureMember::Group(group_options)),
                         Err(error) => Err(syn::Error::new(
                             ident.span(),
-                            format!(
-                                "Unable to parse LayoutMap member group with error: {}",
-                                error
-                            ),
+                            format!("Unable to parse member group with error: {}", error),
                         )),
                     }
                 }
                 _ => {
                     return Err(syn::Error::new(
                         ident.span(),
-                        format!("Unsupported LayoutMap member attribute: {}", identifier),
+                        format!("Unsupported member attribute: {}", identifier),
                     ));
                 }
             }
         } else {
             Err(syn::Error::new(
                 input.span(),
-                "Unsupported LayoutMap member definition",
+                "Unsupported member definition",
             ))
         }
     }
@@ -262,7 +254,7 @@ impl Parse for StructureOptions {
                                 return Err(syn::Error::new(
                                     ident.span(),
                                     format!(
-                                        "Unable to parse LayoutMap structure field with error: {}",
+                                        "Unable to parse structure field with error: {}",
                                         error
                                     ),
                                 ));
@@ -280,7 +272,7 @@ impl Parse for StructureOptions {
                                 return Err(syn::Error::new(
                                     ident.span(),
                                     format!(
-                                        "Unable to parse LayoutMap structure group with error: {}",
+                                        "Unable to parse structure group with error: {}",
                                         error
                                     ),
                                 ));
@@ -297,7 +289,7 @@ impl Parse for StructureOptions {
                                 return Err(syn::Error::new(
                                     ident.span(),
                                     format!(
-                                        "Unable to parse LayoutMap structure member with error: {}",
+                                        "Unable to parse structure member with error: {}",
                                         error
                                     ),
                                 ));
@@ -307,14 +299,14 @@ impl Parse for StructureOptions {
                     _ => {
                         return Err(syn::Error::new(
                             ident.span(),
-                            format!("Unsupported LayoutMap structure attribute: {}", identifier),
+                            format!("Unsupported structure attribute: {}", identifier),
                         ));
                     }
                 }
             } else {
                 return Err(syn::Error::new(
                     input.span(),
-                    "Unsupported LayoutMap structure definition",
+                    "Unsupported structure definition",
                 ));
             }
             if !input.is_empty() {
@@ -333,13 +325,13 @@ impl FromMeta for StructureOptions {
                 Ok(methods_options) => Ok(methods_options),
                 Err(error) => {
                     return Err(darling::Error::custom(format!(
-                        "Unable to parse LayoutMap structure with error: {}",
+                        "Unable to parse structure with error: {}",
                         error
                     )));
                 }
             },
             _ => Err(darling::Error::custom(
-                "Unsupported item type for LayoutMap structure",
+                "Unsupported item type for structure",
             )),
         }
     }

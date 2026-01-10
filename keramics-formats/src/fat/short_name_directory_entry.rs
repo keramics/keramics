@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
-use keramics_types::ByteString;
+use keramics_types::{ByteString, Ucs2String};
 
 use super::enums::FatFormat;
 use super::short_name_directory_entry_fat12::Fat12ShortNameDirectoryEntry;
@@ -63,6 +63,24 @@ impl FatShortNameDirectoryEntry {
             data_start_cluster: 0,
             data_size: 0,
         }
+    }
+
+    /// Retrieves the lookup name.
+    pub fn get_lookup_name(&self) -> Ucs2String {
+        let elements: Vec<u16> = self
+            .name
+            .elements
+            .iter()
+            .map(|element| {
+                if *element >= b'a' && *element <= b'z' {
+                    (*element - 32) as u16
+                } else {
+                    *element as u16
+                }
+            })
+            .collect();
+
+        Ucs2String { elements }
     }
 
     /// Reads the directory entry from a specific position in a data stream.
@@ -127,6 +145,8 @@ mod tests {
             0x00, 0x00, 0x00, 0x00,
         ];
     }
+
+    // TODO: add tests for get_lookup_name
 
     #[test]
     fn test_read_at_position_fat12() -> Result<(), ErrorTrace> {

@@ -11,6 +11,8 @@
  * under the License.
  */
 
+//! Single or multi byte string.
+
 use std::fmt;
 
 use keramics_core::ErrorTrace;
@@ -18,7 +20,10 @@ use keramics_encodings::{
     CharacterDecoder, CharacterEncoding, new_character_decoder, new_character_encoder,
 };
 
-/// String of 8-bit elements.
+use super::ucs2_string::Ucs2String;
+use super::utf16_string::Utf16String;
+
+/// Byte string.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ByteString {
     /// Character encoding.
@@ -45,38 +50,15 @@ impl ByteString {
         }
     }
 
-    /// Creates a new byte string from a string with a specified character encoding.
-    pub fn from_string_with_encoding(
-        string: &str,
-        encoding: &CharacterEncoding,
-    ) -> Result<Self, ErrorTrace> {
-        if *encoding == CharacterEncoding::Utf8 {
-            Ok(ByteString::from(string))
-        } else {
-            let code_points: Vec<u32> = string.chars().map(|character| character as u32).collect();
-
-            let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
-
-            match byte_string.extend_from_codepoints(&code_points) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to encode byte string");
-                    return Err(error);
-                }
-            }
-            Ok(byte_string)
-        }
-    }
-
     /// Decodes the byte string.
     pub fn decode(&self) -> Result<Vec<u32>, ErrorTrace> {
         let mut code_points: Vec<u32> = Vec::new();
 
         for result in new_character_decoder(&self.encoding, &self.elements) {
             match result {
-                Ok(mut decoded_code_points) => code_points.append(&mut decoded_code_points),
+                Ok(mut decoder_results) => code_points.append(&mut decoder_results),
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to decode character");
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode byte string");
                     return Err(error);
                 }
             }
@@ -141,6 +123,72 @@ impl ByteString {
             }
         }
         Ok(())
+    }
+
+    /// Creates a new byte string with a specified character encoding from a string.
+    pub fn from_string_with_encoding(
+        encoding: &CharacterEncoding,
+        string: &str,
+    ) -> Result<Self, ErrorTrace> {
+        if *encoding == CharacterEncoding::Utf8 {
+            Ok(ByteString::from(string))
+        } else {
+            let code_points: Vec<u32> = string.chars().map(|character| character as u32).collect();
+
+            let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
+
+            match byte_string.extend_from_codepoints(&code_points) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to encode byte string");
+                    return Err(error);
+                }
+            }
+            Ok(byte_string)
+        }
+    }
+
+    /// Creates a new byte string with a specified character encoding from an UCS-2 string.
+    pub fn from_ucs2_string_with_encoding(
+        encoding: &CharacterEncoding,
+        ucs2_string: &Ucs2String,
+    ) -> Result<Self, ErrorTrace> {
+        let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
+
+        let code_points: Vec<u32> = ucs2_string.decode();
+
+        match byte_string.extend_from_codepoints(&code_points) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to encode byte string");
+                return Err(error);
+            }
+        }
+        Ok(byte_string)
+    }
+
+    /// Creates a new byte string with a specified character encoding from an UTF-16 string.
+    pub fn from_utf16_string_with_encoding(
+        encoding: &CharacterEncoding,
+        utf16_string: &Utf16String,
+    ) -> Result<Self, ErrorTrace> {
+        let mut byte_string: ByteString = ByteString::new_with_encoding(encoding);
+
+        let code_points: Vec<u32> = match utf16_string.decode() {
+            Ok(code_points) => code_points,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode UTF-16 string");
+                return Err(error);
+            }
+        };
+        match byte_string.extend_from_codepoints(&code_points) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to encode byte string");
+                return Err(error);
+            }
+        }
+        Ok(byte_string)
     }
 
     /// Retrieves a character decoder for the byte string.
@@ -257,36 +305,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_from_string_with_encoding() -> Result<(), ErrorTrace> {
-        let byte_string: ByteString =
-            ByteString::from_string_with_encoding("ASCII string", &CharacterEncoding::Utf8)?;
-
-        assert_eq!(
-            byte_string,
-            ByteString {
-                encoding: CharacterEncoding::Utf8,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
-            }
-        );
-
-        let byte_string: ByteString =
-            ByteString::from_string_with_encoding("ASCII string", &CharacterEncoding::Iso8859_1)?;
-
-        assert_eq!(
-            byte_string,
-            ByteString {
-                encoding: CharacterEncoding::Iso8859_1,
-                elements: vec![
-                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
-                ]
-            }
-        );
-        Ok(())
-    }
-
-    #[test]
     fn test_decode() -> Result<(), ErrorTrace> {
         let byte_string: ByteString = ByteString::from("ASCII string");
 
@@ -333,7 +351,7 @@ mod tests {
         );
 
         let mut byte_string: ByteString =
-            ByteString::from_string_with_encoding("ASCII", &CharacterEncoding::Iso8859_1)?;
+            ByteString::from_string_with_encoding(&CharacterEncoding::Iso8859_1, "ASCII")?;
 
         byte_string.extend(&ByteString::from(" string"))?;
         assert_eq!(
@@ -351,7 +369,7 @@ mod tests {
     #[test]
     fn test_extend_from_codepoints() -> Result<(), ErrorTrace> {
         let mut byte_string: ByteString =
-            ByteString::from_string_with_encoding("ASCII", &CharacterEncoding::Iso8859_1)?;
+            ByteString::from_string_with_encoding(&CharacterEncoding::Iso8859_1, "ASCII")?;
 
         byte_string.extend_from_codepoints(&[0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67])?;
         assert_eq!(
@@ -367,9 +385,42 @@ mod tests {
     }
 
     #[test]
+    fn test_from_string_with_encoding() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString =
+            ByteString::from_string_with_encoding(&CharacterEncoding::Utf8, "ASCII string")?;
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Utf8,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+
+        let byte_string: ByteString =
+            ByteString::from_string_with_encoding(&CharacterEncoding::Iso8859_1, "ASCII string")?;
+
+        assert_eq!(
+            byte_string,
+            ByteString {
+                encoding: CharacterEncoding::Iso8859_1,
+                elements: vec![
+                    0x41, 0x53, 0x43, 0x49, 0x49, 0x20, 0x73, 0x74, 0x72, 0x69, 0x6e, 0x67,
+                ]
+            }
+        );
+        Ok(())
+    }
+
+    // TODO: add tests for from_ucs2_string_with_encoding
+    // TODO: add tests for from_utf16_string_with_encoding
+
+    #[test]
     fn test_get_character_decoder() -> Result<(), ErrorTrace> {
         let byte_string: ByteString =
-            ByteString::from_string_with_encoding("ASCII", &CharacterEncoding::Iso8859_1)?;
+            ByteString::from_string_with_encoding(&CharacterEncoding::Iso8859_1, "ASCII")?;
 
         let _ = byte_string.get_character_decoder();
 

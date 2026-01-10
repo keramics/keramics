@@ -12,14 +12,14 @@
  */
 
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_types::{Ucs2String, bytes_to_u64_le};
+use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u64_le};
 
 use crate::path_component::PathComponent;
+use crate::util::calculate_alignment_padding;
 
 use super::constants::*;
 use super::directory_entries::NtfsDirectoryEntries;
@@ -41,7 +41,7 @@ pub struct NtfsDirectoryIndex {
     mediator: MediatorReference,
 
     /// Case folding mappings.
-    pub case_folding_mappings: Arc<HashMap<u16, u16>>,
+    pub case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
     /// Index.
     index: NtfsIndex,
@@ -58,7 +58,10 @@ pub struct NtfsDirectoryIndex {
 
 impl NtfsDirectoryIndex {
     /// Creates a new directory index.
-    pub fn new(cluster_block_size: u32, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Self {
+    pub fn new(
+        cluster_block_size: u32,
+        case_folding_mappings: &Arc<Ucs2CharacterMappings>,
+    ) -> Self {
         Self {
             mediator: Mediator::current(),
             case_folding_mappings: case_folding_mappings.clone(),
@@ -94,14 +97,11 @@ impl NtfsDirectoryIndex {
                 "Unsupported non-resident $I30 $INDEX_ROOT attribute"
             ));
         }
+        keramics_core::debug_trace_structure!(NtfsIndexRootHeader::debug_read_data(
+            &i30_index_root_attribute.resident_data
+        ));
         let mut index_root_header: NtfsIndexRootHeader = NtfsIndexRootHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(NtfsIndexRootHeader::debug_read_data(
-                    &i30_index_root_attribute.resident_data,
-                ));
-        }
         match index_root_header.read_data(&i30_index_root_attribute.resident_data) {
             Ok(_) => {}
             Err(mut error) => {
@@ -144,6 +144,7 @@ impl NtfsDirectoryIndex {
                             return Err(error);
                         }
                     };
+                // Note that recent version of NTFS support case-sensitive file names.
                 if standard_information.maximum_number_of_versions == 0
                     && standard_information.version_number == 1
                 {
@@ -212,12 +213,21 @@ impl NtfsDirectoryIndex {
                 }
             }
         };
-        self.get_directory_entry_by_name_from_node(
+        match self.get_directory_entry_by_name_from_node(
             &self.root_node_data,
             16,
             data_stream,
             &lookup_name,
-        )
+        ) {
+            Ok(directory_entry) => Ok(directory_entry),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve directory entry from node"
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves a directory entry by name from an index node.
@@ -295,10 +305,9 @@ impl NtfsDirectoryIndex {
                     .name
                     .new_with_case_folding(&self.case_folding_mappings);
 
-                // TODO: add a compare_with_case_folding
-                case_folded_name.compare(name)
+                case_folded_name.cmp(name)
             } else {
-                file_name.name.compare(name)
+                file_name.name.cmp(name)
             };
             if result == Ordering::Equal {
                 let directory_entry: NtfsDirectoryEntry =
@@ -310,11 +319,11 @@ impl NtfsDirectoryIndex {
             }
             index_value_offset += value_data_size;
 
-            let alignment_padding: usize = index_value_offset % 8;
+            let alignment_padding: usize = calculate_alignment_padding(index_value_offset, 8);
             if alignment_padding > 0 {
                 // TODO: debug print 8-byte alignment padding.
 
-                index_value_offset += 8 - alignment_padding;
+                index_value_offset += alignment_padding;
             }
         }
         if is_branch {
@@ -341,10 +350,13 @@ impl NtfsDirectoryIndex {
                     return Err(error);
                 }
             };
-            let result: Option<NtfsDirectoryEntry> = match self
-                .get_directory_entry_by_name_from_node(&index_entry.data, 24, data_stream, name)
-            {
-                Ok(result) => result,
+            match self.get_directory_entry_by_name_from_node(
+                &index_entry.data,
+                24,
+                data_stream,
+                name,
+            ) {
+                Ok(result) => Ok(result),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -352,13 +364,10 @@ impl NtfsDirectoryIndex {
                     );
                     return Err(error);
                 }
-            };
-            match result {
-                Some(directory_entry) => return Ok(Some(directory_entry)),
-                None => {}
             }
+        } else {
+            Ok(None)
         }
-        Ok(None)
     }
 
     /// Retrieves the directory entries.
@@ -372,7 +381,16 @@ impl NtfsDirectoryIndex {
                 "Directory index was not initialized"
             ));
         }
-        self.get_directory_entries_from_node(&self.root_node_data, 16, data_stream, entries)
+        match self.get_directory_entries_from_node(&self.root_node_data, 16, data_stream, entries) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve directory entries from node"
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves the directory entries from an index node.
@@ -469,15 +487,15 @@ impl NtfsDirectoryIndex {
                         return Err(error);
                     }
                 }
-            } else if self.mediator.debug_output && value_data_size > 0 {
+            } else if value_data_size > 0 {
                 let value_data_end_offset: usize = index_value_offset + value_data_size;
 
-                self.mediator.debug_print(format!(
-                    "NtfsDirectoryIndexLeafValueData data of size: {} at offset: {} (0x{:08x})\n",
-                    value_data_size, index_value_offset, index_value_offset,
-                ));
-                self.mediator
-                    .debug_print_data(&data[index_value_offset..value_data_end_offset], true);
+                keramics_core::debug_trace_data!(
+                    "NtfsDirectoryIndexLeafValueData",
+                    index_value_offset,
+                    &data[index_value_offset..value_data_end_offset],
+                    value_data_size
+                );
             }
             if index_value.flags & NTFS_INDEX_VALUE_FLAG_IS_LAST != 0 {
                 break;
@@ -499,11 +517,11 @@ impl NtfsDirectoryIndex {
             }
             index_value_offset += value_data_size;
 
-            let alignment_padding: usize = index_value_offset % 8;
+            let alignment_padding: usize = calculate_alignment_padding(index_value_offset, 8);
             if alignment_padding > 0 {
                 // TODO: debug print 8-byte alignment padding.
 
-                index_value_offset += 8 - alignment_padding;
+                index_value_offset += alignment_padding;
             }
         }
         Ok(())
@@ -971,12 +989,10 @@ mod tests {
         let mut index_entry = NtfsIndexEntry::new();
         index_entry.read_data(&mut test_data)?;
 
-        let case_folding_mappings: Arc<HashMap<u16, u16>> = Arc::new(
-            UCS2_CASE_MAPPINGS
-                .into_iter()
-                .collect::<HashMap<u16, u16>>(),
-        );
-        let test_struct = NtfsDirectoryIndex::new(4096, &case_folding_mappings);
+        let mappings: Arc<Ucs2CharacterMappings> =
+            Arc::new(Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice()));
+
+        let test_struct = NtfsDirectoryIndex::new(4096, &mappings);
         let data_stream: DataStreamReference = open_fake_data_stream(&[]);
 
         let mut entries: NtfsDirectoryEntries = NtfsDirectoryEntries::new();

@@ -19,6 +19,6 @@ mod utf16_string;
 mod uuid;
 
 pub use byte_string::ByteString;
-pub use ucs2_string::Ucs2String;
-pub use utf16_string::Utf16String;
+pub use ucs2_string::{Ucs2CharacterMappings, Ucs2String};
+pub use utf16_string::{Utf16CharacterMappings, Utf16String};
 pub use uuid::Uuid;

@@ -42,24 +42,6 @@ impl ExtFeatures {
         }
     }
 
-    /// Initializes the features.
-    pub fn initialize(&mut self, superblock: &ExtSuperblock) {
-        self.compatible_feature_flags = superblock.compatible_feature_flags;
-        self.incompatible_feature_flags = superblock.incompatible_feature_flags;
-        self.read_only_compatible_feature_flags = superblock.read_only_compatible_feature_flags;
-
-        if superblock.read_only_compatible_feature_flags
-            & EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_METADATA_CHECKSUM
-            != 0
-        {
-            let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
-            crc32_context.update(&superblock.file_system_identifier);
-            let checksum: u32 = crc32_context.finalize();
-
-            self.metadata_checksum_seed = Some(checksum);
-        }
-    }
-
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> u8 {
         if self.compatible_feature_flags & 0x00000200 != 0
@@ -105,6 +87,24 @@ impl ExtFeatures {
     /// Determines if the sparse superblock version 2 feature is used.
     pub fn has_sparse_superblock2(&self) -> bool {
         self.compatible_feature_flags & EXT_COMPATIBLE_FEATURE_FLAG_SPARSE_SUPERBLOCK2 != 0
+    }
+
+    /// Initializes the features.
+    pub fn initialize(&mut self, superblock: &ExtSuperblock) {
+        self.compatible_feature_flags = superblock.compatible_feature_flags;
+        self.incompatible_feature_flags = superblock.incompatible_feature_flags;
+        self.read_only_compatible_feature_flags = superblock.read_only_compatible_feature_flags;
+
+        if superblock.read_only_compatible_feature_flags
+            & EXT_READ_ONLY_COMPATIBLE_FEATURE_FLAG_METADATA_CHECKSUM
+            != 0
+        {
+            let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0x82f63b78, 0);
+            crc32_context.update(&superblock.file_system_identifier);
+            let checksum: u32 = crc32_context.finalize();
+
+            self.metadata_checksum_seed = Some(checksum);
+        }
     }
 
     /// Checks if there are unsupported features.

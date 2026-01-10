@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::io::SeekFrom;
 use std::sync::Arc;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
-use keramics_types::{Ucs2String, bytes_to_u16_le};
+use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u16_le};
 
 use crate::path::Path;
 
@@ -51,7 +50,7 @@ pub struct NtfsFileSystem {
     mft: Arc<NtfsMasterFileTable>,
 
     /// Case folding mappings.
-    case_folding_mappings: Arc<HashMap<u16, u16>>,
+    case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
     /// Volume information from the $VOLUME_INFORMATION attribute of the "$Volume" metadata file.
     volume_information: Option<NtfsVolumeInformation>,
@@ -73,7 +72,7 @@ impl NtfsFileSystem {
             mft_entry_size: 0,
             index_entry_size: 0,
             mft: Arc::new(NtfsMasterFileTable::new()),
-            case_folding_mappings: Arc::new(HashMap::new()),
+            case_folding_mappings: Arc::new(Ucs2CharacterMappings::new()),
             volume_information: None,
             volume_label: None,
             volume_serial_number: 0,
@@ -115,12 +114,6 @@ impl NtfsFileSystem {
                 return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
-        if mft_entry_number >= self.mft.number_of_entries {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid MFT entry number: {} value out of bounds",
-                mft_entry_number
-            )));
-        }
         let mft_entry: NtfsMftEntry = match self.mft.get_entry(data_stream, mft_entry_number) {
             Ok(mft_entry) => mft_entry,
             Err(mut error) => {
@@ -188,7 +181,13 @@ impl NtfsFileSystem {
         match self.get_file_entry_by_identifier(NTFS_ROOT_DIRECTORY_IDENTIFIER) {
             Ok(file_entry) => Ok(file_entry),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve file entry: {}",
+                        NTFS_ROOT_DIRECTORY_IDENTIFIER
+                    )
+                );
                 return Err(error);
             }
         }
@@ -350,7 +349,7 @@ impl NtfsFileSystem {
                     data_offset += 2;
 
                     if character_value != value_16bit {
-                        case_folding_mappings.insert(character_value, value_16bit);
+                        case_folding_mappings.add(character_value, value_16bit);
                     }
                 }
             }

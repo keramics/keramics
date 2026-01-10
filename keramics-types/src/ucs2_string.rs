@@ -11,13 +11,66 @@
  * under the License.
  */
 
+//! 16-bit Universal Coded Character Set (UCS-2) string.
+
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 
+use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterDecoder;
+
+use super::byte_string::ByteString;
+use super::utf16_string::Utf16String;
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
-/// 16-bit Universal Coded Character Set (UCS-2) string.
+/// UCS-2 character mappings.
+pub struct Ucs2CharacterMappings {
+    /// Mappings.
+    mappings: HashMap<u16, u16>,
+}
+
+impl Ucs2CharacterMappings {
+    /// Creates a new UCS-2 character mappings.
+    pub fn new() -> Self {
+        Self {
+            mappings: HashMap::new(),
+        }
+    }
+
+    /// Adds a mapping.
+    pub fn add(&mut self, element: u16, mapped_element: u16) {
+        self.mappings.insert(element, mapped_element);
+    }
+
+    /// Retrieves a mapped element.
+    pub fn get(&self, element: &u16) -> u16 {
+        match self.mappings.get(element) {
+            Some(mapped_element) => *mapped_element,
+            None => *element,
+        }
+    }
+
+    /// Retrieves the number of mappings.
+    pub fn len(&self) -> usize {
+        self.mappings.len()
+    }
+}
+
+impl From<&[(u16, u16)]> for Ucs2CharacterMappings {
+    /// Converts a [`&[(u16, u16)]`] into a [`Ucs2CharacterMappings`]
+    #[inline(always)]
+    fn from(mappings: &[(u16, u16)]) -> Self {
+        Self {
+            mappings: mappings
+                .iter()
+                .map(|(character, mapped_character)| (*character, *mapped_character))
+                .collect::<HashMap<u16, u16>>(),
+        }
+    }
+}
+
+/// UCS-2 string.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Ucs2String {
     /// Elements.
@@ -33,17 +86,22 @@ impl Ucs2String {
     }
 
     /// Creates a new UCS-2 string with case folding applied.
-    pub fn new_with_case_folding(&self, mappings: &HashMap<u16, u16>) -> Self {
+    pub fn new_with_case_folding(&self, mappings: &Ucs2CharacterMappings) -> Self {
         let elements: Vec<u16> = self
             .elements
             .iter()
-            .map(|element| match mappings.get(element) {
-                Some(&value) => value,
-                None => *element,
-            })
+            .map(|element| mappings.get(element))
             .collect::<Vec<u16>>();
 
         Self { elements }
+    }
+
+    /// Decodes the UCS-2 string.
+    pub fn decode(&self) -> Vec<u32> {
+        self.elements
+            .iter()
+            .map(|element| *element as u32)
+            .collect::<Vec<u32>>()
     }
 
     /// Creates a new UCS-2 string from a byte sequence in big-endian.
@@ -59,6 +117,63 @@ impl Ucs2String {
             elements.push(value_16bit);
         }
         Self { elements }
+    }
+
+    /// Creates a new UCS-2 string from a byte string.
+    pub fn from_byte_string(byte_string: &ByteString) -> Result<Self, ErrorTrace> {
+        let mut elements: Vec<u16> = Vec::new();
+
+        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(code_points) => {
+                    for code_point in code_points {
+                        if code_point > 0x0000ffff {
+                            return Err(keramics_core::error_trace_new!(
+                                "Code point outside of UCS-2 range"
+                            ));
+                        }
+                        elements.push(code_point as u16);
+                    }
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode byte string");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self { elements })
+    }
+
+    /// Creates a new UCS-2 string from a byte string with case folding applied.
+    pub fn from_byte_string_with_case_folding(
+        byte_string: &ByteString,
+        mappings: &Ucs2CharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
+        let mut elements: Vec<u16> = Vec::new();
+
+        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(code_points) => {
+                    for code_point in code_points {
+                        if code_point > 0x0000ffff {
+                            return Err(keramics_core::error_trace_new!(
+                                "Code point outside of UCS-2 range"
+                            ));
+                        }
+                        elements.push(mappings.get(&(code_point as u16)));
+                    }
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode byte string");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self { elements })
     }
 
     /// Creates a new UCS-2 string from a byte sequence in little-endian.
@@ -77,25 +192,69 @@ impl Ucs2String {
     }
 
     /// Creates a new UCS-2 string from a string with case folding applied.
-    pub fn from_string_with_case_folding(string: &str, mappings: &HashMap<u16, u16>) -> Self {
+    pub fn from_string_with_case_folding(
+        string: &str,
+        mappings: &Ucs2CharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
         let mut elements: Vec<u16> = Vec::new();
 
         for character in string.chars() {
-            let mut code_point: u32 = character as u32;
-
-            if code_point > 0xffff {
-                code_point -= 0x10000;
-                elements.push(0xd800 + (code_point >> 10) as u16);
-                elements.push(0xdc00 + (code_point & 0x03ff) as u16);
-            } else {
-                let folded_code_point: u16 = match mappings.get(&(code_point as u16)) {
-                    Some(folded_code_point) => *folded_code_point,
-                    None => code_point as u16,
-                };
-                elements.push(folded_code_point);
+            let code_point: u32 = character as u32;
+            if code_point > 0x0000ffff {
+                return Err(keramics_core::error_trace_new!(
+                    "Code point outside of UCS-2 range"
+                ));
             }
+            elements.push(mappings.get(&(code_point as u16)));
         }
-        Self { elements }
+        Ok(Self { elements })
+    }
+
+    /// Creates a new UCS-2 string from an UTF-16 string.
+    pub fn from_utf16_string(utf16_string: &Utf16String) -> Result<Self, ErrorTrace> {
+        let code_points: Vec<u32> = match utf16_string.decode() {
+            Ok(code_points) => code_points,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode UTF-16 string");
+                return Err(error);
+            }
+        };
+        let mut elements: Vec<u16> = Vec::new();
+
+        for code_point in code_points {
+            if code_point > 0x0000ffff {
+                return Err(keramics_core::error_trace_new!(
+                    "Code point outside of UCS-2 range"
+                ));
+            }
+            elements.push(code_point as u16);
+        }
+        Ok(Self { elements })
+    }
+
+    /// Creates a new UCS-2 string from an UTF-16 string with case folding applied.
+    pub fn from_utf16_string_with_case_folding(
+        utf16_string: &Utf16String,
+        mappings: &Ucs2CharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
+        let code_points: Vec<u32> = match utf16_string.decode() {
+            Ok(code_points) => code_points,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to decode UTF-16 string");
+                return Err(error);
+            }
+        };
+        let mut elements: Vec<u16> = Vec::new();
+
+        for code_point in code_points {
+            if code_point > 0x0000ffff {
+                return Err(keramics_core::error_trace_new!(
+                    "Code point outside of UCS-2 range"
+                ));
+            }
+            elements.push(mappings.get(&(code_point as u16)));
+        }
+        Ok(Self { elements })
     }
 
     /// Determines if the UCS-2 string is empty.
@@ -108,7 +267,18 @@ impl Ucs2String {
         self.elements.len()
     }
 
-    // TODO: add read_data_be
+    /// Reads a UCS-2 string from a buffer in big-endian.
+    pub fn read_data_be(&mut self, data: &[u8]) {
+        let data_size: usize = data.len();
+
+        for data_offset in (0..data_size).step_by(2) {
+            let value_16bit: u16 = bytes_to_u16_be!(data, data_offset);
+            if value_16bit == 0 {
+                break;
+            }
+            self.elements.push(value_16bit);
+        }
+    }
 
     /// Reads a UCS-2 string from a buffer in little-endian.
     pub fn read_data_le(&mut self, data: &[u8]) {
@@ -121,33 +291,6 @@ impl Ucs2String {
             }
             self.elements.push(value_16bit);
         }
-    }
-
-    /// Compares two strings.
-    pub fn compare(&self, other: &Self) -> Ordering {
-        let self_size: usize = self.elements.len();
-        let other_size: usize = other.len();
-
-        let mut element_index: usize = 0;
-        while element_index < self_size && element_index < other_size {
-            let self_element: u16 = self.elements[element_index];
-            let other_element: u16 = other.elements[element_index];
-
-            if self_element < other_element {
-                return Ordering::Less;
-            }
-            if self_element > other_element {
-                return Ordering::Greater;
-            }
-            element_index += 1;
-        }
-        if element_index < other_size {
-            return Ordering::Less;
-        }
-        if element_index < self_size {
-            return Ordering::Greater;
-        }
-        Ordering::Equal
     }
 }
 
@@ -237,11 +380,10 @@ mod tests {
     fn test_new_with_case_folding() {
         let ucs2_string: Ucs2String = Ucs2String::from("UCS-2 string");
 
-        let case_folding_mappings: HashMap<u16, u16> = UCS2_CASE_MAPPINGS
-            .into_iter()
-            .collect::<HashMap<u16, u16>>();
+        let mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
 
-        let test_string: Ucs2String = ucs2_string.new_with_case_folding(&case_folding_mappings);
+        let test_string: Ucs2String = ucs2_string.new_with_case_folding(&mappings);
 
         assert_eq!(
             test_string,
@@ -253,6 +395,8 @@ mod tests {
             }
         );
     }
+
+    // TODO: add tests for decode
 
     #[test]
     fn test_from_be_bytes() {
@@ -272,6 +416,9 @@ mod tests {
             }
         );
     }
+
+    // TODO: add tests for from_byte_string
+    // TODO: add tests for from_byte_string_with_case_folding
 
     #[test]
     fn test_from_le_bytes() {
@@ -293,13 +440,12 @@ mod tests {
     }
 
     #[test]
-    fn test_from_string_with_case_folding() {
-        let case_folding_mappings: HashMap<u16, u16> = UCS2_CASE_MAPPINGS
-            .into_iter()
-            .collect::<HashMap<u16, u16>>();
+    fn test_from_string_with_case_folding() -> Result<(), ErrorTrace> {
+        let mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
 
         let ucs2_string: Ucs2String =
-            Ucs2String::from_string_with_case_folding("UCS-2 string", &case_folding_mappings);
+            Ucs2String::from_string_with_case_folding("UCS-2 string", &mappings)?;
 
         assert_eq!(
             ucs2_string,
@@ -310,7 +456,11 @@ mod tests {
                 ],
             }
         );
+        Ok(())
     }
+
+    // TODO: add tests for from_utf16_string
+    // TODO: add tests for from_utf16_string_with_case_folding
 
     #[test]
     fn test_is_empty() {
@@ -400,29 +550,6 @@ mod tests {
 
         assert!(ucs2_string.eq("UCS-2 string"));
         assert!(ucs2_string.eq(&"UCS-2 string"));
-    }
-
-    #[test]
-    fn test_compare() {
-        let ucs2_string: Ucs2String = Ucs2String::from("string1");
-
-        let compare_ucs2_string: Ucs2String = Ucs2String::from("STRING1");
-        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Greater);
-
-        let compare_ucs2_string: Ucs2String = Ucs2String::from("string0");
-        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Greater);
-
-        let compare_ucs2_string: Ucs2String = Ucs2String::from("string1");
-        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Equal);
-
-        let compare_ucs2_string: Ucs2String = Ucs2String::from("string2");
-        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Less);
-
-        let compare_ucs2_string: Ucs2String = Ucs2String::from("string");
-        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Greater);
-
-        let compare_ucs2_string: Ucs2String = Ucs2String::from("string10");
-        assert_eq!(ucs2_string.compare(&compare_ucs2_string), Ordering::Less);
     }
 
     #[test]

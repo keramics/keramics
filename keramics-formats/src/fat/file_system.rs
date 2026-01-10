@@ -11,13 +11,12 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::io::SeekFrom;
 use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_types::ByteString;
 use keramics_types::constants::UCS2_CASE_MAPPINGS;
+use keramics_types::{ByteString, Ucs2CharacterMappings};
 
 use crate::path::Path;
 
@@ -61,7 +60,7 @@ pub struct FatFileSystem {
     block_allocation_table: Option<Arc<FatBlockAllocationTable>>,
 
     /// Case folding mappings.
-    case_folding_mappings: Arc<HashMap<u16, u16>>,
+    case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
     /// Volume serial number.
     pub volume_serial_number: u32,
@@ -86,11 +85,9 @@ impl FatFileSystem {
             root_directory_cluster_block_number: 0,
             format: FatFormat::Fat12,
             block_allocation_table: None,
-            case_folding_mappings: Arc::new(
-                UCS2_CASE_MAPPINGS
-                    .into_iter()
-                    .collect::<HashMap<u16, u16>>(),
-            ),
+            case_folding_mappings: Arc::new(Ucs2CharacterMappings::from(
+                UCS2_CASE_MAPPINGS.as_slice(),
+            )),
             volume_serial_number: 0,
             volume_label: None,
             root_directory_volume_label: None,

@@ -291,8 +291,12 @@ impl StructureLayoutField {
 
                 quote! {
                     string_parts.push(format!(#format_string));
-                    for line in #field_type::debug_read_data(&data[#data_offset_literal..#data_end_offset_literal]).lines() {
-                        string_parts.push(format!("    {}\n", line));
+                    for (line_index, line) in #field_type::debug_read_data(&data[#data_offset_literal..#data_end_offset_literal]).lines().enumerate() {
+                        if line_index == 0 {
+                            string_parts.push(format!("{}\n", line));
+                        } else if !line.is_empty() {
+                            string_parts.push(format!("    {}\n", line));
+                        }
                     }
 
                 }
@@ -375,7 +379,11 @@ impl StructureLayoutField {
                     string_parts.push(format!(#format_string));
                     for data_offset in (#data_offset_literal..#data_end_offset_literal).step_by(#element_data_size_literal) {
                         for line in #field_type::debug_read_data(&data[data_offset..data_offset + #element_data_size_literal]).lines() {
-                            string_parts.push(format!("        {}\n", line));
+                            if line.ends_with('}') {
+                                string_parts.push(format!("        {},\n", line));
+                            } else if !line.is_empty() {
+                                string_parts.push(format!("        {}\n", line));
+                            }
                         }
                     }
                     string_parts.push(format!("    ],\n"));
@@ -1223,8 +1231,12 @@ mod tests {
                 string_parts.push(format!("    field1: {},\n", field1));
 
                 string_parts.push(format!("    field2: "));
-                for line in MyStruct::debug_read_data(&data[4..11]).lines() {
-                    string_parts.push(format!("    {}\n", line));
+                for (line_index, line) in MyStruct::debug_read_data(&data[4..11]).lines().enumerate() {
+                    if line_index == 0 {
+                        string_parts.push(format!("{}\n", line));
+                    } else if !line.is_empty() {
+                        string_parts.push(format!("    {}\n", line));
+                    }
                 }
                 string_parts.push(format!("}}\n\n"));
 
@@ -1280,7 +1292,11 @@ mod tests {
                 string_parts.push(format!("    field2: [\n"));
                 for data_offset in (4..54).step_by(5) {
                     for line in MyStruct::debug_read_data(&data[data_offset..data_offset + 5]).lines() {
-                        string_parts.push(format!("        {}\n", line));
+                        if line.ends_with('}') {
+                            string_parts.push(format!("        {},\n", line));
+                        } else if !line.is_empty() {
+                            string_parts.push(format!("        {}\n", line));
+                        }
                     }
                 }
                 string_parts.push(format!("    ],\n"));

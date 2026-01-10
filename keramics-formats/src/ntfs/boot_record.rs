@@ -17,11 +17,6 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
 use super::constants::*;
 
-const SUPPORTED_BYTES_PER_SECTOR: [u16; 5] = [256, 512, 1024, 2048, 4096];
-const SUPPORTED_CLUSTER_BLOCK_SIZE: [u32; 14] = [
-    256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576, 2097152,
-];
-
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -78,6 +73,13 @@ pub struct NtfsBootRecord {
 }
 
 impl NtfsBootRecord {
+    const SUPPORTED_BYTES_PER_SECTOR: [u16; 5] = [256, 512, 1024, 2048, 4096];
+
+    const SUPPORTED_CLUSTER_BLOCK_SIZE: [u32; 14] = [
+        256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576,
+        2097152,
+    ];
+
     /// Creates a new boot record.
     pub fn new() -> Self {
         Self {
@@ -101,7 +103,7 @@ impl NtfsBootRecord {
         }
         self.bytes_per_sector = bytes_to_u16_le!(data, 11);
 
-        if !SUPPORTED_BYTES_PER_SECTOR.contains(&self.bytes_per_sector) {
+        if !Self::SUPPORTED_BYTES_PER_SECTOR.contains(&self.bytes_per_sector) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported bytes per sector: {}",
                 self.bytes_per_sector
@@ -124,7 +126,7 @@ impl NtfsBootRecord {
         };
         self.cluster_block_size *= self.bytes_per_sector as u32;
 
-        if !SUPPORTED_CLUSTER_BLOCK_SIZE.contains(&self.cluster_block_size) {
+        if !Self::SUPPORTED_CLUSTER_BLOCK_SIZE.contains(&self.cluster_block_size) {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported sectors per cluster block: {}",
                 sectors_per_cluster_block

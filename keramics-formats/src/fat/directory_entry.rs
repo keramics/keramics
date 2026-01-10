@@ -11,10 +11,9 @@
  * under the License.
  */
 
-use std::collections::HashMap;
 use std::sync::Arc;
 
-use keramics_types::Ucs2String;
+use keramics_types::{Ucs2CharacterMappings, Ucs2String};
 
 use super::long_name_directory_entry::FatLongNameDirectoryEntry;
 use super::short_name_directory_entry::FatShortNameDirectoryEntry;
@@ -43,24 +42,13 @@ impl FatDirectoryEntry {
     }
 
     /// Retrieves the lookup name.
-    pub fn get_lookup_name(&self, case_folding_mappings: &Arc<HashMap<u16, u16>>) -> Ucs2String {
+    pub fn get_lookup_name(
+        &self,
+        case_folding_mappings: &Arc<Ucs2CharacterMappings>,
+    ) -> Ucs2String {
         match &self.long_name {
             Some(long_name) => long_name.new_with_case_folding(case_folding_mappings),
-            None => Ucs2String {
-                elements: self
-                    .short_name
-                    .name
-                    .elements
-                    .iter()
-                    .map(|element| {
-                        if *element >= b'a' && *element <= b'z' {
-                            (*element - 32) as u16
-                        } else {
-                            *element as u16
-                        }
-                    })
-                    .collect::<Vec<u16>>(),
-            },
+            None => self.short_name.get_lookup_name(),
         }
     }
 

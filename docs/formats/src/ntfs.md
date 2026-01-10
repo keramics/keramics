@@ -683,6 +683,10 @@ in size and consists of:
 > Note that MFT entries have been observed without a $STANDARD_INFORMATION
 > attribute, but with other attributes such as $FILE_NAME and an $I30 index.
 
+Recent version of NTFS support case-sentive file names. If a directory is case-sensitive the
+corresponding $STANDARD_INFORMATION attribute will have a maximum number of versions of 0 and a
+version number of 1.
+
 ### The attribute list attribute
 
 The attribute list attribute ($ATTRIBUTE_LIST) is used to store MFT attributes
@@ -767,12 +771,12 @@ attributes with the parent file reference of each hard link.
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | POSIX | Case sensitive character set that consists of all Unicode characters except for: "\0" (zero character), "/" (forward slash). The ":" (colon) is valid for NTFS but not for Windows |
-| 1 | FILE_NAME_NTFS, WINDOWS | Case insensitive sub set of the POSIX character set that consists of all Unicode characters except for: `" * / : < > ? \ \| +`. Note that names cannot end with a "." (dot) or " " (space) |
-| 2 | FILE_NAME_DOS, DOS | Case insensitive sub set of the WINDOWS character set that consists of all upper case ASCII characters except for: `" * + , / : ; < = > ? \`. Note that the name must follow the 8.3 format |
+| 0 | POSIX | Case-sensitive character set that consists of all Unicode characters except for: "\0" (zero character), "/" (forward slash). The ":" (colon) is valid for NTFS but not for Windows |
+| 1 | FILE_NAME_NTFS, WINDOWS | Case-insensitive sub set of the POSIX character set that consists of all Unicode characters except for: `" * / : < > ? \ \| +`. Note that names cannot end with a "." (dot) or " " (space) |
+| 2 | FILE_NAME_DOS, DOS | Case-insensitive sub set of the WINDOWS character set that consists of all upper case ASCII characters except for: `" * + , / : ; < = > ? \`. Note that the name must follow the 8.3 format |
 | 3 | DOS_WINDOWS | Both the DOS and WINDOWS names are identical, which is the same as the DOS character set, with the exception that lower case is used as well |
 
-> Note that the Windows API function CreateFile allows to create case sensitive
+> Note that the Windows API function CreateFile allows to create case-sensitive
 > file names when the flag FILE_FLAG_POSIX_SEMANTICS is set.
 
 #### Long to short name conversion

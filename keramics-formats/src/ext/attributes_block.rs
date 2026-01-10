@@ -61,21 +61,18 @@ impl ExtAttributesBlock {
             if data_end_offset >= data_size {
                 break;
             }
-            DebugTrace::print_structure(
-                ExtAttributesEntry::debug_read_data,
-                &data[entry_data_offset..data_end_offset],
-            );
+            keramics_core::debug_trace_structure!(ExtAttributesEntry::debug_read_data(
+                &data[entry_data_offset..]
+            ));
             let mut entry: ExtAttributesEntry = ExtAttributesEntry::new();
 
-            match entry.read_data(&data[entry_data_offset..data_end_offset]) {
+            match entry.read_data(&data[entry_data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read attributes entry");
                     return Err(error);
                 }
             }
-            entry_data_offset = data_end_offset;
-
             let name: ByteString = match entry.read_name(&data[entry_data_offset..]) {
                 Ok(name) => name,
                 Err(mut error) => {
@@ -84,7 +81,8 @@ impl ExtAttributesBlock {
                 }
             };
             DebugTrace::print_value("ExtAttributesBlock: attribute name", &name);
-            entry_data_offset += entry.name_size as usize;
+
+            entry_data_offset += 16 + (entry.name_size as usize);
 
             if entry.value_data_inode_number == 0 && entry.value_data_size > 0 {
                 let value_data_offset: usize =
@@ -105,12 +103,11 @@ impl ExtAttributesBlock {
                 }
                 let value_data: &[u8] = &data[value_data_offset..value_data_end_offset];
 
-                DebugTrace::print_data(
+                keramics_core::debug_trace_data!(
                     "ExtAttributesBlock: attribute value",
                     value_data_offset as u64,
                     value_data,
-                    value_data_size,
-                    true,
+                    value_data_size
                 );
                 entry.value_data = Vec::from(value_data);
             }
@@ -118,12 +115,11 @@ impl ExtAttributesBlock {
 
             let alignment_padding_size: usize = calculate_alignment_padding(entry_data_offset, 4);
 
-            DebugTrace::print_data(
+            keramics_core::debug_trace_data!(
                 "ExtAttributesBlock: alignment padding",
                 entry_data_offset as u64,
                 &data[entry_data_offset..entry_data_offset + alignment_padding_size],
-                alignment_padding_size,
-                true,
+                alignment_padding_size
             );
             entry_data_offset += alignment_padding_size;
         }
