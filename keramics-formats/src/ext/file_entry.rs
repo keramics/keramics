@@ -202,7 +202,8 @@ impl ExtFileEntry {
                     self.inode.data_size,
                 )));
             }
-            let mut byte_string: ByteString = ByteString::new_with_encoding(&self.sub_directory_entries.encoding);
+            let mut byte_string: ByteString =
+                ByteString::new_with_encoding(&self.sub_directory_entries.encoding);
 
             if self.inode.data_size < 60 {
                 byte_string.read_data(self.inode.data_reference.as_slice())
