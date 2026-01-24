@@ -156,36 +156,26 @@ impl ExtFileSystem {
         if path.is_empty() || path.is_relative() {
             return Ok(None);
         }
-        let result: Option<ExtFileEntry> = match self.get_root_directory() {
-            Ok(result) => result,
+        let mut file_entry: ExtFileEntry = match self.get_root_directory() {
+            Ok(Some(file_entry)) => file_entry,
+            Ok(None) => return Ok(None),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
                 return Err(error);
             }
         };
-        let mut file_entry: ExtFileEntry = match result {
-            Some(file_entry) => file_entry,
-            None => return Ok(None),
-        };
         // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
-            let result: Option<ExtFileEntry> =
-                match file_entry.get_sub_file_entry_by_name(path_component) {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve sub file entry: {}",
-                                path_component.to_string()
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-            file_entry = match result {
-                Some(file_entry) => file_entry,
-                None => return Ok(None),
+            file_entry = match file_entry.get_sub_file_entry_by_name(path_component) {
+                Ok(Some(file_entry)) => file_entry,
+                Ok(None) => return Ok(None),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve sub file entry: {}", path_component)
+                    );
+                    return Err(error);
+                }
             };
         }
         Ok(Some(file_entry))
@@ -580,13 +570,13 @@ mod tests {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(2)?;
-        assert_eq!(file_entry.get_inode_number(), 2);
+        assert_eq!(file_entry.inode_number, 2);
 
         let name: Option<&ByteString> = file_entry.get_name();
         assert!(name.is_none());
 
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_identifier(12)?;
-        assert_eq!(file_entry.get_inode_number(), 12);
+        assert_eq!(file_entry.inode_number, 12);
 
         let name: Option<&ByteString> = file_entry.get_name();
         assert!(name.is_none());
@@ -601,17 +591,17 @@ mod tests {
         let path: Path = Path::from("/");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.get_inode_number(), 2);
+        assert_eq!(file_entry.inode_number, 2);
 
         let path: Path = Path::from("/emptyfile");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.get_inode_number(), 12);
+        assert_eq!(file_entry.inode_number, 12);
 
         let path: Path = Path::from("/testdir1/testfile1");
         let file_entry: ExtFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.get_inode_number(), 14);
+        assert_eq!(file_entry.inode_number, 14);
 
         let name: Option<&ByteString> = file_entry.get_name();
         assert_eq!(name, Some(ByteString::from("testfile1")).as_ref());
@@ -625,7 +615,7 @@ mod tests {
 
         let file_entry: ExtFileEntry = file_system.get_root_directory()?.unwrap();
 
-        assert_eq!(file_entry.get_inode_number(), 2);
+        assert_eq!(file_entry.inode_number, 2);
 
         Ok(())
     }

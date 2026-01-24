@@ -13,13 +13,15 @@
 
 //! 16-bit Unicode Transformation Format (UTF-16) string.
 
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::slice::Iter;
 
 use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterDecoder;
 
+use super::byte_string::ByteString;
+use super::ucs2_string::Ucs2String;
 use super::{bytes_to_u16_be, bytes_to_u16_le};
 
 /// UTF-16 character mappings.
@@ -157,6 +159,67 @@ impl Utf16String {
         Self { elements }
     }
 
+    /// Creates a new UTF-16 string from a `ByteString`.
+    pub fn from_byte_string(byte_string: &ByteString) -> Result<Self, ErrorTrace> {
+        let mut elements: Vec<u16> = Vec::new();
+
+        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(code_points) => {
+                    for mut code_point in code_points {
+                        if code_point > 0x0000ffff {
+                            code_point -= 0x00010000;
+                            elements.push(0xd800 + (code_point >> 10) as u16);
+                            elements.push(0xdc00 + (code_point & 0x000003ff) as u16);
+                        } else {
+                            elements.push(code_point as u16);
+                        }
+                    }
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode byte string");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self { elements })
+    }
+
+    /// Creates a new UTF-16 string from a `ByteString` with case folding applied.
+    pub fn from_byte_string_with_case_folding(
+        byte_string: &ByteString,
+        mappings: &Utf16CharacterMappings,
+    ) -> Result<Self, ErrorTrace> {
+        let mut elements: Vec<u16> = Vec::new();
+
+        let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
+
+        while let Some(result) = character_decoder.next() {
+            match result {
+                Ok(code_points) => {
+                    for code_point in code_points {
+                        let mut mapped_code_point: u32 = mappings.get_code_point(&code_point);
+
+                        if mapped_code_point > 0x0000ffff {
+                            mapped_code_point -= 0x00010000;
+                            elements.push(0xd800 + (mapped_code_point >> 10) as u16);
+                            elements.push(0xdc00 + (mapped_code_point & 0x000003ff) as u16);
+                        } else {
+                            elements.push(mapped_code_point as u16);
+                        }
+                    }
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decode byte string");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(Self { elements })
+    }
+
     /// Reads a little-endian UTF-16 string from a byte sequence.
     pub fn from_le_bytes(data: &[u8]) -> Self {
         let data_size: usize = data.len();
@@ -174,8 +237,48 @@ impl Utf16String {
 
     /// Creates a new UTF-16 string from a string with case folding applied.
     pub fn from_string_with_case_folding(string: &str, mappings: &Utf16CharacterMappings) -> Self {
-        // TODO: implement
-        todo!();
+        let mut elements: Vec<u16> = Vec::new();
+
+        for character in string.chars() {
+            let mut mapped_code_point: u32 = mappings.get_code_point(&(character as u32));
+
+            if mapped_code_point > 0x0000ffff {
+                mapped_code_point -= 0x00010000;
+                elements.push(0xd800 + (mapped_code_point >> 10) as u16);
+                elements.push(0xdc00 + (mapped_code_point & 0x000003ff) as u16);
+            } else {
+                elements.push(mapped_code_point as u16);
+            }
+        }
+        Self { elements }
+    }
+
+    /// Creates a new UTF-16 string from an `Ucs2String`.
+    pub fn from_ucs2_string(ucs2_string: &Ucs2String) -> Self {
+        Self {
+            elements: ucs2_string.elements.clone(),
+        }
+    }
+
+    /// Creates a new UTF-16 string from an `Ucs2String` with case folding applied.
+    pub fn from_ucs2_string_with_case_folding(
+        ucs2_string: &Ucs2String,
+        mappings: &Utf16CharacterMappings,
+    ) -> Self {
+        let mut elements: Vec<u16> = Vec::new();
+
+        for element in ucs2_string.elements.iter() {
+            let mut mapped_code_point: u32 = mappings.get_code_point(&(*element as u32));
+
+            if mapped_code_point > 0x0000ffff {
+                mapped_code_point -= 0x00010000;
+                elements.push(0xd800 + (mapped_code_point >> 10) as u16);
+                elements.push(0xdc00 + (mapped_code_point & 0x000003ff) as u16);
+            } else {
+                elements.push(mapped_code_point as u16);
+            }
+        }
+        Self { elements }
     }
 
     /// Determines if the UTF-16 string is empty.
@@ -327,6 +430,44 @@ mod tests {
     }
 
     #[test]
+    fn test_from_byte_string() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString = ByteString::from("UTF-16 string");
+        let utf16_string: Utf16String = Utf16String::from_byte_string(&byte_string)?;
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0055, 0x0054, 0x0046, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_byte_string_with_case_folding() -> Result<(), ErrorTrace> {
+        let mappings: Utf16CharacterMappings =
+            Utf16CharacterMappings::from(UNICODE_CASE_MAPPINGS.as_slice());
+
+        let byte_string: ByteString = ByteString::from("UTF-16 string");
+        let utf16_string: Utf16String =
+            Utf16String::from_byte_string_with_case_folding(&byte_string, &mappings)?;
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0075, 0x0074, 0x0066, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_from_le_bytes() {
         let test_data: [u8; 26] = [
             0x55, 0x00, 0x54, 0x00, 0x46, 0x00, 0x2d, 0x00, 0x31, 0x00, 0x36, 0x00, 0x20, 0x00,
@@ -346,6 +487,42 @@ mod tests {
     }
 
     // TODO: add test_from_string_with_case_folding
+
+    #[test]
+    fn test_from_ucs2_string() {
+        let ucs2_string: Ucs2String = Ucs2String::from("UTF-16 string");
+        let utf16_string: Utf16String = Utf16String::from_ucs2_string(&ucs2_string);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0055, 0x0054, 0x0046, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+    }
+
+    #[test]
+    fn test_from_ucs2_string_with_case_folding() {
+        let mappings: Utf16CharacterMappings =
+            Utf16CharacterMappings::from(UNICODE_CASE_MAPPINGS.as_slice());
+
+        let ucs2_string: Ucs2String = Ucs2String::from("UTF-16 string");
+        let utf16_string: Utf16String =
+            Utf16String::from_ucs2_string_with_case_folding(&ucs2_string, &mappings);
+
+        assert_eq!(
+            utf16_string,
+            Utf16String {
+                elements: vec![
+                    0x0075, 0x0074, 0x0066, 0x002d, 0x0031, 0x0036, 0x0020, 0x0073, 0x0074, 0x0072,
+                    0x0069, 0x006e, 0x0067,
+                ],
+            }
+        );
+    }
 
     #[test]
     fn test_is_empty() {

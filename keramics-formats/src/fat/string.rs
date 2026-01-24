@@ -25,13 +25,6 @@ pub enum FatString {
     Ucs2String(Ucs2String),
 }
 
-impl FatString {
-    /// Creates a new string.
-    pub fn new() -> Self {
-        Self::Ucs2String(Ucs2String::new())
-    }
-}
-
 impl From<&str> for FatString {
     /// Converts a [`&str`] into a [`FatString`]
     #[inline(always)]

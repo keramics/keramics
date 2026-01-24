@@ -59,13 +59,17 @@ impl ExtBlockStream {
         let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
         self.block_tree =
             BlockTree::<ExtBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
+
         for block_range in block_ranges.iter() {
-            let logical_offset: u64 = block_range.logical_block_number * (self.block_size as u64);
+            let range_logical_offset: u64 =
+                block_range.logical_block_number * (self.block_size as u64);
             let range_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
-            match self
-                .block_tree
-                .insert_value(logical_offset, range_size, block_range.clone())
-            {
+
+            match self.block_tree.insert_value(
+                range_logical_offset,
+                range_size,
+                block_range.clone(),
+            ) {
                 Ok(_) => {}
                 Err(error) => {
                     return Err(keramics_core::error_trace_new_with_error!(
@@ -73,7 +77,7 @@ impl ExtBlockStream {
                         error
                     ));
                 }
-            };
+            }
         }
         self.data_stream = Some(data_stream.clone());
 

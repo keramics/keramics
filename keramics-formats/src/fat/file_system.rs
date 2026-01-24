@@ -156,23 +156,16 @@ impl FatFileSystem {
         };
         // TODO: cache file entries.
         for path_component in path.components[1..].iter() {
-            let result: Option<FatFileEntry> =
-                match file_entry.get_sub_file_entry_by_name(path_component) {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve sub file entry: {}",
-                                path_component.to_string()
-                            )
-                        );
-                        return Err(error);
-                    }
-                };
-            file_entry = match result {
-                Some(file_entry) => file_entry,
-                None => return Ok(None),
+            file_entry = match file_entry.get_sub_file_entry_by_name(path_component) {
+                Ok(Some(file_entry)) => file_entry,
+                Ok(None) => return Ok(None),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve sub file entry: {}", path_component,)
+                    );
+                    return Err(error);
+                }
             };
         }
         Ok(Some(file_entry))

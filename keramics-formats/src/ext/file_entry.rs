@@ -43,7 +43,7 @@ pub struct ExtFileEntry {
     inode_table: Arc<ExtInodeTable>,
 
     /// The inode number.
-    inode_number: u32,
+    pub(super) inode_number: u32,
 
     /// The inode.
     inode: ExtInode,
@@ -195,17 +195,17 @@ impl ExtFileEntry {
 
     /// Retrieves the symbolic link target.
     pub fn get_symbolic_link_target(&mut self) -> Result<Option<&ByteString>, ErrorTrace> {
-        if self.symbolic_link_target.is_none()
-            && self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_SYMBOLIC_LINK
-        {
+        if self.symbolic_link_target.is_none() && self.is_symbolic_link() {
             if self.inode.data_size > (self.inode_table.block_size as u64) {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid symbolic link target data size: {} value out of bounds",
                     self.inode.data_size,
                 )));
             }
-            let byte_string: ByteString = if self.inode.data_size < 60 {
-                ByteString::from(self.inode.data_reference.as_slice())
+            let mut byte_string: ByteString = ByteString::new_with_encoding(&self.sub_directory_entries.encoding);
+
+            if self.inode.data_size < 60 {
+                byte_string.read_data(self.inode.data_reference.as_slice())
             } else {
                 match self.inode.read_block_ranges(
                     self.inode_table.format_version,
@@ -245,7 +245,7 @@ impl ExtFileEntry {
                         return Err(error);
                     }
                 }
-                ByteString::from(data.as_slice())
+                byte_string.read_data(data.as_slice())
             };
             self.symbolic_link_target = Some(byte_string);
         }
@@ -589,6 +589,11 @@ impl ExtFileEntry {
         self.inode_number == EXT_ROOT_DIRECTORY_IDENTIFIER
     }
 
+    /// Determines if the file entry is a symbolic link.
+    fn is_symbolic_link(&self) -> bool {
+        self.inode.file_mode & 0xf000 == EXT_FILE_MODE_TYPE_SYMBOLIC_LINK
+    }
+
     /// Reads the attributes block.
     fn read_attributes_block(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.file_acl_block_number != 0 {
@@ -686,7 +691,7 @@ mod tests {
         let mut file_system: ExtFileSystem = ExtFileSystem::new();
 
         let test_data_path_string: String = get_test_data_path(path_string);
-        let path_buf: PathBuf = PathBuf::from(&test_data_path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file_system.read_data_stream(&data_stream)?;
 
@@ -899,7 +904,6 @@ mod tests {
             symbolic_link_target,
             Some(ByteString::from("/mnt/keramics/testdir1/testfile1")).as_ref()
         );
-
         Ok(())
     }
 

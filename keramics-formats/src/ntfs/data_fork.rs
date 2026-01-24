@@ -28,7 +28,7 @@ pub struct NtfsDataFork {
 
 impl NtfsDataFork {
     /// Creates a new data fork.
-    pub fn new(
+    pub(super) fn new(
         name: Option<&Ucs2String>,
         data_stream: DataStreamReference,
         base_record_file_reference: u64,

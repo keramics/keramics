@@ -15,7 +15,7 @@ use std::fmt;
 use std::path::{Component, MAIN_SEPARATOR_STR, PathBuf};
 
 use keramics_core::ErrorTrace;
-use keramics_types::{ByteString, Ucs2String};
+use keramics_types::{ByteString, Ucs2String, Utf16String};
 
 use super::path_component::PathComponent;
 
@@ -409,6 +409,49 @@ impl From<&Ucs2String> for Path {
                     }
                     let path_component: PathComponent =
                         PathComponent::Ucs2String(Ucs2String::from(ucs2_string_segment));
+
+                    components.push(path_component);
+                }
+            }
+            components
+        };
+        Self { components }
+    }
+}
+
+impl From<&Utf16String> for Path {
+    /// Converts a [`&Utf16String`] into a [`Path`]
+    fn from(utf16_string: &Utf16String) -> Self {
+        let components: Vec<PathComponent> = if utf16_string.is_empty() {
+            vec![]
+        } else if utf16_string.elements == [0x002f] {
+            vec![PathComponent::Root]
+        } else {
+            let mut components: Vec<PathComponent> = Vec::new();
+
+            for utf16_string_segment in utf16_string.elements.split(|value| *value == 0x002f) {
+                if utf16_string_segment.is_empty() {
+                    if components.is_empty() {
+                        components.push(PathComponent::Root);
+                    }
+                } else if utf16_string_segment == [0x002e] {
+                    if components.is_empty() {
+                        components.push(PathComponent::Current);
+                    }
+                } else if utf16_string_segment == [0x002e, 0x002e] {
+                    match components.last() {
+                        None | Some(PathComponent::Parent) => {
+                            components.push(PathComponent::Parent);
+                        }
+                        Some(PathComponent::Root) => {}
+                        _ => _ = components.pop(),
+                    }
+                } else {
+                    if let Some(PathComponent::Current) = components.last() {
+                        _ = components.pop();
+                    }
+                    let path_component: PathComponent =
+                        PathComponent::Utf16String(Utf16String::from(utf16_string_segment));
 
                     components.push(path_component);
                 }
@@ -1080,7 +1123,8 @@ mod tests {
     // TODO: add tests for from path components slice
     // TODO: add tests for from path components vector
 
-    // TODO: add tests from ucs2 string
+    // TODO: add tests from UCS-2 string
+    // TODO: add tests from UTF-16 string
 
     #[test]
     fn test_to_string() {

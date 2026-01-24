@@ -303,17 +303,23 @@ mod tests {
         assert_eq!(test_struct.access_timestamp, 1735977482);
         assert_eq!(
             test_struct.access_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1735977482)))
+            Some(DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977482
+            }))
         );
         assert_eq!(test_struct.change_timestamp, 1735977481);
         assert_eq!(
             test_struct.change_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1735977481)))
+            Some(DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977481
+            }))
         );
         assert_eq!(test_struct.modification_timestamp, 1735977481);
         assert_eq!(
             test_struct.modification_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1735977481)))
+            Some(DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977481
+            }))
         );
         assert_eq!(test_struct.deletion_time, DateTime::NotSet);
         assert_eq!(test_struct.number_of_links, 1);
@@ -339,17 +345,23 @@ mod tests {
         assert_eq!(test_struct.access_timestamp, 1597862888);
         assert_eq!(
             test_struct.access_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1597862888)))
+            Some(DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1597862888
+            }))
         );
         assert_eq!(test_struct.change_timestamp, 1597862888);
         assert_eq!(
             test_struct.change_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1597862888)))
+            Some(DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1597862888
+            }))
         );
         assert_eq!(test_struct.modification_timestamp, 1597862888);
         assert_eq!(
             test_struct.modification_time,
-            Some(DateTime::PosixTime32(PosixTime32::new(1597862888)))
+            Some(DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1597862888
+            }))
         );
         assert_eq!(test_struct.deletion_time, DateTime::NotSet);
         assert_eq!(test_struct.number_of_links, 1);
@@ -375,23 +387,26 @@ mod tests {
         assert_eq!(test_struct.access_timestamp, 1735977482);
         assert_eq!(
             test_struct.access_time,
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                1735977482, 236516931
-            )))
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns {
+                timestamp: 1735977482,
+                fraction: 236516931
+            }))
         );
         assert_eq!(test_struct.change_timestamp, 1735977482);
         assert_eq!(
             test_struct.change_time,
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                1735977482, 236516931
-            )))
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns {
+                timestamp: 1735977482,
+                fraction: 236516931
+            }))
         );
         assert_eq!(test_struct.modification_timestamp, 1735977482);
         assert_eq!(
             test_struct.modification_time,
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                1735977482, 236516931
-            )))
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns {
+                timestamp: 1735977482,
+                fraction: 236516931
+            }))
         );
         assert_eq!(test_struct.deletion_time, DateTime::NotSet);
         assert_eq!(test_struct.number_of_links, 1);
@@ -401,9 +416,10 @@ mod tests {
         assert_eq!(test_struct.file_acl_block_number, 0);
         assert_eq!(
             test_struct.creation_time,
-            Some(DateTime::PosixTime64Ns(PosixTime64Ns::new(
-                1735977482, 236516931
-            )))
+            Some(DateTime::PosixTime64Ns(PosixTime64Ns {
+                timestamp: 1735977482,
+                fraction: 236516931
+            }))
         );
         assert_eq!(test_struct.checksum, 0x53d5bd9c);
         assert_eq!(test_struct.attributes.len(), 1);

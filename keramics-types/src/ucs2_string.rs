@@ -13,7 +13,6 @@
 
 //! 16-bit Universal Coded Character Set (UCS-2) string.
 
-use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 
@@ -119,7 +118,7 @@ impl Ucs2String {
         Self { elements }
     }
 
-    /// Creates a new UCS-2 string from a byte string.
+    /// Creates a new UCS-2 string from a `ByteString`.
     pub fn from_byte_string(byte_string: &ByteString) -> Result<Self, ErrorTrace> {
         let mut elements: Vec<u16> = Vec::new();
 
@@ -146,7 +145,7 @@ impl Ucs2String {
         Ok(Self { elements })
     }
 
-    /// Creates a new UCS-2 string from a byte string with case folding applied.
+    /// Creates a new UCS-2 string from a `ByteString` with case folding applied.
     pub fn from_byte_string_with_case_folding(
         byte_string: &ByteString,
         mappings: &Ucs2CharacterMappings,
@@ -210,7 +209,7 @@ impl Ucs2String {
         Ok(Self { elements })
     }
 
-    /// Creates a new UCS-2 string from an UTF-16 string.
+    /// Creates a new UCS-2 string from an `Utf16String`.
     pub fn from_utf16_string(utf16_string: &Utf16String) -> Result<Self, ErrorTrace> {
         let code_points: Vec<u32> = match utf16_string.decode() {
             Ok(code_points) => code_points,
@@ -232,7 +231,7 @@ impl Ucs2String {
         Ok(Self { elements })
     }
 
-    /// Creates a new UCS-2 string from an UTF-16 string with case folding applied.
+    /// Creates a new UCS-2 string from an `Utf16String` with case folding applied.
     pub fn from_utf16_string_with_case_folding(
         utf16_string: &Utf16String,
         mappings: &Ucs2CharacterMappings,
@@ -417,8 +416,43 @@ mod tests {
         );
     }
 
-    // TODO: add tests for from_byte_string
-    // TODO: add tests for from_byte_string_with_case_folding
+    #[test]
+    fn test_from_byte_string() -> Result<(), ErrorTrace> {
+        let byte_string: ByteString = ByteString::from("UCS-2 string");
+        let ucs2_string: Ucs2String = Ucs2String::from_byte_string(&byte_string)?;
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_byte_string_with_case_folding() -> Result<(), ErrorTrace> {
+        let mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
+
+        let byte_string: ByteString = ByteString::from("UCS-2 string");
+        let ucs2_string: Ucs2String =
+            Ucs2String::from_byte_string_with_case_folding(&byte_string, &mappings)?;
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0053, 0x0054, 0x0052, 0x0049,
+                    0x004e, 0x0047,
+                ],
+            }
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_from_le_bytes() {
@@ -459,8 +493,43 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for from_utf16_string
-    // TODO: add tests for from_utf16_string_with_case_folding
+    #[test]
+    fn test_from_utf16_string() -> Result<(), ErrorTrace> {
+        let utf16_string: Utf16String = Utf16String::from("UCS-2 string");
+        let ucs2_string: Ucs2String = Ucs2String::from_utf16_string(&utf16_string)?;
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0073, 0x0074, 0x0072, 0x0069,
+                    0x006e, 0x0067,
+                ],
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_from_utf16_string_with_case_folding() -> Result<(), ErrorTrace> {
+        let mappings: Ucs2CharacterMappings =
+            Ucs2CharacterMappings::from(UCS2_CASE_MAPPINGS.as_slice());
+
+        let utf16_string: Utf16String = Utf16String::from("UCS-2 string");
+        let ucs2_string: Ucs2String =
+            Ucs2String::from_utf16_string_with_case_folding(&utf16_string, &mappings)?;
+
+        assert_eq!(
+            ucs2_string,
+            Ucs2String {
+                elements: vec![
+                    0x0055, 0x0043, 0x0053, 0x002d, 0x0032, 0x0020, 0x0053, 0x0054, 0x0052, 0x0049,
+                    0x004e, 0x0047,
+                ],
+            }
+        );
+        Ok(())
+    }
 
     #[test]
     fn test_is_empty() {
