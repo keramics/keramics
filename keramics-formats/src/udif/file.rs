@@ -221,21 +221,25 @@ impl UdifFile {
                             table_index, entry_index,
                         )));
                     }
-                    if block_table_entry.data_offset < file_footer.data_fork_offset
-                        || block_table_entry.data_offset >= data_fork_end_offset
+                    if block_table_entry.entry_type != 0x00000000
+                        && block_table_entry.entry_type != 0x00000002
                     {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unsupported block table: {} entry: {} data offset value out of bounds",
-                            table_index, entry_index,
-                        )));
-                    }
-                    if block_table_entry.data_size
-                        > data_fork_end_offset - block_table_entry.data_offset
-                    {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unsupported block table: {} entry: {} data size value out of bounds",
-                            table_index, entry_index,
-                        )));
+                        if block_table_entry.data_offset < file_footer.data_fork_offset
+                            || block_table_entry.data_offset >= data_fork_end_offset
+                        {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported block table: {} entry: {} data offset value out of bounds",
+                                table_index, entry_index,
+                            )));
+                        }
+                        if block_table_entry.data_size
+                            > data_fork_end_offset - block_table_entry.data_offset
+                        {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported block table: {} entry: {} data size value out of bounds",
+                                table_index, entry_index,
+                            )));
+                        }
                     }
                     let media_size: u64 =
                         block_table_entry.number_of_sectors * self.bytes_per_sector as u64;
