@@ -1,7 +1,7 @@
 # Universal Disk Image Format (UDIF)
 
-The Universal Disk Image Format (UDIF) (.dmg) is one of the disk image formats
-supported natively by Mac OS.
+The Universal Disk Image Format (UDIF) (.dmg) is one of the disk image formats supported natively
+by Mac OS.
 
 ## Overview
 
@@ -27,8 +27,8 @@ An uncompressed UDIF image consist of:
 * data
 * optional file footer
 
-> Note that an uncompressed UDIF image without file footer is equivalent to a
-RAW storage media image (CRawDiskImage).
+> Note that an uncompressed UDIF image without file footer is equivalent to a RAW storage media
+> image (CRawDiskImage).
 
 ### Compressed image format
 
@@ -51,8 +51,7 @@ The number of bytes per sector is 512.
 
 ## File footer
 
-The file footer (also known as resource file or metadata) is 512 bytes in size
-and consists of:
+The file footer (also known as resource file or metadata) is 512 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -293,5 +292,4 @@ TODO: complete section
 
 Is the maximum compressed chunk size 2048 sectors?
 
-Comment seems to reference compressed data but has no size or number of sectors
-value.
+Comment seems to reference compressed data but has no size or number of sectors value.

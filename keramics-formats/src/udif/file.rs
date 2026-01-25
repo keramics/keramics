@@ -110,7 +110,8 @@ impl UdifFile {
             self.has_block_ranges = false;
             self.media_size = file_footer.data_fork_size;
         } else {
-            if file_footer.plist_size == 0 || file_footer.plist_size > 65536 {
+            // Note that 16777216 is an arbitrary chosen limit.
+            if file_footer.plist_size == 0 || file_footer.plist_size > 16777216 {
                 return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
             let mut data: Vec<u8> = vec![0; file_footer.plist_size as usize];
@@ -300,12 +301,11 @@ impl UdifFile {
             self.has_block_ranges = true;
             self.media_size = media_offset;
 
-            let block_tree_data_size: u64 =
-                media_sector.div_ceil(16384) * 16384 * self.bytes_per_sector as u64;
+            let block_tree_data_size: u64 = media_sector * (self.bytes_per_sector as u64);
 
             self.block_tree = BlockTree::<UdifBlockRange>::new(
                 block_tree_data_size,
-                16384,
+                0,
                 self.bytes_per_sector as u64,
             );
             while let Some(block_range) = block_ranges.pop() {
