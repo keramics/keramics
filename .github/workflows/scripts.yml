@@ -22,6 +22,11 @@ jobs:
     - name: Generate test data
       run: |
         ./scripts/generate_fat_test_data_linux.sh
+        ./scripts/generate_gpt_test_data_linux.sh
         ./scripts/generate_iso9660_test_data_linux.sh
+        ./scripts/generate_lvm_test_data_linux.sh
+        ./scripts/generate_luks_test_data_linux.sh
+        ./scripts/generate_mbr_test_data_linux.sh
         ./scripts/generate_ntfs_test_data_linux.sh
+        ./scripts/generate_xfs_test_data_linux.sh
         ./scripts/generate_test_data_linux.sh
