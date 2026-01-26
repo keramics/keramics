@@ -216,8 +216,8 @@ impl PdiImage {
     /// Reads disk parameters from DiskDescriptor.xml.
     fn read_disk_parameters(&mut self, xml_element: &XmlElement) -> Result<(), ErrorTrace> {
         let mut disk_size: u64 = 0;
-        let mut logical_sector_size: u64 = 0;
-        let mut physical_sector_size: u64 = 0;
+        let mut logical_sector_size: u64 = 512;
+        let mut physical_sector_size: u64 = 4096;
 
         for sub_xml_element in xml_element.sub_elements.iter() {
             match sub_xml_element.name.as_str() {
@@ -434,11 +434,10 @@ impl PdiImage {
                 }
             }
         }
-        let mut layer_indexes: HashMap<&Uuid, usize> = HashMap::new();
+        // Note that the snapshots are not necessarily stored in-order.
+        let mut layers: HashMap<&Uuid, PdiImageLayer> = HashMap::new();
 
-        for descriptor_snapshot in self.snapshots.iter().rev() {
-            layer_indexes.insert(&descriptor_snapshot.identifier, self.layers.len());
-
+        for descriptor_snapshot in self.snapshots.iter() {
             let mut image_layer: PdiImageLayer = PdiImageLayer::new(
                 &descriptor_snapshot.identifier,
                 descriptor_snapshot.parent_identifier.as_ref(),
@@ -468,25 +467,62 @@ impl PdiImage {
                     }
                 }
             }
-            if let Some(parent_identifier) = descriptor_snapshot.parent_identifier.as_ref() {
-                match layer_indexes.get(parent_identifier) {
-                    Some(parent_layer_index) => {
-                        match image_layer.set_parent(&self.layers[*parent_layer_index]) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to set parent"
-                                );
-                                return Err(error);
-                            }
-                        }
+            layers.insert(&descriptor_snapshot.identifier, image_layer);
+        }
+        // Determine the order of the layers based on the number of ancestors.
+        let mut layer_chains: Vec<(usize, &Uuid)> = Vec::new();
+
+        for (layer_identifier, mut image_layer) in layers.iter() {
+            let mut number_of_ancestors: usize = 0;
+            let mut parent_identifier: Option<&Uuid> = image_layer.parent_identifier.as_ref();
+
+            while let Some(identifier) = parent_identifier {
+                match layers.get(identifier) {
+                    Some(parent_image_layer) => {
+                        number_of_ancestors += 1;
+                        parent_identifier = parent_image_layer.parent_identifier.as_ref();
                     }
                     None => {
                         return Err(keramics_core::error_trace_new!(format!(
                             "Missing layer: {}",
-                            parent_identifier
+                            identifier
                         )));
+                    }
+                }
+            }
+            layer_chains.push((number_of_ancestors, layer_identifier));
+        }
+        layer_chains.sort();
+
+        // Opens the layers starting from the base layer.
+        let mut layer_indexes: HashMap<&Uuid, usize> = HashMap::new();
+
+        for (_, layer_identifier) in layer_chains.iter() {
+            let mut image_layer: PdiImageLayer = match layers.remove(layer_identifier) {
+                Some(image_layer) => image_layer,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing layer: {}",
+                        layer_identifier
+                    )));
+                }
+            };
+            if let Some(parent_identifier) = image_layer.parent_identifier.as_ref() {
+                let parent_image_layer: &Arc<RwLock<PdiImageLayer>> =
+                    match layer_indexes.get(parent_identifier) {
+                        Some(parent_layer_index) => &self.layers[*parent_layer_index],
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing layer: {}",
+                                parent_identifier
+                            )));
+                        }
+                    };
+                match image_layer.set_parent(parent_image_layer) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to set parent");
+                        return Err(error);
                     }
                 }
             }
@@ -495,11 +531,13 @@ impl PdiImage {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to open layer: {}", descriptor_snapshot.identifier)
+                        format!("Unable to open layer: {}", layer_identifier)
                     );
                     return Err(error);
                 }
             }
+            layer_indexes.insert(layer_identifier, self.layers.len());
+
             self.layers.push(Arc::new(RwLock::new(image_layer)));
         }
         Ok(())

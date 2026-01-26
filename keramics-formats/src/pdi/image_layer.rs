@@ -44,7 +44,7 @@ pub struct PdiImageLayer {
     extent_file_cache: LruCache<u64, PdiExtentFile>,
 
     /// Parent identifier.
-    parent_identifier: Option<Uuid>,
+    pub(super) parent_identifier: Option<Uuid>,
 
     /// Parent layer.
     parent_layer: Option<Arc<RwLock<PdiImageLayer>>>,

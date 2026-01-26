@@ -107,9 +107,9 @@ contains the following values.
 | Heads | Number of heads |
 | Miscellaneous | "Miscellaneous" sub XML element |
 | Name | Name of the disk |
-| LogicSectorSize | Logical sector size |
+| LogicSectorSize | Optional logical sector size, which is 512 bytes by default |
 | Padding | Unknown (padding) |
-| PhysicalSectorSize | Physical sector size |
+| PhysicalSectorSize | Optional physical sector size, which is 4096 bytes by default |
 | Sectors | Number of sectors per cylinder |
 | UID | Unknown (identifier) |
 
