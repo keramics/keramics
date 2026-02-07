@@ -443,7 +443,10 @@ fn main() -> ExitCode {
                 match hash_tool.calculate_hash_from_scan_node(root_scan_node) {
                     Ok(_) => {}
                     Err(error) => {
-                        println!("Unable to calculate hash of: {}\n{}", source, error);
+                        println!(
+                            "Unable to calculate hash of file entry in: {}\n{}",
+                            source, error
+                        );
                         return ExitCode::FAILURE;
                     }
                 };

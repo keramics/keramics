@@ -13,11 +13,13 @@
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
+use keramics_formats::hfs::HfsFork;
 use keramics_formats::ntfs::NtfsDataFork;
 
 /// Virtual File System (VFS) data fork.
 pub enum VfsDataFork {
     DataStream(DataStreamReference),
+    Hfs(HfsFork),
     Ntfs(NtfsDataFork),
 }
 
@@ -26,7 +28,8 @@ impl VfsDataFork {
     pub fn get_data_stream(&self) -> Result<&DataStreamReference, ErrorTrace> {
         match self {
             VfsDataFork::DataStream(data_stream) => Ok(data_stream),
-            VfsDataFork::Ntfs(data_fork) => data_fork.get_data_stream(),
+            VfsDataFork::Hfs(hfs_fork) => hfs_fork.get_data_stream(),
+            VfsDataFork::Ntfs(ntfs_data_fork) => ntfs_data_fork.get_data_stream(),
         }
     }
 
@@ -34,6 +37,7 @@ impl VfsDataFork {
     pub fn get_name(&self) -> Option<PathComponent> {
         match self {
             VfsDataFork::DataStream(_) => None,
+            VfsDataFork::Hfs(_) => None,
             VfsDataFork::Ntfs(data_fork) => match data_fork.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
                 None => None,
@@ -51,6 +55,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
     use keramics_formats::Path;
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
+    use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
     use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
     use keramics_types::Ucs2String;
 
@@ -99,6 +104,57 @@ mod tests {
         let mut ext_file_entry: ExtFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
 
         let data_stream: DataStreamReference = ext_file_entry.get_data_stream()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+
+        let name: Option<PathComponent> = vfs_data_fork.get_name();
+        assert_eq!(name, None);
+
+        Ok(())
+    }
+
+    // Tests with HFS.
+
+    fn get_hfs_file_system(path_string: &str) -> Result<HfsFileSystem, ErrorTrace> {
+        let mut file_system: HfsFileSystem = HfsFileSystem::new();
+
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
+    fn get_hfs_file_entry(path_string: &str) -> Result<HfsFileEntry, ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_hfs_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from(path_string);
+        match hfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let data_stream: DataStreamReference = hfs_file_entry.get_data_stream()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+
+        let _ = vfs_data_fork.get_data_stream()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let data_stream: DataStreamReference = hfs_file_entry.get_data_stream()?.unwrap();
         let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
 
         let name: Option<PathComponent> = vfs_data_fork.get_name();

@@ -35,6 +35,7 @@ pub enum VfsType {
     Fake,
     Fat,
     Gpt,
+    Hfs,
     Mbr,
     Ntfs,
     Os,
@@ -58,6 +59,7 @@ impl fmt::Display for VfsType {
             VfsType::Fake => "FAKE",
             VfsType::Fat => "FAT",
             VfsType::Gpt => "GPT",
+            VfsType::Hfs => "HFS",
             VfsType::Mbr => "MBR",
             VfsType::Ntfs => "NTFS",
             VfsType::Os => "OS",
@@ -103,6 +105,10 @@ mod tests {
         let vfs_type: VfsType = VfsType::Gpt;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "GPT");
+
+        let vfs_type: VfsType = VfsType::Hfs;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "HFS");
 
         let vfs_type: VfsType = VfsType::Mbr;
         let string: String = vfs_type.to_string();

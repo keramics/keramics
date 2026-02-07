@@ -18,6 +18,8 @@ use keramics_datetime::DateTime;
 use keramics_formats::ext::ExtFileEntry;
 use keramics_formats::ext::constants::*;
 use keramics_formats::fat::{FatFileEntry, FatString};
+use keramics_formats::hfs::constants::*;
+use keramics_formats::hfs::{HfsFileEntry, HfsString};
 use keramics_formats::ntfs::NtfsFileEntry;
 use keramics_formats::{Path, PathComponent};
 use keramics_types::Ucs2String;
@@ -51,6 +53,7 @@ pub enum VfsFileEntry {
     Fake(Arc<FakeFileEntry>),
     Fat(FatFileEntry),
     Gpt(GptFileEntry),
+    Hfs(HfsFileEntry),
     Mbr(MbrFileEntry),
     Ntfs(NtfsFileEntry),
     Os(OsFileEntry),
@@ -83,6 +86,7 @@ impl VfsFileEntry {
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_access_time(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_access_time(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_access_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_access_time(),
         }
@@ -106,6 +110,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_change_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_change_time(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_change_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_change_time(),
         }
@@ -129,6 +134,7 @@ impl VfsFileEntry {
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_creation_time(),
+            VfsFileEntry::Hfs(hfs_file_entry) => Some(hfs_file_entry.get_creation_time()),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_creation_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_creation_time(),
         }
@@ -142,6 +148,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Hfs(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
@@ -186,6 +193,10 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_file_mode() as u32),
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_file_mode() {
+                Some(file_mode) => Some(*file_mode as u32),
+                None => None,
+            },
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_mode(),
         }
     }
@@ -196,8 +207,7 @@ impl VfsFileEntry {
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::Ext(ext_file_entry) => {
-                let file_mode: u16 = ext_file_entry.get_file_mode();
-                let file_type: u16 = file_mode & 0xf000;
+                let file_type: u16 = ext_file_entry.get_file_mode() & 0xf000;
                 match file_type {
                     EXT_FILE_MODE_TYPE_FIFO => VfsFileType::NamedPipe,
                     EXT_FILE_MODE_TYPE_CHARACTER_DEVICE => VfsFileType::CharacterDevice,
@@ -218,6 +228,26 @@ impl VfsFileEntry {
                 }
             }
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_file_type(),
+            VfsFileEntry::Hfs(hfs_file_entry) => {
+                match hfs_file_entry.get_file_mode() {
+                    Some(file_mode) => {
+                        let file_type: u16 = *file_mode & 0xf000;
+                        match file_type {
+                            HFS_FILE_MODE_TYPE_FIFO => VfsFileType::NamedPipe,
+                            HFS_FILE_MODE_TYPE_CHARACTER_DEVICE => VfsFileType::CharacterDevice,
+                            HFS_FILE_MODE_TYPE_DIRECTORY => VfsFileType::Directory,
+                            HFS_FILE_MODE_TYPE_BLOCK_DEVICE => VfsFileType::BlockDevice,
+                            HFS_FILE_MODE_TYPE_REGULAR_FILE => VfsFileType::File,
+                            HFS_FILE_MODE_TYPE_SYMBOLIC_LINK => VfsFileType::SymbolicLink,
+                            HFS_FILE_MODE_TYPE_SOCKET => VfsFileType::Socket,
+                            HFS_FILE_MODE_TYPE_WHITEOUT => VfsFileType::Whiteout,
+                            _ => VfsFileType::Unknown(file_type),
+                        }
+                    }
+                    // TODO: determine file type by other means
+                    None => VfsFileType::Unknown(0),
+                }
+            }
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_file_type(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 if ntfs_file_entry.is_symbolic_link() {
@@ -260,6 +290,7 @@ impl VfsFileEntry {
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_modification_time(),
+            VfsFileEntry::Hfs(hfs_file_entry) => Some(hfs_file_entry.get_modification_time()),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_modification_time(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_modification_time(),
         }
@@ -284,6 +315,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_group_identifier()),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_group_identifier().cloned(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_group_identifier(),
         }
     }
@@ -307,6 +339,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_inode_number() as u64),
+            VfsFileEntry::Hfs(hfs_file_entry) => Some(hfs_file_entry.get_identifier() as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_inode_number(),
         }
     }
@@ -331,6 +364,13 @@ impl VfsFileEntry {
                 None => None,
             },
             VfsFileEntry::Gpt(gpt_file_entry) => Some(gpt_file_entry.get_name()),
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_name() {
+                Some(HfsString::ByteString(byte_string)) => Some(PathComponent::from(byte_string)),
+                Some(HfsString::Utf16String(utf16_string)) => {
+                    Some(PathComponent::from(utf16_string))
+                }
+                None => None,
+            },
             VfsFileEntry::Mbr(mbr_file_entry) => Some(mbr_file_entry.get_name()),
             VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
@@ -372,6 +412,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_number_of_links() as u64),
+            VfsFileEntry::Hfs(hfs_file_entry) => Some(hfs_file_entry.get_number_of_links() as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_links(),
         }
     }
@@ -395,6 +436,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_owner_identifier()),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_owner_identifier().cloned(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_owner_identifier(),
         }
     }
@@ -408,6 +450,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_size(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_size(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_size(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_size(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_size(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_size(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_size(),
@@ -448,6 +491,19 @@ impl VfsFileEntry {
                     keramics_core::error_trace_add_frame!(
                         error,
                         "Unable to retrieve ext symbolic link target"
+                    );
+                    Err(error)
+                }
+            },
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_symbolic_link_target() {
+                Ok(result) => match result {
+                    Some(symbolic_link_target) => Ok(Some(Path::from(symbolic_link_target))),
+                    None => Ok(None),
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve HFS symbolic link target"
                     );
                     Err(error)
                 }
@@ -494,9 +550,9 @@ impl VfsFileEntry {
                 EwfFileEntry::Root { .. } => 0,
             },
             VfsFileEntry::Ext(ext_file_entry) => {
-                let file_mode: u16 = ext_file_entry.get_file_mode();
+                let file_type: u16 = ext_file_entry.get_file_mode() & 0xf000;
 
-                if file_mode & 0xf000 != EXT_FILE_MODE_TYPE_REGULAR_FILE {
+                if file_type != EXT_FILE_MODE_TYPE_REGULAR_FILE {
                     0
                 } else {
                     1
@@ -517,6 +573,18 @@ impl VfsFileEntry {
                 GptFileEntry::Partition { .. } => 1,
                 GptFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::Hfs(hfs_file_entry) => {
+                let has_data_fork: bool = hfs_file_entry.has_data_fork();
+                let has_resource_fork: bool = hfs_file_entry.has_resource_fork();
+
+                if has_data_fork && has_resource_fork {
+                    2
+                } else if has_data_fork || has_resource_fork {
+                    1
+                } else {
+                    0
+                }
+            }
             VfsFileEntry::Mbr(mbr_file_entry) => match mbr_file_entry {
                 MbrFileEntry::Partition { .. } => 1,
                 MbrFileEntry::Root { .. } => 0,
@@ -606,15 +674,44 @@ impl VfsFileEntry {
                     None => Ok(None),
                 }
             }
+            VfsFileEntry::Hfs(hfs_file_entry) => {
+                let has_data_fork: bool = hfs_file_entry.has_data_fork();
+                let resource_fork_index: usize = if has_data_fork { 1 } else { 0 };
+
+                if has_data_fork && data_fork_index == 0 {
+                    match hfs_file_entry.get_data_fork()? {
+                        Some(hfs_fork) => Ok(Some(VfsDataFork::Hfs(hfs_fork))),
+                        None => Ok(None),
+                    }
+                } else if hfs_file_entry.has_resource_fork()
+                    && data_fork_index == resource_fork_index
+                {
+                    match hfs_file_entry.get_resource_fork()? {
+                        Some(hfs_fork) => Ok(Some(VfsDataFork::Hfs(hfs_fork))),
+                        None => Ok(None),
+                    }
+                } else {
+                    Err(keramics_core::error_trace_new!(format!(
+                        "Invalid data fork index: {}",
+                        data_fork_index
+                    )))
+                }
+            }
             VfsFileEntry::Ntfs(ntfs_file_entry) => Ok(Some(VfsDataFork::Ntfs(
                 ntfs_file_entry.get_data_fork_by_index(data_fork_index)?,
             ))),
         };
         match result {
-            Ok(Some(data_stream)) => Ok(data_stream),
-            Ok(None) => Err(keramics_core::error_trace_new!("Missing data stream")),
+            Ok(Some(data_fork)) => Ok(data_fork),
+            Ok(None) => Err(keramics_core::error_trace_new!(format!(
+                "Missing data fork: {}",
+                data_fork_index
+            ))),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve data fork: {}", data_fork_index)
+                );
                 Err(error)
             }
         }
@@ -636,6 +733,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_data_stream(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_data_stream(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.get_data_stream(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_data_stream(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.get_data_stream(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_data_stream(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream(),
@@ -671,6 +769,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
+            | VfsFileEntry::Hfs(_)
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
@@ -715,6 +814,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => Ok(0),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_extended_attributes(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_extended_attributes(),
         };
         match result {
             Ok(number_of_extended_attributes) => Ok(number_of_extended_attributes),
@@ -752,6 +852,9 @@ impl VfsFileEntry {
             | VfsFileEntry::Vmdk(_) => Ok(None),
             VfsFileEntry::Ext(ext_file_entry) => Ok(Some(VfsExtendedAttribute::Ext(
                 ext_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
+            VfsFileEntry::Hfs(hfs_file_entry) => Ok(Some(VfsExtendedAttribute::Hfs(
+                hfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
             ))),
         };
         match result {
@@ -803,6 +906,14 @@ impl VfsFileEntry {
                     None => Ok(None),
                 }
             }
+            VfsFileEntry::Hfs(hfs_file_entry) => {
+                match hfs_file_entry.get_extended_attribute_by_name(extended_attribute_name)? {
+                    Some(hfs_extended_attribute) => {
+                        Ok(Some(VfsExtendedAttribute::Hfs(hfs_extended_attribute)))
+                    }
+                    None => Ok(None),
+                }
+            }
         };
         match result {
             Ok(result) => Ok(result),
@@ -838,6 +949,7 @@ impl VfsFileEntry {
             VfsFileEntry::Gpt(gpt_file_entry) => {
                 Ok(gpt_file_entry.get_number_of_sub_file_entries())
             }
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_sub_file_entries(),
             VfsFileEntry::Mbr(mbr_file_entry) => {
                 Ok(mbr_file_entry.get_number_of_sub_file_entries())
             }
@@ -904,6 +1016,9 @@ impl VfsFileEntry {
             VfsFileEntry::Gpt(gpt_file_entry) => Ok(VfsFileEntry::Gpt(
                 gpt_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
+            VfsFileEntry::Hfs(hfs_file_entry) => Ok(VfsFileEntry::Hfs(
+                hfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
             VfsFileEntry::Mbr(mbr_file_entry) => Ok(VfsFileEntry::Mbr(
                 mbr_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
@@ -969,6 +1084,7 @@ impl VfsFileEntry {
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.is_root_file_entry(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
             VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.is_root_file_entry(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.is_root_directory(),
             VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.is_root_file_entry(),
             VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
@@ -994,12 +1110,15 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
-    use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, PosixTime32};
+    use keramics_datetime::{
+        FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, HfsTime, PosixTime32,
+    };
     use keramics_encodings::CharacterEncoding;
     use keramics_formats::ext::ExtFileSystem;
     use keramics_formats::fat::FatFileSystem;
+    use keramics_formats::hfs::HfsFileSystem;
     use keramics_formats::ntfs::NtfsFileSystem;
-    use keramics_types::ByteString;
+    use keramics_types::{ByteString, Utf16String};
 
     use crate::enums::{VfsFileType, VfsType};
     use crate::file_system::VfsFileSystem;
@@ -2905,6 +3024,396 @@ mod tests {
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> =
             sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with HFS.
+
+    fn get_hfs_file_system() -> Result<HfsFileSystem, ErrorTrace> {
+        let mut file_system: HfsFileSystem = HfsFileSystem::new();
+
+        let path_string: String = get_test_data_path("hfs/hfsplus.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
+    fn get_hfs_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_hfs_file_system()?;
+
+        let path: Path = Path::from(path_string);
+        match hfs_file_system.get_file_entry_by_path(&path)? {
+            Some(hfs_file_entry) => Ok(VfsFileEntry::Hfs(hfs_file_entry)),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::HfsTime(HfsTime {
+                timestamp: 3814701237
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::HfsTime(HfsTime {
+                timestamp: 3814701242
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::HfsTime(HfsTime {
+                timestamp: 3814701220
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, Some(0o100644));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, Some(20));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, Some(21));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::HfsTime(HfsTime {
+                timestamp: 3814701220
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(PathComponent::from(Utf16String::from("testfile1")))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, Some(1));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, Some(501));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 9);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/file_symboliclink1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+
+        assert_eq!(
+            link_target,
+            Some(Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::ByteString(ByteString::from("Volumes")),
+                    PathComponent::ByteString(ByteString::from("hfsplus_test")),
+                    PathComponent::ByteString(ByteString::from("testdir1")),
+                    PathComponent::ByteString(ByteString::from("testfile1")),
+                ],
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_hfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+
+        let extended_attribute: VfsExtendedAttribute =
+            vfs_file_entry.get_extended_attribute_by_index(0)?;
+        let expected_name: PathComponent = PathComponent::Utf16String(Utf16String {
+            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(extended_attribute.get_name(), expected_name,);
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+
+        let name: PathComponent = PathComponent::from("myxattr1");
+        let extended_attribute: VfsExtendedAttribute = vfs_file_entry
+            .get_extended_attribute_by_name(&name)?
+            .unwrap();
+        let expected_name: PathComponent = PathComponent::Utf16String(Utf16String {
+            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(extended_attribute.get_name(), expected_name);
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 5);
+
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(PathComponent::from(Utf16String::from("large_xattr")))
+        );
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_hfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(9).next();
         assert!(result.is_none());
 
         Ok(())

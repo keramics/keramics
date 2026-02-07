@@ -47,6 +47,7 @@ pub mod mbr;
 // File system formats
 pub mod ext;
 pub mod fat;
+pub mod hfs;
 pub mod ntfs;
 
 pub use enums::FormatIdentifier;

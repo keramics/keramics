@@ -208,40 +208,53 @@ impl MbrVolumeSystem {
                 }
             }
         }
+        let mut partition_entries: Vec<MbrPartitionEntry> = self.partition_entries.clone();
+        partition_entries.sort_by_key(|partition_entry| partition_entry.start_address_lba);
+
+        let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+        let mut last_end_address_lba: u64 = 0;
+
+        for partition_entry in partition_entries.iter() {
+            if (partition_entry.start_address_lba as u64) < last_end_address_lba {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported overlapping partition entries"
+                ));
+            }
+            let end_address_lba: u64 = (partition_entry.start_address_lba as u64)
+                + (partition_entry.number_of_sectors as u64);
+            if end_address_lba > data_stream_size {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid partition entry size value out of bounds"
+                ));
+            }
+            let end_address_lba: u64 = (partition_entry.start_address_lba as u64)
+                + (partition_entry.number_of_sectors as u64);
+        }
         if self.bytes_per_sector == 0 {
-            match self
-                .partition_entries
-                .iter()
-                .max_by_key(|element| element.start_address_lba)
-            {
-                Some(last_partition_entry) => {
-                    let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+            if let Some(last_partition_entry) = partition_entries.last() {
+                let start_address_lba: u64 = last_partition_entry.start_address_lba as u64;
+                let end_address_lba: u64 =
+                    start_address_lba + (last_partition_entry.number_of_sectors as u64);
 
-                    let start_address_lba: u64 = last_partition_entry.start_address_lba as u64;
-                    let end_address_lba: u64 =
-                        start_address_lba + (last_partition_entry.number_of_sectors as u64);
+                for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter().rev() {
+                    // The partition last LBA should not exceed the data stream size.
+                    if end_address_lba > data_stream_size / (*bytes_per_sector as u64) {
+                        continue;
+                    }
+                    let offset: u64 = start_address_lba * (*bytes_per_sector as u64);
 
-                    for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter().rev() {
-                        // The partition last LBA should not exceed the data stream size.
-                        if end_address_lba > data_stream_size / (*bytes_per_sector as u64) {
-                            continue;
-                        }
-                        let offset: u64 = start_address_lba * (*bytes_per_sector as u64);
+                    keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut boot_signature,
+                        SeekFrom::Start(offset + 510)
+                    );
+                    // Some file systems like FAT and NTFS use the MBR boot signature in their boot sectors.
+                    if &boot_signature == MBR_BOOT_SIGNATURE {
+                        self.bytes_per_sector = *bytes_per_sector;
 
-                        keramics_core::data_stream_read_at_position!(
-                            data_stream,
-                            &mut boot_signature,
-                            SeekFrom::Start(offset + 510)
-                        );
-                        // Some file systems like FAT and NTFS use the MBR boot signature in their boot sectors.
-                        if &boot_signature == MBR_BOOT_SIGNATURE {
-                            self.bytes_per_sector = *bytes_per_sector;
-
-                            break;
-                        }
+                        break;
                     }
                 }
-                None => {}
             }
         }
         self.disk_identity = master_boot_record.disk_identity;

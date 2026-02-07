@@ -22,6 +22,7 @@ use super::enums::FormatIdentifier;
 use super::ewf::constants::*;
 use super::ext::constants::*;
 use super::gpt::constants::*;
+use super::hfs::constants::*;
 use super::mbr::constants::*;
 use super::ntfs::constants::*;
 use super::sparseimage::constants::*;
@@ -135,6 +136,28 @@ impl FormatScanner {
             PatternType::BoundToStart,
             4096,
             GPT_PARTITION_TABLE_SIGNATURE,
+        ));
+    }
+
+    /// Adds Hierarchical File System (HFS) signatures.
+    pub fn add_hfs_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "hfs1",
+            PatternType::BoundToStart,
+            1024,
+            HFS_MASTER_DIRECTORY_BLOCK_SIGNATURE,
+        ));
+        self.signature_scanner.add_signature(Signature::new(
+            "hfs2",
+            PatternType::BoundToStart,
+            1024,
+            HFSPLUS_VOLUME_HEADER_SIGNATURE,
+        ));
+        self.signature_scanner.add_signature(Signature::new(
+            "hfs3",
+            PatternType::BoundToStart,
+            1024,
+            HFSX_VOLUME_HEADER_SIGNATURE,
         ));
     }
 
@@ -349,6 +372,7 @@ impl FormatScanner {
                 "ext1" => FormatIdentifier::Ext,
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
+                "hfs1" | "hfs2" | "hfs3" => FormatIdentifier::Hfs,
                 "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
                 "pdi1" => FormatIdentifier::Pdi,
@@ -384,6 +408,7 @@ mod tests {
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
+        format_scanner.add_hfs_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
@@ -404,6 +429,7 @@ mod tests {
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_gpt_signatures();
+        format_scanner.add_hfs_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();

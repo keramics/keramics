@@ -472,7 +472,7 @@ impl PdiImage {
         // Determine the order of the layers based on the number of ancestors.
         let mut layer_chains: Vec<(usize, &Uuid)> = Vec::new();
 
-        for (layer_identifier, mut image_layer) in layers.iter() {
+        for (layer_identifier, image_layer) in layers.iter() {
             let mut number_of_ancestors: usize = 0;
             let mut parent_identifier: Option<&Uuid> = image_layer.parent_identifier.as_ref();
 

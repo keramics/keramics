@@ -946,7 +946,10 @@ impl ImageTool {
                 format!("{}", ext_file_entry.get_inode_number())
             }
             VfsFileEntry::Fat(fat_file_entry) => {
-                format!("0x{:08x}", fat_file_entry.identifier)
+                format!("0x{:0x}", fat_file_entry.identifier)
+            }
+            VfsFileEntry::Hfs(hfs_file_entry) => {
+                format!("{}", hfs_file_entry.get_identifier())
             }
             VfsFileEntry::Ntfs(ntfs_file_entry) => {
                 // Note that the directory entry file reference can be differrent
@@ -970,6 +973,14 @@ impl ImageTool {
 
                 file_mode_info.to_string()
             }
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_file_mode() {
+                Some(file_mode) => {
+                    let file_mode_info: FileModeInfo = FileModeInfo::new(*file_mode);
+
+                    file_mode_info.to_string()
+                }
+                None => Self::get_file_mode_string_from_file_type(&file_type),
+            },
             VfsFileEntry::Fat(fat_file_entry) => {
                 let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
 
@@ -994,6 +1005,10 @@ impl ImageTool {
 
                 format!("{}", owner_identifier)
             }
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_owner_identifier() {
+                Some(owner_identifier) => format!("{}", owner_identifier),
+                None => String::from(""),
+            },
             _ => String::from(""),
         };
         let group_identifier: String = match file_entry {
@@ -1002,6 +1017,10 @@ impl ImageTool {
 
                 format!("{}", group_identifier)
             }
+            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_group_identifier() {
+                Some(group_identifier) => format!("{}", group_identifier),
+                None => String::from(""),
+            },
             _ => String::from(""),
         };
         let size: u64 = file_entry.get_size();
@@ -1314,7 +1333,7 @@ impl ImageTool {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
             match vfs_scan_node.get_type() {
-                VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {}
+                VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => {}
                 _ => return Ok(()),
             }
             let file_system: VfsFileSystemReference =

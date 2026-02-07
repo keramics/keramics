@@ -515,18 +515,20 @@ impl NtfsInfo {
         } else {
             println!("    Is allocated\t\t\t\t: {}", file_entry.is_allocated());
 
+            let file_reference: u64 = file_entry.get_file_reference();
             println!(
                 "    File reference\t\t\t\t: {}-{}",
-                file_entry.mft_entry_number, file_entry.sequence_number
+                file_reference & 0x0000ffffffffffff,
+                file_reference >> 48,
             );
-            let base_record_file_reference: u64 = file_entry.get_base_record_file_reference();
-            if base_record_file_reference == 0 {
+            let file_reference: u64 = file_entry.get_base_record_file_reference();
+            if file_reference == 0 {
                 println!("    Base record file reference\t\t\t: Not set (0)");
             } else {
                 println!(
                     "    Base record file reference\t\t\t: {}-{}",
-                    base_record_file_reference & 0x0000ffffffffffff,
-                    base_record_file_reference >> 48,
+                    file_reference & 0x0000ffffffffffff,
+                    file_reference >> 48,
                 );
             }
             println!(

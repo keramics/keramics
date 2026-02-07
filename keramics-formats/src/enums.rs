@@ -21,6 +21,7 @@ pub enum FormatIdentifier {
     Ext,
     Fat,
     Gpt,
+    Hfs,
     Mbr,
     Ntfs,
     Pdi,
@@ -43,6 +44,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Ext => "ext",
             FormatIdentifier::Fat => "fat",
             FormatIdentifier::Gpt => "gpt",
+            FormatIdentifier::Hfs => "hfs",
             FormatIdentifier::Mbr => "mbr",
             FormatIdentifier::Ntfs => "ntfs",
             FormatIdentifier::Pdi => "pdi",
@@ -84,6 +86,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Gpt;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "gpt");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::Hfs;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "hfs");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Mbr;
         let string: String = format_identifier.to_string();

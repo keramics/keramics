@@ -56,7 +56,10 @@ pub trait DataStream: Send + Sync {
         let read_count: usize = self.read(buf)?;
 
         if read_count != read_size {
-            return Err(crate::error_trace_new!("Unable to read the exact amount"));
+            return Err(crate::error_trace_new!(format!(
+                "Unable to read the exact amount at offset: {} (0x{:08x})",
+                offset, offset
+            )));
         }
         Ok(offset)
     }

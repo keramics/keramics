@@ -14,10 +14,12 @@
 use keramics_core::DataStreamReference;
 use keramics_formats::PathComponent;
 use keramics_formats::ext::ExtExtendedAttribute;
+use keramics_formats::hfs::{HfsExtendedAttribute, HfsString};
 
 /// Virtual File System (VFS) extended attribute.
 pub enum VfsExtendedAttribute {
     Ext(ExtExtendedAttribute),
+    Hfs(HfsExtendedAttribute),
 }
 
 impl VfsExtendedAttribute {
@@ -27,6 +29,9 @@ impl VfsExtendedAttribute {
             VfsExtendedAttribute::Ext(ext_extended_attribute) => {
                 ext_extended_attribute.get_data_stream()
             }
+            VfsExtendedAttribute::Hfs(hfs_extended_attribute) => {
+                hfs_extended_attribute.get_data_stream()
+            }
         }
     }
 
@@ -35,6 +40,12 @@ impl VfsExtendedAttribute {
         match self {
             VfsExtendedAttribute::Ext(ext_extended_attribute) => {
                 PathComponent::from(ext_extended_attribute.get_name())
+            }
+            VfsExtendedAttribute::Hfs(hfs_extended_attribute) => {
+                match hfs_extended_attribute.get_name() {
+                    HfsString::ByteString(byte_string) => PathComponent::from(byte_string),
+                    HfsString::Utf16String(utf16_string) => PathComponent::from(utf16_string),
+                }
             }
         }
     }
@@ -50,7 +61,8 @@ mod tests {
     use keramics_encodings::CharacterEncoding;
     use keramics_formats::Path;
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
-    use keramics_types::ByteString;
+    use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
+    use keramics_types::{ByteString, Utf16String};
 
     use crate::tests::get_test_data_path;
 
@@ -111,6 +123,65 @@ mod tests {
             ],
         });
         assert_eq!(name, expected_name);
+
+        Ok(())
+    }
+
+    // Tests with HFS.
+
+    fn get_hfs_file_system(path_string: &str) -> Result<HfsFileSystem, ErrorTrace> {
+        let mut file_system: HfsFileSystem = HfsFileSystem::new();
+
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file_system.read_data_stream(&data_stream)?;
+
+        Ok(file_system)
+    }
+
+    fn get_hfs_file_entry(path_string: &str) -> Result<HfsFileEntry, ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_hfs_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from(path_string);
+        match hfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
+        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+
+        let hfs_extended_attribute: HfsExtendedAttribute =
+            hfs_file_entry.get_extended_attribute_by_index(0)?;
+        let vfs_extended_attribute: VfsExtendedAttribute =
+            VfsExtendedAttribute::Hfs(hfs_extended_attribute);
+
+        let _ = vfs_extended_attribute.get_data_stream();
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
+        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+
+        let hfs_extended_attribute: HfsExtendedAttribute =
+            hfs_file_entry.get_extended_attribute_by_index(0)?;
+        let vfs_extended_attribute: VfsExtendedAttribute =
+            VfsExtendedAttribute::Hfs(hfs_extended_attribute);
+
+        let name: PathComponent = vfs_extended_attribute.get_name();
+        let expected_name: PathComponent = PathComponent::Utf16String(Utf16String {
+            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(name, expected_name);
+
         Ok(())
     }
 }

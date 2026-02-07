@@ -143,12 +143,9 @@ impl NtfsFileEntry {
         }
     }
 
-    /// Retrieves the file reference.
+    /// Retrieves the file reference from the $MFT entry.
     pub fn get_file_reference(&self) -> u64 {
-        match &self.directory_entry {
-            Some(directory_entry) => directory_entry.file_reference,
-            None => self.mft_entry_number | ((self.sequence_number as u64) << 48),
-        }
+        self.mft_entry_number | ((self.mft_entry.sequence_number as u64) << 48)
     }
 
     /// Retrieves the journal sequence number.
@@ -169,7 +166,7 @@ impl NtfsFileEntry {
         self.name.as_ref()
     }
 
-    /// Retrieves the parent file reference.
+    /// Retrieves the parent file reference from the ($I30) directory entry.
     pub fn get_parent_file_reference(&self) -> Option<u64> {
         match &self.directory_entry {
             Some(directory_entry) => Some(directory_entry.file_name.parent_file_reference),

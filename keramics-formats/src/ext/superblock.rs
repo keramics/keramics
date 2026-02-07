@@ -39,7 +39,7 @@ use super::constants::*;
         field(name = "last_written_time", data_type = "PosixTime32"),
         field(name = "mount_count", data_type = "u16"),
         field(name = "maximum_mount_count", data_type = "u16"),
-        field(name = "signature", data_type = "[u8; 2]"),
+        field(name = "signature", data_type = "[u8; 2]", format = "hex"),
         field(name = "file_system_state_flags", data_type = "u16", format = "hex"),
         field(name = "error_handling_status", data_type = "u16"),
         field(name = "minor_format_revision", data_type = "u16"),

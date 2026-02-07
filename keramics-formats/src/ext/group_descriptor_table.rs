@@ -71,11 +71,14 @@ impl ExtGroupDescriptorTable {
             if &data[data_offset..data_end_offset] == &empty_group_descriptor {
                 break;
             }
+            // Note that the ExtGroupDescriptor read functions rely on the size of the group descriptor.
             keramics_core::debug_trace_structure!(ExtGroupDescriptor::debug_read_data(
                 self.format_version,
-                &data[data_offset..]
+                &data[data_offset..data_end_offset]
             ));
-            match group_descriptor.read_data(self.format_version, &data[data_offset..]) {
+            match group_descriptor
+                .read_data(self.format_version, &data[data_offset..data_end_offset])
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read group descriptor");

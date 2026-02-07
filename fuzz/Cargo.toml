@@ -73,6 +73,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "hfs"
+path = "fuzz_targets/hfs.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "lzfse"
 path = "fuzz_targets/lzfse.rs"
 test = false

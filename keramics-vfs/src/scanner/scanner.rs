@@ -17,6 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 
 use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::ewf::EwfImage;
+use keramics_formats::fat::FatFileSystem;
 use keramics_formats::gpt::GptVolumeSystem;
 use keramics_formats::mbr::MbrVolumeSystem;
 use keramics_formats::pdi::PdiImage;
@@ -154,6 +155,7 @@ impl VfsScanner {
         }
         self.file_system_scanner.add_ext_signatures();
         self.file_system_scanner.add_fat_signatures();
+        self.file_system_scanner.add_hfs_signatures();
         self.file_system_scanner.add_ntfs_signatures();
         match self.file_system_scanner.build() {
             Ok(_) => {}
@@ -276,7 +278,7 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            VfsType::Ext | VfsType::Fake | VfsType::Fat | VfsType::Ntfs => Err(
+            VfsType::Ext | VfsType::Fake | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => Err(
                 keramics_core::error_trace_new!("Unsupported VFS location type"),
             ),
         }
@@ -307,6 +309,7 @@ impl VfsScanner {
             Some(format_identifier) => match format_identifier {
                 FormatIdentifier::Ext => Ok(Some(VfsType::Ext)),
                 FormatIdentifier::Fat => Ok(Some(VfsType::Fat)),
+                FormatIdentifier::Hfs => Ok(Some(VfsType::Hfs)),
                 FormatIdentifier::Ntfs => Ok(Some(VfsType::Ntfs)),
                 _ => Err(keramics_core::error_trace_new!(
                     "Found unsupported file system format signature"
@@ -473,7 +476,7 @@ impl VfsScanner {
                     }
                 }
             }
-            VfsType::Ext | VfsType::Fat | VfsType::Ntfs => {}
+            VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => {}
             VfsType::Fake => {
                 return Err(keramics_core::error_trace_new!(
                     "Unsupported VFS location type"
@@ -861,7 +864,15 @@ impl VfsScanner {
                         }
                         match scan_results.iter().next() {
                             Some(format_identifier) => match format_identifier {
-                                FormatIdentifier::Mbr => Ok(Some(VfsType::Mbr)),
+                                FormatIdentifier::Mbr => {
+                                    // FAT does not have unique signatures.
+                                    let mut fat_file_system: FatFileSystem = FatFileSystem::new();
+
+                                    match fat_file_system.read_data_stream(data_stream) {
+                                        Ok(_) => Ok(Some(VfsType::Fat)),
+                                        Err(_) => Ok(Some(VfsType::Mbr)),
+                                    }
+                                }
                                 _ => Err(keramics_core::error_trace_new!(
                                     "Found unsupported overlapping volume system format signature"
                                 )),
@@ -1179,6 +1190,36 @@ mod tests {
             .unwrap();
 
         assert_eq!(vfs_type, VfsType::Fat);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_file_system_format_with_hfs() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("hfs/hfs.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_file_system_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::Hfs);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_for_file_system_format_with_hfsplus() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("hfs/hfsplus.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_file_system_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::Hfs);
 
         Ok(())
     }

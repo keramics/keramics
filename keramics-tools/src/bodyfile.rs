@@ -22,6 +22,10 @@ pub struct Bodyfile {}
 impl Bodyfile {
     pub const FILE_HEADER: &'static str = "# extended bodyfile 3 format";
 
+    const POSIX_TIMESTAMP_1601: i64 = -11644473600;
+    const POSIX_TIMESTAMP_1904: i64 = -2082844800;
+    const POSIX_TIMESTAMP_1980: u32 = 315532800;
+
     /// Calculates the MD5 of a data stream.
     pub fn calculate_md5(data_stream: &DataStreamReference) -> Result<String, ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 65536];
@@ -63,18 +67,22 @@ impl Bodyfile {
                 DateTime::FatDate(fat_date) => {
                     let number_of_seconds: u32 = fat_date.get_number_of_seconds();
 
-                    format!("{}", 315532800 + number_of_seconds)
+                    format!("{}", Self::POSIX_TIMESTAMP_1980 + number_of_seconds)
                 }
                 DateTime::FatTimeDate(fat_date_time) => {
                     let number_of_seconds: u32 = fat_date_time.get_number_of_seconds();
 
-                    format!("{}", 315532800 + number_of_seconds)
+                    format!("{}", Self::POSIX_TIMESTAMP_1980 + number_of_seconds)
                 }
                 DateTime::FatTimeDate10Ms(fat_date_time_10ms) => {
                     let (number_of_seconds, fraction): (u32, u32) =
                         fat_date_time_10ms.get_number_of_seconds();
 
-                    format!("{}.{:02}", 315532800 + number_of_seconds, fraction)
+                    format!(
+                        "{}.{:02}",
+                        Self::POSIX_TIMESTAMP_1980 + number_of_seconds,
+                        fraction
+                    )
                 }
                 DateTime::Filetime(filetime) => {
                     let mut number_of_seconds: u64 = filetime.timestamp / 10000000;
@@ -84,9 +92,15 @@ impl Bodyfile {
                         number_of_seconds += 1;
                         fraction = 10000000 - fraction;
                     };
-                    let posix_time: i64 = (number_of_seconds as i64) - 11644473600;
+                    let posix_time: i64 = Self::POSIX_TIMESTAMP_1601 + (number_of_seconds as i64);
 
                     format!("{}.{:07}", posix_time, fraction)
+                }
+                DateTime::HfsTime(hfs_time) => {
+                    format!(
+                        "{}",
+                        Self::POSIX_TIMESTAMP_1904 + (hfs_time.timestamp as i64)
+                    )
                 }
                 DateTime::NotSet => String::from(""),
                 DateTime::PosixTime32(posix_time32) => format!("{}", posix_time32.timestamp),
