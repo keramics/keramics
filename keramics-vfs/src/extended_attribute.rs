@@ -155,7 +155,7 @@ mod tests {
 
     #[test]
     fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
-        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
 
         let hfs_extended_attribute: HfsExtendedAttribute =
             hfs_file_entry.get_extended_attribute_by_index(0)?;
@@ -169,7 +169,7 @@ mod tests {
 
     #[test]
     fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
-        let mut hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
+        let hfs_file_entry: HfsFileEntry = get_hfs_file_entry("/testdir1/xattr1")?;
 
         let hfs_extended_attribute: HfsExtendedAttribute =
             hfs_file_entry.get_extended_attribute_by_index(0)?;

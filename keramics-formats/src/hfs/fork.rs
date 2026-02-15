@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::DataStreamReference;
 
 use super::enums::HfsForkType;
 
@@ -34,7 +34,12 @@ impl HfsFork {
     }
 
     /// Retrieves the data stream.
-    pub fn get_data_stream(&self) -> Result<&DataStreamReference, ErrorTrace> {
-        Ok(&self.data_stream)
+    pub fn get_data_stream(&self) -> &DataStreamReference {
+        &self.data_stream
+    }
+
+    /// Retrieves the fork type.
+    pub fn get_type(&self) -> &HfsForkType {
+        &self.fork_type
     }
 }

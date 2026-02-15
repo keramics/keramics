@@ -42,8 +42,7 @@ impl NtfsWofReparseData {
 
     /// Reads the header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        let data_size = data.len();
-        if data_size != 16 {
+        if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.compression_method = bytes_to_u32_le!(data, 12);

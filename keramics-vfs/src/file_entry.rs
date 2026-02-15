@@ -510,26 +510,17 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_symbolic_link_target()
             {
-                Ok(result) => match result {
-                    Some(name) => {
-                        let path_components: Vec<PathComponent> = name
-                            .elements
-                            .split(|value| *value == 0x005c)
-                            .skip(2) // Strip leading "\\??\\".
-                            .map(|component| PathComponent::Ucs2String(Ucs2String::from(component)))
-                            .collect::<Vec<PathComponent>>();
+                Some(name) => {
+                    let path_components: Vec<PathComponent> = name
+                        .elements
+                        .split(|value| *value == 0x005c)
+                        .skip(2) // Strip leading "\\??\\".
+                        .map(|component| PathComponent::Ucs2String(Ucs2String::from(component)))
+                        .collect::<Vec<PathComponent>>();
 
-                        Ok(Some(Path::from(path_components)))
-                    }
-                    None => Ok(None),
-                },
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve NTFS symbolic link target"
-                    );
-                    Err(error)
+                    Ok(Some(Path::from(path_components)))
                 }
+                None => Ok(None),
             },
             VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_symbolic_link_target() {
                 Some(link_target) => Ok(Some(Path::from(&link_target))),

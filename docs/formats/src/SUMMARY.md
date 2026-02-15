@@ -19,6 +19,7 @@
   * [Master Boot Record (MBR)](mbr.md)
 * [File system formats](file_system.md)
   * [Apple File System (APFS)](apfs.md)
+  * [Apple File System Compression (decmpfs)](decmpfs.md)
   * [Extended File System (ext)](ext.md)
   * [Extensible File Allocation Table (exFAT)](exfat.md)
   * [File Allocation Table (FAT)](fat.md)

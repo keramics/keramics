@@ -40,7 +40,7 @@ pub struct MbrPartitionEntry {
     pub partition_type: u8,
 
     /// The start LBA of the partition.
-    pub start_address_lba: u32,
+    pub start_address_lba: u64,
 
     /// The total number of sectors in the partition.
     pub number_of_sectors: u32,
@@ -65,7 +65,7 @@ impl MbrPartitionEntry {
         }
         self.flags = data[0];
         self.partition_type = data[4];
-        self.start_address_lba = bytes_to_u32_le!(data, 8);
+        self.start_address_lba = bytes_to_u32_le!(data, 8) as u64;
         self.number_of_sectors = bytes_to_u32_le!(data, 12);
 
         Ok(())

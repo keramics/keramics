@@ -762,7 +762,7 @@ The HFS+ and HFSX catalog key is of variable size and consists of:
 | --- | --- | --- | --- |
 | 0 | 2 | | Key data size, in bytes |
 | <td colspan="4">*If key data size >= 4*</td> |
-| 2 | 4 | | Parent identifier, which conatains a CNID |
+| 2 | 4 | | Parent identifier, which contains a CNID |
 | <td colspan="4">*If key data size >= 6*</td> |
 | 6 | 2 | | Number of characters in the name string |
 | 8 | ... | | Name string, which contains an UTF-16 big-endian string without end-of-string character |
@@ -1393,54 +1393,6 @@ The extents attribute record is 72 bytes in size and consists of:
 | 4 | 4 | 0 | Unknown (Reserved) |
 | 8 | 64 | | Attribute [extents record](#hfs_plus_extents_record) |
 
-### Compressed data extended attribute
-
-The compressed extended attribute is named "com.apple.decmpfs" and consists of:
-
-* compressed data header
-* optional compressed data
-
-#### Compressed data header {#compressed_data_header}
-
-The compressed data header is 16 bytes in size and consists of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 4 | "fpmc" | Signature |
-| 4 | 4 | | [Compression method](#compression_methods) |
-| 8 | 8 | | Uncompressed data size |
-
-> Note that the signature is likely stored in little-endian and represents "cmpf".
-
-#### Compression methods {#compression_methods}
-
-| Value | Identifier | Description |
-| --- | --- | --- |
-| 1 | CMP_Type1 | Unknown (uncompressed extended attribute data) |
-| | | |
-| 3 | | ZLIB (DEFLATE) compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
-| 4 | | 64k chunked ZLIB (DEFLATE) compressed resource fork, where the compressed data is stored in the resource fork |
-| 5 | | Unknown (sparse compressed extended attribute data), where the uncompressed data contains 0-byte values |
-| 6 | | Unknown (unused) |
-| 7 | | LZVN compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
-| 8 | | 64k chunked LZVN compressed resource fork, where the compressed data is stored in the resource fork |
-| 9 | | Unknown (uncompressed extended attribute data, different than CMP_Type1) |
-| 10 | | Unknown (64k chunked uncompressed data resource fork), where the compressed data is stored in the resource fork |
-| 11 | | LZFSE compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
-| 12 | | 64k chunked LZFSE compressed resource fork, where the compressed data is stored in the resource fork |
-| | | |
-| 0x80000001 | | Unknown (faulting file) |
-
-<!-- rumdl-disable MD028 -->
-
-> Note that if the ZLIB (DEFLATE) compressed data starts with 0xff the data is stored uncompressed
-> after the first compressed data byte.
-
-> Note that if the LZVN compressed data starts with 0x06 (end of stream oppcode) the data is stored
-> uncompressed after the first compressed data byte.
-
-<!-- rumdl-enable MD028 -->
-
 ## Startup file
 
 The startup file is a file system metadata file intended to hold information needed when
@@ -1837,17 +1789,16 @@ The extents of the file content are stored in the fork descriptor and extents ov
 
 ### Compressed data extended attribute
 
-[Compression method](#compression_methods) should be 3, 5 or 7.
+The file has an attribute record with inline data named "com.apple.decmpfs" with
+[compression method](decmpfs.md#compression_methods) 3, 5 or 7.
 
-The file content size is stored in the compressed data header of a
-"com.apple.decmpfs" extended attribute.
+The file content size is stored in the compressed data header of the extended attribute.
 
-For compression method 3 or 7 the file content data is stored in a
-"com.apple.decmpfs" extended attribute after the [compressed data header](#compressed_data_header).
+For compression method 3 or 7 the file content data is stored in the extended attribute after the
+decmpfs compressed data header.
 
-For compression method 5 the file content data contains 0-byte values. There
-are 12 bytes stored after the [compressed data header](#compressed_data_header)
-that contain:
+For compression method 5 the file content data contains 0-byte values. There are 12 bytes stored
+after the decmpfs compressed data header that consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1857,10 +1808,10 @@ that contain:
 
 ### Compressed data extended attribute with resource fork
 
-[Compression method](#compression_methods) should be 4 or 8.
+The file has an attribute record with inline data named "com.apple.decmpfs" with
+[compression method](decmpfs.md#compression_methods) 4 or 8.
 
-The file content size is stored in the compressed data header of a "com.apple.decmpfs" extended
-attribute.
+The file content size is stored in the compressed data header of the extended attribute.
 
 The file content data is stored in a "com.apple.ResourceFork" extended attribute.
 

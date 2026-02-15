@@ -758,9 +758,6 @@ The file name data (FILE_NAME) is of variable size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-TODO: determine if the allocated file size and file size values contain accurate
-values when the file name data is stored in a MFT attribute.
-
 An MFT attribute can contain multiple file name attributes, e.g. for a separate
 (long) name and short name.
 

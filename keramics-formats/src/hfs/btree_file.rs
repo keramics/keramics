@@ -261,7 +261,6 @@ mod tests {
     fn test_initialize() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let test_data_size: u64 = test_data.len() as u64;
-        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange::new(0, 0, 1)];
         let mut test_struct = HfsBtreeFile::new();

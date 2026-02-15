@@ -946,7 +946,7 @@ impl ImageTool {
                 format!("{}", ext_file_entry.get_inode_number())
             }
             VfsFileEntry::Fat(fat_file_entry) => {
-                format!("0x{:0x}", fat_file_entry.identifier)
+                format!("0x{:0x}", fat_file_entry.get_identifier())
             }
             VfsFileEntry::Hfs(hfs_file_entry) => {
                 format!("{}", hfs_file_entry.get_identifier())

@@ -30,8 +30,8 @@ pub struct MbrVolumeSystem {
     /// Bytes per sector.
     pub bytes_per_sector: u32,
 
-    /// First extended boot record offset.
-    first_extended_boot_record_offset: u64,
+    /// First extended boot record LBA.
+    first_extended_boot_record_lba: u64,
 
     /// Disk identity.
     pub disk_identity: u32,
@@ -48,7 +48,7 @@ impl MbrVolumeSystem {
         Self {
             data_stream: None,
             bytes_per_sector: 0,
-            first_extended_boot_record_offset: 0,
+            first_extended_boot_record_lba: 0,
             disk_identity: 0,
             partition_entries: Vec::new(),
         }
@@ -77,14 +77,11 @@ impl MbrVolumeSystem {
                         "Unsupported bytes per sector: 0"
                     ));
                 }
-                let mut partition_offset: u64 =
-                    (partition_entry.start_address_lba as u64) * (self.bytes_per_sector as u64);
+                let partition_offset: u64 =
+                    partition_entry.start_address_lba * (self.bytes_per_sector as u64);
                 let partition_size: u64 =
                     (partition_entry.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
-                if partition_entry.index >= 4 {
-                    partition_offset += self.first_extended_boot_record_offset;
-                }
                 let mut partition: MbrPartition = MbrPartition::new(
                     partition_entry.index,
                     partition_offset,
@@ -155,7 +152,7 @@ impl MbrVolumeSystem {
                 if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
                     for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
                         let offset: u64 =
-                            (partition_entry.start_address_lba as u64) * (*bytes_per_sector as u64);
+                            partition_entry.start_address_lba * (*bytes_per_sector as u64);
 
                         keramics_core::data_stream_read_at_position!(
                             data_stream,
@@ -172,7 +169,7 @@ impl MbrVolumeSystem {
             }
         }
         let mut entry_index: usize = 0;
-        let mut extended_boot_record_offset: u64 = 0;
+        let mut extended_boot_record_lba: u64 = 0;
 
         while let Some(mut partition_entry) = master_boot_record.partition_entries.pop_front() {
             if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
@@ -181,21 +178,23 @@ impl MbrVolumeSystem {
                         "Unsupported bytes per sector: 0"
                     ));
                 }
-                if extended_boot_record_offset != 0 {
+                if extended_boot_record_lba != 0 {
                     return Err(keramics_core::error_trace_new!(
                         "More than 1 extended partition entry per boot record is not supported"
                     ));
                 }
-                extended_boot_record_offset =
-                    (partition_entry.start_address_lba as u64) * (self.bytes_per_sector as u64);
+                extended_boot_record_lba = partition_entry.start_address_lba;
             } else if partition_entry.partition_type != 0 {
                 partition_entry.index = entry_index;
                 self.partition_entries.push(partition_entry);
             }
             entry_index += 1;
         }
-        if extended_boot_record_offset != 0 {
-            self.first_extended_boot_record_offset = extended_boot_record_offset;
+        if extended_boot_record_lba != 0 {
+            self.first_extended_boot_record_lba = extended_boot_record_lba;
+
+            let extended_boot_record_offset: u64 =
+                extended_boot_record_lba * (self.bytes_per_sector as u64);
 
             match self.read_extended_boot_record(data_stream, extended_boot_record_offset, 4) {
                 Ok(_) => {}
@@ -215,24 +214,24 @@ impl MbrVolumeSystem {
         let mut last_end_address_lba: u64 = 0;
 
         for partition_entry in partition_entries.iter() {
-            if (partition_entry.start_address_lba as u64) < last_end_address_lba {
+            if partition_entry.start_address_lba < last_end_address_lba {
                 return Err(keramics_core::error_trace_new!(
                     "Unsupported overlapping partition entries"
                 ));
             }
-            let end_address_lba: u64 = (partition_entry.start_address_lba as u64)
-                + (partition_entry.number_of_sectors as u64);
-            if end_address_lba > data_stream_size {
+            last_end_address_lba =
+                partition_entry.start_address_lba + (partition_entry.number_of_sectors as u64);
+            let end_offset: u64 = (last_end_address_lba as u64) * (self.bytes_per_sector as u64);
+
+            if end_offset > data_stream_size {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid partition entry size value out of bounds"
                 ));
             }
-            let end_address_lba: u64 = (partition_entry.start_address_lba as u64)
-                + (partition_entry.number_of_sectors as u64);
         }
         if self.bytes_per_sector == 0 {
             if let Some(last_partition_entry) = partition_entries.last() {
-                let start_address_lba: u64 = last_partition_entry.start_address_lba as u64;
+                let start_address_lba: u64 = last_partition_entry.start_address_lba;
                 let end_address_lba: u64 =
                     start_address_lba + (last_partition_entry.number_of_sectors as u64);
 
@@ -302,10 +301,12 @@ impl MbrVolumeSystem {
                         "More than 1 extended partition entry per boot record is not supported"
                     ));
                 }
-                extended_boot_record_offset = self.first_extended_boot_record_offset
-                    + ((partition_entry.start_address_lba as u64) * (self.bytes_per_sector as u64));
+                extended_boot_record_offset = (self.first_extended_boot_record_lba
+                    + partition_entry.start_address_lba)
+                    * (self.bytes_per_sector as u64);
             } else if partition_entry.partition_type != 0 {
                 partition_entry.index = first_entry_index + entry_index;
+                partition_entry.start_address_lba += self.first_extended_boot_record_lba;
                 self.partition_entries.push(partition_entry);
             }
             entry_index += 1;

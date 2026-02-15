@@ -731,6 +731,11 @@ impl HfsCatalogFile {
                 }
                 if key.parent_identifier == identifier {
                     if is_branch {
+                        record_index += 1;
+
+                        last_key = key;
+                        last_record_data = record_data;
+
                         break;
                     }
                     if key.name_size == 0 {

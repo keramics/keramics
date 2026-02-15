@@ -13,7 +13,7 @@
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
-use keramics_formats::hfs::HfsFork;
+use keramics_formats::hfs::{HfsFork, HfsForkType};
 use keramics_formats::ntfs::NtfsDataFork;
 
 /// Virtual File System (VFS) data fork.
@@ -28,7 +28,7 @@ impl VfsDataFork {
     pub fn get_data_stream(&self) -> Result<&DataStreamReference, ErrorTrace> {
         match self {
             VfsDataFork::DataStream(data_stream) => Ok(data_stream),
-            VfsDataFork::Hfs(hfs_fork) => hfs_fork.get_data_stream(),
+            VfsDataFork::Hfs(hfs_fork) => Ok(hfs_fork.get_data_stream()),
             VfsDataFork::Ntfs(ntfs_data_fork) => ntfs_data_fork.get_data_stream(),
         }
     }
@@ -37,7 +37,10 @@ impl VfsDataFork {
     pub fn get_name(&self) -> Option<PathComponent> {
         match self {
             VfsDataFork::DataStream(_) => None,
-            VfsDataFork::Hfs(_) => None,
+            VfsDataFork::Hfs(fork) => match fork.get_type() {
+                HfsForkType::Data => None,
+                HfsForkType::Resource => Some(PathComponent::from("rsrc")),
+            },
             VfsDataFork::Ntfs(data_fork) => match data_fork.get_name() {
                 Some(name) => Some(PathComponent::from(name)),
                 None => None,

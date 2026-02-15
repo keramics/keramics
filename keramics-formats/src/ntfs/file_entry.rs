@@ -186,14 +186,13 @@ impl NtfsFileEntry {
     }
 
     /// Retrieves the symbolic link target.
-    pub fn get_symbolic_link_target(&self) -> Result<Option<&Ucs2String>, ErrorTrace> {
-        let result: Option<&Ucs2String> = match &self.mft_attributes.reparse_point {
+    pub fn get_symbolic_link_target(&self) -> Option<&Ucs2String> {
+        match &self.mft_attributes.reparse_point {
             Some(NtfsReparsePoint::SymbolicLink { reparse_data }) => {
                 Some(&reparse_data.substitute_name)
             }
             _ => None,
-        };
-        Ok(result)
+        }
     }
 
     /// Retrieves the default data stream.
@@ -894,8 +893,7 @@ mod tests {
         let ntfs_file_entry: NtfsFileEntry =
             ntfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let symbolic_link_target: Option<&Ucs2String> =
-            ntfs_file_entry.get_symbolic_link_target()?;
+        let symbolic_link_target: Option<&Ucs2String> = ntfs_file_entry.get_symbolic_link_target();
         assert_eq!(symbolic_link_target, None);
 
         // TODO: test with symbolic link file entry

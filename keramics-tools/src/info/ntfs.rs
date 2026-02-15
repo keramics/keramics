@@ -583,22 +583,21 @@ impl NtfsInfo {
                 return Err(error);
             }
         };
-        let mut file_entry: Option<NtfsFileEntry> =
-            match ntfs_file_system.get_file_entry_by_path(path) {
-                Ok(file_entry) => file_entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                    return Err(error);
-                }
-            };
-        if file_entry.is_none() {
-            return Err(keramics_core::error_trace_new!("Missing file entry"));
-        }
+        let mut file_entry: NtfsFileEntry = match ntfs_file_system.get_file_entry_by_path(path) {
+            Ok(Some(file_entry)) => file_entry,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!("Missing file entry"));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
+            }
+        };
         println!("New Technologies File System (NTFS) file entry information:");
 
         println!("    Path\t\t\t\t\t: {}", path);
 
-        match Self::print_file_entry(file_entry.as_mut().unwrap()) {
+        match Self::print_file_entry(&mut file_entry) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
