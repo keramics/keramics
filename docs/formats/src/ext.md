@@ -857,11 +857,10 @@ According to [The Linux Kernel documentation](https://docs.kernel.org/filesystem
 
 <!-- rumdl-enable MD013 -->
 
-> For backward compatibility with older versions of this feature, the
-> i_mtime/i_generation may store a back-reference to the inode number and
-> i_generation of the one owning inode (in cases where the EA inode is not
-> referenced by multiple inodes) to verify that the EA inode is the correct
-> one being accessed.
+> For backward compatibility with older versions of this feature, the i_mtime/i_generation may
+> store a back-reference to the inode number and i_generation of the one owning inode (in cases
+> where the EA inode is not referenced by multiple inodes) to verify that the EA inode is the
+> correct one being accessed.
 
 ### File mode {#file_mode}
 
@@ -1189,8 +1188,5 @@ accessible.
 
 ## References
 
-<!-- rumdl-disable MD013 -->
-
-* [ext4 Data Structures and Algorithms](https://docs.kernel.org/filesystems/ext4), by the Linux kernel documentation
-
-<!-- rumdl-enable MD013 -->
+* [ext4 Data Structures and Algorithms](https://docs.kernel.org/filesystems/ext4), by the Linux
+  kernel documentation

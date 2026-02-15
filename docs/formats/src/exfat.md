@@ -251,9 +251,6 @@ A directory entry is 32 bytes in size and consists of:
 
 ## References
 
-<!-- rumdl-disable MD013 -->
-
-* [exFAT file system specification](https://learn.microsoft.com/en-gb/windows/win32/fileio/exfat-specification), by Microsoft
+* [exFAT file system specification](https://learn.microsoft.com/en-gb/windows/win32/fileio/exfat-specification),
+  by Microsoft
 * [exFAT](https://en.wikipedia.org/wiki/ExFAT), by Wikipedia
-
-<!-- rumdl-enable MD013 -->

@@ -741,8 +741,5 @@ very expensive process IO-wise.
 
 ## References
 
-<!-- rumdl-disable MD013 -->
-
-* [Virtual Disk Format 5.0](https://web.archive.org/web/20120302211605/http://www.vmware.com/support/developer/vddk/vmdk_50_technote.pdf), by VMWare
-
-<!-- rumdl-enable MD013 -->
+* [Virtual Disk Format 5.0](https://web.archive.org/web/20120302211605/http://www.vmware.com/support/developer/vddk/vmdk_50_technote.pdf),
+  by VMWare

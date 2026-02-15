@@ -22,7 +22,7 @@ The decmpfs extended attribute consists of:
 * decmpfs header
 * optional compressed data
 
-#### decmpfs header
+### decmpfs header
 
 The decmpfs header is 16 bytes in size and consists of:
 
