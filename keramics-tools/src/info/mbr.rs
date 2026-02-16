@@ -128,13 +128,26 @@ impl MbrInfo {
 
     /// Prints information about a volume system.
     pub fn print_volume_system(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let mbr_volume_system: MbrVolumeSystem = match Self::open_volume_system(data_stream) {
+        let mut mbr_volume_system: MbrVolumeSystem = match Self::open_volume_system(data_stream) {
             Ok(mbr_volume_system) => mbr_volume_system,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open volume system");
                 return Err(error);
             }
         };
+        if mbr_volume_system.bytes_per_sector == 0 {
+            // TODO: allow to specify bytes per sector as an argument
+            match mbr_volume_system.set_bytes_per_sector(512) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to set bytes per sector to 512"
+                    );
+                    return Err(error);
+                }
+            }
+        }
         println!("Master Boot Record (MBR) information:");
 
         println!(

@@ -245,7 +245,7 @@ fn main() -> ExitCode {
             println!("Unable to open file with error:\n{}", error);
             return ExitCode::FAILURE;
         }
-    };
+    }
     let data_stream: DataStreamReference = Arc::new(RwLock::new(file_range_stream));
 
     let result: Option<FormatIdentifier> = match InfoTool::scan_for_formats(&data_stream) {

@@ -102,7 +102,10 @@ impl Signature {
 impl PartialEq for Signature {
     /// Determines if the signature is equivalent to another signature.
     fn eq(&self, other: &Signature) -> bool {
-        self.pattern == other.pattern
+        self.pattern_offset == other.pattern_offset
+            && self.pattern_size == other.pattern_size
+            && self.pattern_type == other.pattern_type
+            && self.pattern == other.pattern
     }
 }
 
