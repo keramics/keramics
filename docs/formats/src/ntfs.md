@@ -371,9 +371,13 @@ and XP.
 
 ##### Sequence number
 
+<!-- rumdl-disable MD013 -->
+
 According to [FILE_RECORD_SEGMENT_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/file-record-segment-header)
-the sequence number is incremented each time that a file record segment is
-freed; it is 0 if the segment is not used.
+the sequence number is incremented each time that a file record segment is freed; it is 0 if the
+segment is not used.
+
+<!-- rumdl-enable MD013 -->
 
 ##### Base record file reference
 
@@ -398,22 +402,22 @@ The fix-up values are of variable size and consists of:
 | 0 | 2 | | Fix-up placeholder value |
 | 2 | 2 x number of fix-up values | | Fix-up (original) value array |
 
-On disk the last 2 bytes for each 512 byte block is replaced by the fix-up
-placeholder value. The original value is stored in the corresponding fix-up
-(original) value array entry.
+On disk the last 2 bytes for each 512 byte block is replaced by the fix-up placeholder value. The
+original value is stored in the corresponding fix-up (original) value array entry.
 
-> Note that there can be more fix-up values than the number of 512 byte blocks
-> in the data.
+> Note that there can be more fix-up values than the number of 512 byte blocks in the data.
+
+<!-- rumdl-disable MD013 -->
 
 According to [MULTI_SECTOR_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/multi-sector-header)
-the update sequence array must end before the last USHORT value in the first
-sector. It also states that the update sequence array size value contains the
-number of bytes, but based on analysis of data samples it seems to be more
-likely to the number of words.
+the update sequence array must end before the last USHORT value in the first sector. It also states
+that the update sequence array size value contains the number of bytes, but based on analysis of
+data samples it seems to be more likely to the number of words.
 
-In NT4 (version 1.2) the MFT entry is 42 bytes in size and the fix-up values
-are stored at offset 42. This is likely where the name wfixupPattern originates
-from.
+<!-- rumdl-enable MD013 -->
+
+In NT4 (version 1.2) the MFT entry is 42 bytes in size and the fix-up values are stored at
+offset 42. This is likely where the name wfixupPattern originates from.
 
 TODO: provide examples on applying the fix-up values.
 
@@ -1219,7 +1223,11 @@ Also see [the security descriptor hash index value](#security_descriptor_hash_in
 The MFT attribute name of the security descriptor identifier index is: $SII.
 It appears to only to be used by the $Secure metadata file.
 
+<!-- rumdl-disable MD013 -->
+
 Also see [the security descriptor identifier index value](#security_descriptor_identifier_index_value).
+
+<!-- rumdl-enable MD013 -->
 
 ## Compression {#compression}
 
@@ -1821,8 +1829,12 @@ The Zone.Identifier alternate data stream contains ASCII text in the form:
 ZoneId=3
 ```
 
+<!-- rumdl-disable MD013 -->
+
 Where ZoneId refers to the [Internet Explorer URL security zone](https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/ms537183(v=vs.85))
 of the origin.
+
+<!-- rumdl-enable MD013 -->
 
 ## Transactional NTFS (TxF) {#transactional_ntfs}
 
@@ -2264,6 +2276,8 @@ TODO: verify behavior of Windows NTFS implementation.
 
 ## References
 
+<!-- rumdl-disable MD013 -->
+
 * [How NTFS Works](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc781134(v=ws.10)), by Microsoft
 * [Master File Table](https://learn.microsoft.com/en-us/windows/win32/devnotes/master-file-table), by Microsoft
 * [NTFS Attribute Types](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/a82e9105-2405-4e37-b2c3-28c773902d85), by Microsoft
@@ -2280,3 +2294,5 @@ TODO: verify behavior of Windows NTFS implementation.
 * [Zone.Identifier Stream Name](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/6e3f7352-d11c-4d76-8c39-2516a9df36e8), by Microsoft
 * [the Internet Explorer URL security zone](https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/ms537183(v=vs.85)), by Microsoft
 * [ntfs_layout.h](https://ultradefrag.net/doc/man/ntfs/ntfs_layout.h.html), by Anton Altaparmakov
+
+<!-- rumdl-enable MD013 -->
