@@ -1954,6 +1954,10 @@ A HFSX volume cannot be wrapped in a HFS volume.
 
 ## References
 
+<!-- rumdl-disable MD013 -->
+
 * [hfs_format.h](https://github.com/apple-oss-distributions/hfs/blob/main/core/hfs_format.h)
 * [Data Organization on Volumes](https://developer.apple.com/library/archive/documentation/mac/Files/Files-99.html), by Apple Inc.
 * [Technical Note TN1150: HFS plus volume format](https://developer.apple.com/library/archive/technotes/tn/tn1150.html), by Apple Inc.
+
+<!-- rumdl-enable MD013 -->

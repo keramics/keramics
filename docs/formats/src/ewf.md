@@ -193,8 +193,12 @@ Some sections contain additional data, refer to paragraph section types for more
 
 ### Section types
 
+<!-- rumdl-disable MD013 -->
+
 There are multiple section types. [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
 defines the following:
+
+<!-- rumdl-enable MD013 -->
 
 * Header section
 * Volume section
@@ -259,7 +263,8 @@ information as the [header section](#header_section).
 
 The end of line character(s) is a newline (0x0a).
 
-> Note this end of line character differs from the one used in the [header section](#header_section).
+> Note this end of line character differs from the one used in the
+> [header section](#header_section).
 
 The 3rd and the 4th line consist of the following tab (0x09) separated values.
 
@@ -873,7 +878,11 @@ In the next paragraphs the various versions of the volume section are described.
 
 #### EWF specification
 
+<!-- rumdl-disable MD013 -->
+
 The specification according to [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
+
+<!-- rumdl-enable MD013 -->
 
 The volume section data is 94 bytes in size and consists of:
 
@@ -2448,5 +2457,9 @@ TODO: link to format definition
 
 ## References
 
+<!-- rumdl-disable MD013 -->
+
 * [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html)
 * [RFC4122 - A Universally Unique Identifier (UUID) URN Namespace](http://www.ietf.org/rfc/rfc4122.txt)
+
+<!-- rumdl-enable MD013 -->

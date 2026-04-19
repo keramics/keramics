@@ -25,6 +25,6 @@ jobs:
     steps:
     - uses: actions/checkout@v5
     - name: Install rumdl
-      run: cargo install rumdl
+      run: cargo install --locked rumdl
     - name: Check format of Markdown documents
       run: rumdl check

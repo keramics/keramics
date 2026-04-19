@@ -25,10 +25,12 @@ use pulldown_cmark_to_cmark::cmark;
 struct TablesPreprocessor {}
 
 impl TablesPreprocessor {
+    /// Creates a new mdBook preprocessor.
     fn new() -> Self {
         Self {}
     }
 
+    /// Preprocess Markdown tables.
     fn preprocess_tables(&self, chapter: &mut Chapter) -> Result<String, Error> {
         let mut options: Options = Options::empty();
         options.insert(Options::ENABLE_TABLES);
@@ -80,9 +82,10 @@ impl TablesPreprocessor {
                     in_colspan = false;
                 }
                 Event::Start(Tag::Table(_)) => {
-                    table_html = Vec::new();
-                    table_html.push("<div class=\"table-wrapper\">".to_string());
-                    table_html.push("<table>".to_string());
+                    table_html = vec![
+                        "<div class=\"table-wrapper\">".to_string(),
+                        "<table>".to_string(),
+                    ];
 
                     in_table = true;
 
@@ -124,7 +127,7 @@ impl TablesPreprocessor {
                     continue;
                 }
                 _ => {}
-            };
+            }
             if in_table {
                 let mut html_string: String = String::new();
 
@@ -182,10 +185,85 @@ fn main() -> ExitCode {
         }
         None => {}
     }
-
     if let Err(error) = handle_preprocessing() {
         eprintln!("{}", error);
         return ExitCode::FAILURE;
     }
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_preprocess_tables() {
+        let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
+
+        let mut chapter: Chapter = Chapter::new("test", String::new(), "empty.md", vec![]);
+
+        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+
+        assert_eq!(result, "");
+
+        let content: &str = "### Characteristics\n\n";
+        let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
+
+        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+
+        assert_eq!(result, "### Characteristics");
+
+        let content: &str = concat!(
+            "### Characteristics\n",
+            "\n",
+            "| Characteristics | Description |\n",
+            "| --- | --- |\n",
+            "| Byte order | big-endian |\n",
+            "| Date and time values | N/A |\n",
+            "| Character strings | ASCII |\n"
+        );
+        let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
+
+        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+
+        let expected_result: &str = concat!(
+            "### Characteristics  \n",
+            "<div class=\"table-wrapper\"><table>",
+            "<thead><th>Characteristics</th><th>Description</th></thead>",
+            "<tr><td>Byte order</td><td>big-endian</td></tr>\n",
+            "<tr><td>Date and time values</td><td>N/A</td></tr>\n",
+            "<tr><td>Character strings</td><td>ASCII</td></tr>\n",
+            "</table></div>"
+        );
+        assert_eq!(result, expected_result);
+    }
+
+    #[test]
+    fn test_preprocess_tables_with_colspan() {
+        let preprocessor: TablesPreprocessor = TablesPreprocessor::new();
+
+        let content: &str = concat!(
+            "| Value | Description |\n",
+            "| --- | --- |\n",
+            "| <td colspan=\"4\">*Critical and primary*</td> |\n",
+            "| 0x81 | Allocation bitmap |\n",
+            "| 0x82 | Case folding mappings |\n",
+            "| 0x83 | Volume label |\n"
+        );
+        let mut chapter: Chapter = Chapter::new("test", content.to_string(), "test.md", vec![]);
+
+        let result: String = preprocessor.preprocess_tables(&mut chapter).unwrap();
+
+        let expected_result: &str = concat!(
+            "  \n",
+            "<div class=\"table-wrapper\"><table>",
+            "<thead><th>Value</th><th>Description</th></thead>",
+            "<tr><td colspan=\"4\"><em>Critical and primary</em></td></tr>\n",
+            "<tr><td>0x81</td><td>Allocation bitmap</td></tr>\n",
+            "<tr><td>0x82</td><td>Case folding mappings</td></tr>\n",
+            "<tr><td>0x83</td><td>Volume label</td></tr>\n",
+            "</table></div>"
+        );
+        assert_eq!(result, expected_result);
+    }
 }

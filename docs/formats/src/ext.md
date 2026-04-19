@@ -851,7 +851,11 @@ extra_precision_timestamp = (extra_epoch_value * 0x100000000) + timestamp
 It has been observed that when EXT4_EA_INODE_FL is set the (last) modification
 time can contain a valid timestamp.
 
+<!-- rumdl-disable MD013 -->
+
 According to [The Linux Kernel documentation](https://docs.kernel.org/filesystems/ext4/overview.html#large-extended-attribute-values)
+
+<!-- rumdl-enable MD013 -->
 
 > For backward compatibility with older versions of this feature, the
 > i_mtime/i_generation may store a back-reference to the inode number and
@@ -1185,4 +1189,8 @@ accessible.
 
 ## References
 
+<!-- rumdl-disable MD013 -->
+
 * [ext4 Data Structures and Algorithms](https://docs.kernel.org/filesystems/ext4), by the Linux kernel documentation
+
+<!-- rumdl-enable MD013 -->

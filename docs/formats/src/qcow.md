@@ -562,5 +562,9 @@ TODO: complete section
 
 ## References
 
+<!-- rumdl-disable MD013 -->
+
 * [The QCOW Image Format](https://web.archive.org/web/20201006212750/https://people.gnome.org/~markmc/qcow-image-format-version-1.html), by Mark McLoughlin
 * [The QCOW2 Image Format](https://web.archive.org/web/20121004073848/http://people.gnome.org/~markmc/qcow-image-format.html), by Mark McLoughlin
+
+<!-- rumdl-enable MD013 -->
