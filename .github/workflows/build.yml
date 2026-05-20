@@ -1,6 +1,8 @@
 # Build from source.
 name: build
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
 permissions: read-all
 env:
   CARGO_TERM_COLOR: always
@@ -17,7 +19,7 @@ jobs:
           build-args: ""
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Build
       run: cargo build --verbose ${{ matrix.build-args }}
     - name: Run tests
