@@ -1,6 +1,8 @@
 # Generate code coverage report and upload to Codecov.
 name: coverage
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
 permissions: read-all
 env:
   CARGO_TERM_COLOR: always
@@ -8,12 +10,12 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Install Python dependencies
       run: |
         sudo add-apt-repository universe
         sudo apt-get update
-        sudo apt-get install -y python3 python3-dev python3-venv python3-maturin python3-pip tox
+        sudo apt-get install -y curl python3 python3-dev python3-venv python3-maturin python3-pip tox
     - name: Install cargo-llvm-cov
       uses: taiki-e/install-action@cargo-llvm-cov
     - name: Install pytest and pytest-cov
@@ -31,7 +33,7 @@ jobs:
         pytest --cov=pykeramics --cov-report=xml
         cargo llvm-cov report --lcov --output-path coverage.lcov
     - name: Upload code coverage report to Codecov
-      uses: codecov/codecov-action@v5
+      uses: codecov/codecov-action@v6
       with:
         files: coverage.lcov,coverage.xml
         token: ${{ secrets.CODECOV_TOKEN }}

@@ -1,23 +1,19 @@
 # Checks scripts.
 name: scripts
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
 permissions: read-all
 env:
   CARGO_TERM_COLOR: always
 jobs:
-  generate_test_data_macos:
-    runs-on: macos-latest
-    steps:
-    - uses: actions/checkout@v5
-    - name: Generate test data
-      run: ./scripts/generate_test_data_macos.sh
   generate_test_data_linux:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Install dependencies
       run: |
-        sudo apt-get update &&
+        sudo apt-get update
         sudo apt-get install -y attr genisoimage hfsprogs hfsutils qemu-utils
     - name: Generate test data
       run: |
@@ -31,3 +27,9 @@ jobs:
         ./scripts/generate_ntfs_test_data_linux.sh
         ./scripts/generate_xfs_test_data_linux.sh
         ./scripts/generate_test_data_linux.sh
+  generate_test_data_macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v6
+    - name: Generate test data
+      run: ./scripts/generate_test_data_macos.sh

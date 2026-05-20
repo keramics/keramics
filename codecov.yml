@@ -11,6 +11,7 @@ coverage:
     project: true
 
 ignore:
+- "fuzz/"
 - "tests/"
 - "**/*test*.rs"
 
