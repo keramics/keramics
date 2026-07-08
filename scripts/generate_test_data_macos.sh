@@ -155,11 +155,10 @@ hdiutil create -fs 'HFS+' -layout 'SPUD' -size ${IMAGE_SIZE} -type UDIF -volname
 hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
+
+# Unmount the file system first, then sleep to prevent "resource busy" warning.
 diskutil unmount "/Volumes/hfsplus_test"
-
-# Sleep to prevent "resource busy" warning.
 sleep 5
-
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse image with a HFS+ file system
@@ -176,11 +175,10 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSE -volname hfsplus_test
 hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
+
+# Unmount the file system first, then sleep to prevent "resource busy" warning.
 diskutil unmount "/Volumes/hfsplus_test"
-
-# Sleep to prevent "resource busy" warning.
 sleep 5
-
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse bundle with a HFS+ file system
@@ -197,11 +195,10 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplu
 hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
+
+# Unmount the file system first, then sleep to prevent "resource busy" warning.
 diskutil unmount "/Volumes/hfsplus_test"
-
-# Sleep to prevent "resource busy" warning.
 sleep 5
-
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a raw image with a HFS+ file system
@@ -218,7 +215,6 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test $
 hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
-diskutil unmount "/Volumes/hfsplus_test"
 
 # Create an ADC compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_adc"
@@ -260,9 +256,9 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
-# Sleep to prevent "resource busy" warning.
+# Unmount the file system first, then sleep to prevent "resource busy" warning.
+diskutil unmount "/Volumes/hfsplus_test"
 sleep 5
-
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 exit ${EXIT_SUCCESS}
