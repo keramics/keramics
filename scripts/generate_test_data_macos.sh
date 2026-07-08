@@ -131,19 +131,19 @@ create_file_entries()
 
 detach_dmg()
 {
-	local DEVICE=$1
+	DMG_DEVICE=$1
 
 	sync
 
 	for ((attempt=1; attempt<=5; attempt++))
        	do
-		hdiutil detach "${DEVICE}" -force 2>/dev/null
+		hdiutil detach "${DMG_DEVICE}" -force 2>/dev/null
 
 		if test $? -eq 0
 		then
 			break
 		fi
-		echo "${DEVICE} busy, waiting 10 seconds."
+		echo "${DMG_DEVICE} busy, waiting 10 seconds."
 		sleep 10
 	done
 }
@@ -175,7 +175,7 @@ hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse image with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -192,7 +192,7 @@ hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse bundle with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -209,7 +209,7 @@ hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 # Create a raw image with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -266,6 +266,6 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
-detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 exit ${EXIT_SUCCESS}
