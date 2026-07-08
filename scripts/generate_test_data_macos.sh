@@ -159,6 +159,7 @@ create_file_entries "/Volumes/hfsplus_test"
 # Sleep to prevent "resource busy" warning.
 sleep 3
 
+diskutil unmount "/Volumes/hfsplus_test"
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse image with a HFS+ file system
@@ -179,6 +180,7 @@ create_file_entries "/Volumes/hfsplus_test"
 # Sleep to prevent "resource busy" warning.
 sleep 3
 
+diskutil unmount "/Volumes/hfsplus_test"
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse bundle with a HFS+ file system
@@ -199,6 +201,7 @@ create_file_entries "/Volumes/hfsplus_test"
 # Sleep to prevent "resource busy" warning.
 sleep 3
 
+diskutil unmount "/Volumes/hfsplus_test"
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a raw image with a HFS+ file system
@@ -259,6 +262,7 @@ hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 # Sleep to prevent "resource busy" warning.
 sleep 3
 
+diskutil unmount "/Volumes/hfsplus_test"
 hdiutil detach disk${VOLUME_DEVICE_NUMBER}
 
 exit ${EXIT_SUCCESS}
