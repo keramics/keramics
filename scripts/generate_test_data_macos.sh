@@ -152,7 +152,7 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -fs 'HFS+' -layout 'SPUD' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.dmg
+hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
@@ -172,7 +172,7 @@ rm -f ${IMAGE_FILE}.sparseimage
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSE -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.sparseimage
+hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
@@ -192,7 +192,7 @@ rm -rf ${IMAGE_FILE}.sparsebundle
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.sparsebundle
+hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
@@ -212,7 +212,7 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.dmg
+hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
