@@ -129,6 +129,25 @@ create_file_entries()
 	mkfifo ${MOUNT_POINT}/testdir1/pipe1
 }
 
+detach_dmg()
+{
+	local DEVICE=$1
+
+	sync
+
+	for ((attempt=1; attempt<=5; attempt++))
+       	do
+		hdiutil detach "${DEVICE}" -force 2>/dev/null
+
+		if test $? -eq 0
+		then
+			break
+		fi
+		echo "${DEVICE} busy, waiting 10 seconds."
+		sleep 10
+	done
+}
+
 assert_availability_binary diskutil
 assert_availability_binary hdiutil
 assert_availability_binary mkfifo
@@ -156,11 +175,7 @@ hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-# Unmount the file system first, then sleep to prevent "resource busy" warning.
-sync
-diskutil unmount "/Volumes/hfsplus_test"
-sleep 5
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse image with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -177,11 +192,7 @@ hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-# Unmount the file system first, then sleep to prevent "resource busy" warning.
-sync
-diskutil unmount "/Volumes/hfsplus_test"
-sleep 5
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse bundle with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -198,11 +209,7 @@ hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-# Unmount the file system first, then sleep to prevent "resource busy" warning.
-sync
-diskutil unmount "/Volumes/hfsplus_test"
-sleep 5
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
 
 # Create a raw image with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -259,10 +266,6 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
-# Unmount the file system first, then sleep to prevent "resource busy" warning.
-sync
-diskutil unmount "/Volumes/hfsplus_test"
-sleep 5
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg detach disk${VOLUME_DEVICE_NUMBER}
 
 exit ${EXIT_SUCCESS}
