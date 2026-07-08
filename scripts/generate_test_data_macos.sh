@@ -156,6 +156,8 @@ hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
+sync
+
 # Sleep to prevent "resource busy" warning.
 sleep 3
 
@@ -176,6 +178,8 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSE -volname hfsplus_test
 hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
+
+sync
 
 # Sleep to prevent "resource busy" warning.
 sleep 3
@@ -198,6 +202,8 @@ hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
+sync
+
 # Sleep to prevent "resource busy" warning.
 sleep 3
 
@@ -218,6 +224,8 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test $
 hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
+
+sync
 
 # Create an ADC compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_adc"
