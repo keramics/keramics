@@ -133,6 +133,8 @@ detach_dmg()
 {
 	DMG_DEVICE=$1
 
+	set +e
+
 	sync
 
 	for ((attempt=1; attempt<=5; attempt++))
@@ -146,6 +148,8 @@ detach_dmg()
 		echo "${DMG_DEVICE} busy, waiting 10 seconds."
 		sleep 10
 	done
+
+	set -e
 }
 
 assert_availability_binary diskutil
