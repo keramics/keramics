@@ -40,10 +40,9 @@ impl HfsBlockRanges {
     pub fn read_extents(
         &mut self,
         data_area_block_number: u16,
+        logical_block_number: &mut u32,
         extents: &Vec<HfsExtentDescriptor>,
     ) -> Result<(), ErrorTrace> {
-        let mut logical_block_number: u32 = 0;
-
         for extent_descriptor in extents.iter() {
             if extent_descriptor.block_number > u32::MAX - (data_area_block_number as u32) {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -51,7 +50,7 @@ impl HfsBlockRanges {
                     extent_descriptor.block_number
                 )));
             }
-            if extent_descriptor.number_of_blocks > u32::MAX - logical_block_number {
+            if extent_descriptor.number_of_blocks > u32::MAX - *logical_block_number {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid number of blocks: {} value out of bounds",
                     extent_descriptor.number_of_blocks
@@ -61,15 +60,15 @@ impl HfsBlockRanges {
                 (data_area_block_number as u32) + extent_descriptor.block_number;
 
             let block_range: HfsBlockRange = HfsBlockRange::new(
-                logical_block_number,
+                *logical_block_number,
                 physical_block_number,
                 extent_descriptor.number_of_blocks,
             );
             self.ranges.push(block_range);
 
-            logical_block_number += extent_descriptor.number_of_blocks;
+            *logical_block_number += extent_descriptor.number_of_blocks;
         }
-        self.number_of_blocks = logical_block_number;
+        self.number_of_blocks = *logical_block_number;
 
         Ok(())
     }
@@ -83,7 +82,13 @@ impl HfsBlockRanges {
         data_stream: &DataStreamReference,
         extents_overflow_file: &HfsExtentsOverflowFile,
     ) -> Result<(), ErrorTrace> {
-        match self.read_extents(data_area_block_number, &fork_descriptor.extents) {
+        let mut logical_block_number: u32 = 0;
+
+        match self.read_extents(
+            data_area_block_number,
+            &mut logical_block_number,
+            &fork_descriptor.extents,
+        ) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -113,7 +118,11 @@ impl HfsBlockRanges {
                     return Err(error);
                 }
             }
-            match self.read_extents(data_area_block_number, &overflow_extents) {
+            match self.read_extents(
+                data_area_block_number,
+                &mut logical_block_number,
+                &overflow_extents,
+            ) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

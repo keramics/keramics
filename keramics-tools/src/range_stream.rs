@@ -11,15 +11,15 @@
  * under the License.
  */
 
-use std::fs::{File, Metadata};
 use std::io::SeekFrom;
+use std::path::PathBuf;
 
-use keramics_core::{DataStream, ErrorTrace};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
-/// Data stream of a specific range within a file.
-pub struct FileRangeDataStream {
-    /// The file.
-    file: Option<File>,
+/// Data stream of a specific range within another data stream.
+pub struct RangeDataStream {
+    /// The (base) data stream.
+    data_stream: DataStreamReference,
 
     /// The current offset.
     current_offset: u64,
@@ -31,11 +31,11 @@ pub struct FileRangeDataStream {
     range_size: u64,
 }
 
-impl FileRangeDataStream {
+impl RangeDataStream {
     /// Creates a new data stream.
-    pub fn new(range_offset: u64) -> Self {
+    pub fn new(data_stream: DataStreamReference, range_offset: u64) -> Self {
         Self {
-            file: None,
+            data_stream,
             current_offset: 0,
             range_offset,
             range_size: 0,
@@ -43,40 +43,37 @@ impl FileRangeDataStream {
     }
 
     /// Opens a data stream.
-    pub fn open(&mut self, path: &str) -> Result<(), ErrorTrace> {
-        let file: File = match File::open(path) {
-            Ok(file) => file,
+    pub fn open(&mut self) -> Result<(), ErrorTrace> {
+        let data_stream_size: u64 = match self.data_stream.write() {
+            Ok(mut data_stream) => match data_stream.get_size() {
+                Ok(size) => size,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to determine data stream size"
+                    );
+                    return Err(error);
+                }
+            },
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to open file",
+                    "Unable to obtain write lock on data stream",
                     error
                 ));
             }
         };
-        let metadata: Metadata = match file.metadata() {
-            Ok(metadata) => metadata,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to retrieve file metadata",
-                    error
-                ));
-            }
-        };
-        let file_size: u64 = metadata.len();
-
-        if self.range_offset >= file_size {
+        if self.range_offset >= data_stream_size {
             return Err(keramics_core::error_trace_new!(
-                "Invalid range offset value exceeds file size"
+                "Invalid range offset value exceeds data stream size"
             ));
         }
-        self.file = Some(file);
-        self.range_size = file_size - self.range_offset;
+        self.range_size = data_stream_size - self.range_offset;
 
         Ok(())
     }
 }
 
-impl DataStream for FileRangeDataStream {
+impl DataStream for RangeDataStream {
     /// Retrieves the current position.
     fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
         Ok(self.current_offset)
@@ -89,14 +86,6 @@ impl DataStream for FileRangeDataStream {
 
     /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        let file: &mut File = match self.file.as_mut() {
-            Some(file) => file,
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to file"
-                ));
-            }
-        };
         if self.current_offset >= self.range_size {
             return Ok(0);
         }
@@ -106,24 +95,11 @@ impl DataStream for FileRangeDataStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        match file.seek(SeekFrom::Start(self.range_offset + self.current_offset)) {
-            Ok(offset) => offset,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to seek position",
-                    error
-                ));
-            }
-        };
-        let read_count: usize = match file.read(&mut buf[0..read_size]) {
-            Ok(read_count) => read_count,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to read data",
-                    error
-                ));
-            }
-        };
+        let read_count: usize = keramics_core::data_stream_read_at_position!(
+            &self.data_stream,
+            &mut buf[0..read_size],
+            SeekFrom::Start(self.range_offset + self.current_offset)
+        );
         self.current_offset += read_count as u64;
 
         Ok(read_count)

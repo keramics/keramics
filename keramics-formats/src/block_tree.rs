@@ -138,26 +138,30 @@ impl<T> BlockTree<T> {
         if self.root_node.is_none() {
             self.create_root_node(size);
         }
-        let root_node: &mut BlockTreeNode<T> = match self.root_node.as_mut() {
-            Some(node) => node,
+        match self.root_node.as_mut() {
+            Some(root_node) => {
+                match root_node.insert_value(
+                    self.elements_per_node,
+                    self.leaf_value_size,
+                    offset,
+                    size,
+                    Arc::new(value),
+                ) {
+                    Ok(_) => Ok(()),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to insert value into root node"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             None => {
                 return Err(keramics_core::error_trace_new!(
                     "Unable to obtain mutable reference to root node"
                 ));
             }
-        };
-        match root_node.insert_value(
-            self.elements_per_node,
-            self.leaf_value_size,
-            offset,
-            size,
-            Arc::new(value),
-        ) {
-            Ok(_) => Ok(()),
-            Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                "Unable to insert value into root node",
-                error
-            )),
         }
     }
 }

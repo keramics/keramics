@@ -902,13 +902,14 @@ impl EwfImage {
                 block_range,
             ) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
-            };
+            }
             safe_block_media_offset += self.chunk_size as u64;
 
             // handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset
@@ -969,13 +970,14 @@ impl EwfImage {
             block_range,
         ) {
             Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to insert block range into block tree",
-                    error
-                ));
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to insert block range into block tree"
+                );
+                return Err(error);
             }
-        };
+        }
         *block_media_offset = safe_block_media_offset + (self.chunk_size as u64);
 
         Ok(())

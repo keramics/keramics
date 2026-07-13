@@ -130,7 +130,10 @@ impl<T> BlockTreeNode<T> {
 
             for value_index in first_value_index..last_value_index {
                 if self.values[value_index as usize].is_some() {
-                    return Err(keramics_core::error_trace_new!("Leaf value already set"));
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Leaf value: {} already set",
+                        value_index
+                    )));
                 }
                 self.values[value_index as usize] = Some(value.clone());
             }

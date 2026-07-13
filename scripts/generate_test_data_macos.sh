@@ -139,7 +139,7 @@ detach_dmg()
 
 	for ((attempt=1; attempt<=5; attempt++))
        	do
-		hdiutil detach "${DMG_DEVICE}" -force 2>/dev/null
+		hdiutil detach "${DMG_DEVICE}" 2>/dev/null
 
 		if test $? -eq 0
 		then

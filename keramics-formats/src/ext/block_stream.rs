@@ -71,11 +71,12 @@ impl ExtBlockStream {
                 block_range.clone(),
             ) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
             }
         }

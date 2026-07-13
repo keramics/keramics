@@ -331,8 +331,13 @@ impl HfsFileSystem {
             return Err(keramics_core::error_trace_new!("Unsupported file size"));
         }
         let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+        let mut logical_block_number: u32 = 0;
 
-        match block_ranges.read_extents(self.data_area_block_number, &fork_descriptor.extents) {
+        match block_ranges.read_extents(
+            self.data_area_block_number,
+            &mut logical_block_number,
+            &fork_descriptor.extents,
+        ) {
             Ok(result) => result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

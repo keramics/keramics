@@ -223,6 +223,7 @@ impl MbrVolumeSystem {
                 partition_entry.start_address_lba + (partition_entry.number_of_sectors as u64);
             let end_offset: u64 = (last_end_address_lba as u64) * (self.bytes_per_sector as u64);
 
+            // TODO: mark the partition as corrupt
             if end_offset > data_stream_size {
                 return Err(keramics_core::error_trace_new!(
                     "Invalid partition entry size value out of bounds"

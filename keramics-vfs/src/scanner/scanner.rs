@@ -211,7 +211,7 @@ impl VfsScanner {
         match self.scan_for_sub_nodes(scan_options, &file_system, vfs_location, &mut scan_node) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to scan fro sub nodes");
+                keramics_core::error_trace_add_frame!(error, "Unable to scan for sub nodes");
                 return Err(error);
             }
         }
@@ -463,7 +463,7 @@ impl VfsScanner {
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan fro sub nodes"
+                            "Unable to scan for sub nodes"
                         );
                         return Err(error);
                     }

@@ -347,11 +347,12 @@ impl QcowFile {
                 .insert_value(level1_media_offset, range_media_size, block_range)
             {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
             }
         } else {
@@ -408,11 +409,12 @@ impl QcowFile {
                 block_range,
             ) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
             }
         }

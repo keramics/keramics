@@ -252,13 +252,14 @@ impl VhdFile {
                 block_range,
             ) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
-            };
+            }
         }
         Ok(())
     }
@@ -318,13 +319,14 @@ impl VhdFile {
                 .insert_value(range_media_offset, bitmap_range.size, block_range)
             {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
-            };
+            }
             range_media_offset += bitmap_range.size;
             range_data_offset += bitmap_range.size;
         }
