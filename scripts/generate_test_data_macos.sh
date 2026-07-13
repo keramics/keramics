@@ -129,9 +129,12 @@ create_file_entries()
 	mkfifo ${MOUNT_POINT}/testdir1/pipe1
 }
 
-detach_dmg()
+detach_image()
 {
-	DMG_DEVICE=$1
+	DISK_NODE=$(hdiutil info | awk -v img="$1" '
+	    $0 ~ img {found=1}
+	    found && /^\/dev\/disk[0-9]+/ {sub(/^\/dev\//, "", $1); print $1; exit}
+	')
 
 	set +e
 
@@ -145,6 +148,7 @@ detach_dmg()
 		then
 			break
 		fi
+		echo ""
 		echo "${DMG_DEVICE} busy, waiting 10 seconds."
 		sleep 10
 	done
@@ -160,13 +164,9 @@ assert_availability_binary sw_vers
 
 set -e
 
-DEVICE_NUMBER=`diskutil list | grep -e '^/dev/disk' | tail -n 1 | sed 's?^/dev/disk??;s? .*$??'`
-
 mkdir -p test_data
 
 # Create an image with an APM partition table and a HFS+ file system
-VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
-
 IMAGE_FILE="test_data/apm/apm"
 IMAGE_SIZE="4M"
 
@@ -179,11 +179,9 @@ hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_dmg disk${VOLUME_DEVICE_NUMBER}
+detach_image ${IMAGE_FILE}.dmg
 
 # Create a sparse image with a HFS+ file system
-VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
-
 IMAGE_FILE="test_data/sparseimage/hfsplus"
 IMAGE_SIZE="4M"
 
@@ -196,11 +194,9 @@ hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_dmg disk${VOLUME_DEVICE_NUMBER}
+detach_image ${IMAGE_FILE}.sparseimage
 
 # Create a sparse bundle with a HFS+ file system
-VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
-
 IMAGE_FILE="test_data/sparsebundle/hfsplus"
 IMAGE_SIZE="4M"
 
@@ -213,11 +209,9 @@ hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-detach_dmg disk${VOLUME_DEVICE_NUMBER}
+detach_image ${IMAGE_FILE}.sparsebundle
 
 # Create a raw image with a HFS+ file system
-VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
-
 IMAGE_FILE="test_data/hfs/hfsplus"
 IMAGE_SIZE="4M"
 
@@ -229,6 +223,8 @@ hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test $
 hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
+
+BASE_IMAGE_FILE=${IMAGE_FILE}
 
 # Create an ADC compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_adc"
@@ -270,6 +266,6 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
-detach_dmg disk${VOLUME_DEVICE_NUMBER}
+detach_image ${BASE_IMAGE_FILE}.dmg
 
 exit ${EXIT_SUCCESS}
