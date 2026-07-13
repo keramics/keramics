@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
@@ -63,8 +64,14 @@ impl HfsBlockStream {
         for (range_index, block_range) in block_ranges.iter().enumerate() {
             let range_logical_offset: u64 =
                 (block_range.logical_block_number as u64) * (self.block_size as u64);
-            let range_size: u64 = (block_range.number_of_blocks as u64) * (self.block_size as u64);
 
+            if range_logical_offset >= block_tree_data_size {
+                break;
+            }
+            let range_size: u64 = min(
+                (block_range.number_of_blocks as u64) * (self.block_size as u64),
+                block_tree_data_size - range_logical_offset,
+            );
             match self.block_tree.insert_value(
                 range_logical_offset,
                 range_size,
