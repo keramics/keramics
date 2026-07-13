@@ -31,7 +31,7 @@ mod range_stream;
 
 use crate::enums::EncodingType;
 use crate::info::{
-    ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
+    ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
     SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::range_stream::FileRangeDataStream;
@@ -146,6 +146,7 @@ impl InfoTool {
         format_scanner.add_ext_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_fat_signatures();
+        format_scanner.add_hfs_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
         format_scanner.add_pdi_signatures();
@@ -244,7 +245,7 @@ fn main() -> ExitCode {
             println!("Unable to open file with error:\n{}", error);
             return ExitCode::FAILURE;
         }
-    };
+    }
     let data_stream: DataStreamReference = Arc::new(RwLock::new(file_range_stream));
 
     let result: Option<FormatIdentifier> = match InfoTool::scan_for_formats(&data_stream) {
@@ -279,6 +280,9 @@ fn main() -> ExitCode {
             FormatIdentifier::Fat => {
                 FatInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
+            FormatIdentifier::Hfs => {
+                HfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
+            }
             FormatIdentifier::Ntfs => {
                 NtfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
             }
@@ -292,6 +296,7 @@ fn main() -> ExitCode {
                 ExtInfo::print_hierarchy(&data_stream, info_tool.character_encoding.as_ref())
             }
             FormatIdentifier::Fat => FatInfo::print_hierarchy(&data_stream),
+            FormatIdentifier::Hfs => HfsInfo::print_hierarchy(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
@@ -310,6 +315,7 @@ fn main() -> ExitCode {
                     info_tool.character_encoding.as_ref(),
                 ),
                 FormatIdentifier::Fat => FatInfo::print_file_entry_by_path(&data_stream, &path),
+                FormatIdentifier::Hfs => HfsInfo::print_file_entry_by_path(&data_stream, &path),
                 FormatIdentifier::Ntfs => NtfsInfo::print_file_entry_by_path(&data_stream, &path),
                 _ => Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
@@ -325,6 +331,7 @@ fn main() -> ExitCode {
                 ExtInfo::print_file_system(&data_stream, info_tool.character_encoding.as_ref())
             }
             FormatIdentifier::Fat => FatInfo::print_file_system(&data_stream),
+            FormatIdentifier::Hfs => HfsInfo::print_file_system(&data_stream),
             FormatIdentifier::Gpt => GptInfo::print_volume_system(&data_stream),
             FormatIdentifier::Mbr => MbrInfo::print_volume_system(&data_stream),
             FormatIdentifier::Ntfs => NtfsInfo::print_file_system(&data_stream),

@@ -435,10 +435,8 @@ A VFAT long file name entry is 32 bytes in size and consists of:
 
 ## References
 
-<!-- rumdl-disable MD013 -->
-
-* [Microsoft Extensible Firmware Initiative FAT32 File System Specification](http://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc), by Microsoft
-* [Design of the FAT file system](https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system), by Wikipedia
+* [Microsoft Extensible Firmware Initiative FAT32 File System Specification](http://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc),
+  by Microsoft
+* [Design of the FAT file system](https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system), by
+  Wikipedia
 * [File Allocation Table](https://en.wikipedia.org/wiki/File_Allocation_Table), by Wikipedia
-
-<!-- rumdl-enable MD013 -->

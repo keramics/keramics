@@ -47,10 +47,10 @@ pub struct ExtFileSystem {
     pub number_of_inodes: u32,
 
     /// Block size.
-    block_size: u32,
+    pub block_size: u32,
 
     /// Inode size.
-    inode_size: u16,
+    pub inode_size: u16,
 
     /// Inode table.
     inode_table: Arc<ExtInodeTable>,

@@ -12,8 +12,9 @@
  */
 
 use keramics_core::ErrorTrace;
+use keramics_encodings::CharacterEncoding;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u16_be, bytes_to_u32_be};
+use keramics_types::{ByteString, bytes_to_u16_be, bytes_to_u32_be};
 
 use super::constants::*;
 use super::extent_descriptor::HfsExtentDescriptor;
@@ -70,6 +71,9 @@ pub struct HfsMasterDirectoryBlock {
     /// Data area block number.
     pub data_area_block_number: u16,
 
+    /// Volume label.
+    pub volume_label: ByteString,
+
     /// Extents overflow file size.
     pub extents_overflow_file_size: u32,
 
@@ -89,6 +93,7 @@ impl HfsMasterDirectoryBlock {
         Self {
             block_size: 0,
             data_area_block_number: 0,
+            volume_label: ByteString::new_with_encoding(&CharacterEncoding::MacRoman),
             extents_overflow_file_size: 0,
             extents_overflow_file_extents: Vec::new(),
             catalog_file_size: 0,
@@ -106,6 +111,17 @@ impl HfsMasterDirectoryBlock {
         }
         self.block_size = bytes_to_u32_be!(data, 20);
         self.data_area_block_number = bytes_to_u16_be!(data, 28);
+
+        if data[36] > 27 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid volume label size value out of bounds"
+            ));
+        }
+        let data_end_offset: usize = 37 + (data[36] as usize);
+
+        if data_end_offset > 37 {
+            self.volume_label.read_data(&data[37..data_end_offset]);
+        }
         self.extents_overflow_file_size = bytes_to_u32_be!(data, 130);
 
         for data_offset in (134..146).step_by(4) {
@@ -254,6 +270,16 @@ mod tests {
     fn test_read_data_with_unsupported_signature() {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
+
+        let mut test_struct = HfsMasterDirectoryBlock::new();
+        let result = test_struct.read_data(&test_data);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_volume_label_size() {
+        let mut test_data: Vec<u8> = get_test_data();
+        test_data[36] = 0xff;
 
         let mut test_struct = HfsMasterDirectoryBlock::new();
         let result = test_struct.read_data(&test_data);

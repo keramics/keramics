@@ -35,7 +35,7 @@ pub struct FatFileEntry {
     block_allocation_table: Arc<FatBlockAllocationTable>,
 
     /// The identifier.
-    pub identifier: u32,
+    pub(super) identifier: u32,
 
     /// The directory entry.
     directory_entry: Option<FatDirectoryEntry>,
@@ -84,6 +84,11 @@ impl FatFileEntry {
             Some(directory_entry) => directory_entry.short_name.file_attribute_flags,
             None => 0,
         }
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> u32 {
+        self.identifier
     }
 
     /// Retrieves the modification time.
@@ -357,6 +362,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_identifier
 
     #[test]
     fn test_get_modification_time() -> Result<(), ErrorTrace> {

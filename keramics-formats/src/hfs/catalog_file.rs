@@ -731,9 +731,12 @@ impl HfsCatalogFile {
                 }
                 if key.parent_identifier == identifier {
                     if is_branch {
-                        break;
-                    }
-                    if key.name_size == 0 {
+                        // Note that the B-Tree file records are sorted by key and that the thread
+                        // record of a key without a name is stored in the current branch node.
+                        if key.name_size > 0 {
+                            break;
+                        }
+                    } else if key.name_size == 0 {
                         match self.read_thread_record(&key, record_data) {
                             Ok(thread_record) => return Ok(Some(thread_record)),
                             Err(mut error) => {

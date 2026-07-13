@@ -362,12 +362,11 @@ and consists of:
 
 ##### "BAAD" signature
 
-According to [NTFS documentation](https://flatcap.github.io/linux-ntfs/ntfs/) if
-during chkdsk, when a multi-sector item is found where the multi-sector header
-does not match the values at the end of the sector, it marks the item as "BAAD"
-and fill it with 0-byte values except for a fix-up value at the end of the first
-sector of the item. The "BAAD" signature has been seen to be used on Windows NT4
-and XP.
+According to [NTFS documentation](https://flatcap.github.io/linux-ntfs/ntfs/) if during chkdsk,
+when a multi-sector item is found where the multi-sector header does not match the values at the
+end of the sector, it marks the item as "BAAD" and fill it with 0-byte values except for a fix-up
+value at the end of the first sector of the item. The "BAAD" signature has been seen to be used on
+Windows NT4 and XP.
 
 ##### Sequence number
 
@@ -757,9 +756,6 @@ The file name data (FILE_NAME) is of variable size and consists of:
 | 66 | ... | | Name, which contains an UCS-2 little-endian string without end-of-string character |
 
 <!-- rumdl-enable MD033 MD056 -->
-
-TODO: determine if the allocated file size and file size values contain accurate
-values when the file name data is stored in a MFT attribute.
 
 An MFT attribute can contain multiple file name attributes, e.g. for a separate
 (long) name and short name.
@@ -1233,21 +1229,19 @@ Also see [the security descriptor identifier index value](#security_descriptor_i
 
 ### Compressed data-runs
 
-NTFS compression groups 16 cluster blocks together. This group of 16 cluster
-blocks also named a compression unit, which is either "compressed" or
-uncompressed.
+NTFS compression groups 16 cluster blocks together. This group of 16 cluster blocks also named a
+compression unit, which is either "compressed" or uncompressed.
 
-The term compressed is quoted here because the group of cluster blocks can also
-contain uncompressed data. A group of cluster blocks is "compressed" when it is
-compressed size is smaller than its uncompressed data size. Within a group of
-cluster blocks each of the 16 blocks is "compressed" individually.
+The term compressed is quoted here because the group of cluster blocks can also contain
+uncompressed data. A group of cluster blocks is "compressed" when it is compressed size is smaller
+than its uncompressed data size. Within a group of cluster blocks each of the 16 blocks is
+"compressed" individually.
 
-The compression unit size is stored in the non-resident MFT attribute. The
-maximum uncompressed data size is always the cluster size (in most case
-4096).
+The compression unit size is stored in the non-resident MFT attribute. The maximum uncompressed
+data size is always the cluster size (in most case 4096).
 
-> Note that a resident $DATA attribute with the compression type in the
-> data flags is stored uncompressed.
+> Note that a resident $DATA attribute with the compression type in the data flags is stored
+> uncompressed.
 
 The data runs in the $DATA attribute define cluster block ranges, e.g.
 
@@ -1255,11 +1249,10 @@ The data runs in the $DATA attribute define cluster block ranges, e.g.
 21 02 35 52
 ```
 
-This data run defines 2 data blocks starting at block number 21045 followed by
-14 sparse blocks. The total number of blocks in the compression unit is 16.
-Compressed data is stored in the first 2 blocks and the 14 sparse blocks are
-only there to make sure the data runs add up to the compression unit size. They
-do not define actual sparse data.
+This data run defines 2 data blocks starting at block number 21045 followed by 14 sparse blocks.
+The total number of blocks in the compression unit is 16. Compressed data is stored in the first 2
+blocks and the 14 sparse blocks are only there to make sure the data runs add up to the compression
+unit size. They do not define actual sparse data.
 
 Another example:
 
@@ -1267,28 +1260,25 @@ Another example:
 21 40 37 52
 ```
 
-This data run defines 64 data blocks starting at block number 21047. Since
-this data run is larger than the compression unit size the data is stored
-uncompressed.
+This data run defines 64 data blocks starting at block number 21047. Since this data run is larger
+than the compression unit size the data is stored uncompressed.
 
-If the data run was e.g. 60 data blocks followed by 4 sparse blocks the first 3
-compression units (blocks 1 to 48) would be uncompressed and the last
-compression unit (blocks 49 to 64) would be compressed.
+If the data run was e.g. 60 data blocks followed by 4 sparse blocks the first 3 compression units
+(blocks 1 to 48) would be uncompressed and the last compression unit (blocks 49 to 64) would be
+compressed.
 
-Also "sparse data" and "sparse compression unit" data runs can be mixed. If in
-the previous example the 60 data blocks would be followed by 20 sparse blocks
-the last compression unit (blocks 65 to 80) would be sparse.
+Also "sparse data" and "sparse compression unit" data runs can be mixed. If in the previous example
+the 60 data blocks would be followed by 20 sparse blocks the last compression unit (blocks 65
+to 80) would be sparse.
 
-A compression unit can consists of multiple compressed data runs, e.g. 1 data
-block followed by 4 data blocks followed by 11 sparse blocks. Data runs have
-been observed where the last data run size does not align with the compression
-unit size.
+A compression unit can consists of multiple compressed data runs, e.g. 1 data block followed by 4
+data blocks followed by 11 sparse blocks. Data runs have been observed where the last data run size
+does not align with the compression unit size.
 
-The sparse blocks data run can be stored in a subsequent attribute in an
-attribute chain and can be stored in multiple data runs.
+The sparse blocks data run can be stored in a subsequent attribute in an attribute chain and can be
+stored in multiple data runs.
 
-NTFS compression stores the "compressed" data in blocks. Each block has a 2
-byte block header.
+NTFS compression stores the "compressed" data in blocks. Each block has a 2 byte block header.
 
 The block is of variable size and consists of:
 
@@ -2276,23 +2266,33 @@ TODO: verify behavior of Windows NTFS implementation.
 
 ## References
 
-<!-- rumdl-disable MD013 -->
-
-* [How NTFS Works](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc781134(v=ws.10)), by Microsoft
-* [Master File Table](https://learn.microsoft.com/en-us/windows/win32/devnotes/master-file-table), by Microsoft
-* [NTFS Attribute Types](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/a82e9105-2405-4e37-b2c3-28c773902d85), by Microsoft
-* [File Attribute Constants](https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants), by Microsoft
-* [Reparse Tags](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4), by Microsoft
+* [How NTFS Works](https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-server-2003/cc781134(v=ws.10)),
+  by Microsoft
+* [Master File Table](https://learn.microsoft.com/en-us/windows/win32/devnotes/master-file-table),
+  by Microsoft
+* [NTFS Attribute Types](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/a82e9105-2405-4e37-b2c3-28c773902d85),
+  by Microsoft
+* [File Attribute Constants](https://learn.microsoft.com/en-us/windows/win32/fileio/file-attribute-constants),
+  by Microsoft
+* [Reparse Tags](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/c8e77b37-3909-4fe6-a4ea-2b9d423b1ee4),
+  by Microsoft
 * [NTFS documentation](https://flatcap.github.io/linux-ntfs/ntfs/), by Richard Russon
-* [ATTRIBUTE_LIST_ENTRY structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/attribute-list-entry), by Microsoft
-* [ATTRIBUTE_RECORD_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/attribute-record-header), by Microsoft
-* [FILE_RECORD_SEGMENT_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/file-record-segment-header), by Microsoft
-* [MULTI_SECTOR_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/multi-sector-header), by Microsoft
-* [REPARSE_DATA_BUFFER structure (ntifs.h)](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer), by Microsoft
-* [REPARSE_DATA_BUFFER_EX structure (ntifs.h)](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer_ex), by Microsoft
-* [USN_RECORD_V2](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v2), by Microsoft
-* [Zone.Identifier Stream Name](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/6e3f7352-d11c-4d76-8c39-2516a9df36e8), by Microsoft
-* [the Internet Explorer URL security zone](https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/ms537183(v=vs.85)), by Microsoft
+* [ATTRIBUTE_LIST_ENTRY structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/attribute-list-entry),
+  by Microsoft
+* [ATTRIBUTE_RECORD_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/attribute-record-header),
+  by Microsoft
+* [FILE_RECORD_SEGMENT_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/file-record-segment-header),
+  by Microsoft
+* [MULTI_SECTOR_HEADER structure](https://learn.microsoft.com/en-us/windows/win32/devnotes/multi-sector-header),
+  by Microsoft
+* [REPARSE_DATA_BUFFER structure (ntifs.h)](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer),
+  by Microsoft
+* [REPARSE_DATA_BUFFER_EX structure (ntifs.h)](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/ns-ntifs-_reparse_data_buffer_ex),
+  by Microsoft
+* [USN_RECORD_V2](https://learn.microsoft.com/en-us/windows/win32/api/winioctl/ns-winioctl-usn_record_v2),
+  by Microsoft
+* [Zone.Identifier Stream Name](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/6e3f7352-d11c-4d76-8c39-2516a9df36e8),
+  by Microsoft
+* [the Internet Explorer URL security zone](https://learn.microsoft.com/en-us/previous-versions/windows/internet-explorer/ie-developer/platform-apis/ms537183(v=vs.85)),
+  by Microsoft
 * [ntfs_layout.h](https://ultradefrag.net/doc/man/ntfs/ntfs_layout.h.html), by Anton Altaparmakov
-
-<!-- rumdl-enable MD013 -->

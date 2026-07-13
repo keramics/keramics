@@ -129,6 +129,29 @@ create_file_entries()
 	mkfifo ${MOUNT_POINT}/testdir1/pipe1
 }
 
+detach_dmg()
+{
+	DMG_DEVICE=$1
+
+	set +e
+
+	sync
+
+	for ((attempt=1; attempt<=5; attempt++))
+       	do
+		hdiutil detach "${DMG_DEVICE}" -force 2>/dev/null
+
+		if test $? -eq 0
+		then
+			break
+		fi
+		echo "${DMG_DEVICE} busy, waiting 10 seconds."
+		sleep 10
+	done
+
+	set -e
+}
+
 assert_availability_binary diskutil
 assert_availability_binary hdiutil
 assert_availability_binary mkfifo
@@ -152,14 +175,11 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -fs 'HFS+' -layout 'SPUD' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.dmg
+hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-# Sleep to prevent "resource busy" warning.
-sleep 3
-
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse image with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -172,14 +192,11 @@ rm -f ${IMAGE_FILE}.sparseimage
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSE -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.sparseimage
+hdiutil attach ${IMAGE_FILE}.sparseimage -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-# Sleep to prevent "resource busy" warning.
-sleep 3
-
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 # Create a sparse bundle with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -192,14 +209,11 @@ rm -rf ${IMAGE_FILE}.sparsebundle
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type SPARSEBUNDLE -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.sparsebundle
+hdiutil attach ${IMAGE_FILE}.sparsebundle -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
-# Sleep to prevent "resource busy" warning.
-sleep 3
-
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 # Create a raw image with a HFS+ file system
 VOLUME_DEVICE_NUMBER=$(( ${DEVICE_NUMBER} + 1 ))
@@ -212,7 +226,7 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -fs 'HFS+' -size ${IMAGE_SIZE} -type UDIF -volname hfsplus_test ${IMAGE_FILE}
 
-hdiutil attach ${IMAGE_FILE}.dmg
+hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
 
 create_file_entries "/Volumes/hfsplus_test"
 
@@ -256,9 +270,6 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil create -format UDZO -srcfolder "/Volumes/hfsplus_test" ${IMAGE_FILE}
 
-# Sleep to prevent "resource busy" warning.
-sleep 3
-
-hdiutil detach disk${VOLUME_DEVICE_NUMBER}
+detach_dmg disk${VOLUME_DEVICE_NUMBER}
 
 exit ${EXIT_SUCCESS}

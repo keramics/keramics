@@ -22,6 +22,7 @@ use crate::path::Path;
 
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::boot_record::FatBootRecord;
+use super::constants::*;
 use super::directory_entries::FatDirectoryEntries;
 use super::directory_entry::FatDirectoryEntry;
 use super::directory_entry_type::FatDirectoryEntryType;
@@ -107,9 +108,6 @@ impl FatFileSystem {
         &self,
         file_entry_identifier: u32,
     ) -> Result<FatFileEntry, ErrorTrace> {
-        if (file_entry_identifier as u64) == self.root_directory_offset {
-            return self.get_root_directory();
-        }
         let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
             Some(data_stream) => data_stream,
             None => {
@@ -125,19 +123,22 @@ impl FatFileSystem {
                     ));
                 }
             };
-        let directory_entry: FatDirectoryEntry =
+        let directory_entry: Option<FatDirectoryEntry> = if file_entry_identifier == 0 {
+            None
+        } else {
             match self.read_directory_entry_by_identifier(data_stream, file_entry_identifier) {
-                Ok(directory_entry) => directory_entry,
+                Ok(directory_entry) => Some(directory_entry),
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read directory entry");
                     return Err(error);
                 }
-            };
+            }
+        };
         Ok(FatFileEntry::new(
             data_stream,
             block_allocation_table,
             file_entry_identifier,
-            Some(directory_entry),
+            directory_entry,
             FatDirectoryEntries::new(&self.format, &self.case_folding_mappings),
         ))
     }
@@ -195,17 +196,10 @@ impl FatFileSystem {
                 return Err(error);
             }
         };
-        let root_directory_offset: u64 = if self.root_directory_size > 0 {
-            self.root_directory_offset
-        } else {
-            self.first_cluster_offset
-                + (((self.root_directory_cluster_block_number - 2) as u64)
-                    * (self.cluster_block_size as u64))
-        };
         Ok(FatFileEntry::new(
             data_stream,
             block_allocation_table,
-            root_directory_offset as u32,
+            0,
             None,
             directory_entries,
         ))
@@ -253,6 +247,12 @@ impl FatFileSystem {
                 );
                 return Err(error);
             }
+        }
+        if short_name_entry.file_attribute_flags & 0x58 == FAT_FILE_ATTRIBUTE_FLAG_VOLUME_LABEL {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported short name directory entry at offset: {} (0x{:08x})",
+                file_entry_identifier, file_entry_identifier
+            )));
         }
         let mut directory_entry_offset: u64 = (file_entry_identifier as u64) - 32;
 
@@ -511,11 +511,15 @@ mod tests {
     fn test_get_file_entry_by_identifier() -> Result<(), ErrorTrace> {
         let file_system: FatFileSystem = get_file_system()?;
 
-        let file_entry: FatFileEntry = file_system.get_file_entry_by_identifier(0x00001a00)?;
-        assert_eq!(file_entry.identifier, 0x00001a00);
+        let file_entry: FatFileEntry = file_system.get_file_entry_by_identifier(0x00000000)?;
+        assert_eq!(file_entry.identifier, 0x00000000);
 
         let name: Option<FatString> = file_entry.get_name();
         assert!(name.is_none());
+
+        let result: Result<FatFileEntry, ErrorTrace> =
+            file_system.get_file_entry_by_identifier(0x00001a00);
+        assert!(result.is_err());
 
         let file_entry: FatFileEntry = file_system.get_file_entry_by_identifier(0x00001a40)?;
         assert_eq!(file_entry.identifier, 0x00001a40);
@@ -533,7 +537,6 @@ mod tests {
                 "My long, very long file name, so very long"
             ))
         );
-
         Ok(())
     }
 
@@ -544,7 +547,7 @@ mod tests {
         let path: Path = Path::from("/");
         let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(file_entry.identifier, 0x00001a00);
+        assert_eq!(file_entry.identifier, 0x00000000);
 
         let path: Path = Path::from("/emptyfile");
         let file_entry: FatFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
@@ -574,7 +577,7 @@ mod tests {
 
         let file_entry: FatFileEntry = file_system.get_root_directory()?;
 
-        assert_eq!(file_entry.identifier, 0x00001a00);
+        assert_eq!(file_entry.identifier, 0x00000000);
 
         Ok(())
     }

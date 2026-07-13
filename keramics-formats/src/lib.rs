@@ -45,6 +45,7 @@ pub mod gpt;
 pub mod mbr;
 
 // File system formats
+mod decmpfs;
 pub mod ext;
 pub mod fat;
 pub mod hfs;

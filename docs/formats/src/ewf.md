@@ -2,9 +2,10 @@
 
 EWF is short for Expert Witness Compression Format. It is a file type used to store storage media
 images for digital forensic purposes. It is currently widely used in the field of computer
-forensics in proprietary tooling like EnCase en FTK. The
-[original specification](http://www.asrdata.com/whitepaper-html) of the format was provided by ASR
-Data for the SMART application.
+forensics in proprietary tooling like EnCase en FTK.
+
+The [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) is the earliest
+known specification of the format was provided by ASR Data for the SMART application.
 
 The EWF format was succeeded by the [Expert Witness Compression Format version 2](ewf2.md) in
 EnCase 7 (EWF2-Ex01 and EWF2-Lx01). EnCase 7 also uses a different version of EWF-L01 then its

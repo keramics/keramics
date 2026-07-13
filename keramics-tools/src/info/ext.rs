@@ -17,9 +17,10 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::Path;
-use keramics_formats::ext::constants::*;
 use keramics_formats::ext::{ExtExtendedAttribute, ExtFileEntry, ExtFileSystem};
 use keramics_types::ByteString;
+
+use super::posix::PosixFileModeInfo;
 
 /// Extended File System (ext) compatible feature flags information.
 struct ExtCompatibleFeatureFlagsInfo {
@@ -142,6 +143,9 @@ struct ExtFileEntryInfo {
     /// The size.
     pub size: u64,
 
+    /// Creation date and time.
+    pub creation_time: Option<DateTime>,
+
     /// Modification date and time.
     pub modification_time: Option<DateTime>,
 
@@ -150,9 +154,6 @@ struct ExtFileEntryInfo {
 
     /// Change date and time.
     pub change_time: Option<DateTime>,
-
-    /// Creation date and time.
-    pub creation_time: Option<DateTime>,
 
     /// Deletion date and time.
     pub deletion_time: DateTime,
@@ -183,10 +184,10 @@ impl ExtFileEntryInfo {
             inode_number: 0,
             name: None,
             size: 0,
+            creation_time: None,
             modification_time: None,
             access_time: None,
             change_time: None,
-            creation_time: None,
             deletion_time: DateTime::NotSet,
             number_of_links: 0,
             owner_identifier: 0,
@@ -208,6 +209,11 @@ impl fmt::Display for ExtFileEntryInfo {
         };
         writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
 
+        if let Some(date_time) = &self.creation_time {
+            let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
+
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
+        }
         if let Some(date_time) = &self.modification_time {
             let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
 
@@ -231,11 +237,6 @@ impl fmt::Display for ExtFileEntryInfo {
                 date_time_info
             )?;
         }
-        if let Some(date_time) = &self.creation_time {
-            let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
-
-            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_info)?;
-        }
         let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.deletion_time);
 
         writeln!(formatter, "    Deletion time\t\t\t\t: {}", date_time_info)?;
@@ -255,9 +256,10 @@ impl fmt::Display for ExtFileEntryInfo {
             "    Group identifier\t\t\t\t: {}",
             self.group_identifier
         )?;
-        let file_mode_info: ExtFileModeInfo = ExtFileModeInfo::new(self.file_mode);
+        let file_mode_info: PosixFileModeInfo = PosixFileModeInfo::new(self.file_mode);
 
         writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
+
         if let Some(device_identifier) = &self.device_identifier {
             writeln!(
                 formatter,
@@ -274,71 +276,6 @@ impl fmt::Display for ExtFileEntryInfo {
             )?;
         }
         writeln!(formatter)
-    }
-}
-
-/// Extended File System (ext) file mode information.
-struct ExtFileModeInfo {
-    /// Flags.
-    file_mode: u16,
-}
-
-impl ExtFileModeInfo {
-    /// Creates new file mode information.
-    fn new(file_mode: u16) -> Self {
-        Self { file_mode }
-    }
-
-    /// Retrieves a file mode string representation.
-    fn get_file_mode_string(file_mode: u16) -> String {
-        let mut string_parts: Vec<&str> = vec!["-"; 10];
-
-        if file_mode & 0x0001 != 0 {
-            string_parts[9] = "x";
-        }
-        if file_mode & 0x0002 != 0 {
-            string_parts[8] = "w";
-        }
-        if file_mode & 0x0004 != 0 {
-            string_parts[7] = "r";
-        }
-        if file_mode & 0x0008 != 0 {
-            string_parts[6] = "x";
-        }
-        if file_mode & 0x0010 != 0 {
-            string_parts[5] = "w";
-        }
-        if file_mode & 0x0020 != 0 {
-            string_parts[4] = "r";
-        }
-        if file_mode & 0x0040 != 0 {
-            string_parts[3] = "x";
-        }
-        if file_mode & 0x0080 != 0 {
-            string_parts[2] = "w";
-        }
-        if file_mode & 0x0100 != 0 {
-            string_parts[1] = "r";
-        }
-        string_parts[0] = match file_mode & 0xf000 {
-            EXT_FILE_MODE_TYPE_FIFO => "p",
-            EXT_FILE_MODE_TYPE_CHARACTER_DEVICE => "c",
-            EXT_FILE_MODE_TYPE_DIRECTORY => "d",
-            EXT_FILE_MODE_TYPE_BLOCK_DEVICE => "b",
-            EXT_FILE_MODE_TYPE_SYMBOLIC_LINK => "l",
-            EXT_FILE_MODE_TYPE_SOCKET => "s",
-            _ => "-",
-        };
-        string_parts.join("")
-    }
-}
-
-impl fmt::Display for ExtFileModeInfo {
-    /// Formats partition file mode information for display.
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let string: String = Self::get_file_mode_string(self.file_mode);
-
-        write!(formatter, "{} (0o{:0o})", string, self.file_mode)
     }
 }
 
@@ -585,24 +522,24 @@ pub struct ExtInfo {}
 impl ExtInfo {
     /// Retrieves the file entry information.
     fn get_file_entry_information(
-        ext_file_entry: &mut ExtFileEntry,
+        file_entry: &mut ExtFileEntry,
     ) -> Result<ExtFileEntryInfo, ErrorTrace> {
         let mut file_entry_information: ExtFileEntryInfo = ExtFileEntryInfo::new();
 
-        file_entry_information.inode_number = ext_file_entry.get_inode_number();
-        file_entry_information.name = ext_file_entry.get_name().cloned();
-        file_entry_information.size = ext_file_entry.get_size();
-        file_entry_information.modification_time = ext_file_entry.get_modification_time().cloned();
-        file_entry_information.access_time = ext_file_entry.get_access_time().cloned();
-        file_entry_information.change_time = ext_file_entry.get_change_time().cloned();
-        file_entry_information.creation_time = ext_file_entry.get_creation_time().cloned();
-        file_entry_information.deletion_time = ext_file_entry.get_deletion_time().clone();
-        file_entry_information.number_of_links = ext_file_entry.get_number_of_links();
-        file_entry_information.owner_identifier = ext_file_entry.get_owner_identifier();
-        file_entry_information.group_identifier = ext_file_entry.get_group_identifier();
-        file_entry_information.file_mode = ext_file_entry.get_file_mode();
+        file_entry_information.inode_number = file_entry.get_inode_number();
+        file_entry_information.name = file_entry.get_name().cloned();
+        file_entry_information.size = file_entry.get_size();
+        file_entry_information.creation_time = file_entry.get_creation_time().cloned();
+        file_entry_information.modification_time = file_entry.get_modification_time().cloned();
+        file_entry_information.access_time = file_entry.get_access_time().cloned();
+        file_entry_information.change_time = file_entry.get_change_time().cloned();
+        file_entry_information.deletion_time = file_entry.get_deletion_time().clone();
+        file_entry_information.number_of_links = file_entry.get_number_of_links();
+        file_entry_information.owner_identifier = file_entry.get_owner_identifier();
+        file_entry_information.group_identifier = file_entry.get_group_identifier();
+        file_entry_information.file_mode = file_entry.get_file_mode();
 
-        match ext_file_entry.get_device_identifier() {
+        match file_entry.get_device_identifier() {
             Ok(result) => file_entry_information.device_identifier = result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -612,7 +549,7 @@ impl ExtInfo {
                 return Err(error);
             }
         }
-        match ext_file_entry.get_symbolic_link_target() {
+        match file_entry.get_symbolic_link_target() {
             Ok(result) => file_entry_information.symbolic_link_target = result.cloned(),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -767,22 +704,21 @@ impl ExtInfo {
                     return Err(error);
                 }
             };
-        let mut file_entry: Option<ExtFileEntry> =
-            match ext_file_system.get_file_entry_by_path(path) {
-                Ok(file_entry) => file_entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                    return Err(error);
-                }
-            };
-        if file_entry.is_none() {
-            return Err(keramics_core::error_trace_new!("Missing file entry"));
-        }
+        let mut file_entry: ExtFileEntry = match ext_file_system.get_file_entry_by_path(path) {
+            Ok(Some(file_entry)) => file_entry,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!("Missing file entry"));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
+            }
+        };
         println!("Extended File System (ext) file entry information:");
 
         println!("    Path\t\t\t\t\t: {}", path);
 
-        match Self::print_file_entry(file_entry.as_mut().unwrap()) {
+        match Self::print_file_entry(&mut file_entry) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
@@ -810,12 +746,6 @@ impl ExtInfo {
         let format_version: u8 = ext_file_system.get_format_version();
         println!("    Format version\t\t\t\t: ext{}", format_version);
 
-        let volume_label: String = match ext_file_system.get_volume_label() {
-            Some(volume_label) => volume_label.to_string(),
-            None => String::new(),
-        };
-        println!("    Volume label\t\t\t\t: {}", volume_label);
-
         let feature_flags: u32 = ext_file_system.get_compatible_feature_flags();
         println!("    Compatible features\t\t\t\t: 0x{:08x}", feature_flags);
 
@@ -840,6 +770,20 @@ impl ExtInfo {
             ExtReadOnlyCompatibleFeatureFlagsInfo::new(feature_flags);
         println!("{}", flags_info);
 
+        let volume_label: String = match ext_file_system.get_volume_label() {
+            Some(volume_label) => volume_label.to_string(),
+            None => String::new(),
+        };
+        println!("    Volume label\t\t\t\t: {}", volume_label);
+
+        println!(
+            "    Block size\t\t\t\t\t: {} bytes",
+            ext_file_system.block_size
+        );
+        println!(
+            "    Inode size\t\t\t\t\t: {} bytes",
+            ext_file_system.inode_size
+        );
         println!(
             "    Number of inodes\t\t\t\t: {}",
             ext_file_system.number_of_inodes
@@ -935,7 +879,7 @@ impl ExtInfo {
 
         for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
             let mut sub_file_entry: ExtFileEntry = match result {
-                Ok(ext_file_entry) => ext_file_entry,
+                Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -1046,37 +990,6 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_mode_string() {
-        let string: String = ExtFileModeInfo::get_file_mode_string(0x1000);
-        assert_eq!(string, "p---------");
-
-        let string: String = ExtFileModeInfo::get_file_mode_string(0x2000);
-        assert_eq!(string, "c---------");
-
-        let string: String = ExtFileModeInfo::get_file_mode_string(0x4000);
-        assert_eq!(string, "d---------");
-
-        let string: String = ExtFileModeInfo::get_file_mode_string(0x6000);
-        assert_eq!(string, "b---------");
-
-        let string: String = ExtFileModeInfo::get_file_mode_string(0xa000);
-        assert_eq!(string, "l---------");
-
-        let string: String = ExtFileModeInfo::get_file_mode_string(0xc000);
-        assert_eq!(string, "s---------");
-
-        let string: String = ExtFileModeInfo::get_file_mode_string(0x81ff);
-        assert_eq!(string, "-rwxrwxrwx");
-    }
-
-    #[test]
-    fn test_file_mode_information_fmt() {
-        let test_struct: ExtFileModeInfo = ExtFileModeInfo::new(0x81a4);
-        let string: String = test_struct.to_string();
-        assert_eq!(string, "-rw-r--r-- (0o100644)");
-    }
-
-    #[test]
     fn test_incompatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtIncompatibleFeatureFlagsInfo =
             ExtIncompatibleFeatureFlagsInfo::new(0x00000002);
@@ -1121,6 +1034,7 @@ mod tests {
         assert_eq!(test_struct.inode_number, 14);
         assert_eq!(test_struct.name, Some(ByteString::from("testfile1")));
         assert_eq!(test_struct.size, 9);
+        assert_eq!(test_struct.creation_time, None);
         assert_eq!(
             test_struct.modification_time,
             Some(DateTime::PosixTime32(PosixTime32::new(1735977481)))
@@ -1133,7 +1047,6 @@ mod tests {
             test_struct.change_time,
             Some(DateTime::PosixTime32(PosixTime32::new(1735977481)))
         );
-        assert_eq!(test_struct.creation_time, None);
         assert_eq!(test_struct.deletion_time, DateTime::NotSet);
         assert_eq!(test_struct.number_of_links, 2);
         assert_eq!(test_struct.owner_identifier, 1000);

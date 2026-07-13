@@ -176,15 +176,25 @@ impl VfsScanner {
     ) -> Result<(), ErrorTrace> {
         let mut scan_node: VfsScanNode = VfsScanNode::new(vfs_location.clone());
 
-        let file_system: VfsFileSystemReference = self.resolver.open_file_system(vfs_location)?;
-
-        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_location(vfs_location)? {
-            Some(file_entry) => file_entry,
-            None => {
+        let file_system: VfsFileSystemReference = match self.resolver.open_file_system(vfs_location)
+        {
+            Ok(file_system) => file_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                return Err(error);
+            }
+        };
+        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_location(vfs_location) {
+            Ok(Some(file_entry)) => file_entry,
+            Ok(None) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Missing file entry: {}",
                     vfs_location
                 )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
             }
         };
         match file_entry.get_file_type() {
@@ -198,8 +208,13 @@ impl VfsScanner {
                 return Err(keramics_core::error_trace_new!("Unsupported file type"));
             }
         };
-        self.scan_for_sub_nodes(scan_options, &file_system, vfs_location, &mut scan_node)?;
-
+        match self.scan_for_sub_nodes(scan_options, &file_system, vfs_location, &mut scan_node) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to scan fro sub nodes");
+                return Err(error);
+            }
+        }
         scan_context.root_node = Some(scan_node);
 
         Ok(())
@@ -239,17 +254,42 @@ impl VfsScanner {
             | VfsType::Vhdx
             | VfsType::Vmdk => {
                 let mut result: Option<VfsType> =
-                    self.scan_for_volume_system_format(&data_stream)?;
-
+                    match self.scan_for_volume_system_format(&data_stream) {
+                        Ok(scan_results) => scan_results,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan data stream for volume system formats"
+                            );
+                            return Err(error);
+                        }
+                    };
                 if result.is_none() {
-                    result = self.scan_for_file_system_format(&data_stream)?;
+                    result = match self.scan_for_file_system_format(&data_stream) {
+                        Ok(scan_results) => scan_results,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan data stream for file system formats"
+                            );
+                            return Err(error);
+                        }
+                    };
                 }
                 Ok(result)
             }
             VfsType::Os => {
                 let mut result: Option<VfsType> =
-                    self.scan_for_storage_media_image_format(&data_stream)?;
-
+                    match self.scan_for_storage_media_image_format(&data_stream) {
+                        Ok(scan_results) => scan_results,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan data stream for storage media image formats"
+                            );
+                            return Err(error);
+                        }
+                    };
                 if result.is_none() {
                     let mut splitraw_image: SplitRawImage = SplitRawImage::new();
 
@@ -271,10 +311,28 @@ impl VfsScanner {
                     };
                 }
                 if result.is_none() {
-                    result = self.scan_for_volume_system_format(&data_stream)?;
+                    result = match self.scan_for_volume_system_format(&data_stream) {
+                        Ok(scan_results) => scan_results,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan data stream for volume system formats"
+                            );
+                            return Err(error);
+                        }
+                    };
                 }
                 if result.is_none() {
-                    result = self.scan_for_file_system_format(&data_stream)?;
+                    result = match self.scan_for_file_system_format(&data_stream) {
+                        Ok(scan_results) => scan_results,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan data stream for file system formats"
+                            );
+                            return Err(error);
+                        }
+                    };
                 }
                 Ok(result)
             }
@@ -395,12 +453,21 @@ impl VfsScanner {
                     node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
                 let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
-                self.scan_for_sub_nodes(
+                match self.scan_for_sub_nodes(
                     scan_options,
                     &node_file_system,
                     &node_vfs_location,
                     &mut sub_scan_node,
-                )?;
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan fro sub nodes"
+                        );
+                        return Err(error);
+                    }
+                }
                 scan_node.sub_nodes.push(sub_scan_node);
             }
             None => {}
@@ -935,12 +1002,21 @@ impl VfsScanner {
                         .new_with_layer(&sub_node_vfs_type, sub_node_path);
                     let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
 
-                    self.scan_for_sub_nodes(
+                    match self.scan_for_sub_nodes(
                         scan_options,
                         &node_file_system,
                         &volume_scan_node.location,
                         &mut sub_scan_node,
-                    )?;
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan for sub nodes"
+                            );
+                            return Err(error);
+                        }
+                    }
                     volume_scan_node.sub_nodes.push(sub_scan_node);
                 }
                 None => {}

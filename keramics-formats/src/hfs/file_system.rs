@@ -28,6 +28,7 @@ use super::extents_overflow_file::HfsExtentsOverflowFile;
 use super::file_entry::HfsFileEntry;
 use super::fork_descriptor::HfsForkDescriptor;
 use super::master_directory_block::HfsMasterDirectoryBlock;
+use super::string::HfsString;
 use super::volume_header::HfsVolumeHeader;
 
 /// Hierarchical File System (HFS) file system.
@@ -43,6 +44,9 @@ pub struct HfsFileSystem {
 
     /// Data area block number.
     data_area_block_number: u16,
+
+    /// Volume label.
+    volume_label: Option<HfsString>,
 
     /// Extents overflow file.
     extents_overflow_file: Arc<HfsExtentsOverflowFile>,
@@ -62,6 +66,7 @@ impl HfsFileSystem {
             format: HfsFormat::HfsPlus,
             block_size: 0,
             data_area_block_number: 0,
+            volume_label: None,
             extents_overflow_file: Arc::new(HfsExtentsOverflowFile::new()),
             catalog_file: Arc::new(HfsCatalogFile::new()),
             attributes_file: Arc::new(HfsAttributesFile::new()),
@@ -112,6 +117,13 @@ impl HfsFileSystem {
                 return Err(error);
             }
         }
+        match file_entry.read_attributes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
         Ok(Some(file_entry))
     }
 
@@ -151,6 +163,11 @@ impl HfsFileSystem {
         Ok(Some(file_entry))
     }
 
+    /// Retrieves the format.
+    pub fn get_format(&self) -> &HfsFormat {
+        &self.format
+    }
+
     /// Retrieves the root directory (file entry).
     pub fn get_root_directory(&self) -> Result<HfsFileEntry, ErrorTrace> {
         match self.get_file_entry_by_identifier(HFS_ROOT_DIRECTORY_IDENTIFIER) {
@@ -170,6 +187,11 @@ impl HfsFileSystem {
                 Err(error)
             }
         }
+    }
+
+    /// Retrieves the volume label.
+    pub fn get_volume_label(&self) -> Option<&HfsString> {
+        self.volume_label.as_ref()
     }
 
     /// Reads the attributes file.
@@ -387,6 +409,8 @@ impl HfsFileSystem {
                 self.format = HfsFormat::Hfs;
                 self.block_size = master_directory_block.block_size;
                 self.data_area_block_number = master_directory_block.data_area_block_number;
+                self.volume_label =
+                    Some(HfsString::ByteString(master_directory_block.volume_label));
 
                 let fork_descriptor: HfsForkDescriptor = HfsForkDescriptor {
                     size: master_directory_block.extents_overflow_file_size as u64,
@@ -483,6 +507,25 @@ impl HfsFileSystem {
             }
             _ => return Err(keramics_core::error_trace_new!("Unsupported signature")),
         }
+        if self.volume_label.is_none() {
+            match self
+                .catalog_file
+                .get_directory_entry_by_identifier(data_stream, HFS_ROOT_DIRECTORY_IDENTIFIER)
+            {
+                Ok(Some(directory_entry)) => self.volume_label = directory_entry.name,
+                Ok(None) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve directory entry: {} from catalog file",
+                            HFS_ROOT_DIRECTORY_IDENTIFIER
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        }
         Ok(())
     }
 }
@@ -533,6 +576,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for get_volume_label
+
     #[test]
     fn test_read_data_stream_with_hfs() -> Result<(), ErrorTrace> {
         let mut file_system: HfsFileSystem = HfsFileSystem::new();
@@ -562,6 +607,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for get_format
+
     #[test]
     fn test_get_root_directory_with_hfsplus() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
@@ -571,6 +618,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_volume_label
 
     #[test]
     fn test_read_data_stream_with_hfsplus() -> Result<(), ErrorTrace> {

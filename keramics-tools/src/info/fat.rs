@@ -112,9 +112,9 @@ impl FatFileEntryInfo {
             identifier: 0,
             name: None,
             size: 0,
-            modification_time: None,
-            access_time: None,
             creation_time: None,
+            access_time: None,
+            modification_time: None,
             file_attribute_flags: 0,
         }
     }
@@ -145,6 +145,12 @@ impl fmt::Display for FatFileEntryInfo {
         };
         writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
 
+        if let Some(date_time) = &self.creation_time {
+            // TODO: convert to formatter.
+            let date_time_string: String = Self::get_date_time_string(date_time);
+
+            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
+        }
         if let Some(date_time) = &self.modification_time {
             // TODO: convert to formatter.
             let date_time_string: String = Self::get_date_time_string(date_time);
@@ -160,12 +166,6 @@ impl fmt::Display for FatFileEntryInfo {
             let date_time_string: String = Self::get_date_time_string(date_time);
 
             writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
-        }
-        if let Some(date_time) = &self.creation_time {
-            // TODO: convert to formatter.
-            let date_time_string: String = Self::get_date_time_string(date_time);
-
-            writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
         }
         writeln!(
             formatter,
@@ -186,16 +186,16 @@ pub struct FatInfo {}
 
 impl FatInfo {
     /// Retrieves the file entry information.
-    fn get_file_entry_information(fat_file_entry: &FatFileEntry) -> FatFileEntryInfo {
+    fn get_file_entry_information(file_entry: &FatFileEntry) -> FatFileEntryInfo {
         let mut file_entry_information: FatFileEntryInfo = FatFileEntryInfo::new();
 
-        file_entry_information.identifier = fat_file_entry.identifier;
-        file_entry_information.name = fat_file_entry.get_name();
-        file_entry_information.size = fat_file_entry.get_size();
-        file_entry_information.modification_time = fat_file_entry.get_modification_time().cloned();
-        file_entry_information.access_time = fat_file_entry.get_access_time().cloned();
-        file_entry_information.creation_time = fat_file_entry.get_creation_time().cloned();
-        file_entry_information.file_attribute_flags = fat_file_entry.get_file_attribute_flags();
+        file_entry_information.identifier = file_entry.get_identifier();
+        file_entry_information.name = file_entry.get_name();
+        file_entry_information.size = file_entry.get_size();
+        file_entry_information.creation_time = file_entry.get_creation_time().cloned();
+        file_entry_information.modification_time = file_entry.get_modification_time().cloned();
+        file_entry_information.access_time = file_entry.get_access_time().cloned();
+        file_entry_information.file_attribute_flags = file_entry.get_file_attribute_flags();
 
         file_entry_information
     }
@@ -270,8 +270,8 @@ impl FatInfo {
                 return Err(error);
             }
         };
-        let fat_file_entry: FatFileEntry = match fat_file_system.get_file_entry_by_path(path) {
-            Ok(Some(fat_file_entry)) => fat_file_entry,
+        let file_entry: FatFileEntry = match fat_file_system.get_file_entry_by_path(path) {
+            Ok(Some(file_entry)) => file_entry,
             Ok(None) => return Err(keramics_core::error_trace_new!("Missing file entry")),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
@@ -283,7 +283,7 @@ impl FatInfo {
         println!("    Path\t\t\t\t\t: {}", path);
 
         let file_entry_information: FatFileEntryInfo =
-            Self::get_file_entry_information(&fat_file_entry);
+            Self::get_file_entry_information(&file_entry);
 
         print!("{}", file_entry_information);
 
@@ -371,7 +371,7 @@ impl FatInfo {
 
         for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
             let mut sub_file_entry: FatFileEntry = match result {
-                Ok(fat_file_entry) => fat_file_entry,
+                Ok(file_entry) => file_entry,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -429,9 +429,9 @@ mod tests {
             "    Identifier\t\t\t\t\t: 0x00006260\n",
             "    Name\t\t\t\t\t: testfile1\n",
             "    Size\t\t\t\t\t: 9\n",
+            "    Creation time\t\t\t\t: 2025-10-19T18:44:31.25\n",
             "    Modification time\t\t\t\t: 2025-10-19T18:44:30\n",
             "    Access time\t\t\t\t\t: 2025-10-19\n",
-            "    Creation time\t\t\t\t: 2025-10-19T18:44:31.25\n",
             "    File attribute flags\t\t\t: 0x20\n",
             "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n",
             "\n"
@@ -458,6 +458,14 @@ mod tests {
         );
         assert_eq!(test_struct.size, 9);
         assert_eq!(
+            test_struct.creation_time,
+            Some(DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
+                date: 0x5b53,
+                time: 0x958f,
+                fraction: 0x7d,
+            }))
+        );
+        assert_eq!(
             test_struct.modification_time,
             Some(DateTime::FatTimeDate(FatTimeDate {
                 date: 0x5b53,
@@ -467,14 +475,6 @@ mod tests {
         assert_eq!(
             test_struct.access_time,
             Some(DateTime::FatDate(FatDate { date: 0x5b53 }))
-        );
-        assert_eq!(
-            test_struct.creation_time,
-            Some(DateTime::FatTimeDate10Ms(FatTimeDate10Ms {
-                date: 0x5b53,
-                time: 0x958f,
-                fraction: 0x7d,
-            }))
         );
         assert_eq!(test_struct.file_attribute_flags, 0x20);
 

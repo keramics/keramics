@@ -18,6 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
+use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsHeader};
 use crate::path_component::PathComponent;
 
 use super::attribute_record::HfsAttributeRecord;
@@ -66,6 +67,9 @@ pub struct HfsFileEntry {
     /// Indirect node.
     indirect_node: Option<HfsDirectoryEntry>,
 
+    /// Compressed data header.
+    compressed_data_header: Option<DecmpfsHeader>,
+
     /// Sub directory entries.
     sub_directory_entries: HfsDirectoryEntries,
 
@@ -74,9 +78,6 @@ pub struct HfsFileEntry {
 
     /// Attributes.
     attributes: BTreeMap<HfsString, HfsAttributeRecord>,
-
-    /// Value to indicate the attributes file was read.
-    attributes_file_is_read: bool,
 }
 
 impl HfsFileEntry {
@@ -100,10 +101,10 @@ impl HfsFileEntry {
             identifier: directory_entry.get_identifier(),
             directory_entry,
             indirect_node: None,
+            compressed_data_header: None,
             sub_directory_entries: HfsDirectoryEntries::new(),
             symbolic_link_target: None,
             attributes: BTreeMap::new(),
-            attributes_file_is_read: false,
         }
     }
 
@@ -236,9 +237,12 @@ impl HfsFileEntry {
 
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
-        match self.get_data_fork_descriptor() {
-            Some(fork_descriptor) => fork_descriptor.size,
-            None => 0,
+        match self.compressed_data_header.as_ref() {
+            Some(compressed_data_header) => compressed_data_header.uncompressed_data_size,
+            None => match self.get_data_fork_descriptor() {
+                Some(fork_descriptor) => fork_descriptor.size,
+                None => 0,
+            },
         }
     }
 
@@ -280,15 +284,82 @@ impl HfsFileEntry {
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
-            Some(fork_descriptor) => fork_descriptor,
-            None => return Ok(None),
-        };
-        match self.get_block_stream(&fork_descriptor) {
-            Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
-                Err(error)
+        match self.compressed_data_header.as_ref() {
+            Some(compressed_data_header) => {
+                let compression_method: DecmpfsCompressionMethod =
+                    match compressed_data_header.get_compression_method() {
+                        Some(compression_method) => compression_method,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported compression method: {}",
+                                compressed_data_header.compression_method
+                            )));
+                        }
+                    };
+                let data_stream: DataStreamReference = match compressed_data_header
+                    .compression_method
+                {
+                    4 | 8 => {
+                        let fork_descriptor: &HfsForkDescriptor =
+                            match self.get_resource_fork_descriptor() {
+                                Some(fork_descriptor) => fork_descriptor,
+                                None => return Ok(None),
+                            };
+                        match self.get_block_stream(&fork_descriptor) {
+                            Ok(block_stream) => Arc::new(RwLock::new(block_stream)),
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve block stream"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    _ => {
+                        let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
+
+                        match self.attributes.get_key_value(&lookup_name) {
+                            Some((name, attribute_record)) => match attribute_record {
+                                HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
+                                    let data_stream: FakeDataStream = FakeDataStream::new(
+                                        &attribute_inline_data_record.data,
+                                        attribute_inline_data_record.data_size as u64,
+                                    );
+                                    Arc::new(RwLock::new(data_stream))
+                                }
+                                _ => {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unsupported decmpfs attribute record type"
+                                    ));
+                                }
+                            },
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Missing com.apple.decmpfs attribute record"
+                                ));
+                            }
+                        }
+                    }
+                };
+                // TODO: create compressed data stream from data stream
+                Ok(Some(data_stream))
+            }
+            None => {
+                let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
+                    Some(fork_descriptor) => fork_descriptor,
+                    None => return Ok(None),
+                };
+                match self.get_block_stream(&fork_descriptor) {
+                    Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve block stream"
+                        );
+                        Err(error)
+                    }
+                }
             }
         }
     }
@@ -346,16 +417,7 @@ impl HfsFileEntry {
     }
 
     /// Retrieves the number of extended attributes.
-    pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
-        if !self.attributes_file_is_read {
-            match self.read_attributes_file() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes file");
-                    return Err(error);
-                }
-            }
-        }
+    pub fn get_number_of_extended_attributes(&self) -> Result<usize, ErrorTrace> {
         Ok(self.attributes.len())
     }
 
@@ -380,10 +442,10 @@ impl HfsFileEntry {
                     }
                 }
             }
-            HfsAttributeRecord::InlineData(inline_data_attribute_record) => {
+            HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                 let data_stream: FakeDataStream = FakeDataStream::new(
-                    &inline_data_attribute_record.data,
-                    inline_data_attribute_record.data_size as u64,
+                    &attribute_inline_data_record.data,
+                    attribute_inline_data_record.data_size as u64,
                 );
                 Ok(Arc::new(RwLock::new(data_stream)))
             }
@@ -392,18 +454,9 @@ impl HfsFileEntry {
 
     /// Retrieves a specific extended attribute.
     pub fn get_extended_attribute_by_index(
-        &mut self,
+        &self,
         extended_attribute_index: usize,
     ) -> Result<HfsExtendedAttribute, ErrorTrace> {
-        if !self.attributes_file_is_read {
-            match self.read_attributes_file() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes file");
-                    return Err(error);
-                }
-            }
-        }
         match self.attributes.iter().nth(extended_attribute_index) {
             Some((name, attribute_record)) => {
                 let data_stream: DataStreamReference =
@@ -428,18 +481,9 @@ impl HfsFileEntry {
 
     /// Retrieves a specific extended attribute.
     pub fn get_extended_attribute_by_name(
-        &mut self,
+        &self,
         extended_attribute_name: &PathComponent,
     ) -> Result<Option<HfsExtendedAttribute>, ErrorTrace> {
-        if !self.attributes_file_is_read {
-            match self.read_attributes_file() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read attributes file");
-                    return Err(error);
-                }
-            }
-        }
         let lookup_name: HfsString = match extended_attribute_name.to_utf16_string() {
             Ok(utf16_string) => HfsString::Utf16String(utf16_string),
             Err(mut error) => {
@@ -535,6 +579,13 @@ impl HfsFileEntry {
                         return Err(error);
                     }
                 }
+                match file_entry.read_attributes() {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                        return Err(error);
+                    }
+                }
                 Ok(file_entry)
             }
             None => Err(keramics_core::error_trace_new!(format!(
@@ -576,6 +627,13 @@ impl HfsFileEntry {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read indirect node");
+                return Err(error);
+            }
+        }
+        match file_entry.read_attributes() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
                 return Err(error);
             }
         }
@@ -624,11 +682,13 @@ impl HfsFileEntry {
         }
     }
 
-    /// Reads the attributes file.
-    fn read_attributes_file(&mut self) -> Result<(), ErrorTrace> {
+    /// Reads the attributes.
+    pub(super) fn read_attributes(&mut self) -> Result<(), ErrorTrace> {
+        let identifier: u32 = self.get_identifier();
+
         match self.attributes_file.get_attributes_by_identifier(
             &self.data_stream,
-            self.identifier,
+            identifier,
             &mut self.attributes,
         ) {
             Ok(_) => {}
@@ -637,14 +697,39 @@ impl HfsFileEntry {
                     error,
                     format!(
                         "Unable to retrieve attributes for identifier: {}",
-                        self.identifier
+                        identifier
                     )
                 );
                 return Err(error);
             }
         }
-        self.attributes_file_is_read = true;
+        let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
+        match self.attributes.get_key_value(&lookup_name) {
+            Some((name, attribute_record)) => match attribute_record {
+                HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
+                    let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
+
+                    match compressed_data_header.read_data(&attribute_inline_data_record.data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read compressed data header"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    self.compressed_data_header = Some(compressed_data_header);
+                }
+                _ => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported decmpfs attribute record type"
+                    ));
+                }
+            },
+            None => {}
+        }
         Ok(())
     }
 
@@ -901,15 +986,13 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
-        let mut hfs_file_entry: HfsFileEntry =
-            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = hfs_file_entry.get_data_stream()?;
         assert!(result.is_none());
 
         let path: Path = Path::from("/testdir1/testfile1");
-        let mut hfs_file_entry: HfsFileEntry =
-            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let result: Option<DataStreamReference> = hfs_file_entry.get_data_stream()?;
         assert!(result.is_some());
@@ -964,8 +1047,7 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
-        let mut hfs_file_entry: HfsFileEntry =
-            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_attributes: usize = hfs_file_entry.get_number_of_extended_attributes()?;
         assert_eq!(number_of_attributes, 1);
@@ -978,8 +1060,7 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
-        let mut hfs_file_entry: HfsFileEntry =
-            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let extended_attribute: HfsExtendedAttribute =
             hfs_file_entry.get_extended_attribute_by_index(0)?;
@@ -1000,8 +1081,7 @@ mod tests {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
-        let mut hfs_file_entry: HfsFileEntry =
-            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let name: PathComponent = PathComponent::from("myxattr1");
         let extended_attribute: HfsExtendedAttribute = hfs_file_entry
@@ -1207,7 +1287,7 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for read_attributes_file
+    // TODO: add tests for read_attributes
     // TODO: add tests for read_indirect_node
     // TODO: add tests for read_sub_directory_entries
 }
