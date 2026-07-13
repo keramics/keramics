@@ -142,14 +142,14 @@ detach_image()
 
 	for ((attempt=1; attempt<=5; attempt++))
        	do
-		hdiutil detach "${DMG_DEVICE}" 2>/dev/null
+		hdiutil detach "${DISK_NODE}" 2>/dev/null
 
 		if test $? -eq 0
 		then
 			break
 		fi
 		echo ""
-		echo "${DMG_DEVICE} busy, waiting 10 seconds."
+		echo "${DISK_NODE} busy, waiting 10 seconds."
 		sleep 10
 	done
 
