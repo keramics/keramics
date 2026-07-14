@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
@@ -60,22 +61,34 @@ impl HfsBlockStream {
         self.block_tree =
             BlockTree::<HfsBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
 
-        for block_range in block_ranges.iter() {
+        for (range_index, block_range) in block_ranges.iter().enumerate() {
             let range_logical_offset: u64 =
                 (block_range.logical_block_number as u64) * (self.block_size as u64);
-            let range_size: u64 = (block_range.number_of_blocks as u64) * (self.block_size as u64);
 
+            if range_logical_offset >= block_tree_data_size {
+                break;
+            }
+            let range_size: u64 = min(
+                (block_range.number_of_blocks as u64) * (self.block_size as u64),
+                block_tree_data_size - range_logical_offset,
+            );
             match self.block_tree.insert_value(
                 range_logical_offset,
                 range_size,
                 block_range.clone(),
             ) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to insert block range: {} [{} - {}] into block tree",
+                            range_index,
+                            range_logical_offset,
+                            range_logical_offset + range_size
+                        )
+                    );
+                    return Err(error);
                 }
             }
         }

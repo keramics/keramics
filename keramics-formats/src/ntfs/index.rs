@@ -158,13 +158,14 @@ impl NtfsIndex {
                     .insert_value(virtual_cluster_offset, range_size, block_range)
                 {
                     Ok(_) => {}
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to insert block range into block tree",
-                            error
-                        ));
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to insert block range into block tree"
+                        );
+                        return Err(error);
                     }
-                };
+                }
                 virtual_cluster_number += data_run.number_of_blocks as u64;
                 virtual_cluster_offset += range_size;
             }

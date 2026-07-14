@@ -167,13 +167,14 @@ impl SparseImageFile {
                 block_range,
             ) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
-            };
+            }
         }
         if mediator.debug_output {
             if number_of_bands % 16 != 0 {

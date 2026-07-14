@@ -16,6 +16,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
+use clap_num::maybe_hex;
 
 use keramics_core::ErrorTrace;
 use keramics_core::mediator::Mediator;
@@ -36,11 +37,11 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
-    #[arg(short, long, default_value_t = 0)]
-    /// Offset within the source file.
+    #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]
+    /// Offset within the storage media
     offset: u64,
 
-    /// Comma seperated list of partitions to include.
+    /// Comma seperated list of partitions to include
     #[arg(long)]
     partitions: Option<String>,
 

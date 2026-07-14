@@ -152,13 +152,14 @@ impl NtfsCompressedStream {
                                 compression_range,
                             ) {
                                 Ok(_) => {}
-                                Err(error) => {
-                                    return Err(keramics_core::error_trace_new_with_error!(
-                                        "Unable to insert block range into block tree",
-                                        error
-                                    ));
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to insert block range into block tree"
+                                    );
+                                    return Err(error);
                                 }
-                            };
+                            }
                             virtual_cluster_offset += compression_range_size;
 
                             compression_range = NtfsCompressionRange::new(
@@ -197,13 +198,14 @@ impl NtfsCompressedStream {
                     compression_range,
                 ) {
                     Ok(_) => {}
-                    Err(error) => {
-                        return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to insert block range into block tree",
-                            error
-                        ));
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to insert block range into block tree"
+                        );
+                        return Err(error);
                     }
-                };
+                }
             }
         }
         self.size = data_attribute.data_size;

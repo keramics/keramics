@@ -20,7 +20,7 @@ use clap::{Args, Parser, Subcommand};
 use clap_num::maybe_hex;
 
 use keramics_core::mediator::Mediator;
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 
@@ -28,13 +28,15 @@ mod enums;
 mod formatters;
 mod info;
 mod range_stream;
+mod storage_media_image;
 
 use crate::enums::EncodingType;
 use crate::info::{
     ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
     SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
-use crate::range_stream::FileRangeDataStream;
+use crate::range_stream::RangeDataStream;
+use crate::storage_media_image::StorageMediaImage;
 
 #[derive(Parser)]
 #[command(version, about = "Provides information about file formats", long_about = None)]
@@ -47,8 +49,12 @@ struct CommandLineArguments {
     #[arg(long, value_enum)]
     encoding: Option<EncodingType>,
 
+    #[arg(long, default_value_t = false)]
+    /// Process storage media image contents
+    image: bool,
+
     #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]
-    /// Offset within the source file
+    /// Offset within the source file or storage media
     offset: u64,
 
     /// Path of the source file
@@ -93,11 +99,17 @@ struct PathCommandArguments {
 struct InfoTool {
     /// Character encoding.
     character_encoding: Option<CharacterEncoding>,
+
+    /// Image mode.
+    image_mode: bool,
+
+    /// Offset.
+    offset: u64,
 }
 
 impl InfoTool {
     /// Creates a new info tool.
-    fn new(encoding_type: &Option<EncodingType>) -> InfoTool {
+    fn new(encoding_type: &Option<EncodingType>, image_mode: bool, offset: u64) -> InfoTool {
         let character_encoding: Option<CharacterEncoding> = match encoding_type {
             Some(EncodingType::Ascii) => Some(CharacterEncoding::Ascii),
             Some(EncodingType::Iso8859_1) => Some(CharacterEncoding::Iso8859_1),
@@ -134,31 +146,76 @@ impl InfoTool {
             Some(EncodingType::Windows1258) => Some(CharacterEncoding::Windows1258),
             None => None,
         };
-        InfoTool { character_encoding }
+        InfoTool {
+            character_encoding,
+            image_mode,
+            offset,
+        }
+    }
+
+    /// Retrieves a data stream.
+    pub fn get_data_stream(&self, path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
+        let data_stream: DataStreamReference = if self.image_mode {
+            let storage_media_image: StorageMediaImage = match StorageMediaImage::open(path) {
+                Ok(storage_media_image) => storage_media_image,
+                Err(error) => {
+                    return Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to open storage media image",
+                        error
+                    ));
+                }
+            };
+            storage_media_image.get_data_stream()
+        } else {
+            match open_os_data_stream(path) {
+                Ok(data_stream) => data_stream,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                    return Err(error);
+                }
+            }
+        };
+        if self.offset == 0 {
+            return Ok(data_stream);
+        }
+        let mut range_data_stream: RangeDataStream = RangeDataStream::new(data_stream, self.offset);
+
+        match range_data_stream.open() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open range data stream");
+                return Err(error);
+            }
+        }
+        Ok(Arc::new(RwLock::new(range_data_stream)))
     }
 
     /// Scans a data stream for format signatures.
     fn scan_for_formats(
+        &self,
         data_stream: &DataStreamReference,
     ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
+
+        if !self.image_mode {
+            format_scanner.add_ewf_signatures();
+            format_scanner.add_pdi_signatures();
+            format_scanner.add_qcow_signatures();
+            // TODO: add support for sparse bundle.
+            format_scanner.add_sparseimage_signatures();
+            format_scanner.add_udif_signatures();
+            format_scanner.add_vhd_signatures();
+            format_scanner.add_vhdx_signatures();
+            format_scanner.add_vmdk_signatures();
+            // TODO: add support for individual VMDK sparse file.
+            // TODO: add support for individual VMDK sparse COWD file.
+        }
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
-        format_scanner.add_ewf_signatures();
         format_scanner.add_fat_signatures();
         format_scanner.add_hfs_signatures();
         format_scanner.add_gpt_signatures();
         format_scanner.add_ntfs_signatures();
-        format_scanner.add_pdi_signatures();
-        format_scanner.add_qcow_signatures();
-        // TODO: add support for sparse bundle.
-        format_scanner.add_sparseimage_signatures();
-        format_scanner.add_udif_signatures();
-        format_scanner.add_vhd_signatures();
-        format_scanner.add_vhdx_signatures();
-        format_scanner.add_vmdk_signatures();
-        // TODO: add support for individual VMDK sparse file.
-        // TODO: add support for individual VMDK sparse COWD file.
 
         match format_scanner.build() {
             Ok(_) => {}
@@ -235,20 +292,16 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let info_tool: InfoTool = InfoTool::new(&arguments.encoding);
+    let info_tool: InfoTool = InfoTool::new(&arguments.encoding, arguments.image, arguments.offset);
 
-    let mut file_range_stream: FileRangeDataStream = FileRangeDataStream::new(arguments.offset);
-
-    match file_range_stream.open(source) {
-        Ok(_) => {}
+    let data_stream: DataStreamReference = match info_tool.get_data_stream(&arguments.source) {
+        Ok(data_stream) => data_stream,
         Err(error) => {
-            println!("Unable to open file with error:\n{}", error);
+            println!("Unable to open data stream with error:\n{}", error);
             return ExitCode::FAILURE;
         }
-    }
-    let data_stream: DataStreamReference = Arc::new(RwLock::new(file_range_stream));
-
-    let result: Option<FormatIdentifier> = match InfoTool::scan_for_formats(&data_stream) {
+    };
+    let result: Option<FormatIdentifier> = match info_tool.scan_for_formats(&data_stream) {
         Ok(result) => result,
         Err(error) => {
             println!(

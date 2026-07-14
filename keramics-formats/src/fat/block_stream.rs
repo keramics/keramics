@@ -90,13 +90,14 @@ impl FatBlockStream {
                 .insert_value(logical_offset, self.block_size as u64, block_range)
             {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to insert block range into block tree",
-                        error
-                    ));
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to insert block range into block tree"
+                    );
+                    return Err(error);
                 }
-            };
+            }
             logical_offset += self.block_size as u64;
 
             read_cluster_block_numbers.insert(cluster_block_number);
