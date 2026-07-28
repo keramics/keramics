@@ -388,9 +388,9 @@ The MDB is 162 bytes in size and consists of:
 | 14 | 2 | | Volume bitmap block number, contains a block number relative from the start of the volume, where 0 is the first block number, typically 3 |
 | 16 | 2 | | [Next allocation search](#next_allocation_search) block number |
 | 18 | 2 | | Number of blocks, where a volume can contain at most 65535 blocks |
-| 20 | 4 | | Block size, in bytes, must be a multitude of 512 |
+| 20 | 4 | | Block size (drAlBlkSiz), in bytes, must be a multitude of 512 |
 | 24 | 4 | | Clump size, in bytes |
-| 28 | 2 | | Data area block number, contains a block number relative from the start of the volume, where 0 is the first block number |
+| 28 | 2 | | Data area start sector (drAlBlSt), contains a sector number relative from the start of the volume, where 0 is the first sector number and bytes per sector is 512 |
 | 30 | 4 | | Next available catalog node identifier (CNID), which can be a directory or file record identifier |
 | 34 | 2 | | Number of unused blocks |
 | 36 | 1 | | Volume label size, with a maximum of 27 |
@@ -404,8 +404,8 @@ The MDB is 162 bytes in size and consists of:
 | 84 | 4 | | Total number of files, which does not include file system metadata files |
 | 88 | 4 | | Total number of directories (folders), which does not include the root folder |
 | 92 | 32 | | [Finder information](#finder_information) |
-| 124 | 2 | | Embedded volume signature (drVCSize) |
-| 126 | 4 | | Embedded volume [extent descriptor](#hfs_extents_descriptor) (drVBMCSize and drCtlCSize) |
+| 124 | 2 | | Embedded volume signature (drEmbedSigWord, previously used for drVCSize) |
+| 126 | 4 | | Embedded volume [extent descriptor](#hfs_extents_descriptor) (drEmbedExtent, previously used for drVBMCSize and drCtlCSize) |
 | 130 | 4 | | Extents overflow file size |
 | 134 | 12 | | Extents overflow file [extents record](#hfs_extents_record) |
 | 146 | 4 | | Catalog file size |
@@ -1808,9 +1808,12 @@ The file has an extended attribute named "com.apple.decmpfs" and the content is 
 
 ## HFS wrapper {#hfs_wrapper}
 
-TODO: complete section
+A HFS+ can be wrapped in a HFS volume, a HFSX volume cannot.
 
-A HFSX volume cannot be wrapped in a HFS volume.
+A HFS wrapped HFS+ file system consists of a:
+
+* [master directory block (MDB)](#hfs_master_directory_block), where the "Embedded volume signature"
+  contains "H+"
 
 ## References
 

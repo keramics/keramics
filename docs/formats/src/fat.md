@@ -359,8 +359,7 @@ Valid FAT short file name characters are:
 | '~' | Tilde |
 | 0x80 - 0xff | Extended ASCII character, which are codepage dependent |
 
-> Note that other characters such as plus sign ('+') have been observed in FAT
-> short file names.
+> Note that other characters such as plus sign ('+') have been observed in FAT short file names.
 
 #### First character {#short_name_first_character}
 

@@ -48,12 +48,22 @@ impl FormatScanner {
     /// Adds Apple Partition Map (APM) signatures.
     pub fn add_apm_signatures(&mut self) {
         // APM signature.
-        // Note that technically "PM" at offset 512 is the Apple Partion Map
+        // Note that technically "PM" at offset 512 or 2048 is the Apple Partion Map
         // signature but using the partition type is less error prone.
         self.signature_scanner.add_signature(Signature::new(
             "apm1",
             PatternType::BoundToStart,
             560,
+            &[
+                0x41, 0x70, 0x70, 0x6c, 0x65, 0x5f, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f,
+                0x6e, 0x5f, 0x6d, 0x61, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ],
+        ));
+        self.signature_scanner.add_signature(Signature::new(
+            "apm2",
+            PatternType::BoundToStart,
+            2096,
             &[
                 0x41, 0x70, 0x70, 0x6c, 0x65, 0x5f, 0x70, 0x61, 0x72, 0x74, 0x69, 0x74, 0x69, 0x6f,
                 0x6e, 0x5f, 0x6d, 0x61, 0x70, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -163,32 +173,10 @@ impl FormatScanner {
 
     /// Adds Master Boot Record (MBR) signatures.
     pub fn add_mbr_signatures(&mut self) {
-        // Signature for 512 bytes per sector.
         self.signature_scanner.add_signature(Signature::new(
             "mbr1",
             PatternType::BoundToStart,
             510,
-            MBR_BOOT_SIGNATURE,
-        ));
-        // Signature for 1024 bytes per sector.
-        self.signature_scanner.add_signature(Signature::new(
-            "mbr2",
-            PatternType::BoundToStart,
-            1022,
-            MBR_BOOT_SIGNATURE,
-        ));
-        // Signature for 2048 bytes per sector.
-        self.signature_scanner.add_signature(Signature::new(
-            "mbr3",
-            PatternType::BoundToStart,
-            2046,
-            MBR_BOOT_SIGNATURE,
-        ));
-        // Signature for 4096 bytes per sector.
-        self.signature_scanner.add_signature(Signature::new(
-            "mbr4",
-            PatternType::BoundToStart,
-            4094,
             MBR_BOOT_SIGNATURE,
         ));
     }
@@ -367,13 +355,13 @@ impl FormatScanner {
         let mut scan_results: HashSet<FormatIdentifier> = HashSet::new();
         for signature in scan_context.results.values() {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
-                "apm1" => FormatIdentifier::Apm,
+                "apm1" | "apm2" => FormatIdentifier::Apm,
                 "ewf1" => FormatIdentifier::Ewf,
                 "ext1" => FormatIdentifier::Ext,
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,
                 "hfs1" | "hfs2" | "hfs3" => FormatIdentifier::Hfs,
-                "mbr1" | "mbr2" | "mbr3" | "mbr4" => FormatIdentifier::Mbr,
+                "mbr1" => FormatIdentifier::Mbr,
                 "ntfs1" => FormatIdentifier::Ntfs,
                 "pdi1" => FormatIdentifier::Pdi,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
