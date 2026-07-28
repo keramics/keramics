@@ -411,9 +411,18 @@ impl HfsFileSystem {
                         return Err(error);
                     }
                 }
+                let data_area_start_offset: u32 =
+                    (master_directory_block.data_area_start_sector as u32) * 512;
+
+                if data_area_start_offset % master_directory_block.block_size != 0 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unsupported data area start sector not a multitude of block size"
+                    ));
+                }
                 self.format = HfsFormat::Hfs;
                 self.block_size = master_directory_block.block_size;
-                self.data_area_block_number = master_directory_block.data_area_block_number;
+                self.data_area_block_number =
+                    (data_area_start_offset / master_directory_block.block_size) as u16;
                 self.volume_label =
                     Some(HfsString::ByteString(master_directory_block.volume_label));
 

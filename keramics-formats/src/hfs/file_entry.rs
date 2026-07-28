@@ -663,9 +663,9 @@ impl HfsFileEntry {
 
     /// Determines if the file entry is a directory.
     pub fn is_directory(&self) -> bool {
-        match self.get_file_mode() {
-            Some(file_mode) => *file_mode & 0xf000 == HFS_FILE_MODE_TYPE_DIRECTORY,
-            None => false,
+        match &self.indirect_node {
+            Some(indirect_node) => indirect_node.is_directory(),
+            None => self.directory_entry.is_directory(),
         }
     }
 

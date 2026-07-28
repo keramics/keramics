@@ -79,4 +79,7 @@ then
 	set +e
 fi
 
+# dd if=/dev/zero of=hfs_wrapped_hfsplus.raw bs=512 count=$(( ( 8 * 1024 * 1024 ) / 512 ))
+# ./newfs_hfs -w -v "TestWrappedHFS" hfs_wrapped_hfsplus.raw
+
 exit ${EXIT_SUCCESS}

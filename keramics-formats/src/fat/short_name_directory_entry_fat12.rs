@@ -62,7 +62,7 @@ impl Fat12ShortNameDirectoryEntry {
                 directory_entry.name.elements.push(*byte_value);
             }
         }
-        if data[8] != 0 && data[8] != b' ' {
+        if data[8] != 0 && &data[8..11] != b"   " {
             // Do not add an extension separator for a volume label.
             if directory_entry.file_attribute_flags & 0x58 != FAT_FILE_ATTRIBUTE_FLAG_VOLUME_LABEL {
                 directory_entry.name.elements.push(b'.');

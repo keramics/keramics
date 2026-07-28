@@ -27,14 +27,14 @@ use super::extent_descriptor_standard::HfsStandardExtentDescriptor;
         field(name = "signature", data_type = "ByteString<2>"),
         field(name = "creation_time", data_type = "HfsTime"),
         field(name = "modification_time", data_type = "HfsTime"),
-        field(name = "attribute_flags", data_type = "u16"),
+        field(name = "attribute_flags", data_type = "u16", format = "hex"),
         field(name = "number_of_files_in_root", data_type = "u16"),
         field(name = "bitmap_block_number", data_type = "u16"),
         field(name = "next_allocation_search_block_number", data_type = "u16"),
         field(name = "number_of_blocks", data_type = "u16"),
         field(name = "block_size", data_type = "u32"),
         field(name = "clump_size", data_type = "u32"),
-        field(name = "data_area_block_number", data_type = "u16"),
+        field(name = "data_area_start_sector", data_type = "u16"),
         field(name = "next_available_catalog_node_identifier", data_type = "u32"),
         field(name = "number_of_unused_blocks", data_type = "u16"),
         field(name = "volume_label_size", data_type = "u8"),
@@ -48,8 +48,11 @@ use super::extent_descriptor_standard::HfsStandardExtentDescriptor;
         field(name = "number_of_files", data_type = "u32"),
         field(name = "number_of_directories", data_type = "u32"),
         field(name = "finder_information", data_type = "[u8; 32]"),
-        field(name = "embedded_volume_signature", data_type = "u16"),
-        field(name = "embedded_volume_extent_descriptor", data_type = "[u8; 4]"),
+        field(name = "embedded_volume_signature", data_type = "ByteString<2>"),
+        field(
+            name = "embedded_volume_extent_descriptor",
+            data_type = "Struct<HfsStandardExtentDescriptor; 4>"
+        ),
         field(name = "extents_overflow_file_size", data_type = "u32"),
         field(
             name = "extents_overflow_file_extents_record",
@@ -68,8 +71,8 @@ pub struct HfsMasterDirectoryBlock {
     /// Block size.
     pub block_size: u32,
 
-    /// Data area block number.
-    pub data_area_block_number: u16,
+    /// Data area start sector.
+    pub data_area_start_sector: u16,
 
     /// Volume label.
     pub volume_label: ByteString,
@@ -85,6 +88,9 @@ pub struct HfsMasterDirectoryBlock {
 
     /// Catalog file extents.
     pub catalog_file_extents: Vec<HfsExtentDescriptor>,
+
+    /// Embedded volume extent.
+    pub embedded_volume_extent: Option<HfsExtentDescriptor>,
 }
 
 impl HfsMasterDirectoryBlock {
@@ -92,12 +98,13 @@ impl HfsMasterDirectoryBlock {
     pub fn new() -> Self {
         Self {
             block_size: 0,
-            data_area_block_number: 0,
+            data_area_start_sector: 0,
             volume_label: ByteString::new_with_encoding(&CharacterEncoding::MacRoman),
             extents_overflow_file_size: 0,
             extents_overflow_file_extents: Vec::new(),
             catalog_file_size: 0,
             catalog_file_extents: Vec::new(),
+            embedded_volume_extent: None,
         }
     }
 
@@ -110,7 +117,7 @@ impl HfsMasterDirectoryBlock {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.block_size = bytes_to_u32_be!(data, 20);
-        self.data_area_block_number = bytes_to_u16_be!(data, 28);
+        self.data_area_start_sector = bytes_to_u16_be!(data, 28);
 
         if data[36] > 27 {
             return Err(keramics_core::error_trace_new!(
@@ -121,6 +128,21 @@ impl HfsMasterDirectoryBlock {
 
         if data_end_offset > 37 {
             self.volume_label.read_data(&data[37..data_end_offset]);
+        }
+        if &data[124..126] == b"H+" {
+            let mut extent_descriptor: HfsExtentDescriptor = HfsExtentDescriptor::new();
+
+            match HfsStandardExtentDescriptor::read_data(&mut extent_descriptor, &data[126..130]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read embedded volume extent descriptor"
+                    );
+                    return Err(error);
+                }
+            }
+            self.embedded_volume_extent = Some(extent_descriptor);
         }
         self.extents_overflow_file_size = bytes_to_u32_be!(data, 130);
 
@@ -236,7 +258,7 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.block_size, 512);
-        assert_eq!(test_struct.data_area_block_number, 5);
+        assert_eq!(test_struct.data_area_start_sector, 5);
         assert_eq!(test_struct.extents_overflow_file_size, 32256);
         assert_eq!(
             test_struct.extents_overflow_file_extents,
