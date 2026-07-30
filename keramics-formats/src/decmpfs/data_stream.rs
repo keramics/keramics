@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_compression::{LzfseContext, LzvnContext, ZlibContext};
@@ -45,15 +44,6 @@ pub struct DecmpfsDataStream {
     /// Decompressed block cache.
     block_cache: LruCache<u64, Vec<u8>>,
 
-    /// The compressed segment data buffer.
-    compressed_segment_data: Vec<u8>,
-
-    /// The decompressed block data.
-    decompressed_block_data: Option<Vec<u8>>,
-
-    /// The current compressed block index.
-    current_compressed_block_index: u32,
-
     /// The number of compressed blocks.
     number_of_compressed_blocks: u32,
 }
@@ -71,9 +61,6 @@ impl DecmpfsDataStream {
             size: 0,
             block_offsets: Vec::new(),
             block_cache: LruCache::new(8),
-            compressed_segment_data: vec![0u8; Self::BLOCK_SIZE + 1],
-            decompressed_block_data: None,
-            current_compressed_block_index: u32::MAX,
             number_of_compressed_blocks: 0,
         }
     }
@@ -107,121 +94,164 @@ impl DecmpfsDataStream {
 
     /// Reads media data based on the compressed blocks.
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
-        let mut bytes_read: usize = 0;
-
-        if self.block_offsets.is_empty() {
+        if self.size > 0 && self.block_offsets.is_empty() {
             self.compute_block_offsets()?;
         }
 
-        if self.compression_method == DecmpfsCompressionMethod::Unknown5 {
-            let remaining: u64 = self.size - self.current_offset;
-            let read_size = std::cmp::min(data.len(), remaining as usize);
-            data[..read_size].fill(0);
-            self.current_offset += read_size as u64;
-            return Ok(read_size);
-        }
+        let mut bytes_read: usize = 0;
+        let mut current_offset: u64 = self.current_offset;
 
         while bytes_read < data.len() {
-            let block_index: u32 = ((self.current_offset as u64) / Self::BLOCK_SIZE as u64) as u32;
-            let offset_in_block: usize =
-                ((self.current_offset as u64) % Self::BLOCK_SIZE as u64) as usize;
+            if current_offset >= self.size {
+                break;
+            }
+
+            let block_index: u32 = (current_offset / Self::BLOCK_SIZE as u64) as u32;
 
             if block_index >= self.number_of_compressed_blocks {
                 break;
             }
 
-            if self.current_compressed_block_index != block_index {
-                let compressed_offset: u64 = self.block_offsets[block_index as usize] as u64;
-                let compressed_length: u32 = self.block_offsets[(block_index + 1) as usize]
-                    - self.block_offsets[block_index as usize];
+            let compressed_offset: u64 = self.block_offsets[block_index as usize] as u64;
+            let compressed_length: u32 = self.block_offsets[(block_index + 1) as usize]
+                - self.block_offsets[block_index as usize];
 
-                if compressed_length == 0 {
-                    self.current_compressed_block_index = block_index;
-                    continue;
-                }
+            if compressed_length == 0 {
+                break;
+            }
 
-                if let Some(ref stream) = self.data_stream {
-                    let read_result = match stream.write() {
-                        Ok(mut ds) => ds.read_at_position(
-                            &mut self.compressed_segment_data[..compressed_length as usize],
-                            SeekFrom::Start(compressed_offset),
-                        ),
-                        Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain write lock on data stream",
-                            error
-                        )),
-                    };
-                    match read_result {
-                        Ok(read) => {
-                            if read != compressed_length as usize {
-                                return Err(keramics_core::error_trace_new!(format!(
-                                    "Unable to read compressed block: expected {}, got {}",
-                                    compressed_length, read
-                                )));
-                            }
-                        }
+            let range_offset: u64 = block_index as u64 * Self::BLOCK_SIZE as u64;
+            let range_size: u64 = std::cmp::min(Self::BLOCK_SIZE as u64, self.size - range_offset);
+
+            let block_relative_offset: u64 = current_offset - range_offset;
+            let block_remainder_size: u64 = range_size - block_relative_offset;
+
+            let block_read_size: usize =
+                std::cmp::min(data.len() - bytes_read, block_remainder_size as usize);
+
+            if block_read_size == 0 {
+                break;
+            }
+
+            let data_end_offset: usize = bytes_read + block_read_size;
+
+            let copied_size = if range_size == (compressed_length as u64) {
+                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                    Some(stream) => stream,
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+                    }
+                };
+                let read_offset: u64 = compressed_offset + block_relative_offset;
+
+                keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut data[bytes_read..data_end_offset],
+                    SeekFrom::Start(read_offset)
+                );
+                block_read_size
+            } else {
+                if !self.block_cache.contains(&compressed_offset) {
+                    let mut decompressed: Vec<u8> = vec![0u8; Self::BLOCK_SIZE];
+                    let decompressed_size = match self.read_compressed_block(
+                        compressed_offset,
+                        compressed_length as usize,
+                        &mut decompressed,
+                    ) {
+                        Ok(size) => size,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
                                 format!(
-                                    "Unable to read compressed block at offset: {}",
-                                    compressed_offset
+                                    "Unable to read compressed block at offset: {} (0x{:08x})",
+                                    compressed_offset, compressed_offset
                                 )
                             );
                             return Err(error);
                         }
-                    }
-                } else {
-                    return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+                    };
+                    decompressed.truncate(decompressed_size);
+                    self.block_cache.insert(compressed_offset, decompressed);
                 }
-
-                let mut decompressed = vec![0u8; Self::BLOCK_SIZE];
-                let decompressed_size = match self.decompress_data(
-                    &self.compressed_segment_data[..compressed_length as usize],
-                    &mut decompressed,
-                ) {
-                    Ok(size) => size,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
-                        return Err(error);
+                let block_data: &Vec<u8> = match self.block_cache.get(&compressed_offset) {
+                    Some(data) => data,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unable to retrieve data from cache"
+                        ));
                     }
                 };
-                decompressed.truncate(decompressed_size);
 
-                self.decompressed_block_data = Some(decompressed);
-                self.current_compressed_block_index = block_index;
-            }
+                let block_data_offset: usize = block_relative_offset as usize;
+                let block_data_end_offset: usize =
+                    std::cmp::min(block_data_offset + block_read_size, block_data.len());
 
-            let decompressed_data = match &self.decompressed_block_data {
-                Some(d) => d.as_slice(),
-                None => {
+                if block_data_offset >= block_data.len() {
                     return Err(keramics_core::error_trace_new!(
-                        "Decompressed block is empty"
+                        "Invalid offset within decompressed block"
                     ));
                 }
+
+                let copy_size: usize = block_data_end_offset - block_data_offset;
+                let remaining_output: usize = data_end_offset - bytes_read;
+                let final_copy_size: usize = std::cmp::min(copy_size, remaining_output);
+
+                data[bytes_read..bytes_read + final_copy_size].copy_from_slice(
+                    &block_data[block_data_offset..block_data_offset + final_copy_size],
+                );
+
+                final_copy_size
             };
 
-            if offset_in_block >= decompressed_data.len() {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid offset within decompressed block"
-                ));
-            }
-
-            let remaining_in_block: usize = decompressed_data.len() - offset_in_block;
-            let remaining_in_output: usize = data.len() - bytes_read;
-            let copy_size: usize = std::cmp::min(remaining_in_block, remaining_in_output);
-
-            data[bytes_read..bytes_read + copy_size]
-                .copy_from_slice(&decompressed_data[offset_in_block..offset_in_block + copy_size]);
-
-            bytes_read += copy_size;
-
-            if offset_in_block + copy_size >= decompressed_data.len() {
-                self.current_compressed_block_index = u32::MAX;
-            }
+            bytes_read += copied_size;
+            current_offset += copied_size as u64;
         }
 
+        self.current_offset = current_offset;
         Ok(bytes_read)
+    }
+
+    /// Reads and decompresses a compressed block.
+    fn read_compressed_block(
+        &self,
+        block_offset: u64,
+        compressed_length: usize,
+        decompressed: &mut [u8],
+    ) -> Result<usize, ErrorTrace> {
+        let compressed_data: Vec<u8> = match self.data_stream.as_ref() {
+            Some(stream) => {
+                let mut data = vec![0u8; compressed_length];
+                match stream.write() {
+                    Ok(mut ds) => {
+                        match ds.read_at_position(&mut data, SeekFrom::Start(block_offset)) {
+                            Ok(_) => data,
+                            Err(err) => {
+                                return Err(keramics_core::error_trace_new_with_error!(
+                                    "Unable to read compressed block from stream",
+                                    err
+                                ));
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        return Err(keramics_core::error_trace_new_with_error!(
+                            "Unable to obtain write lock on data stream",
+                            error
+                        ));
+                    }
+                }
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+            }
+        };
+
+        self.decompress_data(&compressed_data, decompressed)
+    }
+
+    /// Helper macro to read a LE u32 from a buffer at a given offset.
+    fn read_u32_le(buf: &[u8], offset: usize) -> u32 {
+        bytes_to_u32_le!(buf, offset)
     }
 
     /// Gets compressed block offsets.
@@ -230,34 +260,35 @@ impl DecmpfsDataStream {
             return Ok(());
         }
 
-        if let Some(ref stream) = self.data_stream {
-            let read_result = match stream.write() {
-                Ok(mut ds) => {
-                    ds.read_at_position(&mut self.compressed_segment_data[..4], SeekFrom::Start(0))
-                }
-                Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on data stream",
-                    error
-                )),
-            };
-            match read_result {
-                Ok(read) => {
-                    if read != 4 {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unable to read header signature"
-                        ));
+        // Read first 4 bytes for header signature
+        let mut header_buf: Vec<u8> = vec![0u8; 4];
+        match &self.data_stream {
+            Some(stream) => {
+                let read_result = match stream.write() {
+                    Ok(mut ds) => ds.read_at_position(&mut header_buf, SeekFrom::Start(0)),
+                    Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                        "Unable to obtain write lock on data stream",
+                        error
+                    )),
+                };
+                match read_result {
+                    Ok(read) => {
+                        if read != 4 {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unable to read header signature"
+                            ));
+                        }
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read header");
+                        return Err(error);
                     }
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read header");
-                    return Err(error);
-                }
             }
-        } else {
-            return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+            None => return Err(keramics_core::error_trace_new!("Data stream is not opened")),
         }
 
-        if &self.compressed_segment_data[..4] == b"fpmc" {
+        if &header_buf[..4] == b"fpmc" {
             self.number_of_compressed_blocks = 1;
             self.block_offsets = vec![16, self.compressed_size as u32];
             return Ok(());
@@ -265,136 +296,210 @@ impl DecmpfsDataStream {
 
         match self.compression_method {
             DecmpfsCompressionMethod::Deflate => {
-                let compressed_descriptors_offset: u32 =
-                    bytes_to_u32_be!(&self.compressed_segment_data, 0);
-
+                let compressed_descriptors_offset: u32 = Self::read_u32_le(&header_buf, 0);
                 if compressed_descriptors_offset != 0x00000100 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid compressed descriptors offset"
                     ));
                 }
 
-                let read_size: usize = 16 - 4;
-                let read_result = if let Some(ref stream) = self.data_stream {
-                    match stream.write() {
-                        Ok(mut ds) => ds.read_at_position(
-                            &mut self.compressed_segment_data[4..4 + read_size],
-                            SeekFrom::Start(4),
-                        ),
-                        Err(error) => Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain write lock on data stream",
-                            error
-                        )),
-                    }
-                } else {
-                    Err(keramics_core::error_trace_new!("Data stream is not opened"))
-                };
-                match read_result {
-                    Ok(read) => {
-                        if read != read_size {
-                            return Err(keramics_core::error_trace_new!(
-                                "Unable to read compressed header data"
-                            ));
+                // Read the compressed data descriptors offset (4 bytes at offset 4)
+                let mut descriptors_offset_bytes: Vec<u8> = vec![0u8; 4];
+                match &self.data_stream {
+                    Some(stream) => {
+                        let read_result = match stream.write() {
+                            Ok(mut ds) => ds.read_at_position(
+                                &mut descriptors_offset_bytes,
+                                SeekFrom::Start(4),
+                            ),
+                            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain write lock on data stream",
+                                error
+                            )),
+                        };
+                        match read_result {
+                            Ok(read) => {
+                                if read != 4 {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unable to read descriptors offset"
+                                    ));
+                                }
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read descriptors offset"
+                                );
+                                return Err(error);
+                            }
                         }
                     }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read compressed header data"
-                        );
-                        return Err(error);
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Data stream is not opened"));
                     }
                 }
+                let compressed_descriptors_offset_val: u32 =
+                    Self::read_u32_le(&descriptors_offset_bytes, 0);
+                if compressed_descriptors_offset_val != 0x00000100 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid compressed data descriptors offset"
+                    ));
+                }
 
-                let num_blocks: u32 = bytes_to_u32_le!(&self.compressed_segment_data, 260);
-
+                // Read block count (4 bytes at offset 260 in the descriptors)
+                let mut block_count_bytes: Vec<u8> = vec![0u8; 4];
+                match &self.data_stream {
+                    Some(stream) => {
+                        let read_result = match stream.write() {
+                            Ok(mut ds) => {
+                                ds.read_at_position(&mut block_count_bytes, SeekFrom::Start(260))
+                            }
+                            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain write lock on data stream",
+                                error
+                            )),
+                        };
+                        match read_result {
+                            Ok(read) => {
+                                if read != 4 {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unable to read block count"
+                                    ));
+                                }
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read block count"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+                    }
+                }
+                let num_blocks: u32 = Self::read_u32_le(&block_count_bytes, 0);
                 if num_blocks > (u32::MAX / 8) {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid number of compressed blocks"
                     ));
                 }
-
                 self.number_of_compressed_blocks = num_blocks;
 
-                let mut segment_offset: usize = 264;
-                let block_offset: u32 =
-                    bytes_to_u32_le!(&self.compressed_segment_data, segment_offset);
-                segment_offset += 4;
-
-                let descriptors_offset: u32 = 0x00000100 + 4;
-                let descriptor_size: usize = 8;
-
-                if block_offset <= descriptor_size as u32
-                    || block_offset > (Self::BLOCK_SIZE + 1) as u32
-                {
+                // Read first block offset (4 bytes at offset 264 in the descriptors)
+                let mut first_block_bytes: Vec<u8> = vec![0u8; 4];
+                match &self.data_stream {
+                    Some(stream) => {
+                        let read_result = match stream.write() {
+                            Ok(mut ds) => {
+                                ds.read_at_position(&mut first_block_bytes, SeekFrom::Start(264))
+                            }
+                            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain write lock on data stream",
+                                error
+                            )),
+                        };
+                        match read_result {
+                            Ok(read) => {
+                                if read != 4 {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unable to read first block offset"
+                                    ));
+                                }
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read first block offset"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+                    }
+                }
+                let first_block_offset: u32 = Self::read_u32_le(&first_block_bytes, 0);
+                if first_block_offset <= 8 || first_block_offset > (Self::BLOCK_SIZE + 1) as u32 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid first compressed block offset"
                     ));
                 }
 
-                let abs_offset: u32 = block_offset + descriptors_offset;
+                let descriptors_region_offset: u32 = 0x00000100 + 4;
                 self.block_offsets = vec![0; num_blocks as usize + 1];
-                self.block_offsets[0] = abs_offset;
-                let mut prev_offset: u32 = abs_offset;
+                self.block_offsets[0] = first_block_offset + descriptors_region_offset;
 
+                let mut prev_abs_offset: u32 = first_block_offset + descriptors_region_offset;
+
+                // Read remaining block descriptors one at a time from the descriptors region
                 if num_blocks > 1 {
-                    let remaining_blocks: usize = ((num_blocks - 1) as usize - 1) * descriptor_size;
-                    if remaining_blocks > 0 {
-                        let read_len =
-                            std::cmp::min(remaining_blocks, Self::BLOCK_SIZE + 1 - segment_offset);
-                        if let Some(ref stream) = self.data_stream {
-                            let read_result = match stream.write() {
+                    let mut descriptor_buf: Vec<u8> = vec![0u8; 4];
+                    for i in 1..num_blocks as usize {
+                        let deser_offset: u32 = 4 + ((i - 1) as u32 * 4);
+                        let read_result = match &self.data_stream {
+                            Some(stream) => match stream.write() {
                                 Ok(mut ds) => ds.read_at_position(
-                                    &mut self.compressed_segment_data
-                                        [segment_offset..segment_offset + read_len],
-                                    SeekFrom::Start(segment_offset as u64),
+                                    &mut descriptor_buf,
+                                    SeekFrom::Start(deser_offset as u64),
                                 ),
                                 Err(error) => Err(keramics_core::error_trace_new_with_error!(
                                     "Unable to obtain write lock on data stream",
                                     error
                                 )),
-                            };
-                            match read_result {
-                                Ok(_) => {}
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        "Unable to read compressed block descriptors"
-                                    );
-                                    return Err(error);
+                            },
+                            None => {
+                                Err(keramics_core::error_trace_new!("Data stream is not opened"))
+                            }
+                        };
+                        match read_result {
+                            Ok(read) => {
+                                if read != 4 {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unable to read block descriptor"
+                                    ));
                                 }
                             }
-                        } else {
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read block descriptor"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        let raw_offset: u32 = Self::read_u32_le(&descriptor_buf, 0);
+                        let abs: u32 = raw_offset + descriptors_region_offset;
+
+                        if prev_abs_offset > abs
+                            || (abs - prev_abs_offset) as usize > Self::BLOCK_SIZE + 1
+                        {
                             return Err(keramics_core::error_trace_new!(
-                                "Data stream is not opened"
+                                "Invalid compressed block offset"
                             ));
                         }
+                        self.block_offsets[i] = abs;
+                        prev_abs_offset = abs;
                     }
                 }
 
-                for i in 1..num_blocks as usize {
-                    let offset: u32 =
-                        bytes_to_u32_le!(&self.compressed_segment_data, segment_offset);
-                    segment_offset += 4;
+                // Read compressed footer
+                let compressed_footer_offset: u32 = Self::read_u32_be(&header_buf, 4);
+                let compressed_footer_size: u32 = Self::read_u32_be(&header_buf, 12);
 
-                    let abs: u32 = offset + descriptors_offset;
-
-                    if prev_offset > abs || (abs - prev_offset) as usize > Self::BLOCK_SIZE + 1 {
+                if compressed_footer_size == 0 {
+                    let last_offset = self.block_offsets.last().copied().unwrap_or(0) as u64;
+                    if last_offset > self.compressed_size {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid compressed block offset"
                         ));
                     }
-
-                    self.block_offsets[i] = abs;
-                    prev_offset = abs;
-
-                    segment_offset += 4;
+                    self.block_offsets.push(self.compressed_size as u32);
+                    return Ok(());
                 }
-
-                let compressed_footer_offset: u32 =
-                    bytes_to_u32_be!(&self.compressed_segment_data, 4);
-                let compressed_footer_size: u32 =
-                    bytes_to_u32_be!(&self.compressed_segment_data, 12);
 
                 if compressed_footer_size as usize > Self::BLOCK_SIZE + 1 {
                     return Err(keramics_core::error_trace_new!(
@@ -402,12 +507,12 @@ impl DecmpfsDataStream {
                     ));
                 }
 
-                if compressed_footer_size > 0 {
-                    if let Some(ref stream) = self.data_stream {
+                let mut footer_buf: Vec<u8> = vec![0u8; compressed_footer_size as usize];
+                match &self.data_stream {
+                    Some(stream) => {
                         let read_result = match stream.write() {
                             Ok(mut ds) => ds.read_at_position(
-                                &mut self.compressed_segment_data
-                                    [..compressed_footer_size as usize],
+                                &mut footer_buf,
                                 SeekFrom::Start(compressed_footer_offset as u64),
                             ),
                             Err(error) => Err(keramics_core::error_trace_new_with_error!(
@@ -431,7 +536,8 @@ impl DecmpfsDataStream {
                                 return Err(error);
                             }
                         }
-                    } else {
+                    }
+                    None => {
                         return Err(keramics_core::error_trace_new!("Data stream is not opened"));
                     }
                 }
@@ -442,13 +548,11 @@ impl DecmpfsDataStream {
                         "Invalid compressed block offset"
                     ));
                 }
-
                 self.block_offsets.push(self.compressed_size as u32);
                 Ok(())
             }
             DecmpfsCompressionMethod::Lzvn => {
-                let block_offset: u32 = bytes_to_u32_le!(&self.compressed_segment_data, 0);
-
+                let block_offset: u32 = Self::read_u32_le(&header_buf, 0);
                 if block_offset <= 4 || block_offset > (Self::BLOCK_SIZE + 1) as u32 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid compressed block offset"
@@ -456,38 +560,65 @@ impl DecmpfsDataStream {
                 }
 
                 self.number_of_compressed_blocks = block_offset / 4;
-
                 self.block_offsets = vec![0; self.number_of_compressed_blocks as usize + 1];
 
                 let num_blocks: u32 = self.number_of_compressed_blocks;
                 self.block_offsets[0] = block_offset;
                 let mut prev: u32 = block_offset;
 
+                // Read block index data from the start of the stream
+                let block_index_data_size: usize = (num_blocks as usize) * 4;
+                let mut block_index_data: Vec<u8> = vec![0u8; block_index_data_size];
+                match &self.data_stream {
+                    Some(stream) => {
+                        let read_result = match stream.write() {
+                            Ok(mut ds) => {
+                                ds.read_at_position(&mut block_index_data, SeekFrom::Start(0))
+                            }
+                            Err(error) => Err(keramics_core::error_trace_new_with_error!(
+                                "Unable to obtain write lock on data stream",
+                                error
+                            )),
+                        };
+                        match read_result {
+                            Ok(read) => {
+                                if read != block_index_data_size {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Unable to read block index data"
+                                    ));
+                                }
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read block index data"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                    None => {
+                        return Err(keramics_core::error_trace_new!("Data stream is not opened"));
+                    }
+                }
+
                 for i in 1..num_blocks as usize {
                     let idx: usize = i * 4;
-                    if idx + 4 > self.compressed_segment_data.len() {
-                        return Err(keramics_core::error_trace_new!(
-                            "Insufficient data for block index"
-                        ));
-                    }
-                    let next_offset: u32 = bytes_to_u32_le!(&self.compressed_segment_data, idx);
+                    let next_offset: u32 = Self::read_u32_le(&block_index_data, idx);
 
                     if next_offset <= 4 || next_offset > (Self::BLOCK_SIZE + 1) as u32 {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid compressed block index"
                         ));
                     }
-
                     if prev > next_offset || (next_offset - prev) as usize > Self::BLOCK_SIZE + 1 {
                         return Err(keramics_core::error_trace_new!(
                             "Invalid compressed block offset"
                         ));
                     }
-
                     self.block_offsets[i] = next_offset;
                     prev = next_offset;
                 }
-
                 self.block_offsets.push(self.compressed_size as u32);
                 Ok(())
             }
@@ -495,6 +626,11 @@ impl DecmpfsDataStream {
                 "Unsupported compression method for block offsets"
             )),
         }
+    }
+
+    /// Helper to read a BE u32 from a buffer at a given offset.
+    fn read_u32_be(buf: &[u8], offset: usize) -> u32 {
+        bytes_to_u32_be!(buf, offset)
     }
 
     /// Decompresses compressed data.
