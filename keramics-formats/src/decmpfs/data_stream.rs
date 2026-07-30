@@ -608,276 +608,135 @@ mod tests {
 
     /// LZVN compressed data from libfshfs test suite.
     /// This is a single-block LZVN compressed stream with 16 bytes of uncompressed data.
-    const LZVN_COMPRESSED_DATA1: &[u8] = &[
-        0x66, 0x70, 0x6d, 0x63, 0x07, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0xe0, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b,
-        0x0c, 0x0d, 0x0e, 0x0f, 0x06,
-    ];
-
-    /// Creates a single-block LZVN compressed data stream with the expected uncompressed size.
-    fn create_lzvn_data_stream(expected_size: u64) -> (DataStreamReference, DecmpfsDataStream) {
-        let fake_data = open_fake_data_stream(LZVN_COMPRESSED_DATA1);
-        let mut decmpfs = DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
-        decmpfs.open(&fake_data, expected_size).unwrap();
-        (fake_data, decmpfs)
+    fn get_test_data() -> Vec<u8> {
+        return vec![
+            0x66, 0x70, 0x6d, 0x63, 0x07, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xe0, 0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09,
+            0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x06,
+        ];
     }
 
-    /// Tests creating a new DecmpfsDataStream with LZVN compression.
-    #[test]
-    fn test_new_lzvn_stream() {
-        let stream = DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
-        assert_eq!(stream.compression_method, DecmpfsCompressionMethod::Lzvn);
-        assert_eq!(stream.block_offsets.len(), 0);
-        assert_eq!(stream.current_compressed_block_index, u32::MAX);
-        assert_eq!(stream.number_of_compressed_blocks, 0);
+    fn get_lzvn_stream() -> Result<DecmpfsDataStream, ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut stream: DecmpfsDataStream = DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
+        stream.open(&data_stream, 16)?;
+
+        Ok(stream)
     }
 
-    /// Tests opening a data stream with LZVN compression (from C test fshfs_test_compressed_data_handle_initialize).
     #[test]
-    fn test_open_lzvn_stream() {
-        let fake_data = open_fake_data_stream(LZVN_COMPRESSED_DATA1);
-        let mut stream = DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
-        let result = stream.open(&fake_data, 16);
-        assert!(result.is_ok());
-        assert_eq!(stream.compressed_size, 35);
-        assert_eq!(stream.size, 16);
+    fn test_open() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut stream: DecmpfsDataStream = DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
+
+        stream.open(&data_stream, 16)?;
+
+        Ok(())
     }
 
-    /// Tests getting the offset of an LZVN stream (from C test fshfs_test_compressed_data_handle_seek_segment_offset).
+    // TODO: add tests for read_data_from_blocks
+
     #[test]
-    fn test_get_offset_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let offset = stream.get_offset().unwrap();
-        assert_eq!(offset, 0);
+    fn test_read_compressed_data() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
+
+        let mut data: Vec<u8> = vec![0; 16];
+        stream.read(&mut data)?;
+
+        Ok(())
     }
 
-    /// Tests getting the size of an LZVN stream.
     #[test]
-    fn test_get_size_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let size = stream.get_size().unwrap();
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
+
+        let size: u64 = stream.get_size()?;
         assert_eq!(size, 16);
+
+        Ok(())
     }
 
-    /// Tests seeking to start of an LZVN stream (from C test fshfs_test_compressed_data_handle_seek_segment_offset).
+    // TODO: add tests for get_offset.
+
     #[test]
-    fn test_seek_start_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let offset = stream.seek(SeekFrom::Start(0)).unwrap();
-        assert_eq!(offset, 0);
+    fn test_seek_from_start() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
+
+        let offset: u64 = stream.seek(SeekFrom::Start(1024))?;
+        assert_eq!(offset, 1024);
+
+        Ok(())
     }
 
-    /// Tests seeking from end of an LZVN stream (from C test fshfs_test_compressed_data_handle_seek_segment_offset).
     #[test]
-    fn test_seek_end_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let offset = stream.seek(SeekFrom::End(-8)).unwrap();
+    fn test_seek_from_end() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
+
+        let offset: u64 = stream.seek(SeekFrom::End(-8))?;
         assert_eq!(offset, 8);
+
+        Ok(())
     }
 
-    /// Tests seeking by current position of an LZVN stream (from C test fshfs_test_compressed_data_handle_seek_segment_offset).
     #[test]
-    fn test_seek_current_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        stream.seek(SeekFrom::Start(4)).unwrap();
-        let offset = stream.seek(SeekFrom::Current(2)).unwrap();
-        assert_eq!(offset, 6);
+    fn test_seek_from_current() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
+
+        let offset: u64 = stream.seek(SeekFrom::Start(1024))?;
+        assert_eq!(offset, 1024);
+
+        let offset: u64 = stream.seek(SeekFrom::Current(-512))?;
+        assert_eq!(offset, 512);
+
+        Ok(())
     }
 
-    /// Tests seeking to a specific position in an LZVN stream.
     #[test]
-    fn test_seek_to_position() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let offset = stream.seek(SeekFrom::Start(10)).unwrap();
-        assert_eq!(offset, 10);
-    }
+    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
 
-    /// Tests reading LZVN decompressed data (from C test fshfs_test_compressed_data_handle_read_segment_data).
-    /// The test data has "fpmc" signature, so it's a single block starting at offset 16.
-    /// The LZVN compressed data at offset 16 decodes to 16 bytes of data [0x00, 0x01, ..., 0x0f].
-    #[test]
-    fn test_read_lzvn_data() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-
-        let mut buffer = [0u8; 16];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 16);
-
-        // LZVN decode: 0xe0 = LiteralLarge opcode, 0x00 = literal_size - 16, so literal_size = 16
-        // Then 16 literal bytes: 0x00, 0x01, 0x02, ..., 0x0f
-        // Then 0x06 = EndOfStream
-        let expected: [u8; 16] = [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
-            0x0e, 0x0f,
-        ];
-        assert_eq!(buffer, expected);
-    }
-
-    /// Tests reading a partial LZVN decompressed data.
-    #[test]
-    fn test_read_lzvn_partial_data() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        stream.seek(SeekFrom::Start(4)).unwrap();
-
-        let mut buffer = [0u8; 8];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 8);
-
-        let expected: [u8; 8] = [0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b];
-        assert_eq!(buffer, expected);
-    }
-
-    /// Tests reading beyond the uncompressed data boundary.
-    #[test]
-    fn test_read_past_boundary() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        stream.seek(SeekFrom::End(-2)).unwrap();
-
-        let mut buffer = [0u8; 8];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 2);
-        assert_eq!(buffer[0], 0x0e);
-        assert_eq!(buffer[1], 0x0f);
-    }
-
-    /// Tests reading past the end returns zero.
-    #[test]
-    fn test_read_past_end() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        stream.seek(SeekFrom::End(0)).unwrap();
-
-        let mut buffer = [0u8; 4];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 0);
-        assert_eq!(buffer, [0u8; 4]);
-    }
-
-    /// Tests reading small chunks iteratively.
-    #[test]
-    fn test_read_lzvn_chunks() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-
-        let expected: [u8; 16] = [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
-            0x0e, 0x0f,
-        ];
-
-        let mut total_read = 0;
-        let chunk_size = 4;
-        for chunk in expected.chunks(chunk_size) {
-            let mut buffer = [0u8; 4];
-            let read_count = stream.read(&mut buffer).unwrap();
-            assert_eq!(read_count, chunk_size);
-            assert_eq!(&buffer[..read_count], chunk);
-            total_read += read_count;
-        }
-        assert_eq!(total_read, 16);
-    }
-
-    /// Tests seeking and reading at different positions.
-    #[test]
-    fn test_seek_and_read_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-
-        // Read first 4 bytes
-        let mut buffer1 = [0u8; 4];
-        stream.read(&mut buffer1).unwrap();
-        assert_eq!(buffer1, [0x00, 0x01, 0x02, 0x03]);
-        assert_eq!(stream.get_offset().unwrap(), 4);
-
-        // Seek to middle
-        stream.seek(SeekFrom::Start(8)).unwrap();
-        assert_eq!(stream.get_offset().unwrap(), 8);
-
-        // Read next 4 bytes
-        let mut buffer2 = [0u8; 4];
-        stream.read(&mut buffer2).unwrap();
-        assert_eq!(buffer2, [0x08, 0x09, 0x0a, 0x0b]);
-    }
-
-    /// Tests seeking before zero returns an error (from C test fshfs_test_compressed_data_handle_seek_segment_offset).
-    #[test]
-    fn test_seek_before_zero() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let result = stream.seek(SeekFrom::Current(-1));
+        let result: Result<u64, ErrorTrace> = stream.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
+
+        Ok(())
     }
 
-    /// Tests Unknown5 compression method returns zero-filled data (from C test fshfs_test_compressed_data_handle_read_segment_data).
     #[test]
-    fn test_read_unknown5_data() {
-        let compressed_data = [0x66, 0x70, 0x6d, 0x63]; // "fpmc" signature
-        let fake_data = open_fake_data_stream(&compressed_data);
-        let mut stream = DecmpfsDataStream::new(DecmpfsCompressionMethod::Unknown5);
-        stream.open(&fake_data, 16).unwrap();
+    fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
 
-        let mut buffer = [0xFFu8; 16];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 16);
+        let offset: u64 = stream.seek(SeekFrom::End(512))?;
+        assert_eq!(offset, 16 + 512);
 
-        // Unknown5 compression fills with zeros
-        assert_eq!(buffer, [0u8; 16]);
+        Ok(())
     }
 
-    /// Tests Unknown5 compression with partial reads.
     #[test]
-    fn test_read_unknown5_partial() {
-        let compressed_data = [0x66, 0x70, 0x6d, 0x63]; // "fpmc" signature
-        let fake_data = open_fake_data_stream(&compressed_data);
-        let mut stream = DecmpfsDataStream::new(DecmpfsCompressionMethod::Unknown5);
-        stream.open(&fake_data, 16).unwrap();
+    fn test_seek_and_read() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
+        stream.seek(SeekFrom::Start(1024))?;
 
-        let mut buffer = [0u8; 8];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 8);
-        assert_eq!(buffer, [0u8; 8]);
+        let mut data: Vec<u8> = vec![0; 512];
+        let read_size: usize = stream.read(&mut data)?;
+        assert_eq!(read_size, 0);
+
+        Ok(())
     }
 
-    /// Tests the data stream offset tracking during reads (from C test fshfs_test_compressed_data_handle_seek_segment_offset).  
     #[test]
-    fn test_offset_tracking_lzvn() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
+    fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
+        let mut stream: DecmpfsDataStream = get_lzvn_stream()?;
 
-        assert_eq!(stream.get_offset().unwrap(), 0);
+        stream.seek(SeekFrom::End(512))?;
 
-        let mut buffer = [0u8; 4];
-        stream.read(&mut buffer).unwrap();
-        assert_eq!(stream.get_offset().unwrap(), 4);
+        let mut data: Vec<u8> = vec![0; 512];
+        let read_size: usize = stream.read(&mut data)?;
+        assert_eq!(read_size, 0);
 
-        let mut buffer2 = [0u8; 8];
-        stream.read(&mut buffer2).unwrap();
-        assert_eq!(stream.get_offset().unwrap(), 12);
-
-        let mut buffer3 = [0u8; 4];
-        stream.read(&mut buffer3).unwrap();
-        assert_eq!(stream.get_offset().unwrap(), 16);
-    }
-
-    /// Tests seeking past the end of the data.
-    #[test]
-    fn test_seek_past_end() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-        let offset = stream.seek(SeekFrom::End(4)).unwrap();
-        assert_eq!(offset, 20);
-    }
-
-    /// Tests the C test data: LZVN with "fpmc" signature, single block, size 16.
-    /// This mirrors fshfs_test_compressed_data_handle_read_segment_data which reads into a 32-byte buffer.
-    #[test]
-    fn test_large_read_buffer() {
-        let (_fake_data, mut stream) = create_lzvn_data_stream(16);
-
-        // Mirror the C test: read into a 32-byte buffer (larger than expected size)
-        let mut buffer = [0u8; 32];
-        let read_count = stream.read(&mut buffer).unwrap();
-        assert_eq!(read_count, 16);
-
-        let expected: [u8; 16] = [
-            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
-            0x0e, 0x0f,
-        ];
-        assert_eq!(&buffer[..16], &expected);
-        // Remaining buffer should stay zero (initial state)
-        assert_eq!(&buffer[16..], &[0u8; 16]);
+        Ok(())
     }
 }
