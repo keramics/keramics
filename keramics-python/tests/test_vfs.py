@@ -208,7 +208,7 @@ class TestFileEntry(TestClass):
 
         assert file_entry is not None
 
-        sub_file_entry = file_entry.get_sub_file_entry_by_index(0)
+        sub_file_entry = file_entry.get_sub_file_entry_by_index(1)
         assert sub_file_entry is not None
         assert sub_file_entry.name.to_string() == "TestFile2"
 
