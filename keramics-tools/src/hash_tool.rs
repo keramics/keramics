@@ -24,7 +24,7 @@ use keramics_formats::{Path, PathComponent};
 use keramics_hashes::{
     DigestHashContext, Md5Context, Sha1Context, Sha224Context, Sha256Context, Sha512Context,
 };
-use keramics_types::{Ucs2String, Utf16String};
+use keramics_types::Ucs2String;
 use keramics_vfs::{
     VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFinder, VfsLocation, VfsResolver,
     VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner,

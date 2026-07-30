@@ -26,7 +26,6 @@ pub(super) enum VfsScanOptionElement {
 pub(super) enum VfsScanOptionGroup {
     All,
     Elements(Vec<VfsScanOptionElement>),
-    None,
     NotSet,
 }
 

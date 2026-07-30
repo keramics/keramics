@@ -319,8 +319,8 @@ impl HfsFileEntry {
                     _ => {
                         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-                        match self.attributes.get_key_value(&lookup_name) {
-                            Some((name, attribute_record)) => match attribute_record {
+                        match self.attributes.get(&lookup_name) {
+                            Some(attribute_record) => match attribute_record {
                                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                                     let data_stream: FakeDataStream = FakeDataStream::new(
                                         &attribute_inline_data_record.data,
@@ -705,8 +705,8 @@ impl HfsFileEntry {
         }
         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-        match self.attributes.get_key_value(&lookup_name) {
-            Some((name, attribute_record)) => match attribute_record {
+        match self.attributes.get(&lookup_name) {
+            Some(attribute_record) => match attribute_record {
                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                     let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
 
@@ -773,7 +773,7 @@ impl HfsFileEntry {
             self.identifier,
             &mut self.sub_directory_entries,
         ) {
-            Ok(_) => {},
+            Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,

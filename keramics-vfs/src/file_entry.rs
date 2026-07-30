@@ -2142,7 +2142,7 @@ mod tests {
     fn test_test_get_sub_file_entry_by_index_with_ext() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1")?;
 
-        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(1)?;
 
         let name: Option<PathComponent> = sub_file_entry.get_name();
         assert_eq!(

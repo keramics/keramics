@@ -12,7 +12,6 @@
  */
 
 use std::io::SeekFrom;
-use std::path::PathBuf;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 

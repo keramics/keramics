@@ -27,11 +27,13 @@ use super::attributes_entry::ExtAttributesEntry;
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
+use super::directory_tree::ExtDirectoryTree;
 use super::extended_attribute::ExtExtendedAttribute;
 use super::extended_attributes::ExtExtendedAttributesIterator;
 use super::file_entries::ExtFileEntriesIterator;
 use super::inode::ExtInode;
 use super::inode_table::ExtInodeTable;
+
 use crate::ext::block_range::ExtBlockRange;
 
 /// Extended File System (ext) file entry.
@@ -457,7 +459,7 @@ impl ExtFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -477,7 +479,7 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<ExtFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -533,7 +535,7 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_name: &PathComponent,
     ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -624,15 +626,18 @@ impl ExtFileEntry {
     /// Reads the sub directory entries.
     fn read_sub_directory_entries(&mut self) -> Result<(), ErrorTrace> {
         if self.inode.flags & EXT_INODE_FLAG_INLINE_DATA != 0 {
-            match self
-                .sub_directory_entries
-                .read_inline_data(&self.inode.data_reference, self.inode_table.block_size)
+            let mut directory_tree: ExtDirectoryTree = ExtDirectoryTree::new(
+                &self.sub_directory_entries.encoding,
+                self.inode_table.block_size,
+            );
+            match directory_tree
+                .read_inline_data(&self.inode.data_reference, &mut self.sub_directory_entries)
             {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries from inline data"
+                        "Unable to read directory tree from inline data"
                     );
                     return Err(error);
                 }
@@ -655,21 +660,28 @@ impl ExtFileEntry {
                     return Err(error);
                 }
             }
-            match self.sub_directory_entries.read_block_data(
-                &self.data_stream,
+            let mut directory_tree: ExtDirectoryTree = ExtDirectoryTree::new(
+                &self.sub_directory_entries.encoding,
                 self.inode_table.block_size,
+            );
+
+            match directory_tree.read_block_data(
+                &self.data_stream,
                 &block_ranges,
+                &mut self.sub_directory_entries,
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read directory entries from block data"
+                        "Unable to read directory tree from block data"
                     );
                     return Err(error);
                 }
             }
         }
+        self.sub_directory_entries.is_read = true;
+
         Ok(())
     }
 }
@@ -1048,7 +1060,7 @@ mod tests {
         let mut ext_file_entry: ExtFileEntry =
             ext_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let sub_file_entry: ExtFileEntry = ext_file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: ExtFileEntry = ext_file_entry.get_sub_file_entry_by_index(1)?;
 
         let name: Option<&ByteString> = sub_file_entry.get_name();
         assert_eq!(name, Some(ByteString::from("TestFile2")).as_ref());
