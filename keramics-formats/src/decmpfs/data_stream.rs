@@ -249,11 +249,6 @@ impl DecmpfsDataStream {
         self.decompress_data(&compressed_data, decompressed)
     }
 
-    /// Helper macro to read a LE u32 from a buffer at a given offset.
-    fn read_u32_le(buf: &[u8], offset: usize) -> u32 {
-        bytes_to_u32_le!(buf, offset)
-    }
-
     /// Gets compressed block offsets.
     fn compute_block_offsets(&mut self) -> Result<(), ErrorTrace> {
         if !self.block_offsets.is_empty() {
@@ -296,7 +291,7 @@ impl DecmpfsDataStream {
 
         match self.compression_method {
             DecmpfsCompressionMethod::Deflate => {
-                let compressed_descriptors_offset: u32 = Self::read_u32_le(&header_buf, 0);
+                let compressed_descriptors_offset: u32 = bytes_to_u32_le!(&header_buf, 0);
                 if compressed_descriptors_offset != 0x00000100 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid compressed descriptors offset"
@@ -339,7 +334,7 @@ impl DecmpfsDataStream {
                     }
                 }
                 let compressed_descriptors_offset_val: u32 =
-                    Self::read_u32_le(&descriptors_offset_bytes, 0);
+                    bytes_to_u32_le!(&descriptors_offset_bytes, 0);
                 if compressed_descriptors_offset_val != 0x00000100 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid compressed data descriptors offset"
@@ -380,7 +375,7 @@ impl DecmpfsDataStream {
                         return Err(keramics_core::error_trace_new!("Data stream is not opened"));
                     }
                 }
-                let num_blocks: u32 = Self::read_u32_le(&block_count_bytes, 0);
+                let num_blocks: u32 = bytes_to_u32_le!(&block_count_bytes, 0);
                 if num_blocks > (u32::MAX / 8) {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid number of compressed blocks"
@@ -422,7 +417,7 @@ impl DecmpfsDataStream {
                         return Err(keramics_core::error_trace_new!("Data stream is not opened"));
                     }
                 }
-                let first_block_offset: u32 = Self::read_u32_le(&first_block_bytes, 0);
+                let first_block_offset: u32 = bytes_to_u32_le!(&first_block_bytes, 0);
                 if first_block_offset <= 8 || first_block_offset > (Self::BLOCK_SIZE + 1) as u32 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid first compressed block offset"
@@ -471,7 +466,7 @@ impl DecmpfsDataStream {
                                 return Err(error);
                             }
                         }
-                        let raw_offset: u32 = Self::read_u32_le(&descriptor_buf, 0);
+                        let raw_offset: u32 = bytes_to_u32_le!(&descriptor_buf, 0);
                         let abs: u32 = raw_offset + descriptors_region_offset;
 
                         if prev_abs_offset > abs
@@ -487,8 +482,8 @@ impl DecmpfsDataStream {
                 }
 
                 // Read compressed footer
-                let compressed_footer_offset: u32 = Self::read_u32_be(&header_buf, 4);
-                let compressed_footer_size: u32 = Self::read_u32_be(&header_buf, 12);
+                let compressed_footer_offset: u32 = bytes_to_u32_be!(&header_buf, 4);
+                let compressed_footer_size: u32 = bytes_to_u32_be!(&header_buf, 12);
 
                 if compressed_footer_size == 0 {
                     let last_offset = self.block_offsets.last().copied().unwrap_or(0) as u64;
@@ -552,7 +547,7 @@ impl DecmpfsDataStream {
                 Ok(())
             }
             DecmpfsCompressionMethod::Lzvn => {
-                let block_offset: u32 = Self::read_u32_le(&header_buf, 0);
+                let block_offset: u32 = bytes_to_u32_le!(&header_buf, 0);
                 if block_offset <= 4 || block_offset > (Self::BLOCK_SIZE + 1) as u32 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid compressed block offset"
@@ -604,7 +599,7 @@ impl DecmpfsDataStream {
 
                 for i in 1..num_blocks as usize {
                     let idx: usize = i * 4;
-                    let next_offset: u32 = Self::read_u32_le(&block_index_data, idx);
+                    let next_offset: u32 = bytes_to_u32_le!(&block_index_data, idx);
 
                     if next_offset <= 4 || next_offset > (Self::BLOCK_SIZE + 1) as u32 {
                         return Err(keramics_core::error_trace_new!(
@@ -626,11 +621,6 @@ impl DecmpfsDataStream {
                 "Unsupported compression method for block offsets"
             )),
         }
-    }
-
-    /// Helper to read a BE u32 from a buffer at a given offset.
-    fn read_u32_be(buf: &[u8], offset: usize) -> u32 {
-        bytes_to_u32_be!(buf, offset)
     }
 
     /// Decompresses compressed data.
