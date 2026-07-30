@@ -773,15 +773,18 @@ impl HfsFileEntry {
             self.identifier,
             &mut self.sub_directory_entries,
         ) {
-            Ok(_) => Ok(()),
+            Ok(_) => {},
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     "Unable to retrieve sub directory entries from catalog file"
                 );
-                Err(error)
+                return Err(error);
             }
         }
+        self.sub_directory_entries.is_read = true;
+
+        Ok(())
     }
 }
 

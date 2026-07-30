@@ -29,7 +29,7 @@ pub struct HfsDirectoryEntries {
     names: Vec<HfsString>,
 
     /// Value to indicate the directory entries were read.
-    is_read: bool,
+    pub is_read: bool,
 }
 
 impl HfsDirectoryEntries {
