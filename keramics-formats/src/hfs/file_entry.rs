@@ -520,7 +520,7 @@ impl HfsFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -540,7 +540,7 @@ impl HfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<HfsFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
