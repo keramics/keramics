@@ -12,8 +12,10 @@
  */
 
 mod constants;
+mod data_stream;
 mod enums;
 mod header;
 
+pub use data_stream::DecmpfsDataStream;
 pub use enums::DecmpfsCompressionMethod;
 pub use header::DecmpfsHeader;

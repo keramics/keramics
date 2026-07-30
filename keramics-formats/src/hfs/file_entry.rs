@@ -18,7 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
-use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsHeader};
+use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader};
 use crate::path_component::PathComponent;
 
 use super::attribute_record::HfsAttributeRecord;
@@ -342,8 +342,22 @@ impl HfsFileEntry {
                         }
                     }
                 };
-                // TODO: create compressed data stream from data stream
-                Ok(Some(data_stream))
+                let mut decmpfs_stream: DecmpfsDataStream =
+                    DecmpfsDataStream::new(compression_method);
+
+                match decmpfs_stream
+                    .open(&data_stream, compressed_data_header.uncompressed_data_size)
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open decmpfs data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+                Ok(Some(Arc::new(RwLock::new(decmpfs_stream))))
             }
             None => {
                 let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
