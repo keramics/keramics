@@ -17,7 +17,7 @@
 
 use std::fmt;
 
-use keramics_core::{DebugTrace, ErrorTrace};
+use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
 
 use super::huffman::HuffmanTree;
 use super::traits::Bitstream;
@@ -281,6 +281,7 @@ impl DeflateContext {
     /// Builds dynamic Huffman trees from the bitstream.
     fn build_dynamic_huffman_trees(
         &mut self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut DeflateBitstream,
         literals_huffman_tree: &mut HuffmanTree,
         distances_huffman_tree: &mut HuffmanTree,
@@ -311,11 +312,11 @@ impl DeflateContext {
 
         let number_of_code_sizes: usize = (value_32bit as usize) + 4;
 
-        DebugTrace::print_start("DeflateDynamicHuffmanTrees");
-        DebugTrace::print_field("number_of_literal_codes", number_of_literal_codes);
-        DebugTrace::print_field("number_of_distance_codes", number_of_distance_codes);
-        DebugTrace::print_field("number_of_code_sizes", number_of_code_sizes);
-        DebugTrace::print_end();
+        debug_trace.print_start("DeflateDynamicHuffmanTrees");
+        debug_trace.print_field("number_of_literal_codes", number_of_literal_codes);
+        debug_trace.print_field("number_of_distance_codes", number_of_distance_codes);
+        debug_trace.print_field("number_of_code_sizes", number_of_code_sizes);
+        debug_trace.print_end();
 
         for code_size_index in DEFLATE_CODE_SIZES_SEQUENCE
             .iter()
@@ -486,138 +487,174 @@ impl DeflateContext {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
-        while bitstream.data_offset < bitstream.data_size {
-            let mut block_header: DeflateBlockHeader = DeflateBlockHeader::new();
-
-            match block_header.read_from_bitstream(bitstream) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read block header");
-                    return Err(error);
+        DebugTrace::scope(|debug_trace| {
+            while bitstream.data_offset < bitstream.data_size {
+                let last_block: bool = match self.decompress_block(
+                    debug_trace,
+                    bitstream,
+                    uncompressed_data,
+                    &mut uncompressed_data_offset,
+                    uncompressed_data_size,
+                ) {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to decompress block");
+                        return Err(error);
+                    }
+                };
+                if last_block {
+                    break;
                 }
             }
-            DebugTrace::print(&block_header);
-
-            match block_header.block_type {
-                DEFLATE_BLOCK_TYPE_UNCOMPRESED => {
-                    // Ignore the bits in the buffer upto the next byte.
-                    let skip_bits: usize = bitstream.number_of_bits & 0x07;
-
-                    if skip_bits > 0 {
-                        bitstream.skip_bits(skip_bits);
-                    }
-                    let value_32bit: u32 = bitstream.get_value(32);
-                    let block_size: usize = (value_32bit & 0x0000ffff) as usize;
-                    let block_size_copy: usize = ((value_32bit >> 16) ^ 0xffff) as usize;
-
-                    if block_size != block_size_copy {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Mismatch in uncompressed block size: {} and copy: {}",
-                            block_size, block_size_copy
-                        )));
-                    }
-                    if block_size > 0 {
-                        match bitstream.copy_bytes(
-                            block_size,
-                            uncompressed_data,
-                            uncompressed_data_offset,
-                            uncompressed_data_size,
-                        ) {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to copy uncompressed block data"
-                                );
-                                return Err(error);
-                            }
-                        }
-                        uncompressed_data_offset += block_size;
-                    }
-                }
-                DEFLATE_BLOCK_TYPE_HUFFMAN_FIXED => {
-                    if !self.build_fixed_huffman_trees {
-                        match self.build_fixed_huffman_trees() {
-                            Ok(_) => {}
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to build fixed Huffman trees"
-                                );
-                                return Err(error);
-                            }
-                        }
-                    }
-                    match self.decompress_huffmann_encoded_block(
-                        bitstream,
-                        &self.fixed_literals_huffman_tree,
-                        &self.fixed_distances_huffman_tree,
-                        uncompressed_data,
-                        &mut uncompressed_data_offset,
-                        uncompressed_data_size,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to decompress fixed Huffman encoded block"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-                DEFLATE_BLOCK_TYPE_HUFFMAN_DYNAMIC => {
-                    let mut dynamic_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
-                    let mut dynamic_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
-
-                    match self.build_dynamic_huffman_trees(
-                        bitstream,
-                        &mut dynamic_literals_huffman_tree,
-                        &mut dynamic_distances_huffman_tree,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to build dynamic Huffman trees"
-                            );
-                            return Err(error);
-                        }
-                    }
-                    match self.decompress_huffmann_encoded_block(
-                        bitstream,
-                        &dynamic_literals_huffman_tree,
-                        &dynamic_distances_huffman_tree,
-                        uncompressed_data,
-                        &mut uncompressed_data_offset,
-                        uncompressed_data_size,
-                    ) {
-                        Ok(_) => {}
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to decompress dynamic Huffman encoded block"
-                            );
-                            return Err(error);
-                        }
-                    }
-                }
-                _ => {
-                    return Err(keramics_core::error_trace_new!("Unsupported block type"));
-                }
-            }
-            if block_header.last_block_flag != 0 {
-                break;
-            }
-        }
+            Ok(())
+        })?;
         self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())
     }
 
+    /// Decompresses a block.
+    fn decompress_block(
+        &mut self,
+        debug_trace: &mut DebugTraceScope,
+        bitstream: &mut DeflateBitstream,
+        uncompressed_data: &mut [u8],
+        uncompressed_data_offset: &mut usize,
+        uncompressed_data_size: usize,
+    ) -> Result<bool, ErrorTrace> {
+        let mut data_offset: usize = *uncompressed_data_offset;
+
+        let mut block_header: DeflateBlockHeader = DeflateBlockHeader::new();
+
+        match block_header.read_from_bitstream(bitstream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read block header");
+                return Err(error);
+            }
+        }
+        debug_trace.print(&block_header);
+
+        match block_header.block_type {
+            DEFLATE_BLOCK_TYPE_UNCOMPRESED => {
+                // Ignore the bits in the buffer upto the next byte.
+                let skip_bits: usize = bitstream.number_of_bits & 0x07;
+
+                if skip_bits > 0 {
+                    bitstream.skip_bits(skip_bits);
+                }
+                let value_32bit: u32 = bitstream.get_value(32);
+                let block_size: usize = (value_32bit & 0x0000ffff) as usize;
+                let block_size_copy: usize = ((value_32bit >> 16) ^ 0xffff) as usize;
+
+                if block_size != block_size_copy {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Mismatch in uncompressed block size: {} and copy: {}",
+                        block_size, block_size_copy
+                    )));
+                }
+                if block_size > 0 {
+                    match bitstream.copy_bytes(
+                        block_size,
+                        uncompressed_data,
+                        data_offset,
+                        uncompressed_data_size,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to copy uncompressed block data"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    data_offset += block_size;
+                }
+            }
+            DEFLATE_BLOCK_TYPE_HUFFMAN_FIXED => {
+                if !self.build_fixed_huffman_trees {
+                    match self.build_fixed_huffman_trees() {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to build fixed Huffman trees"
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+                match self.decompress_huffmann_encoded_block(
+                    debug_trace,
+                    bitstream,
+                    &self.fixed_literals_huffman_tree,
+                    &self.fixed_distances_huffman_tree,
+                    uncompressed_data,
+                    &mut data_offset,
+                    uncompressed_data_size,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress fixed Huffman encoded block"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            DEFLATE_BLOCK_TYPE_HUFFMAN_DYNAMIC => {
+                let mut dynamic_literals_huffman_tree: HuffmanTree = HuffmanTree::new(288, 15);
+                let mut dynamic_distances_huffman_tree: HuffmanTree = HuffmanTree::new(30, 15);
+
+                match self.build_dynamic_huffman_trees(
+                    debug_trace,
+                    bitstream,
+                    &mut dynamic_literals_huffman_tree,
+                    &mut dynamic_distances_huffman_tree,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to build dynamic Huffman trees"
+                        );
+                        return Err(error);
+                    }
+                }
+                match self.decompress_huffmann_encoded_block(
+                    debug_trace,
+                    bitstream,
+                    &dynamic_literals_huffman_tree,
+                    &dynamic_distances_huffman_tree,
+                    uncompressed_data,
+                    &mut data_offset,
+                    uncompressed_data_size,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress dynamic Huffman encoded block"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            _ => {
+                return Err(keramics_core::error_trace_new!("Unsupported block type"));
+            }
+        }
+        *uncompressed_data_offset = data_offset;
+
+        Ok(block_header.last_block_flag != 0)
+    }
+
     /// Decompresses a Huffman encoded block.
     fn decompress_huffmann_encoded_block(
         &self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut DeflateBitstream,
         literals_huffman_tree: &HuffmanTree,
         distances_huffman_tree: &HuffmanTree,
@@ -627,7 +664,7 @@ impl DeflateContext {
     ) -> Result<(), ErrorTrace> {
         let mut data_offset: usize = *uncompressed_data_offset;
 
-        DebugTrace::print_start("DeflateHuffmannEncodedBlock");
+        debug_trace.print_start("DeflateHuffmannEncodedBlock");
 
         loop {
             let mut symbol: u16 = match literals_huffman_tree.decode_symbol(bitstream) {
@@ -637,8 +674,8 @@ impl DeflateContext {
                     return Err(error);
                 }
             };
-            DebugTrace::print_field("uncompressed_data_offset", data_offset);
-            DebugTrace::print_field("symbol", symbol);
+            debug_trace.print_field("uncompressed_data_offset", data_offset);
+            debug_trace.print_field("symbol", symbol);
 
             if symbol == 256 {
                 break;
@@ -659,7 +696,7 @@ impl DeflateContext {
                     DEFLATE_LITERAL_CODES_NUMBER_OF_EXTRA_BITS[symbol as usize];
                 let extra_bits: u32 = bitstream.get_value(number_of_extra_bits as usize);
 
-                DebugTrace::print_field("extra_bits", format!("0x{:04x}", extra_bits));
+                debug_trace.print_field("extra_bits", format!("0x{:04x}", extra_bits));
 
                 let compression_size: usize =
                     ((DEFLATE_LITERAL_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
@@ -671,13 +708,13 @@ impl DeflateContext {
                         return Err(error);
                     }
                 };
-                DebugTrace::print_field("symbol", symbol);
+                debug_trace.print_field("symbol", symbol);
 
                 let number_of_extra_bits: u16 =
                     DEFLATE_DISTANCE_CODES_NUMBER_OF_EXTRA_BITS[symbol as usize];
                 let extra_bits: u32 = bitstream.get_value(number_of_extra_bits as usize);
 
-                DebugTrace::print_field("extra_bits", format!("0x{:04x}", extra_bits));
+                debug_trace.print_field("extra_bits", format!("0x{:04x}", extra_bits));
 
                 let compression_offset: usize =
                     ((DEFLATE_DISTANCE_CODES_BASE[symbol as usize] as u32) + extra_bits) as usize;
@@ -694,8 +731,8 @@ impl DeflateContext {
                         compression_size
                     )));
                 }
-                DebugTrace::print_field("compression_offset", compression_offset);
-                DebugTrace::print_field("compression_size", compression_size);
+                debug_trace.print_field("compression_offset", compression_offset);
+                debug_trace.print_field("compression_size", compression_size);
 
                 let mut compression_data_offset: usize = data_offset - compression_offset;
 
@@ -712,7 +749,7 @@ impl DeflateContext {
                 )));
             }
         }
-        DebugTrace::print_end();
+        debug_trace.print_end();
 
         *uncompressed_data_offset = data_offset;
 
@@ -1091,11 +1128,14 @@ mod tests {
         let test_value: u32 = test_bitstream.get_value(3);
         assert_eq!(test_value, 0x00000005);
 
-        test_context.build_dynamic_huffman_trees(
-            &mut test_bitstream,
-            &mut test_literals_huffman_tree,
-            &mut test_distances_huffman_tree,
-        )?;
+        DebugTrace::scope(|debug_trace| {
+            test_context.build_dynamic_huffman_trees(
+                debug_trace,
+                &mut test_bitstream,
+                &mut test_literals_huffman_tree,
+                &mut test_distances_huffman_tree,
+            )
+        })?;
         Ok(())
     }
 
@@ -1121,4 +1161,7 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for decompress_block
+    // TODO: add tests for decompress_huffmann_encoded_block
 }

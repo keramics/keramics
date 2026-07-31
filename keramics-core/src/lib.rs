@@ -22,7 +22,7 @@ pub mod mediator;
 mod os_data_stream;
 
 pub use data_stream::{DataStream, DataStreamReference};
-pub use debug_trace::DebugTrace;
+pub use debug_trace::{DebugTrace, DebugTraceScope};
 pub use enums::ByteOrder;
 pub use errors::ErrorTrace;
 pub use fake_data_stream::{FakeDataStream, open_fake_data_stream};
