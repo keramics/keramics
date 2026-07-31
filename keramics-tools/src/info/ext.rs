@@ -22,6 +22,8 @@ use keramics_types::ByteString;
 
 use super::posix::PosixFileModeInfo;
 
+use crate::formatters::ByteSize;
+
 /// Extended File System (ext) compatible feature flags information.
 struct ExtCompatibleFeatureFlagsInfo {
     /// Flags.
@@ -207,7 +209,8 @@ impl fmt::Display for ExtFileEntryInfo {
         if let Some(name) = &self.name {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         };
-        writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
+        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         if let Some(date_time) = &self.creation_time {
             let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(date_time);
@@ -776,14 +779,12 @@ impl ExtInfo {
         };
         println!("    Volume label\t\t\t\t: {}", volume_label);
 
-        println!(
-            "    Block size\t\t\t\t\t: {} bytes",
-            ext_file_system.block_size
-        );
-        println!(
-            "    Inode size\t\t\t\t\t: {} bytes",
-            ext_file_system.inode_size
-        );
+        let byte_size: ByteSize = ByteSize::new(ext_file_system.block_size as u64, 1024);
+        println!("    Block size\t\t\t\t\t: {}", byte_size);
+
+        let byte_size: ByteSize = ByteSize::new(ext_file_system.inode_size as u64, 1024);
+        println!("    Inode size\t\t\t\t\t: {}", byte_size);
+
         println!(
             "    Number of inodes\t\t\t\t: {}",
             ext_file_system.number_of_inodes
@@ -973,7 +974,7 @@ mod tests {
         let expected_string: &str = concat!(
             "    Inode number\t\t\t\t: 14\n",
             "    Name\t\t\t\t\t: testfile1\n",
-            "    Size\t\t\t\t\t: 9\n",
+            "    Size\t\t\t\t\t: 9 bytes\n",
             "    Modification time\t\t\t\t: 2025-01-04T07:58:01\n",
             "    Access time\t\t\t\t\t: 2025-01-04T07:58:02\n",
             "    Inode change time\t\t\t\t: 2025-01-04T07:58:01\n",

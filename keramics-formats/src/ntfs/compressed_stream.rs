@@ -112,12 +112,12 @@ impl NtfsCompressedStream {
             .allocated_data_size
             .div_ceil(self.compression_unit_size as u64)
             * (self.compression_unit_size as u64);
+
         self.block_tree = BlockTree::<NtfsCompressionRange>::new(
             block_tree_size,
             0,
             self.compression_unit_size as u64,
         );
-
         if data_attribute.allocated_data_size > 0 {
             let mut virtual_cluster_offset: u64 = 0;
             let mut last_data_run_type: NtfsDataRunType = NtfsDataRunType::EndOfList;

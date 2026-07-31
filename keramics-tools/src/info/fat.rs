@@ -18,6 +18,8 @@ use keramics_datetime::DateTime;
 use keramics_formats::Path;
 use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat, FatString};
 
+use crate::formatters::ByteSize;
+
 /// File Allocation Table (FAT) file attribute flags information.
 struct FatFileAttributeFlagsInfo {
     /// Flags.
@@ -143,7 +145,8 @@ impl fmt::Display for FatFileEntryInfo {
         if let Some(name) = &self.name {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         };
-        writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
+        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         if let Some(date_time) = &self.creation_time {
             // TODO: convert to formatter.
@@ -428,7 +431,7 @@ mod tests {
         let expected_string: &str = concat!(
             "    Identifier\t\t\t\t\t: 0x00006260\n",
             "    Name\t\t\t\t\t: testfile1\n",
-            "    Size\t\t\t\t\t: 9\n",
+            "    Size\t\t\t\t\t: 9 bytes\n",
             "    Creation time\t\t\t\t: 2025-10-19T18:44:31.25\n",
             "    Modification time\t\t\t\t: 2025-10-19T18:44:30\n",
             "    Access time\t\t\t\t\t: 2025-10-19\n",

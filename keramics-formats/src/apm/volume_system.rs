@@ -33,6 +33,8 @@ pub struct ApmVolumeSystem {
 }
 
 impl ApmVolumeSystem {
+    const SUPPORTED_BYTES_PER_SECTOR: [u16; 2] = [512, 2048];
+
     /// Creates a volume system.
     pub fn new() -> Self {
         Self {
@@ -117,11 +119,28 @@ impl ApmVolumeSystem {
 
     /// Reads the partition map.
     fn read_partition_map(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let mut partition_map_signature: [u8; 80] = [0; 80];
         let mut number_of_entries: u32 = 0;
         let mut partition_map_entry_index: u32 = 0;
-        let mut partition_map_entry_offset: u64 = 512;
 
-        self.bytes_per_sector = 512;
+        if self.bytes_per_sector == 0 {
+            for bytes_per_sector in Self::SUPPORTED_BYTES_PER_SECTOR.iter() {
+                let offset: u64 = *bytes_per_sector as u64;
+
+                keramics_core::data_stream_read_at_position!(
+                    data_stream,
+                    &mut partition_map_signature,
+                    SeekFrom::Start(offset)
+                );
+                if &partition_map_signature[0..2] == APM_PARTITION_MAP_SIGNATURE
+                    && &partition_map_signature[48..67] == APM_PARTITION_MAP_TYPE
+                {
+                    self.bytes_per_sector = *bytes_per_sector;
+                    break;
+                }
+            }
+        }
+        let mut partition_map_entry_offset: u64 = self.bytes_per_sector as u64;
 
         loop {
             let mut partition_map_entry: ApmPartitionMapEntry = ApmPartitionMapEntry::new();
@@ -133,7 +152,10 @@ impl ApmVolumeSystem {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read partition map entry"
+                        format!(
+                            "Unable to read partition map entry at offset: {} (0x{:08x})",
+                            partition_map_entry_offset, partition_map_entry_offset
+                        )
                     );
                     return Err(error);
                 }
@@ -155,7 +177,7 @@ impl ApmVolumeSystem {
                 self.partition_map_entries.push(partition_map_entry);
             }
             partition_map_entry_index += 1;
-            partition_map_entry_offset += 512;
+            partition_map_entry_offset += self.bytes_per_sector as u64;
 
             if partition_map_entry_index >= number_of_entries {
                 break;

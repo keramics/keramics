@@ -18,7 +18,7 @@ use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
-use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsHeader};
+use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader};
 use crate::path_component::PathComponent;
 
 use super::attribute_record::HfsAttributeRecord;
@@ -129,11 +129,12 @@ impl HfsFileEntry {
         &self,
         fork_descriptor: &HfsForkDescriptor,
     ) -> Result<HfsBlockStream, ErrorTrace> {
+        let identifier: u32 = self.get_identifier();
         let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
 
         match block_ranges.read_fork_descriptor(
             self.data_area_block_number,
-            self.identifier,
+            identifier,
             fork_descriptor,
             &self.data_stream,
             &self.extents_overflow_file,
@@ -319,8 +320,8 @@ impl HfsFileEntry {
                     _ => {
                         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-                        match self.attributes.get_key_value(&lookup_name) {
-                            Some((name, attribute_record)) => match attribute_record {
+                        match self.attributes.get(&lookup_name) {
+                            Some(attribute_record) => match attribute_record {
                                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                                     let data_stream: FakeDataStream = FakeDataStream::new(
                                         &attribute_inline_data_record.data,
@@ -342,8 +343,22 @@ impl HfsFileEntry {
                         }
                     }
                 };
-                // TODO: create compressed data stream from data stream
-                Ok(Some(data_stream))
+                let mut decmpfs_stream: DecmpfsDataStream =
+                    DecmpfsDataStream::new(compression_method);
+
+                match decmpfs_stream
+                    .open(&data_stream, compressed_data_header.uncompressed_data_size)
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open decmpfs data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+                Ok(Some(Arc::new(RwLock::new(decmpfs_stream))))
             }
             None => {
                 let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
@@ -520,7 +535,7 @@ impl HfsFileEntry {
 
     /// Retrieves the number of sub file entries.
     pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -540,7 +555,7 @@ impl HfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<HfsFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
+        if self.is_directory() && !self.sub_directory_entries.is_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -705,8 +720,8 @@ impl HfsFileEntry {
         }
         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-        match self.attributes.get_key_value(&lookup_name) {
-            Some((name, attribute_record)) => match attribute_record {
+        match self.attributes.get(&lookup_name) {
+            Some(attribute_record) => match attribute_record {
                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                     let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
 
@@ -773,15 +788,18 @@ impl HfsFileEntry {
             self.identifier,
             &mut self.sub_directory_entries,
         ) {
-            Ok(_) => Ok(()),
+            Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     "Unable to retrieve sub directory entries from catalog file"
                 );
-                Err(error)
+                return Err(error);
             }
         }
+        self.sub_directory_entries.is_read = true;
+
+        Ok(())
     }
 }
 

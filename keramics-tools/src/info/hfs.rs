@@ -22,6 +22,8 @@ use keramics_formats::hfs::{
 
 use super::posix::PosixFileModeInfo;
 
+use crate::formatters::ByteSize;
+
 /// Hierarchical File System (HFS) file entry information.
 struct HfsFileEntryInfo {
     /// The identifier.
@@ -101,7 +103,8 @@ impl fmt::Display for HfsFileEntryInfo {
         if let Some(name) = &self.name {
             writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
         };
-        writeln!(formatter, "    Size\t\t\t\t\t: {}", self.size)?;
+        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
 
         // TODO: convert to formatter.
         let date_time_string: String = Self::get_date_time_string(&self.creation_time);
@@ -355,10 +358,8 @@ impl HfsInfo {
         };
         println!("    Volume label\t\t\t\t: {}", volume_label);
 
-        println!(
-            "    Block size\t\t\t\t\t: {} bytes",
-            hfs_file_system.block_size
-        );
+        let byte_size: ByteSize = ByteSize::new(hfs_file_system.block_size as u64, 1024);
+        println!("    Block size\t\t\t\t\t: {}", byte_size);
         println!();
 
         Ok(())
@@ -473,7 +474,7 @@ mod tests {
         let expected_string: &str = concat!(
             "    Identifier\t\t\t\t\t: 21\n",
             "    Name\t\t\t\t\t: testfile1\n",
-            "    Size\t\t\t\t\t: 9\n",
+            "    Size\t\t\t\t\t: 9 bytes\n",
             "    Creation time\t\t\t\t: 2024-11-17T15:13:40\n",
             "    Modification time\t\t\t\t: 2024-11-17T15:13:40\n",
             "    Access time\t\t\t\t\t: 2024-11-17T15:13:57\n",

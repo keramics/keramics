@@ -18,6 +18,8 @@ A GUID Partition Table (GPT) consists of:
 
 The GPT partition table header signature can be used to determine the block (LBA) (or sector) size.
 
+> Note that the maximum number of partitions is typically 128, but can be 256 as well.
+
 ### Characteristics
 
 | Characteristics | Description |

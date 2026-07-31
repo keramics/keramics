@@ -20,7 +20,7 @@ use std::fmt;
 
 use keramics_checksums::Crc32Context;
 use keramics_core::formatters::debug_format_array;
-use keramics_core::{DebugTrace, ErrorTrace};
+use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 
 use super::huffman::HuffmanTree;
@@ -295,19 +295,22 @@ impl Bzip2Context {
         }
         let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(compressed_data, 4);
 
-        match self.decompress_bitstream(&mut bitstream, uncompressed_data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
-                return Err(error);
+        DebugTrace::scope(|debug_trace| {
+            match self.decompress_bitstream(debug_trace, &mut bitstream, uncompressed_data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
+                    return Err(error);
+                }
             }
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     /// Decompress a bitstream.
     fn decompress_bitstream(
         &mut self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut Bzip2Bitstream,
         uncompressed_data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
@@ -327,7 +330,7 @@ impl Bzip2Context {
                     return Err(error);
                 }
             }
-            DebugTrace::print(&block_header);
+            debug_trace.print(&block_header);
 
             if block_header.signature == 0x177245385090 {
                 break;
@@ -339,7 +342,7 @@ impl Bzip2Context {
                 )));
             }
             let number_of_symbols: usize =
-                match self.read_symbol_stack(bitstream, &mut symbol_stack) {
+                match self.read_symbol_stack(debug_trace, bitstream, &mut symbol_stack) {
                     Ok(number_of_symbols) => number_of_symbols,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read symbol stack");
@@ -349,13 +352,14 @@ impl Bzip2Context {
             let number_of_trees: u32 = bitstream.get_value(3);
             let number_of_selectors: u32 = bitstream.get_value(15);
 
-            DebugTrace::print_start("Bzip2Context");
-            DebugTrace::print_field("number_of_symbols", number_of_symbols);
-            DebugTrace::print_field("number_of_trees", number_of_trees);
-            DebugTrace::print_field("number_of_selectors", number_of_selectors);
-            DebugTrace::print_end();
+            debug_trace.print_start("Bzip2Context");
+            debug_trace.print_field("number_of_symbols", number_of_symbols);
+            debug_trace.print_field("number_of_trees", number_of_trees);
+            debug_trace.print_field("number_of_selectors", number_of_selectors);
+            debug_trace.print_end();
 
             match self.read_selectors(
+                debug_trace,
                 bitstream,
                 &mut selectors,
                 number_of_selectors as usize,
@@ -382,6 +386,7 @@ impl Bzip2Context {
                 huffman_trees.push(huffman_tree);
             }
             let block_data_size: usize = match self.read_block_data(
+                debug_trace,
                 bitstream,
                 &huffman_trees,
                 number_of_trees as usize,
@@ -430,6 +435,7 @@ impl Bzip2Context {
     /// Reads block data from a bitstream.
     fn read_block_data(
         &self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut Bzip2Bitstream,
         huffman_trees: &[HuffmanTree],
         number_of_trees: usize,
@@ -446,7 +452,7 @@ impl Bzip2Context {
         let mut symbol_index: usize = 0;
         let mut tree_index: usize = selectors[0] as usize;
 
-        DebugTrace::print_start("Bzip2BlockData");
+        debug_trace.print_start("Bzip2BlockData");
 
         loop {
             if tree_index >= number_of_trees {
@@ -468,7 +474,7 @@ impl Bzip2Context {
                 let mut run_length: u64 =
                     ((1 << number_of_run_length_symbols) | run_length_value) - 1;
 
-                DebugTrace::print_field("0-byte run-length", run_length);
+                debug_trace.print_field("0-byte run-length", run_length);
 
                 if (run_length as usize) > BZIP2_BLOCK_SIZE - block_data_offset {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -489,14 +495,14 @@ impl Bzip2Context {
                 }
             }
             if symbol == end_of_block_symbol {
-                DebugTrace::print_field("symbol", symbol);
+                debug_trace.print_field("symbol", symbol);
                 break;
             }
             if symbol == 0 || symbol == 1 {
                 run_length_value |= (symbol as u64) << number_of_run_length_symbols;
                 number_of_run_length_symbols += 1;
 
-                DebugTrace::print_field("symbol", format!("{} (run-length)", symbol));
+                debug_trace.print_field("symbol", format!("{} (run-length)", symbol));
             } else if symbol < end_of_block_symbol {
                 // Inverse move-to-front transform.
                 let stack_value_index: usize = (symbol as usize) - 1;
@@ -508,7 +514,7 @@ impl Bzip2Context {
                 }
                 symbol_stack[0] = stack_value;
 
-                DebugTrace::print_field("symbol", format!("{} (MTF: {})", symbol, stack_value));
+                debug_trace.print_field("symbol", format!("{} (MTF: {})", symbol, stack_value));
                 if block_data_offset >= BZIP2_BLOCK_SIZE {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Invalid block data offset: {} value out of bounds",
@@ -538,7 +544,7 @@ impl Bzip2Context {
                 tree_index = selectors[selector_index] as usize;
             }
         }
-        DebugTrace::print_end();
+        debug_trace.print_end();
 
         Ok(block_data_offset)
     }
@@ -600,6 +606,7 @@ impl Bzip2Context {
     /// Reads the selectors from a bitstream.
     fn read_selectors(
         &self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut Bzip2Bitstream,
         selectors: &mut [u8],
         number_of_selectors: usize,
@@ -636,8 +643,8 @@ impl Bzip2Context {
 
             selector_index += 1;
         }
-        DebugTrace::print_start("Bzip2Selectors");
-        DebugTrace::print_field(
+        debug_trace.print_start("Bzip2Selectors");
+        debug_trace.print_field(
             "selectors",
             debug_format_array(
                 selectors
@@ -647,7 +654,7 @@ impl Bzip2Context {
                     .as_slice(),
             ),
         );
-        DebugTrace::print_end();
+        debug_trace.print_end();
 
         Ok(())
     }
@@ -655,6 +662,7 @@ impl Bzip2Context {
     /// Reads the symbol stack from a bitstream.
     fn read_symbol_stack(
         &self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut Bzip2Bitstream,
         symbol_stack: &mut [u8],
     ) -> Result<usize, ErrorTrace> {
@@ -662,14 +670,14 @@ impl Bzip2Context {
         let mut level1_bitmask: u32 = 0x00008000;
         let mut symbol_index: usize = 0;
 
-        DebugTrace::print_start("Bzip2SymbolStack");
-        DebugTrace::print_field("level1_value", format!("0x{:04x}", level1_value));
+        debug_trace.print_start("Bzip2SymbolStack");
+        debug_trace.print_field("level1_value", format!("0x{:04x}", level1_value));
 
         for level1_bit_index in 0..16 {
             if level1_value & level1_bitmask != 0 {
                 let level2_value: u32 = bitstream.get_value(16);
 
-                DebugTrace::print_field("level2_value", format!("0x{:04x}", level2_value));
+                debug_trace.print_field("level2_value", format!("0x{:04x}", level2_value));
 
                 let mut level2_bitmask: u32 = 0x00008000;
 
@@ -690,7 +698,7 @@ impl Bzip2Context {
             }
             level1_bitmask >>= 1;
         }
-        DebugTrace::print_field(
+        debug_trace.print_field(
             "symbols",
             debug_format_array(
                 symbol_stack
@@ -701,7 +709,7 @@ impl Bzip2Context {
                     .as_slice(),
             ),
         );
-        DebugTrace::print_end();
+        debug_trace.print_end();
 
         Ok(symbol_index + 2)
     }
@@ -873,9 +881,10 @@ mod tests {
         block_header.read_from_bitstream(&mut bitstream)?;
 
         let mut symbol_stack: [u8; 256] = [0; 256];
-        let number_of_symbols: usize =
-            test_context.read_symbol_stack(&mut bitstream, &mut symbol_stack)?;
 
+        let number_of_symbols: usize = DebugTrace::scope(|debug_trace| {
+            test_context.read_symbol_stack(debug_trace, &mut bitstream, &mut symbol_stack)
+        })?;
         let expected_symbol_stack: [u8; 24] = [
             1, 32, 39, 44, 63, 73, 80, 97, 99, 100, 101, 102, 104, 105, 107, 108, 111, 112, 114,
             115, 116, 119, 0, 0,
@@ -897,18 +906,24 @@ mod tests {
         block_header.read_from_bitstream(&mut bitstream)?;
 
         let mut symbol_stack: [u8; 256] = [0; 256];
-        test_context.read_symbol_stack(&mut bitstream, &mut symbol_stack)?;
 
+        _ = DebugTrace::scope(|debug_trace| {
+            test_context.read_symbol_stack(debug_trace, &mut bitstream, &mut symbol_stack)
+        })?;
         let number_of_trees: u32 = bitstream.get_value(3);
         let number_of_selectors: u32 = bitstream.get_value(15);
 
         let mut selectors: [u8; 32769] = [0; 32769];
-        test_context.read_selectors(
-            &mut bitstream,
-            &mut selectors,
-            number_of_selectors as usize,
-            number_of_trees as usize,
-        )?;
+
+        DebugTrace::scope(|debug_trace| {
+            test_context.read_selectors(
+                debug_trace,
+                &mut bitstream,
+                &mut selectors,
+                number_of_selectors as usize,
+                number_of_trees as usize,
+            )
+        })?;
         let expected_selectors: [u8; 2] = [0, 1];
         assert_eq!(&selectors[0..2], &expected_selectors);
 
@@ -926,19 +941,24 @@ mod tests {
         block_header.read_from_bitstream(&mut bitstream)?;
 
         let mut symbol_stack: [u8; 256] = [0; 256];
-        let number_of_symbols: usize =
-            test_context.read_symbol_stack(&mut bitstream, &mut symbol_stack)?;
+
+        let number_of_symbols: usize = DebugTrace::scope(|debug_trace| {
+            test_context.read_symbol_stack(debug_trace, &mut bitstream, &mut symbol_stack)
+        })?;
         let number_of_trees: u32 = bitstream.get_value(3);
         let number_of_selectors: u32 = bitstream.get_value(15);
 
         let mut selectors: [u8; 32769] = [0; 32769];
-        test_context.read_selectors(
-            &mut bitstream,
-            &mut selectors,
-            number_of_selectors as usize,
-            number_of_trees as usize,
-        )?;
 
+        DebugTrace::scope(|debug_trace| {
+            test_context.read_selectors(
+                debug_trace,
+                &mut bitstream,
+                &mut selectors,
+                number_of_selectors as usize,
+                number_of_trees as usize,
+            )
+        })?;
         let mut huffman_tree: HuffmanTree = HuffmanTree::new(number_of_symbols, 20);
         test_context.read_huffman_tree(&mut bitstream, &mut huffman_tree, number_of_symbols)?;
 
@@ -956,18 +976,24 @@ mod tests {
         block_header.read_from_bitstream(&mut bitstream)?;
 
         let mut symbol_stack: [u8; 256] = [0; 256];
-        let number_of_symbols: usize =
-            test_context.read_symbol_stack(&mut bitstream, &mut symbol_stack)?;
+
+        let number_of_symbols: usize = DebugTrace::scope(|debug_trace| {
+            test_context.read_symbol_stack(debug_trace, &mut bitstream, &mut symbol_stack)
+        })?;
         let number_of_trees: u32 = bitstream.get_value(3);
         let number_of_selectors: u32 = bitstream.get_value(15);
 
         let mut selectors: [u8; 32769] = [0; 32769];
-        test_context.read_selectors(
-            &mut bitstream,
-            &mut selectors,
-            number_of_selectors as usize,
-            number_of_trees as usize,
-        )?;
+
+        DebugTrace::scope(|debug_trace| {
+            test_context.read_selectors(
+                debug_trace,
+                &mut bitstream,
+                &mut selectors,
+                number_of_selectors as usize,
+                number_of_trees as usize,
+            )
+        })?;
         let mut huffman_trees: Vec<HuffmanTree> = Vec::new();
 
         for _ in 0..number_of_trees {
@@ -978,16 +1004,20 @@ mod tests {
             huffman_trees.push(huffman_tree);
         }
         let mut block_data: [u8; BZIP2_BLOCK_SIZE] = [0; BZIP2_BLOCK_SIZE];
-        let block_data_size: usize = test_context.read_block_data(
-            &mut bitstream,
-            &huffman_trees,
-            number_of_trees as usize,
-            &selectors,
-            number_of_selectors as usize,
-            &mut symbol_stack,
-            number_of_symbols,
-            &mut block_data,
-        )?;
+
+        let block_data_size: usize = DebugTrace::scope(|debug_trace| {
+            test_context.read_block_data(
+                debug_trace,
+                &mut bitstream,
+                &huffman_trees,
+                number_of_trees as usize,
+                &selectors,
+                number_of_selectors as usize,
+                &mut symbol_stack,
+                number_of_symbols,
+                &mut block_data,
+            )
+        })?;
         let expected_block_data: [u8; 108] = [
             0x3f, 0x66, 0x73, 0x72, 0x72, 0x64, 0x6b, 0x6b, 0x65, 0x61, 0x64, 0x64, 0x72, 0x72,
             0x66, 0x66, 0x73, 0x2c, 0x65, 0x73, 0x3f, 0x3f, 0x3f, 0x64, 0x01, 0x20, 0x20, 0x20,
@@ -1042,8 +1072,10 @@ mod tests {
 
         let mut bitstream: Bzip2Bitstream = Bzip2Bitstream::new(&test_data, 4);
         let mut uncompressed_data: Vec<u8> = vec![0; 512];
-        test_context.decompress_bitstream(&mut bitstream, &mut uncompressed_data)?;
 
+        DebugTrace::scope(|debug_trace| {
+            test_context.decompress_bitstream(debug_trace, &mut bitstream, &mut uncompressed_data)
+        })?;
         let expected_uncompressed_data: [u8; 108] = [
             0x49, 0x66, 0x20, 0x50, 0x65, 0x74, 0x65, 0x72, 0x20, 0x50, 0x69, 0x70, 0x65, 0x72,
             0x20, 0x70, 0x69, 0x63, 0x6b, 0x65, 0x64, 0x20, 0x61, 0x20, 0x70, 0x65, 0x63, 0x6b,
@@ -1058,7 +1090,6 @@ mod tests {
             &uncompressed_data[0..test_context.uncompressed_data_size],
             expected_uncompressed_data
         );
-
         Ok(())
     }
 

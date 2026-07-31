@@ -184,11 +184,24 @@ impl HashTool {
                     // if name == Some(String::from("WofCompressedData")) {
                     //     continue;
                     // }
+                    let mut skip: bool = false;
+
                     // TODO: create path filter as skip list
-                    let hash_string: String = if path.components.len() > 1
-                        && path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
-                        && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
-                    {
+                    if path.components.len() > 1 {
+                        if path.components[1] == PathComponent::from(Ucs2String::from("$BadClus"))
+                            && name == Some(PathComponent::from(Ucs2String::from("$Bad")))
+                        {
+                            skip = true;
+                        }
+                        // if path.components[1]
+                        //     == PathComponent::from(Utf16String::from(
+                        //         "\u{2400}\u{2400}\u{2400}\u{2400}HFS+ Private Data",
+                        //     ))
+                        // {
+                        //     skip = true;
+                        // }
+                    }
+                    let hash_string: String = if skip {
                         String::from("N/A (skipped)")
                     } else {
                         match self.calculate_hash_from_data_fork(&data_fork) {

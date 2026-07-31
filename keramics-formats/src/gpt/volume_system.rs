@@ -214,13 +214,10 @@ impl GptVolumeSystem {
                 partition_table_header.entry_data_size
             )));
         }
-        let maximum_number_of_entries: u32 =
-            (32 * self.bytes_per_sector as u32) / partition_table_header.entry_data_size;
-
-        if partition_table_header.number_of_entries > maximum_number_of_entries {
+        if partition_table_header.number_of_entries > 256 {
             return Err(keramics_core::error_trace_new!(format!(
-                "Number of partition entries: {} value out of bounds: {}",
-                partition_table_header.number_of_entries, maximum_number_of_entries
+                "Number of partition entries: {} value out of bounds: 256",
+                partition_table_header.number_of_entries
             )));
         }
         let mut crc32_context: ReversedCrc32Context = ReversedCrc32Context::new(0xedb88320, 0);

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 use keramics_core::ErrorTrace;
 
@@ -23,17 +23,21 @@ use super::string::HfsString;
 /// Hierarchical File System (HFS) directory entries.
 pub struct HfsDirectoryEntries {
     /// Entries.
-    entries: BTreeMap<HfsString, HfsDirectoryEntry>,
+    entries: HashMap<HfsString, HfsDirectoryEntry>,
+
+    /// Names in order of insert.
+    names: Vec<HfsString>,
 
     /// Value to indicate the directory entries were read.
-    is_read: bool,
+    pub is_read: bool,
 }
 
 impl HfsDirectoryEntries {
     /// Creates new directory entries.
     pub fn new() -> Self {
         Self {
-            entries: BTreeMap::new(),
+            entries: HashMap::new(),
+            names: Vec::new(),
             is_read: false,
         }
     }
@@ -43,7 +47,10 @@ impl HfsDirectoryEntries {
         &self,
         entry_index: usize,
     ) -> Option<(&HfsString, &HfsDirectoryEntry)> {
-        self.entries.iter().nth(entry_index)
+        match self.names.get(entry_index) {
+            Some(name) => self.entries.get_key_value(name),
+            None => None,
+        }
     }
 
     /// Retrieves a specific directory entry by name.
@@ -75,11 +82,9 @@ impl HfsDirectoryEntries {
         name: HfsString,
         entry: HfsDirectoryEntry,
     ) -> Option<HfsDirectoryEntry> {
+        if !self.entries.contains_key(&name) {
+            self.names.push(name.clone());
+        }
         self.entries.insert(name, entry)
-    }
-
-    /// Determines if the directory entries were read.
-    pub fn is_read(&self) -> bool {
-        return self.is_read;
     }
 }

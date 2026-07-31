@@ -234,17 +234,20 @@ impl InfoTool {
                     return Err(error);
                 }
             };
-        if scan_results.len() > 1 {
-            // Ignore VHD footer if additional format was detected.
-            scan_results.remove(&FormatIdentifier::Vhd);
+        let mut result: Option<FormatIdentifier>;
 
-            if scan_results.len() > 1 {
+        if scan_results.len() > 1 {
+            // Check if VHD footer was detected.
+            if scan_results.contains(&FormatIdentifier::Vhd) {
+                result = Some(FormatIdentifier::Vhd);
+            } else {
                 return Err(keramics_core::error_trace_new!(
                     "Unsupported multiple known format signatures"
                 ));
             }
+        } else {
+            result = scan_results.iter().next().cloned();
         }
-        let mut result: Option<FormatIdentifier> = scan_results.drain().next();
         if result.is_none() {
             let mut format_scanner: FormatScanner = FormatScanner::new();
             format_scanner.add_mbr_signatures();
@@ -258,23 +261,22 @@ impl InfoTool {
                     ));
                 }
             }
-            let mut scan_results: HashSet<FormatIdentifier> =
-                match format_scanner.scan_data_stream(data_stream) {
-                    Ok(scan_results) => scan_results,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to scan data stream for known format signatures"
-                        );
-                        return Err(error);
-                    }
-                };
+            scan_results = match format_scanner.scan_data_stream(data_stream) {
+                Ok(scan_results) => scan_results,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to scan data stream for known format signatures"
+                    );
+                    return Err(error);
+                }
+            };
             if scan_results.len() > 1 {
                 return Err(keramics_core::error_trace_new!(
                     "Unsupported multiple known format signatures"
                 ));
             }
-            result = scan_results.drain().next();
+            result = scan_results.iter().next().cloned();
         }
         Ok(result)
     }

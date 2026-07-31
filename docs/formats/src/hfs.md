@@ -33,7 +33,7 @@ volume.
 | Catalog B-tree file node size | 512 bytes | 4096 bytes |
 | File attributes | none | Basic and extended |
 
-### HFS
+### HFS {#hfs_volume}
 
 A HFS file system consists of:
 
@@ -548,6 +548,8 @@ Hard links in HFS+/HFSX are represented by multiple different types of file reco
 * one indirect node file record, named "iNode#", where # is the link reference. This file contains
   the content of the file shared by the hard links.
 * one or more hard link file records, that reference the indirect node file record.
+
+> Note that indirect node records named "dir_#" and "temp#" also have been observed.
 
 Indirect node files are stored in a file system metadata directory referred to as the metadata
 directory with the name "/\u{2400}\u{2400}\u{2400}\u{2400}HFS+ Private Data".
@@ -1601,7 +1603,27 @@ boot process.
 | 3 | Directory identifier (CNID) of a bootable Mac OS 8 or 9 System Folder, or 0 if none |
 | 4 | Unknown (Reserved) |
 | 5 | Directory identifier (CNID) of a bootable Mac OS X system, the "/System/Library/CoreServices" directory, or 0 if none |
-| 6 and 7 | Mac OS X volume identifier, consist of a 64-bit integer |
+| 6 and 7 | Mac OS X Volume Status Database (VSDB) volume identifier |
+
+To convert the VSDB volume identifier into a UUID:
+
+* Append the volume identifier to HFS_UUID_NAMESPACE_ID (B3E20F39-F292-11D6-97A4-00306543ECAC)
+* Calculate the MD5 digest hash of the byte sequence
+* Convert the MD5 digest hash into the UUID, see below
+
+```python
+data = bytes.fromhex("b3e20f39f29211d697a400306543ecac") + volume_identifier
+hash = hashlib.md5(data).hexdigest()
+part1 = hash[0:8]
+part2 = hash[8:12]
+part3 = "".join(["3", hash[13:16]])
+digit = (int(hash[16], 16) & 3) | 8
+part4 = "".join([f"{digit:x}", hash[17:20])
+part5 = hash[20:]
+uuid = "-".join([part1, part2, part3, part4, part5])
+```
+
+> Note that on Mac OS the finder information can be viewed using `bless --info volume_mount_path`.
 
 ### File information
 
@@ -1808,12 +1830,21 @@ The file has an extended attribute named "com.apple.decmpfs" and the content is 
 
 ## HFS wrapper {#hfs_wrapper}
 
-A HFS+ can be wrapped in a HFS volume, a HFSX volume cannot.
+A HFS wrapped HFS+ file system consists of a [HFS file system](#hfs_volume) where the
+[master directory block (MDB)](#hfs_master_directory_block) contains:
 
-A HFS wrapped HFS+ file system consists of a:
+* an embedded volume signature of "H+";
+* an embedded volume extent descriptor that describes the blocks in which the embedded volume is
+  stored;
+* the embedded volume extent is marked in the bad block file.
 
-* [master directory block (MDB)](#hfs_master_directory_block), where the "Embedded volume signature"
-  contains "H+"
+> Note that Mac OS supports a HFS+ to be wrapped in a HFS volume, but not HFSX.
+
+```python
+embedded volume offset = (
+    (data area start sector * 512) + (embedded volume block number * block size)
+)
+```
 
 ## References
 

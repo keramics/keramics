@@ -424,7 +424,9 @@ impl NtfsInfo {
             Some(name) => println!("    Name\t\t\t\t\t: {}", name),
             None => {}
         };
-        println!("    Size\t\t\t\t\t: {} bytes", file_entry.get_size());
+        let file_size: u64 = file_entry.get_size();
+        let byte_size: ByteSize = ByteSize::new(file_size, 1024);
+        println!("    Size\t\t\t\t\t: {}", byte_size);
 
         match file_entry.get_creation_time() {
             Some(date_time) => {
@@ -654,21 +656,18 @@ impl NtfsInfo {
             None => {}
         }
         println!(
-            "    Bytes per sector\t\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {}",
             ntfs_file_system.bytes_per_sector
         );
-        println!(
-            "    Cluster block size\t\t\t\t: {} bytes",
-            ntfs_file_system.cluster_block_size
-        );
-        println!(
-            "    MFT entry size\t\t\t\t: {} bytes",
-            ntfs_file_system.mft_entry_size
-        );
-        println!(
-            "    Index entry size\t\t\t\t: {} bytes",
-            ntfs_file_system.index_entry_size
-        );
+        let byte_size: ByteSize = ByteSize::new(ntfs_file_system.cluster_block_size as u64, 1024);
+        println!("    Cluster block size\t\t\t\t: {}", byte_size);
+
+        let byte_size: ByteSize = ByteSize::new(ntfs_file_system.mft_entry_size as u64, 1024);
+        println!("    MFT entry size\t\t\t\t: {}", byte_size);
+
+        let byte_size: ByteSize = ByteSize::new(ntfs_file_system.index_entry_size as u64, 1024);
+        println!("    Index entry size\t\t\t\t: {}", byte_size);
+
         println!();
 
         Ok(())

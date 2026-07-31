@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::BTreeMap;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -19,6 +18,7 @@ use keramics_encodings::CharacterEncoding;
 use keramics_types::{ByteString, bytes_to_u32_le};
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
+use super::directory_entries::ExtDirectoryEntries;
 use super::directory_entry::ExtDirectoryEntry;
 
 /// Extended File System directory.
@@ -44,7 +44,7 @@ impl ExtDirectoryTree {
         &mut self,
         data_stream: &DataStreamReference,
         block_ranges: &[ExtBlockRange],
-        entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
+        entries: &mut ExtDirectoryEntries,
     ) -> Result<(), ErrorTrace> {
         for block_range in block_ranges.iter() {
             if block_range.range_type != ExtBlockRangeType::InFile {
@@ -81,7 +81,7 @@ impl ExtDirectoryTree {
     pub fn read_inline_data(
         &mut self,
         data: &[u8],
-        entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
+        entries: &mut ExtDirectoryEntries,
     ) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
@@ -107,7 +107,7 @@ impl ExtDirectoryTree {
         data: &[u8],
         mut data_offset: usize,
         data_size: usize,
-        entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
+        entries: &mut ExtDirectoryEntries,
     ) -> Result<(), ErrorTrace> {
         while data_offset < data_size {
             keramics_core::debug_trace_structure!(ExtDirectoryEntry::debug_read_data(
@@ -154,7 +154,7 @@ impl ExtDirectoryTree {
             if name == "." || name == ".." {
                 continue;
             }
-            entries.insert(name, entry);
+            entries.insert_entry(name, entry);
         }
         Ok(())
     }
@@ -164,7 +164,7 @@ impl ExtDirectoryTree {
         &mut self,
         data_stream: &DataStreamReference,
         position: SeekFrom,
-        entries: &mut BTreeMap<ByteString, ExtDirectoryEntry>,
+        entries: &mut ExtDirectoryEntries,
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.block_size as usize];
 
@@ -220,10 +220,10 @@ mod tests {
             number_of_blocks: 1,
             range_type: ExtBlockRangeType::InFile,
         }];
-        let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
         test_struct.read_block_data(&data_stream, &block_ranges, &mut entries)?;
 
-        assert_eq!(entries.len(), 10);
+        assert_eq!(entries.get_number_of_entries(), 10);
 
         Ok(())
     }
@@ -239,10 +239,10 @@ mod tests {
         ];
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
         test_struct.read_inline_data(&test_data, &mut entries)?;
 
-        assert_eq!(entries.len(), 1);
+        assert_eq!(entries.get_number_of_entries(), 1);
 
         Ok(())
     }
@@ -253,10 +253,10 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
         test_struct.read_node_data(&test_data, 0, 256, &mut entries)?;
 
-        assert_eq!(entries.len(), 10);
+        assert_eq!(entries.get_number_of_entries(), 10);
 
         Ok(())
     }
@@ -268,10 +268,10 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: BTreeMap<ByteString, ExtDirectoryEntry> = BTreeMap::new();
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
         test_struct.read_node_at_position(&data_stream, SeekFrom::Start(0), &mut entries)?;
 
-        assert_eq!(entries.len(), 10);
+        assert_eq!(entries.get_number_of_entries(), 10);
 
         Ok(())
     }
