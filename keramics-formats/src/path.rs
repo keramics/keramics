@@ -68,14 +68,15 @@ impl Path {
 
     /// Creates a new path of the parent directory.
     pub fn new_with_parent_directory(&self) -> Self {
-        let mut number_of_components: usize = self.components.len();
+        let number_of_components: usize = self.components.len();
 
-        if number_of_components > 1 {
-            number_of_components -= 1;
-        }
-        let parent_components: Vec<PathComponent> =
-            self.components[0..number_of_components].to_vec();
-
+        let parent_components: Vec<PathComponent> = if number_of_components == 0 {
+            vec![]
+        } else if number_of_components == 1 && &self.components[0] != &PathComponent::Root {
+            vec![PathComponent::Current]
+        } else {
+            self.components[0..number_of_components - 1].to_vec()
+        };
         Self {
             components: parent_components,
         }
@@ -85,10 +86,16 @@ impl Path {
     pub fn file_name(&self) -> Option<&PathComponent> {
         let number_of_components: usize = self.components.len();
 
-        if number_of_components > 1 {
-            Some(&self.components[number_of_components - 1])
-        } else {
+        if number_of_components == 0 {
             None
+        } else {
+            let last_component: &PathComponent = &self.components[number_of_components - 1];
+
+            if last_component == &PathComponent::Root {
+                None
+            } else {
+                Some(last_component)
+            }
         }
     }
 
@@ -626,13 +633,31 @@ mod tests {
 
         let test_struct: Path = string_path.new_with_parent_directory();
         assert_eq!(test_struct.to_string(), "/directory");
+
+        let string_path: Path = Path::from("directory/filename.txt");
+
+        let test_struct: Path = string_path.new_with_parent_directory();
+        assert_eq!(test_struct.to_string(), "directory");
+
+        let string_path: Path = Path::from("filename.txt");
+
+        let test_struct: Path = string_path.new_with_parent_directory();
+        assert_eq!(test_struct.to_string(), ".");
     }
 
     #[test]
     fn test_file_name() {
+        let test_struct: Path = Path::from("");
+        let result: Option<&PathComponent> = test_struct.file_name();
+        assert_eq!(result, None);
+
         let test_struct: Path = Path::from("/");
         let result: Option<&PathComponent> = test_struct.file_name();
         assert_eq!(result, None);
+
+        let test_struct: Path = Path::from("directory");
+        let result: Option<&PathComponent> = test_struct.file_name();
+        assert_eq!(result, Some(&PathComponent::from("directory")));
 
         let test_struct: Path = Path::from("/directory");
         let result: Option<&PathComponent> = test_struct.file_name();
