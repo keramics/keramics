@@ -129,11 +129,12 @@ impl HfsFileEntry {
         &self,
         fork_descriptor: &HfsForkDescriptor,
     ) -> Result<HfsBlockStream, ErrorTrace> {
+        let identifier: u32 = self.get_identifier();
         let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
 
         match block_ranges.read_fork_descriptor(
             self.data_area_block_number,
-            self.identifier,
+            identifier,
             fork_descriptor,
             &self.data_stream,
             &self.extents_overflow_file,

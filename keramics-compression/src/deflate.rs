@@ -1161,7 +1161,4 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for decompress_block
-    // TODO: add tests for decompress_huffmann_encoded_block
 }

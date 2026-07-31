@@ -17,7 +17,7 @@
 
 use std::cmp::min;
 
-use keramics_core::{DebugTrace, ErrorTrace};
+use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
 use keramics_types::{bytes_to_u16_le, bytes_to_u32_le};
 
 use super::huffman::HuffmanTree;
@@ -333,26 +333,30 @@ impl LzxpressHuffmanContext {
         let mut uncompressed_data_offset: usize = 0;
         let uncompressed_data_size: usize = uncompressed_data.len();
 
-        while bitstream.data_offset < bitstream.data_size {
-            if uncompressed_data_offset >= uncompressed_data_size {
-                break;
-            }
-            match self.decompress_block(
-                &mut bitstream,
-                uncompressed_data,
-                &mut uncompressed_data_offset,
-                uncompressed_data_size,
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to decompress Huffman encoded block"
-                    );
-                    return Err(error);
+        DebugTrace::scope(|debug_trace| {
+            while bitstream.data_offset < bitstream.data_size {
+                if uncompressed_data_offset >= uncompressed_data_size {
+                    break;
+                }
+                match self.decompress_block(
+                    debug_trace,
+                    &mut bitstream,
+                    uncompressed_data,
+                    &mut uncompressed_data_offset,
+                    uncompressed_data_size,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decompress Huffman encoded block"
+                        );
+                        return Err(error);
+                    }
                 }
             }
-        }
+            Ok(())
+        })?;
         self.uncompressed_data_size = uncompressed_data_offset;
 
         Ok(())
@@ -361,6 +365,7 @@ impl LzxpressHuffmanContext {
     /// Decompresses a Huffman encoded block.
     fn decompress_block(
         &self,
+        debug_trace: &mut DebugTraceScope,
         bitstream: &mut LzxpressBitstream,
         uncompressed_data: &mut [u8],
         uncompressed_data_offset: &mut usize,
@@ -395,7 +400,7 @@ impl LzxpressHuffmanContext {
         bitstream.number_of_bits = 0;
         bitstream.read_data(32);
 
-        DebugTrace::print_start("LzxpressHuffmannEncodedBlock");
+        debug_trace.print_start("LzxpressHuffmannEncodedBlock");
 
         let end_of_block_uncompressed_data_offset: usize = min(
             safe_uncompressed_data_offset + 65536,
@@ -403,7 +408,7 @@ impl LzxpressHuffmanContext {
         );
         while bitstream.data_offset < bitstream.data_size || bitstream.number_of_bits > 0 {
             if safe_uncompressed_data_offset >= end_of_block_uncompressed_data_offset {
-                DebugTrace::print_field(
+                debug_trace.print_field(
                     "end-of-output at uncompressed_data_offset",
                     safe_uncompressed_data_offset,
                 );
@@ -416,9 +421,9 @@ impl LzxpressHuffmanContext {
                     return Err(error);
                 }
             };
-            DebugTrace::print_field("compressed_data_offset", bitstream.data_offset);
-            DebugTrace::print_field("number_of_bits", bitstream.number_of_bits);
-            DebugTrace::print_field("symbol", symbol);
+            debug_trace.print_field("compressed_data_offset", bitstream.data_offset);
+            debug_trace.print_field("number_of_bits", bitstream.number_of_bits);
+            debug_trace.print_field("symbol", symbol);
 
             // Ensure the bitstream buffer contains at least 16-bits.
             bitstream.read_data(16);
@@ -438,11 +443,10 @@ impl LzxpressHuffmanContext {
                     && bitstream.data_offset >= bitstream.data_size
                     && bitstream.bits == 0
                 {
-                    DebugTrace::print_field(
+                    debug_trace.print_field(
                         "end-of-block at compressed_data_offset",
                         bitstream.data_offset,
                     );
-
                     break;
                 }
                 symbol -= 256;
@@ -491,10 +495,10 @@ impl LzxpressHuffmanContext {
                 }
                 match_size += 3;
 
-                DebugTrace::print_field("compressed_data_offset", bitstream.data_offset);
-                DebugTrace::print_field("distance", distance);
-                DebugTrace::print_field("match_size", match_size);
-                DebugTrace::print_field("uncompressed_data_offset", safe_uncompressed_data_offset);
+                debug_trace.print_field("compressed_data_offset", bitstream.data_offset);
+                debug_trace.print_field("distance", distance);
+                debug_trace.print_field("match_size", match_size);
+                debug_trace.print_field("uncompressed_data_offset", safe_uncompressed_data_offset);
 
                 if distance as usize > safe_uncompressed_data_offset {
                     return Err(keramics_core::error_trace_new!(
@@ -516,17 +520,16 @@ impl LzxpressHuffmanContext {
                     match_end_offset += 1;
                     safe_uncompressed_data_offset += 1;
                 }
-                DebugTrace::print_field("match_offset", match_offset);
-                DebugTrace::print_data_field(
+                debug_trace.print_field("match_offset", match_offset);
+                debug_trace.print_data_field(
                     "match_data",
                     &uncompressed_data[match_offset..match_end_offset],
                 );
-
                 // Ensure the bitstream buffer contains at least 16-bits.
                 bitstream.read_data(16);
             }
         }
-        DebugTrace::print_end();
+        debug_trace.print_end();
 
         *uncompressed_data_offset = safe_uncompressed_data_offset;
 

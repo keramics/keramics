@@ -549,6 +549,8 @@ Hard links in HFS+/HFSX are represented by multiple different types of file reco
   the content of the file shared by the hard links.
 * one or more hard link file records, that reference the indirect node file record.
 
+> Note that indirect node records named "dir_#" and "temp#" also have been observed.
+
 Indirect node files are stored in a file system metadata directory referred to as the metadata
 directory with the name "/\u{2400}\u{2400}\u{2400}\u{2400}HFS+ Private Data".
 
