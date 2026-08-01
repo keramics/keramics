@@ -12,9 +12,11 @@ jobs:
       matrix:
         include:
         - os: macos-latest
-          build-args: "--all-features"
+          build-args: "--features fuzzing"
         - os: ubuntu-latest
-          build-args: "--all-features"
+          build-args: "--features fuzzing"
+        - os: ubuntu-latest
+          build-args: "--features zlib"
         - os: windows-latest
           build-args: ""
     runs-on: ${{ matrix.os }}

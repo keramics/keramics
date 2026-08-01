@@ -13,7 +13,7 @@
 
 use std::io::SeekFrom;
 
-use keramics_compression::{LzfseContext, LzvnContext, ZlibContext};
+use keramics_compression::{LzfseContext, LzvnContext};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::{bytes_to_u32_be, bytes_to_u32_le};
 
@@ -290,7 +290,7 @@ impl DecmpfsDataStream {
         }
 
         match self.compression_method {
-            DecmpfsCompressionMethod::Deflate => {
+            DecmpfsCompressionMethod::Zlib => {
                 let compressed_descriptors_offset: u32 = bytes_to_u32_le!(&header_buf, 0);
                 if compressed_descriptors_offset != 0x00000100 {
                     return Err(keramics_core::error_trace_new!(
@@ -630,17 +630,6 @@ impl DecmpfsDataStream {
         decompressed: &mut [u8],
     ) -> Result<usize, ErrorTrace> {
         match self.compression_method {
-            DecmpfsCompressionMethod::Deflate => {
-                let mut context = ZlibContext::new();
-                if let Err(mut error) = context.decompress(compressed, decompressed) {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to decompress deflate data"
-                    );
-                    return Err(error);
-                }
-                Ok(context.uncompressed_data_size)
-            }
             DecmpfsCompressionMethod::Lzfse => {
                 let mut context = LzfseContext::new();
                 if let Err(mut error) = context.decompress(compressed, decompressed) {
@@ -660,6 +649,14 @@ impl DecmpfsDataStream {
             DecmpfsCompressionMethod::Unknown5 => {
                 decompressed[..compressed.len()].copy_from_slice(compressed);
                 Ok(compressed.len())
+            }
+            DecmpfsCompressionMethod::Zlib => {
+                let uncompressed_data_size: usize = crate::zlib_decompress!(
+                    compressed,
+                    decompressed,
+                    "Unable to decompress zlib data"
+                );
+                Ok(uncompressed_data_size)
             }
         }
     }

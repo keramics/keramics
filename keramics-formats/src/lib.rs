@@ -17,6 +17,7 @@ mod enums;
 mod fake_file_resolver;
 mod file_resolver;
 mod lru_cache;
+mod macros;
 mod os_file_resolver;
 mod path;
 mod path_component;

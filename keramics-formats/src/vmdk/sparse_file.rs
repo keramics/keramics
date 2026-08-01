@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_compression::ZlibContext;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
@@ -116,15 +115,8 @@ impl VmdkSparseFile {
             &compressed_data,
             compressed_grain_header.compressed_data_size
         );
-        let mut zlib_context: ZlibContext = ZlibContext::new();
+        _ = crate::zlib_decompress!(&compressed_data, data, "Unable to decompress grain data");
 
-        match zlib_context.decompress(&compressed_data, data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decompress grain data");
-                return Err(error);
-            }
-        }
         Ok(())
     }
 
