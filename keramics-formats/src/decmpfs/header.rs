@@ -38,7 +38,7 @@ pub struct DecmpfsHeader {
 }
 
 impl DecmpfsHeader {
-    /// Creates a new fork descriptor.
+    /// Creates a new header.
     pub fn new() -> Self {
         Self {
             compression_method: 0,

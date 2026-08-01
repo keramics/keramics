@@ -1115,8 +1115,8 @@ mod tests {
         catalog_file.initialize(
             &HfsFormat::HfsPlus,
             4096,
-            81920,
-            vec![HfsBlockRange::new(0, 242, 20)],
+            65536,
+            vec![HfsBlockRange::new(0, 186, 20)],
             data_stream,
         )?;
         Ok(catalog_file)
@@ -1130,10 +1130,10 @@ mod tests {
         let mut directory_entries: HfsDirectoryEntries = HfsDirectoryEntries::new();
         test_struct.get_directory_entries_by_identifier(
             &data_stream,
-            29,
+            19,
             &mut directory_entries,
         )?;
-        assert_eq!(directory_entries.get_number_of_entries(), 5);
+        assert_eq!(directory_entries.get_number_of_entries(), 12);
 
         Ok(())
     }
@@ -1219,8 +1219,8 @@ mod tests {
         test_struct.initialize(
             &HfsFormat::HfsPlus,
             4096,
-            81920,
-            vec![HfsBlockRange::new(0, 242, 20)],
+            65536,
+            vec![HfsBlockRange::new(0, 186, 20)],
             &data_stream,
         )
     }

@@ -25,7 +25,7 @@ use super::fork_descriptor::HfsForkDescriptor;
         byte_order = "big",
         field(name = "signature", data_type = "ByteString<2>"),
         field(name = "format_version", data_type = "u16"),
-        field(name = "attribute_flags", data_type = "u32"),
+        field(name = "attribute_flags", data_type = "u32", format = "hex"),
         field(name = "last_mounted_version", data_type = "ByteString<4>"),
         field(name = "journal_information_block_number", data_type = "u32"),
         field(name = "creation_time", data_type = "HfsTime"),

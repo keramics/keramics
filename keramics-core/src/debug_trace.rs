@@ -49,7 +49,7 @@ impl DebugTrace {
 
     /// Creates a debug trace scope.
     #[inline]
-    fn static_scope<F>(function: F)
+    pub fn static_scope<F>(function: F)
     where
         F: FnOnce(&DebugTraceStaticScope),
     {

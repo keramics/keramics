@@ -13,3 +13,6 @@
 
 /// decmpfs header signature.
 pub(crate) const DECMPFS_HEADER_SIGNATURE: &[u8] = b"fpmc";
+
+/// decmpfs footer signature.
+pub(crate) const DECMPFS_FOOTER_SIGNATURE: &[u8] = b"cmpf";

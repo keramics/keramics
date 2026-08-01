@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::max;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -231,6 +232,8 @@ impl MbrVolumeSystem {
             }
         }
         if self.bytes_per_sector == 0 {
+            let mut largest_bytes_per_sector: u32 = 0;
+
             if let Some(last_partition_entry) = partition_entries.last() {
                 let start_address_lba: u64 = last_partition_entry.start_address_lba;
                 let end_address_lba: u64 =
@@ -254,6 +257,10 @@ impl MbrVolumeSystem {
 
                         break;
                     }
+                    largest_bytes_per_sector = max(largest_bytes_per_sector, *bytes_per_sector);
+                }
+                if self.bytes_per_sector == 0 && largest_bytes_per_sector == 512 {
+                    self.bytes_per_sector = 512;
                 }
             }
         }

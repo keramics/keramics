@@ -61,6 +61,9 @@ impl VfsScanOptionGroup {
 pub struct VfsScanOptions {
     /// Partitions to include in scan.
     pub(super) partitions: VfsScanOptionGroup,
+
+    /// Sector size.
+    pub(super) sector_size: u32,
 }
 
 impl VfsScanOptions {
@@ -68,6 +71,7 @@ impl VfsScanOptions {
     pub fn new() -> Self {
         Self {
             partitions: VfsScanOptionGroup::NotSet,
+            sector_size: 512,
         }
     }
 

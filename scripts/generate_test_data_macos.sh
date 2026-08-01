@@ -17,7 +17,7 @@
 EXIT_SUCCESS=0
 EXIT_FAILURE=1
 
-AFSCTOOL="/usr/local/bin/afsctool"
+AFSCTOOL=`which afsctool`
 
 # Checks the availability of a binary and exits if not available.
 #
@@ -121,6 +121,14 @@ create_file_entries()
         # Create a file that uses HFS+ compression (decmpfs) compression method 8
         ditto --nohfsCompression LICENSE ${MOUNT_POINT}/testdir1/compressed4
         ${AFSCTOOL} -c -T LZVN ${MOUNT_POINT}/testdir1/compressed4
+
+        # Create a file that uses HFS+ compression (decmpfs) compression method 11
+        echo "My compressed file" > ${MOUNT_POINT}/testdir1/compressed5
+        ${AFSCTOOL} -c -T LZFSE ${MOUNT_POINT}/testdir1/compressed5
+
+        # Create a file that uses HFS+ compression (decmpfs) compression method 12
+        ditto --nohfsCompression LICENSE ${MOUNT_POINT}/testdir1/compressed6
+        ${AFSCTOOL} -c -T LZFSE ${MOUNT_POINT}/testdir1/compressed6
     fi
 
     # Note that compressed UDIF images don't allow for block or character device files.

@@ -15,6 +15,9 @@ mod constants;
 mod data_stream;
 mod enums;
 mod header;
+mod zlib_block_descriptor;
+mod zlib_footer;
+mod zlib_header;
 
 pub use data_stream::DecmpfsDataStream;
 pub use enums::DecmpfsCompressionMethod;

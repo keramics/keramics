@@ -3054,7 +3054,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701237
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -3068,7 +3068,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701242
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -3082,7 +3082,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701220
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -3138,7 +3138,7 @@ mod tests {
         let vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
 
         let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
-        assert_eq!(inode_number, Some(21));
+        assert_eq!(inode_number, Some(20));
 
         Ok(())
     }
@@ -3151,7 +3151,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701220
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -3363,7 +3363,7 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
 
         let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 5);
+        assert_eq!(number_of_sub_file_entries, 12);
 
         let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
 
@@ -3377,7 +3377,7 @@ mod tests {
     fn test_test_get_sub_file_entry_by_index_with_hfs() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
 
-        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(6)?;
 
         let name: Option<PathComponent> = sub_file_entry.get_name();
         assert_eq!(
@@ -3404,7 +3404,7 @@ mod tests {
         assert!(result.unwrap().is_ok());
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> =
-            sub_file_entries_iterator.skip(9).next();
+            sub_file_entries_iterator.skip(11).next();
         assert!(result.is_none());
 
         Ok(())

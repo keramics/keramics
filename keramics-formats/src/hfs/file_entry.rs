@@ -300,7 +300,7 @@ impl HfsFileEntry {
                 let data_stream: DataStreamReference = match compressed_data_header
                     .compression_method
                 {
-                    4 | 8 => {
+                    4 | 8 | 12 => {
                         let fork_descriptor: &HfsForkDescriptor =
                             match self.get_resource_fork_descriptor() {
                                 Some(fork_descriptor) => fork_descriptor,
@@ -725,6 +725,13 @@ impl HfsFileEntry {
                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                     let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
 
+                    keramics_core::debug_trace_data_and_structure!(
+                        "DecmpfsHeader",
+                        0,
+                        &attribute_inline_data_record.data,
+                        attribute_inline_data_record.data_size,
+                        DecmpfsHeader::debug_read_data(&attribute_inline_data_record.data)
+                    );
                     match compressed_data_header.read_data(&attribute_inline_data_record.data) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -841,7 +848,7 @@ mod tests {
         assert_eq!(
             hfs_file_entry.get_change_time(),
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701242
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -860,7 +867,7 @@ mod tests {
         assert_eq!(
             hfs_file_entry.get_change_time(),
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701242
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -876,7 +883,7 @@ mod tests {
         assert_eq!(
             hfs_file_entry.get_change_time(),
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701242
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -919,7 +926,7 @@ mod tests {
         assert_eq!(
             hfs_file_entry.get_change_time(),
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3814701242
+                timestamp: 3868422208
             }))
         );
         Ok(())
@@ -1150,7 +1157,7 @@ mod tests {
             hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         let number_of_sub_file_entries: usize = hfs_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 5);
+        assert_eq!(number_of_sub_file_entries, 12);
 
         let path: Path = Path::from("/testdir1/testfile1");
         let mut hfs_file_entry: HfsFileEntry =
@@ -1170,7 +1177,7 @@ mod tests {
         let mut hfs_file_entry: HfsFileEntry =
             hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let sub_file_entry: HfsFileEntry = hfs_file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: HfsFileEntry = hfs_file_entry.get_sub_file_entry_by_index(6)?;
 
         let name: Option<&HfsString> = sub_file_entry.get_name();
         assert_eq!(name, Some(HfsString::from("large_xattr")).as_ref());
@@ -1217,7 +1224,7 @@ mod tests {
         assert!(result.unwrap().is_ok());
 
         let result: Option<Result<HfsFileEntry, ErrorTrace>> =
-            sub_file_entries_iterator.skip(9).next();
+            sub_file_entries_iterator.skip(11).next();
         assert!(result.is_none());
 
         Ok(())

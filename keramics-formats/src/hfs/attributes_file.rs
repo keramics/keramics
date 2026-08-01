@@ -397,8 +397,8 @@ mod tests {
         attributes_file.initialize(
             &HfsFormat::HfsPlus,
             4096,
-            81920,
-            vec![HfsBlockRange::new(0, 22, 20)],
+            65536,
+            vec![HfsBlockRange::new(0, 10, 16)],
             data_stream,
         )?;
         Ok(attributes_file)
@@ -426,8 +426,8 @@ mod tests {
         test_struct.initialize(
             &HfsFormat::HfsPlus,
             4096,
-            81920,
-            vec![HfsBlockRange::new(0, 22, 20)],
+            65536,
+            vec![HfsBlockRange::new(0, 10, 16)],
             &data_stream,
         )
     }

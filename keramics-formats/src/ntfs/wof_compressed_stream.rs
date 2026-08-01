@@ -242,7 +242,6 @@ impl NtfsWofCompressedStream {
             &compressed_data,
             block_size
         );
-
         match self.compression_method {
             0 | 2 | 3 => {
                 let mut lzxpress_context: LzxpressHuffmanContext = LzxpressHuffmanContext::new();
@@ -1197,7 +1196,6 @@ mod tests {
             block_stream.block_offsets,
             vec![24, 2155, 4529, 6251, 6517, 6982, 8091]
         );
-
         Ok(())
     }
 

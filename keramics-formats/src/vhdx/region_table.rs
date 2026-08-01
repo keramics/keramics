@@ -66,7 +66,7 @@ impl VhdxRegionTable {
                 region_table_header.checksum, calculated_checksum
             )));
         }
-        for _ in 0..region_table_header.number_of_entries {
+        for entry_index in 0..region_table_header.number_of_entries {
             let data_end_offset: usize = data_offset + 32;
 
             if data_end_offset > data_size {
@@ -78,7 +78,6 @@ impl VhdxRegionTable {
             keramics_core::debug_trace_structure!(VhdxRegionTableEntry::debug_read_data(
                 &data[data_offset..]
             ));
-
             let mut region_table_entry: VhdxRegionTableEntry = VhdxRegionTableEntry::new();
 
             match region_table_entry.read_data(&data[data_offset..]) {
@@ -86,7 +85,7 @@ impl VhdxRegionTable {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read region table entry"
+                        format!("Unable to read region table entry: {}", entry_index)
                     );
                     return Err(error);
                 }

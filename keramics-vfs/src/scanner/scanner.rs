@@ -594,6 +594,8 @@ impl VfsScanner {
                         return Err(error);
                     }
                 }
+                // TODO: handle mbr_volume_system.bytes_per_sector == 0
+                // Use options or invoke mediator to get sector size
                 let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();
 
                 match self.scan_for_volume_system_sub_nodes(
