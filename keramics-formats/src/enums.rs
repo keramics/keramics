@@ -26,6 +26,7 @@ pub enum FormatIdentifier {
     Ntfs,
     Pdi,
     Qcow,
+    SparseBundle,
     SparseImage,
     SplitRaw,
     Udif,
@@ -49,6 +50,7 @@ impl fmt::Display for FormatIdentifier {
             FormatIdentifier::Ntfs => "ntfs",
             FormatIdentifier::Pdi => "pdi",
             FormatIdentifier::Qcow => "qcow",
+            FormatIdentifier::SparseBundle => "sparsebundle",
             FormatIdentifier::SparseImage => "sparseimage",
             FormatIdentifier::SplitRaw => "splitraw",
             FormatIdentifier::Udif => "udif",
@@ -106,6 +108,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Qcow;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "qcow");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::SparseBundle;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "sparsebundle");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::SparseImage;
         let string: String = format_identifier.to_string();
