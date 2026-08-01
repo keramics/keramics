@@ -14,6 +14,10 @@ version = { workspace = true }
 name = "keramics_formats"
 path = "src/lib.rs"
 
+[features]
+default = []
+zlib = ["dep:zlib-rs"]
+
 [dependencies]
 keramics-checksums = { version = "0.0.1", path = "../keramics-checksums" }
 keramics-compression = { version = "0.0.1", path = "../keramics-compression" }
@@ -25,6 +29,7 @@ keramics-sigscan = { version = "0.0.1", path = "../keramics-sigscan" }
 keramics-types = { version = "0.0.1", path = "../keramics-types" }
 pest = { version = "2.8.2" }
 pest_derive = { version = "2.8.2" }
+zlib-rs = { version = "0.6.6", optional = true }
 
 [dev-dependencies]
 keramics-hashes = { version = "0.0.1", path = "../keramics-hashes" }

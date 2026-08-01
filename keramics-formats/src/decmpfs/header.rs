@@ -49,7 +49,7 @@ impl DecmpfsHeader {
     /// Retrieves the compression method.
     pub fn get_compression_method(&self) -> Option<DecmpfsCompressionMethod> {
         match self.compression_method {
-            3 | 4 => Some(DecmpfsCompressionMethod::Deflate),
+            3 | 4 => Some(DecmpfsCompressionMethod::Zlib),
             5 => Some(DecmpfsCompressionMethod::Unknown5),
             7 | 8 => Some(DecmpfsCompressionMethod::Lzvn),
             11 | 12 => Some(DecmpfsCompressionMethod::Lzfse),

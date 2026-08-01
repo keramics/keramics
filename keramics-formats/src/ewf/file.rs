@@ -13,7 +13,6 @@
 
 use std::io::SeekFrom;
 
-use keramics_compression::ZlibContext;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
@@ -68,15 +67,8 @@ impl EwfFile {
             &compressed_data,
             chunk_size
         );
-        let mut zlib_context: ZlibContext = ZlibContext::new();
+        _ = crate::zlib_decompress!(&compressed_data, data, "Unable to decompress chunk data");
 
-        match zlib_context.decompress(&compressed_data, data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decompress chunk data");
-                return Err(error);
-            }
-        }
         Ok(())
     }
 

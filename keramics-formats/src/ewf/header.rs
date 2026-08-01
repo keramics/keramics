@@ -14,7 +14,6 @@
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
-use keramics_compression::ZlibContext;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::enums::EwfHeaderValueType;
@@ -43,21 +42,10 @@ impl EwfHeader {
         // as the compressed header.
         let mut data: Vec<u8> = vec![0; compressed_data_size * 4];
 
-        let mut zlib_context: ZlibContext = ZlibContext::new();
+        let uncompressed_data_size: usize =
+            crate::zlib_decompress!(compressed_data, &mut data, "Unable to decompress data");
 
-        match zlib_context.decompress(compressed_data, &mut data) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to decompress data");
-                return Err(error);
-            }
-        }
-        keramics_core::debug_trace_data!(
-            "EwfHeader",
-            offset,
-            &data,
-            zlib_context.uncompressed_data_size
-        );
+        keramics_core::debug_trace_data!("EwfHeader", offset, &data, uncompressed_data_size);
         self.read_data(&data, header_values)
     }
 

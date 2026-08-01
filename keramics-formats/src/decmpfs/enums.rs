@@ -13,8 +13,8 @@
 
 #[derive(Debug, PartialEq)]
 pub enum DecmpfsCompressionMethod {
-    Deflate,
     Lzfse,
     Lzvn,
     Unknown5,
+    Zlib,
 }

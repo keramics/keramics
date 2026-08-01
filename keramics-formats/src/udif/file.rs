@@ -13,7 +13,7 @@
 
 use std::io::SeekFrom;
 
-use keramics_compression::{AdcContext, Bzip2Context, LzfseContext, ZlibContext};
+use keramics_compression::{AdcContext, Bzip2Context, LzfseContext};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use crate::block_tree::BlockTree;
@@ -505,18 +505,11 @@ impl UdifFile {
                 todo!();
             }
             UdifCompressionMethod::Zlib => {
-                let mut zlib_context: ZlibContext = ZlibContext::new();
-
-                match zlib_context.decompress(&compressed_data, data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to decompress zlib data"
-                        );
-                        return Err(error);
-                    }
-                }
+                _ = crate::zlib_decompress!(
+                    &compressed_data,
+                    data,
+                    "Unable to decompress zlib data"
+                );
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(
