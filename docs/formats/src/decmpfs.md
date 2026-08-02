@@ -87,8 +87,8 @@ The compressed data consist of 1 compressed data block.
 
 ### Compressed data stored in resource fork
 
-[Compression method](decmpfs.md#compression_methods) 4, 8, 10 and 12 store the compressed file content
-data in the resource fork of the file.
+[Compression method](decmpfs.md#compression_methods) 4, 8, 10 and 12 store the compressed file
+content data in the resource fork of the file.
 
 The compressed data starts with metadata that contains the offsets of the compressed data blocks.
 
