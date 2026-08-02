@@ -34,6 +34,7 @@ mod mbr;
 mod os;
 mod pdi;
 mod qcow;
+mod sparsebundle;
 mod sparseimage;
 mod splitraw;
 mod udif;

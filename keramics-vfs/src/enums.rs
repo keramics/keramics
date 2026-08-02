@@ -41,6 +41,7 @@ pub enum VfsType {
     Os,
     Pdi,
     Qcow,
+    SparseBundle,
     SparseImage,
     SplitRaw,
     Udif,
@@ -65,6 +66,7 @@ impl fmt::Display for VfsType {
             VfsType::Os => "OS",
             VfsType::Pdi => "PDI",
             VfsType::Qcow => "QCOW",
+            VfsType::SparseBundle => "SPARSEBUNDLE",
             VfsType::SparseImage => "SPARSEIMAGE",
             VfsType::SplitRaw => "SPLITRAW",
             VfsType::Udif => "UDIF",
@@ -129,6 +131,10 @@ mod tests {
         let vfs_type: VfsType = VfsType::Qcow;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "QCOW");
+
+        let vfs_type: VfsType = VfsType::SparseBundle;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "SPARSEBUNDLE");
 
         let vfs_type: VfsType = VfsType::SparseImage;
         let string: String = vfs_type.to_string();

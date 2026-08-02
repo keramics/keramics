@@ -14,7 +14,7 @@
 use std::fmt;
 use std::path::PathBuf;
 
-use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_core::ErrorTrace;
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::{FileResolverReference, open_os_file_resolver};
 

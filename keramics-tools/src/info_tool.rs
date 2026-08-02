@@ -156,16 +156,15 @@ impl InfoTool {
     /// Retrieves a data stream.
     pub fn get_data_stream(&self, path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
         let data_stream: DataStreamReference = if self.image_mode {
-            let storage_media_image: StorageMediaImage = match StorageMediaImage::open(path) {
-                Ok(storage_media_image) => storage_media_image,
+            match StorageMediaImage::open(path) {
+                Ok(storage_media_image) => storage_media_image.get_data_stream(),
                 Err(error) => {
                     return Err(keramics_core::error_trace_new_with_error!(
                         "Unable to open storage media image",
                         error
                     ));
                 }
-            };
-            storage_media_image.get_data_stream()
+            }
         } else {
             match open_os_data_stream(path) {
                 Ok(data_stream) => data_stream,
@@ -201,7 +200,7 @@ impl InfoTool {
             format_scanner.add_ewf_signatures();
             format_scanner.add_pdi_signatures();
             format_scanner.add_qcow_signatures();
-            // TODO: add support for sparse bundle.
+            // TODO: add support for sparse bundle Info.plist.
             format_scanner.add_sparseimage_signatures();
             format_scanner.add_udif_signatures();
             format_scanner.add_vhd_signatures();
