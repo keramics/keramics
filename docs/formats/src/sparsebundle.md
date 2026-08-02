@@ -1,14 +1,13 @@
 # Mac OS sparse bundle (.sparsebundle) format
 
-The Mac OS sparse bundle (.sparsebundle) format is one of the disk image formats
-supported natively by Mac OS.
+The Mac OS sparse bundle (.sparsebundle) format is one of the disk image formats supported natively
+by Mac OS.
 
 The sparse bundle disk image was introduced in Mac OS X 10.5.
 
 ## Overview
 
-A sparse bundle consists of a directory (bundle) with the .sparsbundle suffix
-containing:
+A sparse bundle consists of a directory (bundle) with the .sparsbundle suffix containing:
 
 * "Info.bckup" file
 * "Info.plist" file
@@ -27,8 +26,8 @@ containing:
 
 The Info.plist and its backup (Info.bckup) contain a [XML plist](plist.md).
 
-This plist is also referred to as "Information Property List" and contains a
-single dictionary with the following key-value pairs.
+This plist is also referred to as "Information Property List" and contains a single dictionary with
+the following key-value pairs.
 
 | Identifier | Value | Description |
 | --- | --- | --- |
@@ -63,6 +62,6 @@ The token file is empty.
 
 ## Bands directory
 
-The bands directory contains files containing the actual data of the bands. The
-files are named using a hexadecimal naming scheme where "0" is the 1st band,
-"a" the 10th, "f" the 15th, "10" the 16th, etc.
+The bands directory contains files containing the actual data of the bands. The files are named
+using a hexadecimal naming scheme where "0" is the 1st band, "a" the 10th, "f" the 15th, "10"
+the 16th, etc.

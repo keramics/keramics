@@ -132,6 +132,7 @@ impl VfsContext {
                     None => self.os_vfs_location.clone(),
                 };
                 let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
+
                 match file_system.open(parent_file_system.as_ref(), &file_system_path) {
                     Ok(()) => {}
                     Err(mut error) => {

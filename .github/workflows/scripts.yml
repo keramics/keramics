@@ -31,5 +31,9 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v6
+    - name: Install dependencies
+      run: |
+        brew update -q
+        brew install -q afsctool || true
     - name: Generate test data
       run: ./scripts/generate_test_data_macos.sh

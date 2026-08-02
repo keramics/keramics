@@ -33,7 +33,7 @@ mod storage_media_image;
 use crate::enums::EncodingType;
 use crate::info::{
     ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
-    SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::range_stream::RangeDataStream;
 use crate::storage_media_image::StorageMediaImage;
@@ -303,21 +303,25 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let result: Option<FormatIdentifier> = match info_tool.scan_for_formats(&data_stream) {
-        Ok(result) => result,
-        Err(error) => {
-            println!(
-                "Unable to scan data stream for known format signatures with error:\n{}",
-                error
-            );
-            return ExitCode::FAILURE;
-        }
-    };
-    let format_identifier: FormatIdentifier = match result {
-        Some(format_identifier) => format_identifier,
-        None => {
-            println!("No known format signatures found");
-            return ExitCode::FAILURE;
+    let format_identifier: FormatIdentifier = if !arguments.image
+        && arguments.source.is_dir()
+        && arguments.source.extension() == Some("sparsebundle".as_ref())
+    {
+        FormatIdentifier::SparseBundle
+    } else {
+        match info_tool.scan_for_formats(&data_stream) {
+            Ok(Some(format_identifier)) => format_identifier,
+            Ok(None) => {
+                println!("No known format signatures found");
+                return ExitCode::FAILURE;
+            }
+            Err(error) => {
+                println!(
+                    "Unable to scan data stream for known format signatures with error:\n{}",
+                    error
+                );
+                return ExitCode::FAILURE;
+            }
         }
     };
     Mediator {
@@ -394,7 +398,7 @@ fn main() -> ExitCode {
             FormatIdentifier::Pdi => PdiInfo::print_image(&arguments.source),
             // TODO: add support for QCOW image.
             FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
-            // TODO: add support for sparse bundle.
+            FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
             FormatIdentifier::Udif => UdifInfo::print_file(&data_stream),
             // TODO: add support for VHD image.

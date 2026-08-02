@@ -19,6 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
+use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifFile;
@@ -39,6 +40,9 @@ pub enum StorageMediaImage {
     },
     Qcow {
         qcow_image_layer: QcowImageLayer,
+    },
+    SparseBundle {
+        sparsebundle_image: Arc<RwLock<SparseBundleImage>>,
     },
     SparseImage {
         sparseimage_file: Arc<RwLock<SparseImageFile>>,
@@ -96,6 +100,7 @@ impl StorageMediaImage {
             Self::Qcow {
                 qcow_image_layer, ..
             } => qcow_image_layer.clone(),
+            Self::SparseBundle { sparsebundle_image } => sparsebundle_image.clone(),
             Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
             Self::SplitRaw { splitraw_image } => splitraw_image.clone(),
             Self::Udif { udif_file } => udif_file.clone(),
@@ -141,6 +146,16 @@ impl StorageMediaImage {
 
     /// Opens a storage media image.
     pub fn open(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        if path.is_dir() && path.extension() == Some("sparsebundle".as_ref()) {
+            match Self::open_sparsebundle_image(path) {
+                Ok(storage_media_image) => return Ok(storage_media_image),
+                Err(_) => {
+                    return Err(keramics_core::error_trace_new!(
+                        "No known storage media image formats found"
+                    ));
+                }
+            }
+        }
         let data_stream: DataStreamReference = match open_os_data_stream(path) {
             Ok(data_stream) => data_stream,
             Err(mut error) => {
@@ -328,6 +343,35 @@ impl StorageMediaImage {
                 Err(error)
             }
         }
+    }
+
+    /// Opens a sparsebundle image.
+    fn open_sparsebundle_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&path) {
+            Ok(file_resolver) => file_resolver,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to create file resolver for path: {}",
+                        path.display()
+                    )
+                );
+                return Err(error);
+            }
+        };
+        let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
+
+        match sparsebundle_image.open(&file_resolver) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open sparsebundle image");
+                return Err(error);
+            }
+        }
+        Ok(Self::SparseBundle {
+            sparsebundle_image: Arc::new(RwLock::new(sparsebundle_image)),
+        })
     }
 
     /// Opens a sparseimage file.

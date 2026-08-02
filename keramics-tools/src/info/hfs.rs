@@ -472,13 +472,13 @@ mod tests {
 
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
-            "    Identifier\t\t\t\t\t: 21\n",
+            "    Identifier\t\t\t\t\t: 20\n",
             "    Name\t\t\t\t\t: testfile1\n",
             "    Size\t\t\t\t\t: 9 bytes\n",
-            "    Creation time\t\t\t\t: 2024-11-17T15:13:40\n",
-            "    Modification time\t\t\t\t: 2024-11-17T15:13:40\n",
-            "    Access time\t\t\t\t\t: 2024-11-17T15:13:57\n",
-            "    Change time\t\t\t\t\t: 2024-11-17T15:14:02\n",
+            "    Creation time\t\t\t\t: 2026-08-01T09:43:28\n",
+            "    Modification time\t\t\t\t: 2026-08-01T09:43:28\n",
+            "    Access time\t\t\t\t\t: 2026-08-01T09:43:28\n",
+            "    Change time\t\t\t\t\t: 2026-08-01T09:43:28\n",
             "    Backup time\t\t\t\t\t: Not set (0)\n",
             "    Number of links\t\t\t\t: 1\n",
             "    Owner identifier\t\t\t\t: 501\n",
@@ -501,7 +501,7 @@ mod tests {
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
         let test_struct: HfsFileEntryInfo = HfsInfo::get_file_entry_information(&hfs_file_entry);
 
-        assert_eq!(test_struct.identifier, 21);
+        assert_eq!(test_struct.identifier, 20);
         assert_eq!(
             test_struct.name,
             Some(HfsString::Utf16String(Utf16String::from("testfile1")))
@@ -510,25 +510,25 @@ mod tests {
         assert_eq!(
             test_struct.creation_time,
             DateTime::HfsTime(HfsTime {
-                timestamp: 3814701220
+                timestamp: 3868422208
             })
         );
         assert_eq!(
             test_struct.modification_time,
             DateTime::HfsTime(HfsTime {
-                timestamp: 3814701220
+                timestamp: 3868422208
             })
         );
         assert_eq!(
             test_struct.access_time,
             Some(DateTime::HfsTime(HfsTime {
-                timestamp: 3814701237
+                timestamp: 3868422208
             }))
         );
         assert_eq!(
             test_struct.change_time,
             Some(DateTime::HfsTime(HfsTime {
-                timestamp: 3814701242
+                timestamp: 3868422208
             }))
         );
         assert_eq!(test_struct.backup_time, DateTime::NotSet);

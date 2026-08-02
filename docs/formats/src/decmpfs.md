@@ -89,66 +89,12 @@ in the resource fork of the file.
 
 The compressed data starts with metadata that contains the offsets of the compressed data blocks.
 
-## zlib compressed data
-
-* zlib compressed header
-* Unknown (empty values)
-* zlib compressed data block offsets and sizes
-* zlib compressed data blocks
-* zlib compressed footer
-
-> Note that if the zlib compressed data starts with 0xff the data is stored uncompressed after the
-> first compressed data byte.
-
-### zlib compressed header
-
-The zlib compressed header is 16 bytes in size and consists of:
+## LZFSE compressed data
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | Compressed data block descriptors offset, where the offset is relative from the start of the zlib compressed data |
-| 4 | 4 | | Compressed footer offset, where the offset is relative from the start of the zlib compressed data |
-| 8 | 4 | | Compressed data block descriptors and data size |
-| 12 | 4 | | Compressed footer size |
-
-> Note that the values in the zlib compressed header are stored in big-endian.
-
-### zlib compressed data block descriptors
-
-The zlib compressed data block descriptors are of variable size and consist of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 4 | | Compressed data size |
-| 4 | 4 | | Number of compressed data block offset and size tuples |
-| 8 | 8 x ... | | Array of compressed data block descriptors |
-
-### zlib compressed data block descriptor
-
-The zlib compressed data block descriptor is 8 bytes in size and consists of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 4 | | Compressed block offset, where the offset is relative from the start of the zlib compressed data + 20 |
-| 4 | 4 | | Compressed block size |
-
-### zlib compressed footer
-
-The zlib compressed footer is 50 bytes size and consists of:
-
-| Offset | Size | Value | Description |
-| --- | --- | --- | --- |
-| 0 | 24 | | Unknown (empty values) |
-| 24 | 2 | | Unknown |
-| 26 | 2 | | Unknown |
-| 28 | 2 | | Unknown |
-| 30 | 2 | | Unknown |
-| 32 | 4 | "cmpf" | Unknown (signature) |
-| 36 | 4 | | Unknown |
-| 40 | 4 | | Unknown |
-| 44 | 6 | | Unknown (empty values) |
-
-> Note that the values in the zlib compressed footer are stored in big-endian.
+| 0 | 4 x ... | | Array of compressed data block offsets, where an offset is relative from the start of the LZFSE compressed data |
+| ... | ... | | LZFSE compressed data blocks |
 
 ## LZVN compressed data
 
@@ -161,6 +107,74 @@ The zlib compressed footer is 50 bytes size and consists of:
 > uncompressed after the first compressed data byte. The compressed data block contains a maximum
 > of 65536 bytes of data. The compressed data block therefore should not exceed 65537 bytes in size.
 
-## LZFSE compressed data
+## zlib compressed data
 
-TODO: complete this section
+* zlib compressed header
+* Unknown (empty values)
+* zlib compressed data block descriptors
+* zlib compressed data blocks
+* zlib compressed footer
+
+> Note that if the zlib compressed data starts with 0xff the data is stored uncompressed after the
+> first compressed data byte.
+
+### zlib compressed header
+
+The zlib compressed header is 260 bytes size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | 256 | Unknown (header size or offset?) |
+| 4 | 4 | | Compressed footer offset, where the offset is relative from the start of the zlib compressed data |
+| 8 | 4 | | Unknown (total size - header size?) |
+| 12 | 4 | 50 | Compressed footer size |
+| 16 | 240 | | Unknown (empty values) |
+| 256 | 4 | | Unknown |
+
+> Note that the values in the zlib compressed header are stored in big-endian.
+
+### zlib compressed data block descriptors
+
+The zlib compressed data block descriptors are variable size and consist of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Number of block descriptors (offset and size tuples) |
+| 4 | 8 x ... | | Array of compressed data block descriptors |
+
+> Note that the values in the zlib compressed data block descriptors are store in little-endian.
+
+#### zlib compressed data block descriptor
+
+The zlib compressed data block descriptor is 8 bytes in size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Compressed block offset, where the offset is relative from the start of the zlib compressed data block descriptors |
+| 4 | 4 | | Compressed block size |
+
+### zlib compressed footer
+
+The zlib compressed footer is 50 bytes size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 24 | | Unknown (empty values) |
+| 24 | 2 | | Unknown (signature offset?) |
+| 26 | 2 | | Unknown (footer size?) |
+| 28 | 2 | | Unknown |
+| 30 | 4 | "cmpf" | Unknown (signature) |
+| 34 | 2 | | Unknown (empty values?) |
+| 36 | 2 | | Unknown |
+| 38 | 2 | | Unknown |
+| 40 | 2 | | Unknown (uncompressed block size?) |
+| 42 | 8 | | Unknown (empty values) |
+
+> Note that the values in the zlib compressed header are stored in big-endian.
+
+### zlib compressed data block
+
+If the first byte in the zlib compressed data block is:
+
+* 0x78, the block contains [zlib compressed data](zlib.md);
+* 0xff, the block contains uncompressed data.

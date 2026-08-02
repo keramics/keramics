@@ -55,6 +55,10 @@ struct CommandLineArguments {
     /// Path of the source file
     source: PathBuf,
 
+    #[arg(long, default_value_t = false)]
+    /// Stop when an error is encountered
+    stop_on_error: bool,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -157,11 +161,14 @@ struct ImageTool {
 
     /// The display path.
     display_path: DisplayPath,
+
+    /// Value to indicate to stop on error.
+    pub stop_on_error: bool,
 }
 
 impl ImageTool {
     /// Creates a new tool.
-    fn new() -> Self {
+    fn new(stop_on_error: bool) -> Self {
         let mut display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
         // Escape | as \|
@@ -172,6 +179,7 @@ impl ImageTool {
         Self {
             vfs_resolver: VfsResolver::current(),
             display_path,
+            stop_on_error,
         }
     }
 
@@ -265,27 +273,40 @@ impl ImageTool {
         calculate_md5: bool,
     ) -> Result<(), ErrorTrace> {
         let md5: String = if !calculate_md5 {
+            // TODO: consider changing to: String::from("N/A (skipped)")
             String::from("0")
         } else {
-            let result: Option<DataStreamReference> = match file_entry.get_data_stream() {
-                Ok(result) => result,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                    return Err(error);
-                }
-            };
-            match result {
-                Some(data_stream) => match Bodyfile::calculate_md5(&data_stream) {
+            // TODO: consider skipping $BadClus:$Bad
+            match file_entry.get_data_stream() {
+                Ok(Some(data_stream)) => match Bodyfile::calculate_md5(&data_stream) {
                     Ok(md5_string) => md5_string,
                     Err(mut error) => {
+                        if self.stop_on_error {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to calculate MD5 of data stream"
+                            );
+                            return Err(error);
+                        }
+                        // TODO: consider changing to: String::from("N/A (error)")
+                        String::from("00000000000000000000000000000000")
+                    }
+                },
+                Ok(None) => {
+                    // TODO: consider changing to: String::from("N/A (skipped)")
+                    String::from("00000000000000000000000000000000")
+                }
+                Err(mut error) => {
+                    if self.stop_on_error {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to calculate MD5 of data stream"
+                            "Unable to retrieve data stream"
                         );
                         return Err(error);
                     }
-                },
-                None => String::from("00000000000000000000000000000000"),
+                    // TODO: consider changing to: String::from("N/A (error)")
+                    String::from("00000000000000000000000000000000")
+                }
             }
         };
         let display_path: String = self.display_path.escape_path(path);
@@ -470,11 +491,15 @@ impl ImageTool {
             let data_fork: VfsDataFork = match file_entry.get_data_fork_by_index(data_fork_index) {
                 Ok(number_of_data_forks) => number_of_data_forks,
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!("Unable to retrieve data fork: {}", data_fork_index)
-                    );
-                    return Err(error);
+                    if self.stop_on_error {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to retrieve data fork: {}", data_fork_index)
+                        );
+                        return Err(error);
+                    }
+                    // TODO: report file entry containing error
+                    continue;
                 }
             };
             let data_fork_name: String = match &data_fork.get_name() {
@@ -759,11 +784,19 @@ impl ImageTool {
                         }
                     }
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve file entry from finder"
-                        );
-                        return Err(error);
+                        let path: &Path = vfs_finder.get_path();
+
+                        if self.stop_on_error {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve file entry from finder: {}{}",
+                                    display_path, path
+                                )
+                            );
+                            return Err(error);
+                        }
+                        // TODO: report file entry containing error
                     }
                 };
             }
@@ -849,7 +882,7 @@ fn main() -> ExitCode {
     }
     .make_current();
 
-    let mut image_tool: ImageTool = ImageTool::new();
+    let mut image_tool: ImageTool = ImageTool::new(arguments.stop_on_error);
 
     match arguments.command {
         Some(Commands::Bodyfile(command_arguments)) => {

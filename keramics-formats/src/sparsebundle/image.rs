@@ -26,6 +26,9 @@ pub struct SparseBundleImage {
     /// File resolver.
     file_resolver: FileResolverReference,
 
+    /// Bytes per sector.
+    pub bytes_per_sector: u16,
+
     /// Block size.
     pub block_size: u32,
 
@@ -44,6 +47,7 @@ impl SparseBundleImage {
     pub fn new() -> Self {
         Self {
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
+            bytes_per_sector: 0,
             block_size: 0,
             band_file_cache: LruCache::new(16),
             current_offset: 0,
@@ -189,6 +193,8 @@ impl SparseBundleImage {
                 ));
             }
         }
+        self.bytes_per_sector = 512;
+
         Ok(())
     }
 
