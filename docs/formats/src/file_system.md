@@ -14,6 +14,8 @@ A file system format is used to manage the storage of files.
 * **Reparse point**: a file system object that redirects to another location or implementation
   (filter driver), such as Windows Overlay Filter (WOF) compression. NTFS and ReFS support reparse
   points.
+* **Data range**: a contiguous storage space, such as a file system extent or sequence of blocks or
+  sectors. Can be compressed, encrypted or sparse.
 
 ## Formats
 

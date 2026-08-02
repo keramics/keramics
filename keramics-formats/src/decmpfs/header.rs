@@ -52,7 +52,9 @@ impl DecmpfsHeader {
             3 | 4 => Some(DecmpfsCompressionMethod::Zlib),
             5 => Some(DecmpfsCompressionMethod::Unknown5),
             7 | 8 => Some(DecmpfsCompressionMethod::Lzvn),
+            9 | 10 => Some(DecmpfsCompressionMethod::Raw),
             11 | 12 => Some(DecmpfsCompressionMethod::Lzfse),
+            13 | 14 => Some(DecmpfsCompressionMethod::LzBitmap),
             _ => None,
         }
     }
@@ -84,7 +86,19 @@ mod tests {
         ];
     }
 
-    // TODO: add tests for get_compression_method
+    #[test]
+    fn test_get_compression_method() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = DecmpfsHeader::new();
+        test_struct.read_data(&test_data)?;
+
+        let compression_method: Option<DecmpfsCompressionMethod> =
+            test_struct.get_compression_method();
+        assert_eq!(compression_method, Some(DecmpfsCompressionMethod::Lzvn));
+
+        Ok(())
+    }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {

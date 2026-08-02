@@ -13,8 +13,10 @@
 
 #[derive(Debug, PartialEq)]
 pub enum DecmpfsCompressionMethod {
+    LzBitmap,
     Lzfse,
     Lzvn,
+    Raw,
     Unknown5,
     Zlib,
 }

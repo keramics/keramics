@@ -62,6 +62,7 @@ impl DecmpfsDataStream {
         let uncompressed_data_marker: Option<u8> = match compression_method {
             DecmpfsCompressionMethod::Lzfse | DecmpfsCompressionMethod::Zlib => Some(0xff),
             DecmpfsCompressionMethod::Lzvn => Some(0x06),
+            DecmpfsCompressionMethod::Raw => Some(0xcc),
             _ => None,
         };
         Self {
@@ -269,6 +270,11 @@ impl DecmpfsDataStream {
                     }
                 }
             }
+            DecmpfsCompressionMethod::Raw => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to decompress raw compressed block - unsupported marker byte"
+                ));
+            }
             DecmpfsCompressionMethod::Zlib => {
                 _ = crate::zlib_decompress!(
                     &compressed_data,
@@ -306,68 +312,13 @@ impl DecmpfsDataStream {
             return Ok(());
         }
         match self.compression_method {
-            DecmpfsCompressionMethod::Lzfse => {
-                let first_block_offset: u32 = bytes_to_u32_le!(&data, 0);
-
-                if first_block_offset < 4 || (first_block_offset as u64) >= self.compressed_size {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid block offset: 0 value out of bounds"
-                    ));
-                }
-                let number_of_blocks: u32 = first_block_offset / 4;
-
-                let mut block_descriptor_data: Vec<u8> = vec![0; (first_block_offset - 4) as usize];
-
-                keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
-                    &mut block_descriptor_data,
-                    SeekFrom::Start(4)
-                );
-                self.block_offsets.push(first_block_offset);
-
-                let mut data_offset: usize = 0;
-                let mut last_block_offset: u32 = first_block_offset;
-
-                for entry_index in 1..number_of_blocks {
-                    let block_offset: u32 = bytes_to_u32_le!(&block_descriptor_data, data_offset);
-
-                    data_offset += 4;
-
-                    if block_offset < last_block_offset
-                        || (block_offset as u64) > self.compressed_size
-                    {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid block offset: {} value out of bounds",
-                            entry_index
-                        )));
-                    }
-                    self.block_offsets.push(block_offset);
-
-                    last_block_offset = block_offset;
-                }
-                DebugTrace::static_scope(|debug_trace| {
-                    debug_trace.print_start("DecmpfsLzfseBlockDescriptors");
-                    debug_trace.print_field("number_of_blocks", number_of_blocks);
-                    debug_trace.print_field(
-                        "block_offsets",
-                        debug_format_array(
-                            self.block_offsets
-                                .iter()
-                                .map(|&element| element.to_string())
-                                .collect::<Vec<String>>()
-                                .as_slice(),
-                        ),
-                    );
-                    debug_trace.print_end();
-                });
-                Ok(())
-            }
-            DecmpfsCompressionMethod::Lzvn => {
+            DecmpfsCompressionMethod::Lzfse
+            | DecmpfsCompressionMethod::Lzvn
+            | DecmpfsCompressionMethod::Raw => {
                 let first_block_offset: u32 = bytes_to_u32_le!(&data, 0);
 
                 if first_block_offset < 4
-                    || first_block_offset >= 65537
-                    || (first_block_offset as u64) >= self.compressed_size
+                    || (first_block_offset as u64) >= min(self.compressed_size, 65537)
                 {
                     return Err(keramics_core::error_trace_new!(
                         "Invalid block offset: 0 value out of bounds"
@@ -396,13 +347,25 @@ impl DecmpfsDataStream {
                         || (block_offset as u64) > self.compressed_size
                     {
                         return Err(keramics_core::error_trace_new!(format!(
-                            "Invalid block offset: {} value out of bounds",
+                            "Invalid block descriptor: {} offset value out of bounds",
                             entry_index
+                        )));
+                    }
+                    if block_offset - last_block_offset >= 65537 {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Invalid block descriptor: {} size value out of bounds",
+                            entry_index - 1
                         )));
                     }
                     self.block_offsets.push(block_offset);
 
                     last_block_offset = block_offset;
+                }
+                if self.compressed_size - (last_block_offset as u64) >= 65537 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid block descriptor: {} size value out of bounds",
+                        number_of_blocks - 1
+                    )));
                 }
                 DebugTrace::static_scope(|debug_trace| {
                     debug_trace.print_start("DecmpfsLzvnBlockDescriptors");
@@ -511,9 +474,21 @@ impl DecmpfsDataStream {
                             entry_index
                         )));
                     }
+                    if zlib_block_descriptor.offset - last_block_offset >= 65537 {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Invalid block descriptor: {} size value out of bounds",
+                            entry_index
+                        )));
+                    }
                     self.block_offsets.push(zlib_block_descriptor.offset + 260);
 
                     last_block_offset = zlib_block_descriptor.offset;
+                }
+                if self.compressed_size - (last_block_offset as u64) >= 65537 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Invalid block descriptor: {} size value out of bounds",
+                        number_of_blocks - 1
+                    )));
                 }
                 if zlib_header.footer_offset < last_block_offset + 260 {
                     return Err(keramics_core::error_trace_new!(
@@ -733,6 +708,47 @@ mod tests {
         decmpfs_stream.read_compressed_block(16, 29, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_compressed_block_with_raw() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = vec![
+            0x66, 0x70, 0x6d, 0x63, 0x09, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xcc, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73,
+            0x65, 0x64, 0x20, 0x66, 0x69, 0x6c, 0x65, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut decmpfs_stream: DecmpfsDataStream =
+            DecmpfsDataStream::new(DecmpfsCompressionMethod::Raw);
+
+        decmpfs_stream.open(&data_stream, 19)?;
+        decmpfs_stream.read_compressed_block_offsets()?;
+
+        let mut data: Vec<u8> = vec![0; 32];
+        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+
+        assert_eq!(&data[0..19], b"My compressed file\n");
+
+        let test_data: Vec<u8> = vec![
+            0x66, 0x70, 0x6d, 0x63, 0x09, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x11, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73,
+            0x65, 0x64, 0x20, 0x66, 0x69, 0x6c, 0x65, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut decmpfs_stream: DecmpfsDataStream =
+            DecmpfsDataStream::new(DecmpfsCompressionMethod::Raw);
+
+        decmpfs_stream.open(&data_stream, 19)?;
+        decmpfs_stream.read_compressed_block_offsets()?;
+
+        let mut data: Vec<u8> = vec![0; 32];
+        let result: Result<(), ErrorTrace> =
+            decmpfs_stream.read_compressed_block(16, 20, &mut data);
+        assert!(result.is_err());
 
         Ok(())
     }

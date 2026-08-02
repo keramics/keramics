@@ -63,6 +63,7 @@ mod volume_header;
 
 pub use enums::{HfsForkType, HfsFormat};
 pub use extended_attribute::HfsExtendedAttribute;
+pub use extent_descriptor::HfsExtentDescriptor;
 pub use file_entry::HfsFileEntry;
 pub use file_system::HfsFileSystem;
 pub use fork::HfsFork;
