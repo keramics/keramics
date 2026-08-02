@@ -51,6 +51,8 @@ The decmpfs header is 16 bytes in size and consists of:
 | 10 | | Unknown (64k chunked uncompressed data resource fork), where the compressed data is stored in the resource fork |
 | 11 | | LZFSE compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
 | 12 | | 64k chunked LZFSE compressed resource fork, where the compressed data is stored in the resource fork |
+| 13 | | Unknown (LZBITMAP compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header) |
+| 14 | | Unknown (LZBITMAP compressed resource fork, where the compressed data is stored in the resource fork) |
 | | | |
 | 0x80000001 | | Unknown (faulting file) |
 
@@ -77,15 +79,15 @@ There are 12 bytes stored after the decmpfs compressed data header that consists
 
 ### Compressed data stored in extended attribute
 
-[Compression method](decmpfs.md#compression_methods) 3 and 7 store the compressed file content data
-in the extended attribute after the decmpfs compressed data header.
+[Compression method](decmpfs.md#compression_methods) 3, 5, 7 and 11 store the compressed file
+content data in the extended attribute after the decmpfs compressed data header.
 
 The compressed data consist of 1 compressed data block.
 
 ### Compressed data stored in resource fork
 
-[Compression method](decmpfs.md#compression_methods) 4 and 8 store the compressed file content data
-in the resource fork of the file.
+[Compression method](decmpfs.md#compression_methods) 4, 8 and 12 store the compressed file content
+data in the resource fork of the file.
 
 The compressed data starts with metadata that contains the offsets of the compressed data blocks.
 
@@ -96,6 +98,11 @@ The compressed data starts with metadata that contains the offsets of the compre
 | 0 | 4 x ... | | Array of compressed data block offsets, where an offset is relative from the start of the LZFSE compressed data |
 | ... | ... | | LZFSE compressed data blocks |
 
+### LZFSE compressed data block
+
+If the first byte in the LZFSE compressed data block is 0xff, the block contains uncompressed data,
+otherwise the block should start with a LZFSE block marker.
+
 ## LZVN compressed data
 
 | Offset | Size | Value | Description |
@@ -103,9 +110,13 @@ The compressed data starts with metadata that contains the offsets of the compre
 | 0 | 4 x ... | | Array of compressed data block offsets, where an offset is relative from the start of the LZVN compressed data |
 | ... | ... | | LZVN compressed data blocks |
 
-> Note that if the LZVN compressed data starts with 0x06 (end of stream oppcode) the data is stored
-> uncompressed after the first compressed data byte. The compressed data block contains a maximum
-> of 65536 bytes of data. The compressed data block therefore should not exceed 65537 bytes in size.
+### LZVN compressed data block
+
+If the first byte in the LZVN compressed data block is 0x06 (end of stream oppcode), the block
+contains uncompressed data.
+
+A compressed data block can contains a maximum of 65536 bytes of data. The compressed data block
+therefore should not exceed 65537 bytes in size.
 
 ## zlib compressed data
 
@@ -114,9 +125,6 @@ The compressed data starts with metadata that contains the offsets of the compre
 * zlib compressed data block descriptors
 * zlib compressed data blocks
 * zlib compressed footer
-
-> Note that if the zlib compressed data starts with 0xff the data is stored uncompressed after the
-> first compressed data byte.
 
 ### zlib compressed header
 
@@ -174,7 +182,5 @@ The zlib compressed footer is 50 bytes size and consists of:
 
 ### zlib compressed data block
 
-If the first byte in the zlib compressed data block is:
-
-* 0x78, the block contains [zlib compressed data](zlib.md);
-* 0xff, the block contains uncompressed data.
+If the first byte in the zlib compressed data block is 0xff, the block contains uncompressed data,
+otherwise the block should start with 0x78.

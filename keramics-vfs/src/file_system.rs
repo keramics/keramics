@@ -29,6 +29,7 @@ use super::mbr::{MbrFileEntry, MbrFileSystem};
 use super::os::OsFileSystem;
 use super::pdi::{PdiFileEntry, PdiFileSystem};
 use super::qcow::{QcowFileEntry, QcowFileSystem};
+use super::sparsebundle::{SparseBundleFileEntry, SparseBundleFileSystem};
 use super::sparseimage::{SparseImageFileEntry, SparseImageFileSystem};
 use super::splitraw::{SplitRawFileEntry, SplitRawFileSystem};
 use super::types::VfsFileSystemReference;
@@ -51,6 +52,7 @@ pub enum VfsFileSystem {
     Os,
     Pdi(PdiFileSystem),
     Qcow(QcowFileSystem),
+    SparseBundle(SparseBundleFileSystem),
     SparseImage(SparseImageFileSystem),
     SplitRaw(SplitRawFileSystem),
     Udif(UdifFileSystem),
@@ -75,6 +77,7 @@ impl VfsFileSystem {
             VfsType::Os => VfsFileSystem::Os,
             VfsType::Pdi => VfsFileSystem::Pdi(PdiFileSystem::new()),
             VfsType::Qcow => VfsFileSystem::Qcow(QcowFileSystem::new()),
+            VfsType::SparseBundle => VfsFileSystem::SparseBundle(SparseBundleFileSystem::new()),
             VfsType::SparseImage => VfsFileSystem::SparseImage(SparseImageFileSystem::new()),
             VfsType::SplitRaw => VfsFileSystem::SplitRaw(SplitRawFileSystem::new()),
             VfsType::Udif => VfsFileSystem::Udif(UdifFileSystem::new()),
@@ -158,6 +161,9 @@ impl VfsFileSystem {
             VfsFileSystem::Os => OsFileSystem::file_entry_exists(path),
             VfsFileSystem::Pdi(pdi_file_system) => Ok(pdi_file_system.file_entry_exists(path)),
             VfsFileSystem::Qcow(qcow_file_system) => Ok(qcow_file_system.file_entry_exists(path)),
+            VfsFileSystem::SparseBundle(sparsebundle_file_system) => {
+                Ok(sparsebundle_file_system.file_entry_exists(path))
+            }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 Ok(sparseimage_file_system.file_entry_exists(path))
             }
@@ -314,6 +320,14 @@ impl VfsFileSystem {
                     None => Ok(None),
                 }
             }
+            VfsFileSystem::SparseBundle(sparsebundle_file_system) => {
+                match sparsebundle_file_system.get_file_entry_by_path(path)? {
+                    Some(sparsebundle_file_entry) => {
+                        Ok(Some(VfsFileEntry::SparseBundle(sparsebundle_file_entry)))
+                    }
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 match sparseimage_file_system.get_file_entry_by_path(path)? {
                     Some(sparseimage_file_entry) => {
@@ -458,6 +472,12 @@ impl VfsFileSystem {
 
                 Ok(Some(VfsFileEntry::Qcow(qcow_file_entry)))
             }
+            VfsFileSystem::SparseBundle(sparsebundle_file_system) => {
+                let sparsebundle_file_entry: SparseBundleFileEntry =
+                    sparsebundle_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::SparseBundle(sparsebundle_file_entry)))
+            }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 let sparseimage_file_entry: SparseImageFileEntry =
                     sparseimage_file_system.get_root_file_entry();
@@ -537,6 +557,9 @@ impl VfsFileSystem {
             }
             VfsFileSystem::Qcow(qcow_file_system) => {
                 qcow_file_system.open(parent_file_system, vfs_location)
+            }
+            VfsFileSystem::SparseBundle(sparsebundle_file_system) => {
+                sparsebundle_file_system.open(parent_file_system, vfs_location)
             }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 sparseimage_file_system.open(parent_file_system, vfs_location)
@@ -1471,6 +1494,71 @@ mod tests {
     #[test]
     fn test_get_file_entry_by_path_with_qcow_root() -> Result<(), ErrorTrace> {
         let vfs_file_system: VfsFileSystem = get_qcow_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with sparse bundle.
+
+    fn get_sparsebundle_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseBundle);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparsebundle_file_system()?;
+
+        let path: Path = Path::from("/sparsebundle1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_sparsebundle_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparsebundle_file_system()?;
+
+        let path: Path = Path::from("/bogus1");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_sparsebundle_layer() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparsebundle_file_system()?;
+
+        let path: Path = Path::from("/sparsebundle1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_sparsebundle_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparsebundle_file_system()?;
 
         let path: Path = Path::from("/");
         let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();

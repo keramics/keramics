@@ -195,6 +195,9 @@ impl MbrFileSystem {
             VfsFileSystem::Qcow(qcow_file_system) => {
                 Ok(Some(qcow_file_system.get_bytes_per_sector()?))
             }
+            VfsFileSystem::SparseBundle(sparsebundle_file_system) => {
+                Ok(Some(sparsebundle_file_system.get_bytes_per_sector()?))
+            }
             VfsFileSystem::SparseImage(sparseimage_file_system) => {
                 Ok(Some(sparseimage_file_system.get_bytes_per_sector()?))
             }

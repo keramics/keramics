@@ -22,6 +22,7 @@ use keramics_formats::gpt::GptVolumeSystem;
 use keramics_formats::mbr::MbrVolumeSystem;
 use keramics_formats::pdi::PdiImage;
 use keramics_formats::qcow::QcowImage;
+use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
 use keramics_formats::udif::UdifFile;
@@ -40,6 +41,7 @@ use crate::mbr::MbrFileSystem;
 use crate::pdi::PdiFileSystem;
 use crate::qcow::QcowFileSystem;
 use crate::resolver::VfsResolver;
+use crate::sparsebundle::SparseBundleFileSystem;
 use crate::sparseimage::SparseImageFileSystem;
 use crate::splitraw::SplitRawFileSystem;
 use crate::types::{VfsFileSystemReference, VfsResolverReference};
@@ -193,7 +195,10 @@ impl VfsScanner {
                 )));
             }
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve file entry: {}", vfs_location)
+                );
                 return Err(error);
             }
         };
@@ -203,16 +208,77 @@ impl VfsScanner {
                     "Devices are currently not supported"
                 ));
             }
-            VfsFileType::File => {}
+            VfsFileType::Directory => {
+                let path: &Path = vfs_location.get_path();
+
+                match path.file_name() {
+                    Some(file_name) => match file_name.extension() {
+                        Ok(Some(extension)) => match extension.to_string().as_str() {
+                            "sparsebundle" => {
+                                let sub_node_path: Path = Path::from("/");
+                                let sub_node_vfs_location: VfsLocation = vfs_location
+                                    .new_with_layer(&VfsType::SparseBundle, sub_node_path);
+                                let mut sub_scan_node: VfsScanNode =
+                                    VfsScanNode::new(sub_node_vfs_location);
+
+                                match self.scan_for_sub_nodes(
+                                    scan_options,
+                                    &file_system,
+                                    vfs_location,
+                                    &mut sub_scan_node,
+                                ) {
+                                    Ok(_) => {}
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to scan for sub nodes"
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                                scan_node.sub_nodes.push(sub_scan_node);
+                            }
+                            _ => {}
+                        },
+                        Ok(None) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve extention of file entry: {}",
+                                    vfs_location
+                                )
+                            );
+                            return Err(error);
+                        }
+                    },
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unable to determine file name of file entry: {}",
+                            vfs_location
+                        )));
+                    }
+                }
+            }
+            VfsFileType::File => {
+                match self.scan_for_sub_nodes(
+                    scan_options,
+                    &file_system,
+                    vfs_location,
+                    &mut scan_node,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan for sub nodes"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
             _ => {
                 return Err(keramics_core::error_trace_new!("Unsupported file type"));
-            }
-        };
-        match self.scan_for_sub_nodes(scan_options, &file_system, vfs_location, &mut scan_node) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to scan for sub nodes");
-                return Err(error);
             }
         }
         scan_context.root_node = Some(scan_node);
@@ -245,6 +311,7 @@ impl VfsScanner {
                 self.scan_for_file_system_format(&data_stream)
             }
             VfsType::Ewf
+            | VfsType::SparseBundle
             | VfsType::SparseImage
             | VfsType::SplitRaw
             | VfsType::Pdi
@@ -405,6 +472,7 @@ impl VfsScanner {
                 FormatIdentifier::Ewf => Ok(Some(VfsType::Ewf)),
                 FormatIdentifier::Pdi => Ok(Some(VfsType::Pdi)),
                 FormatIdentifier::Qcow => Ok(Some(VfsType::Qcow)),
+                FormatIdentifier::SparseBundle => Ok(Some(VfsType::SparseBundle)),
                 FormatIdentifier::SparseImage => Ok(Some(VfsType::SparseImage)),
                 FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
                 FormatIdentifier::Vhd => Ok(Some(VfsType::Vhd)),
@@ -686,6 +754,37 @@ impl VfsScanner {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to scan QCOW image");
+                        return Err(error);
+                    }
+                }
+            }
+            VfsType::SparseBundle => {
+                let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
+
+                match SparseBundleFileSystem::open_image(&mut sparsebundle_image, file_system, path)
+                {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open sparsebundle image"
+                        );
+                        return Err(error);
+                    }
+                }
+                match self.scan_for_storage_media_image_sub_nodes(
+                    scan_options,
+                    vfs_location,
+                    scan_node,
+                    SparseBundleFileSystem::PATH_PREFIX,
+                    1,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan sparsebundle image"
+                        );
                         return Err(error);
                     }
                 }
@@ -1141,6 +1240,31 @@ mod tests {
         let vfs_type: &VfsType = scan_node.get_type();
         assert_eq!(vfs_type, &VfsType::Ext);
         assert_eq!(scan_node.sub_nodes.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let mut scan_options: VfsScanOptions = VfsScanOptions::new();
+        scan_options.parse_partitions("1")?;
+
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Os);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::SparseBundle);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
 
         Ok(())
     }

@@ -49,6 +49,9 @@ pub struct DecmpfsDataStream {
 
     /// Decompressed block cache.
     block_cache: LruCache<u64, Vec<u8>>,
+
+    /// Uncompressed data marker.
+    uncompressed_data_marker: Option<u8>,
 }
 
 impl DecmpfsDataStream {
@@ -56,6 +59,11 @@ impl DecmpfsDataStream {
 
     /// Creates a new compressed stream.
     pub(crate) fn new(compression_method: DecmpfsCompressionMethod) -> Self {
+        let uncompressed_data_marker: Option<u8> = match compression_method {
+            DecmpfsCompressionMethod::Lzfse | DecmpfsCompressionMethod::Zlib => Some(0xff),
+            DecmpfsCompressionMethod::Lzvn => Some(0x06),
+            _ => None,
+        };
         Self {
             data_stream: None,
             compression_method,
@@ -64,6 +72,7 @@ impl DecmpfsDataStream {
             size: 0,
             block_offsets: Vec::new(),
             block_cache: LruCache::new(8),
+            uncompressed_data_marker,
         }
     }
 
@@ -220,6 +229,17 @@ impl DecmpfsDataStream {
             &compressed_data,
             block_size
         );
+        if let Some(uncompressed_data_marker) = self.uncompressed_data_marker {
+            let mut compressed_data_size: usize = compressed_data.len();
+
+            if compressed_data_size > 0 && compressed_data[0] == uncompressed_data_marker {
+                compressed_data_size -= 1;
+
+                data[0..compressed_data_size].copy_from_slice(&compressed_data[1..]);
+
+                return Ok(());
+            }
+        }
         match self.compression_method {
             DecmpfsCompressionMethod::Lzfse => {
                 let mut context = LzfseContext::new();
@@ -250,19 +270,11 @@ impl DecmpfsDataStream {
                 }
             }
             DecmpfsCompressionMethod::Zlib => {
-                let mut compressed_data_size: usize = compressed_data.len();
-
-                if compressed_data_size > 0 && compressed_data[0] == 0xff {
-                    compressed_data_size -= 1;
-
-                    data[0..compressed_data_size].copy_from_slice(&compressed_data[1..]);
-                } else {
-                    _ = crate::zlib_decompress!(
-                        &compressed_data,
-                        data,
-                        "Unable to decompress zlib compressed block"
-                    );
-                }
+                _ = crate::zlib_decompress!(
+                    &compressed_data,
+                    data,
+                    "Unable to decompress zlib compressed block"
+                );
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(
@@ -647,7 +659,25 @@ mod tests {
     // TODO: add tests for read_data_from_blocks
 
     #[test]
-    fn test_read_compressed_block_lzfse() -> Result<(), ErrorTrace> {
+    fn test_read_compressed_block_with_lzfse() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = vec![
+            0x66, 0x70, 0x6d, 0x63, 0x0b, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xff, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73,
+            0x65, 0x64, 0x20, 0x66, 0x69, 0x6c, 0x65, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut decmpfs_stream: DecmpfsDataStream =
+            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzfse);
+
+        decmpfs_stream.open(&data_stream, 19)?;
+        decmpfs_stream.read_compressed_block_offsets()?;
+
+        let mut data: Vec<u8> = vec![0; 32];
+        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+
+        assert_eq!(&data[0..19], b"My compressed file\n");
+
         let test_data: Vec<u8> = vec![
             0x66, 0x70, 0x6d, 0x63, 0x0b, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x62, 0x76, 0x78, 0x2d, 0x13, 0x00, 0x00, 0x00, 0x4d, 0x79, 0x20, 0x63,
@@ -671,7 +701,25 @@ mod tests {
     }
 
     #[test]
-    fn test_read_compressed_block_lzvn() -> Result<(), ErrorTrace> {
+    fn test_read_compressed_block_with_lzvn() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = vec![
+            0x66, 0x70, 0x6d, 0x63, 0x07, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x06, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73,
+            0x65, 0x64, 0x20, 0x66, 0x69, 0x6c, 0x65, 0x0a,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut decmpfs_stream: DecmpfsDataStream =
+            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
+
+        decmpfs_stream.open(&data_stream, 19)?;
+        decmpfs_stream.read_compressed_block_offsets()?;
+
+        let mut data: Vec<u8> = vec![0; 32];
+        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+
+        assert_eq!(&data[0..19], b"My compressed file\n");
+
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
@@ -690,7 +738,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_compressed_block_zlib() -> Result<(), ErrorTrace> {
+    fn test_read_compressed_block_with_zlib() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = vec![
             0x66, 0x70, 0x6d, 0x63, 0x03, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0xff, 0x4d, 0x79, 0x20, 0x63, 0x6f, 0x6d, 0x70, 0x72, 0x65, 0x73, 0x73,
@@ -706,6 +754,25 @@ mod tests {
 
         let mut data: Vec<u8> = vec![0; 32];
         decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+
+        assert_eq!(&data[0..19], b"My compressed file\n");
+
+        let test_data: Vec<u8> = vec![
+            0x66, 0x70, 0x6d, 0x63, 0x03, 0x00, 0x00, 0x00, 0x13, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x78, 0x9c, 0xf3, 0xad, 0x54, 0x48, 0xce, 0xcf, 0x2d, 0x28, 0x4a, 0x2d,
+            0x2e, 0x4e, 0x4d, 0x51, 0x48, 0xcb, 0xcc, 0x49, 0xe5, 0x02, 0x00, 0x47, 0x59, 0x06,
+            0xe6,
+        ];
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut decmpfs_stream: DecmpfsDataStream =
+            DecmpfsDataStream::new(DecmpfsCompressionMethod::Zlib);
+
+        decmpfs_stream.open(&data_stream, 19)?;
+        decmpfs_stream.read_compressed_block_offsets()?;
+
+        let mut data: Vec<u8> = vec![0; 32];
+        decmpfs_stream.read_compressed_block(16, 27, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 

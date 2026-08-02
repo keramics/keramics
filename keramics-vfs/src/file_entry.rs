@@ -38,6 +38,7 @@ use super::mbr::MbrFileEntry;
 use super::os::OsFileEntry;
 use super::pdi::PdiFileEntry;
 use super::qcow::QcowFileEntry;
+use super::sparsebundle::SparseBundleFileEntry;
 use super::sparseimage::SparseImageFileEntry;
 use super::splitraw::SplitRawFileEntry;
 use super::udif::UdifFileEntry;
@@ -59,6 +60,7 @@ pub enum VfsFileEntry {
     Os(OsFileEntry),
     Pdi(PdiFileEntry),
     Qcow(QcowFileEntry),
+    SparseBundle(SparseBundleFileEntry),
     SparseImage(SparseImageFileEntry),
     SplitRaw(SplitRawFileEntry),
     Udif(UdifFileEntry),
@@ -77,6 +79,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -102,6 +105,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -125,6 +129,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -153,6 +158,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -186,6 +192,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -261,6 +268,9 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_file_type(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.get_file_type(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_file_type(),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                sparsebundle_file_entry.get_file_type()
+            }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.get_file_type()
             }
@@ -281,6 +291,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -308,6 +319,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -332,6 +344,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -382,6 +395,9 @@ impl VfsFileEntry {
             },
             VfsFileEntry::Pdi(pdi_file_entry) => Some(pdi_file_entry.get_name()),
             VfsFileEntry::Qcow(qcow_file_entry) => Some(qcow_file_entry.get_name()),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                Some(sparsebundle_file_entry.get_name())
+            }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 Some(sparseimage_file_entry.get_name())
             }
@@ -405,6 +421,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -429,6 +446,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Ntfs(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -456,6 +474,9 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_size(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.get_size(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_size(),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                sparsebundle_file_entry.get_size()
+            }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => sparseimage_file_entry.get_size(),
             VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.get_size(),
             VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.get_size(),
@@ -476,6 +497,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Mbr(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -604,6 +626,10 @@ impl VfsFileEntry {
                 QcowFileEntry::Layer { .. } => 1,
                 QcowFileEntry::Root { .. } => 0,
             },
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => match sparsebundle_file_entry {
+                SparseBundleFileEntry::Layer { .. } => 1,
+                SparseBundleFileEntry::Root { .. } => 0,
+            },
             VfsFileEntry::SparseImage(sparseimage_file_entry) => match sparseimage_file_entry {
                 SparseImageFileEntry::Layer { .. } => 1,
                 SparseImageFileEntry::Root { .. } => 0,
@@ -648,6 +674,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -730,6 +757,9 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_data_stream(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.get_data_stream(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.get_data_stream(),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                sparsebundle_file_entry.get_data_stream()
+            }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.get_data_stream()
             }
@@ -765,6 +795,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -798,6 +829,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -835,6 +867,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -883,6 +916,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Os(_)
             | VfsFileEntry::Pdi(_)
             | VfsFileEntry::Qcow(_)
+            | VfsFileEntry::SparseBundle(_)
             | VfsFileEntry::SparseImage(_)
             | VfsFileEntry::SplitRaw(_)
             | VfsFileEntry::Udif(_)
@@ -951,6 +985,9 @@ impl VfsFileEntry {
             }
             VfsFileEntry::Qcow(qcow_file_entry) => {
                 Ok(qcow_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                Ok(sparsebundle_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 Ok(sparseimage_file_entry.get_number_of_sub_file_entries())
@@ -1025,6 +1062,9 @@ impl VfsFileEntry {
             VfsFileEntry::Qcow(qcow_file_entry) => Ok(VfsFileEntry::Qcow(
                 qcow_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => Ok(VfsFileEntry::SparseBundle(
+                sparsebundle_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
             VfsFileEntry::SparseImage(sparseimage_file_entry) => Ok(VfsFileEntry::SparseImage(
                 sparseimage_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
@@ -1081,6 +1121,9 @@ impl VfsFileEntry {
             VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
             VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.is_root_file_entry(),
             VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.is_root_file_entry(),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                sparsebundle_file_entry.is_root_file_entry()
+            }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
                 sparseimage_file_entry.is_root_file_entry()
             }
@@ -5106,6 +5149,340 @@ mod tests {
     #[test]
     fn test_sub_file_entries_with_qcow() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_qcow_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with sparse bundle.
+
+    fn get_sparsebundle_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::SparseBundle);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_sparsebundle_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparsebundle_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_sparsebundle_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let path: Path = Path::from("/sparsebundle1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("sparsebundle1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("sparsebundle1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_sparsebundle() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/")?;
 
         let mut sub_file_entries_iterator: VfsFileEntriesIterator =
             vfs_file_entry.sub_file_entries();
