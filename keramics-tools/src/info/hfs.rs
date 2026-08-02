@@ -362,6 +362,19 @@ impl HfsInfo {
         println!("    Block size\t\t\t\t\t: {}", byte_size);
         println!();
 
+        if let Some(embedded_volume_extent) = hfs_file_system.get_embedded_volume_extent() {
+            println!("Embedded volume:");
+
+            let offset: u64 =
+                (embedded_volume_extent.block_number as u64) * (hfs_file_system.block_size as u64);
+            println!("    Offset\t\t\t\t\t: {} (0x{:08x})", offset, offset);
+
+            let size: u64 = (embedded_volume_extent.number_of_blocks as u64)
+                * (hfs_file_system.block_size as u64);
+            let byte_size: ByteSize = ByteSize::new(size, 1024);
+            println!("    Size\t\t\t\t\t: {}", byte_size);
+            println!();
+        }
         Ok(())
     }
 

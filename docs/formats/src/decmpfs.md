@@ -41,20 +41,21 @@ The decmpfs header is 16 bytes in size and consists of:
 | --- | --- | --- |
 | 1 | CMP_Type1 | Unknown (uncompressed extended attribute data) |
 | | | |
-| 3 | | zlib compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
-| 4 | | 64k chunked zlib compressed resource fork, where the compressed data is stored in the resource fork |
+| 3 | kAFSCTypeZLibChunk | zlib compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
+| 4 | kAFSCTypeZLib | 64k chunked zlib compressed resource fork, where the compressed data is stored in the resource fork |
 | 5 | | Unknown (sparse compressed extended attribute data), where the uncompressed data contains 0-byte values |
 | 6 | | Unknown (unused) |
-| 7 | | LZVN compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
-| 8 | | 64k chunked LZVN compressed resource fork, where the compressed data is stored in the resource fork |
-| 9 | | Unknown (uncompressed extended attribute data, different than CMP_Type1) |
-| 10 | | Unknown (64k chunked uncompressed data resource fork), where the compressed data is stored in the resource fork |
-| 11 | | LZFSE compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
-| 12 | | 64k chunked LZFSE compressed resource fork, where the compressed data is stored in the resource fork |
-| 13 | | Unknown (LZBITMAP compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header) |
-| 14 | | Unknown (LZBITMAP compressed resource fork, where the compressed data is stored in the resource fork) |
+| 7 | kAFSCTypeLZVNChunk | LZVN compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
+| 8 | kAFSCTypeLZVN | 64k chunked LZVN compressed resource fork, where the compressed data is stored in the resource fork |
+| 9 | kAFSCTypeRawChunk | Uncompressed (raw) extended attribute data |
+| 10 | kAFSCTypeRaw | 64k chunked uncompressed (raw) data resource fork, where the compressed data is stored in the resource fork |
+| 11 | kAFSCTypeLZFSEChunk | LZFSE compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
+| 12 | kAFSCTypeLZFSE | 64k chunked LZFSE compressed resource fork, where the compressed data is stored in the resource fork |
+| 13 | kAFSCTypeLZBitmapChunk | LZBITMAP compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
+| 14 | kAFSCTypeLZBitmap | LZBITMAP compressed resource fork, where the compressed data is stored in the resource fork |
 | | | |
-| 0x80000001 | | Unknown (faulting file) |
+| 0x80000001 | DATALESS_CMPFS_TYPE | Unknown (external stored content e.g. on network or in Cloud) |
+| 0x80000002 | DATALESS_PKG_CMPFS_TYPE | Unknown (external stored content e.g. on network or in Cloud) |
 
 ## Compressed file content data
 
@@ -79,15 +80,15 @@ There are 12 bytes stored after the decmpfs compressed data header that consists
 
 ### Compressed data stored in extended attribute
 
-[Compression method](decmpfs.md#compression_methods) 3, 5, 7 and 11 store the compressed file
+[Compression method](decmpfs.md#compression_methods) 3, 5, 7, 9 and 11 store the compressed file
 content data in the extended attribute after the decmpfs compressed data header.
 
 The compressed data consist of 1 compressed data block.
 
 ### Compressed data stored in resource fork
 
-[Compression method](decmpfs.md#compression_methods) 4, 8 and 12 store the compressed file content
-data in the resource fork of the file.
+[Compression method](decmpfs.md#compression_methods) 4, 8, 10 and 12 store the compressed file
+content data in the resource fork of the file.
 
 The compressed data starts with metadata that contains the offsets of the compressed data blocks.
 
@@ -118,10 +119,22 @@ contains uncompressed data.
 A compressed data block can contains a maximum of 65536 bytes of data. The compressed data block
 therefore should not exceed 65537 bytes in size.
 
+## Raw compressed data
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 x ... | | Array of compressed data block offsets, where an offset is relative from the start of the raw compressed data |
+| ... | ... | | raw compressed data blocks |
+
+### Raw compressed data block
+
+If the first byte in the raw compressed data block is 0xcc, the block contains uncompressed data.
+
+The behavior of other byte values is unknown, it has been observed that Mac OS returns no data.
+
 ## zlib compressed data
 
 * zlib compressed header
-* Unknown (empty values)
 * zlib compressed data block descriptors
 * zlib compressed data blocks
 * zlib compressed footer
@@ -171,7 +184,7 @@ The zlib compressed footer is 50 bytes size and consists of:
 | 24 | 2 | | Unknown (signature offset?) |
 | 26 | 2 | | Unknown (footer size?) |
 | 28 | 2 | | Unknown |
-| 30 | 4 | "cmpf" | Unknown (signature) |
+| 30 | 4 | "cmpf" | signature (DECMPFS_MAGIC) |
 | 34 | 2 | | Unknown (empty values?) |
 | 36 | 2 | | Unknown |
 | 38 | 2 | | Unknown |

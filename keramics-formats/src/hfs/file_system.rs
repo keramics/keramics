@@ -24,6 +24,7 @@ use super::catalog_file::HfsCatalogFile;
 use super::constants::*;
 use super::directory_entry::HfsDirectoryEntry;
 use super::enums::HfsFormat;
+use super::extent_descriptor::HfsExtentDescriptor;
 use super::extents_overflow_file::HfsExtentsOverflowFile;
 use super::file_entry::HfsFileEntry;
 use super::fork_descriptor::HfsForkDescriptor;
@@ -56,6 +57,9 @@ pub struct HfsFileSystem {
 
     /// Attributes file.
     attributes_file: Arc<HfsAttributesFile>,
+
+    /// Embedded volume extent.
+    embedded_volume_extent: Option<HfsExtentDescriptor>,
 }
 
 impl HfsFileSystem {
@@ -70,7 +74,13 @@ impl HfsFileSystem {
             extents_overflow_file: Arc::new(HfsExtentsOverflowFile::new()),
             catalog_file: Arc::new(HfsCatalogFile::new()),
             attributes_file: Arc::new(HfsAttributesFile::new()),
+            embedded_volume_extent: None,
         }
+    }
+
+    /// Retrieves the embedded volume extent.
+    pub fn get_embedded_volume_extent(&self) -> Option<&HfsExtentDescriptor> {
+        self.embedded_volume_extent.as_ref()
     }
 
     /// Retrieves the file entry for a specific identifier (CNID).
@@ -457,6 +467,14 @@ impl HfsFileSystem {
                         return Err(error);
                     }
                 }
+                self.embedded_volume_extent = match master_directory_block.embedded_volume_extent {
+                    Some(mut embedded_volume_extent) => {
+                        embedded_volume_extent.block_number += self.data_area_block_number as u32;
+
+                        Some(embedded_volume_extent)
+                    }
+                    None => None,
+                };
             }
             HFSPLUS_VOLUME_HEADER_SIGNATURE | HFSX_VOLUME_HEADER_SIGNATURE => {
                 keramics_core::debug_trace_data_and_structure!(
@@ -568,6 +586,27 @@ mod tests {
     // Tests with HFS.
 
     #[test]
+    fn test_get_embedded_volume_extent_with_hfs() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let embedded_volume_extent: Option<&HfsExtentDescriptor> =
+            file_system.get_embedded_volume_extent();
+        assert!(embedded_volume_extent.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_with_hfs() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let format: &HfsFormat = file_system.get_format();
+        assert_eq!(format, &HfsFormat::Hfs);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_entry_by_identifier_with_hfs() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
 
@@ -606,6 +645,29 @@ mod tests {
         Ok(())
     }
 
+    // Tests with HFS-wrapped HFS+.
+
+    #[test]
+    fn test_get_embedded_volume_extent_with_hfs_wrapped_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfs_wrapped_hfsplus.raw")?;
+
+        let embedded_volume_extent: Option<&HfsExtentDescriptor> =
+            file_system.get_embedded_volume_extent();
+        assert!(embedded_volume_extent.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_wrapped_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfs_wrapped_hfsplus.raw")?;
+
+        let format: &HfsFormat = file_system.get_format();
+        assert_eq!(format, &HfsFormat::Hfs);
+
+        Ok(())
+    }
+
     // Tests with HFS+.
 
     #[test]
@@ -621,7 +683,26 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_format
+    #[test]
+    fn test_get_embedded_volume_extent_with_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let embedded_volume_extent: Option<&HfsExtentDescriptor> =
+            file_system.get_embedded_volume_extent();
+        assert!(embedded_volume_extent.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_with_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let format: &HfsFormat = file_system.get_format();
+        assert_eq!(format, &HfsFormat::HfsPlus);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_root_directory_with_hfsplus() -> Result<(), ErrorTrace> {
