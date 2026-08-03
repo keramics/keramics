@@ -79,7 +79,7 @@ impl Crc32Context {
         let data_size: usize = data.len();
         let mut checksum: u32 = self.checksum;
 
-        for byte_value in data.iter().take(data_size) {
+        for byte_value in data.iter() {
             let table_index: u32 = ((checksum >> 24) ^ (*byte_value as u32)) & 0x000000ff;
 
             checksum = self.table[table_index as usize] ^ (checksum << 8);
@@ -149,10 +149,9 @@ impl ReversedCrc32Context {
         if !self.table_initilized {
             self.initialize_table(self.polynomial);
         }
-        let data_size: usize = data.len();
         let mut checksum: u32 = self.checksum;
 
-        for byte_value in data.iter().take(data_size) {
+        for byte_value in data.iter() {
             let table_index: u32 = (checksum ^ (*byte_value as u32)) & 0x000000ff;
 
             checksum = self.table[table_index as usize] ^ (checksum >> 8);

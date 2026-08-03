@@ -44,13 +44,13 @@ pub struct ExtFileSystem {
     features: ExtFeatures,
 
     /// Number of inodes.
-    pub number_of_inodes: u32,
+    number_of_inodes: u32,
 
     /// Block size.
-    pub block_size: u32,
+    block_size: u32,
 
     /// Inode size.
-    pub inode_size: u16,
+    inode_size: u16,
 
     /// Inode table.
     inode_table: Arc<ExtInodeTable>,
@@ -62,13 +62,13 @@ pub struct ExtFileSystem {
     volume_label: Option<ByteString>,
 
     /// Last mount path.
-    pub last_mount_path: ByteString,
+    last_mount_path: ByteString,
 
     /// Last mount time.
-    pub last_mount_time: DateTime,
+    last_mount_time: DateTime,
 
     /// Last written time.
-    pub last_written_time: DateTime,
+    last_written_time: DateTime,
 }
 
 impl ExtFileSystem {
@@ -90,6 +90,11 @@ impl ExtFileSystem {
         }
     }
 
+    /// Retrieves the block size.
+    pub fn get_block_size(&self) -> u32 {
+        self.block_size
+    }
+
     /// Retrieves the format version.
     pub fn get_format_version(&self) -> u8 {
         self.features.get_format_version()
@@ -103,6 +108,35 @@ impl ExtFileSystem {
     /// Retrieves the incompatible feature flags.
     pub fn get_incompatible_feature_flags(&self) -> u32 {
         self.features.incompatible_feature_flags
+    }
+
+    /// Retrieves the inode size.
+    pub fn get_inode_size(&self) -> u16 {
+        self.inode_size
+    }
+
+    /// Retrieves the last mount path.
+    pub fn get_last_mount_path(&self) -> Option<&ByteString> {
+        if self.last_mount_path.is_empty() {
+            None
+        } else {
+            Some(&self.last_mount_path)
+        }
+    }
+
+    /// Retrieves the last mount time.
+    pub fn get_last_mount_time(&self) -> &DateTime {
+        &self.last_mount_time
+    }
+
+    /// Retrieves the last written time.
+    pub fn get_last_written_time(&self) -> &DateTime {
+        &self.last_written_time
+    }
+
+    /// Retrieves the number of inodes.
+    pub fn get_number_of_inodes(&self) -> u32 {
+        self.number_of_inodes
     }
 
     /// Retrieves the read-only compatible feature flags.

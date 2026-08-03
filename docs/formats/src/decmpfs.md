@@ -3,6 +3,9 @@
 [Hierarchical File System (HFS)](hfs.md) and [Apple File System (APFS)](apfs.md) use Apple File
 System Compression (decmpfs) to compress file contents.
 
+decmpfs is sometimes referred to as AFSC (Apple File System Compression) or HFS/HFS+ compression
+and was introduced in Mac OS X 10.6 (Snow Leopard).
+
 ## Overview
 
 An Apple File System Compression (decmpfs) compressed file consists of:
@@ -43,19 +46,27 @@ The decmpfs header is 16 bytes in size and consists of:
 | | | |
 | 3 | kAFSCTypeZLibChunk | zlib compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
 | 4 | kAFSCTypeZLib | 64k chunked zlib compressed resource fork, where the compressed data is stored in the resource fork |
-| 5 | | Unknown (sparse compressed extended attribute data), where the uncompressed data contains 0-byte values |
+| 5 | | Unknown (sparse compressed extended attribute data), where the uncompressed data contains 0-byte values. According to [copyfile.c](https://github.com/apple-oss-distributions/copyfile/blob/main/copyfile.c) specifies de-dup within the generation store. |
 | 6 | | Unknown (unused) |
+| <td colspan="3">*Added in Mac OS X Yosemite (10.10)*</td> |
 | 7 | kAFSCTypeLZVNChunk | LZVN compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
 | 8 | kAFSCTypeLZVN | 64k chunked LZVN compressed resource fork, where the compressed data is stored in the resource fork |
 | 9 | kAFSCTypeRawChunk | Uncompressed (raw) extended attribute data |
 | 10 | kAFSCTypeRaw | 64k chunked uncompressed (raw) data resource fork, where the compressed data is stored in the resource fork |
+| <td colspan="3">*Added in Mac OS X El Capitan (10.11)*</td> |
 | 11 | kAFSCTypeLZFSEChunk | LZFSE compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
 | 12 | kAFSCTypeLZFSE | 64k chunked LZFSE compressed resource fork, where the compressed data is stored in the resource fork |
+| <td colspan="3">*Added in macOS Ventura (13.0)*</td> |
 | 13 | kAFSCTypeLZBitmapChunk | LZBITMAP compressed extended attribute data, where the compressed data is stored in the extended attribute after the compressed data header |
 | 14 | kAFSCTypeLZBitmap | LZBITMAP compressed resource fork, where the compressed data is stored in the resource fork |
 | | | |
-| 0x80000001 | DATALESS_CMPFS_TYPE | Unknown (external stored content e.g. on network or in Cloud) |
-| 0x80000002 | DATALESS_PKG_CMPFS_TYPE | Unknown (external stored content e.g. on network or in Cloud) |
+| 255 | CMP_MAX | Maximum supported compression method |
+| | | |
+| 0x80000001 | DATALESS_CMPFS_TYPE | Unknown (faulting file or dataless file or directory) |
+| 0x80000002 | DATALESS_PKG_CMPFS_TYPE | Unknown (dataless package) |
+
+> Note that [copyfile.c](https://github.com/apple-oss-distributions/copyfile/blob/main/copyfile.c)
+> indicates faulting files are deprecated since Mac OS X Yosemite (10.10).
 
 ## Compressed file content data
 

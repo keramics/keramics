@@ -62,33 +62,33 @@ impl Adler32Context {
 
     /// Calculates the checksum of the data.
     pub fn update(&mut self, data: &[u8]) {
+        let mut lower_16bit: u32 = self.checksum & 0x0000ffff;
+        let mut upper_16bit: u32 = self.checksum >> 16;
+
         let data_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut lower_word: u32 = self.checksum & 0x0000ffff;
-        let mut upper_word: u32 = self.checksum >> 16;
-
-        while data_offset + 5552 < data_size {
-            // The modulo calculation is needed per 5552 (0x15b0) bytes
-            for _ in 0..5552 {
-                lower_word = lower_word.wrapping_add(data[data_offset] as u32);
-                upper_word = upper_word.wrapping_add(lower_word);
-
-                data_offset += 1;
+        let mut data_end_offset: usize = 5552;
+        while data_end_offset < data_size {
+            for byte_value in data[data_offset..data_end_offset].iter() {
+                lower_16bit = lower_16bit.wrapping_add(*byte_value as u32);
+                upper_16bit = upper_16bit.wrapping_add(lower_16bit);
             }
-            lower_word = Self::mod_65521(lower_word);
-            upper_word = Self::mod_65521(upper_word);
+            data_offset = data_end_offset;
+            data_end_offset += 5552;
+
+            // The modulo calculation is needed per 5552 (0x15b0) bytes
+            lower_16bit = Self::mod_65521(lower_16bit);
+            upper_16bit = Self::mod_65521(upper_16bit);
         }
         if data_offset < data_size {
-            while data_offset < data_size {
-                lower_word = lower_word.wrapping_add(data[data_offset] as u32);
-                upper_word = upper_word.wrapping_add(lower_word);
-
-                data_offset += 1;
+            for byte_value in data[data_offset..data_size].iter() {
+                lower_16bit = lower_16bit.wrapping_add(*byte_value as u32);
+                upper_16bit = upper_16bit.wrapping_add(lower_16bit);
             }
-            lower_word = Self::mod_65521(lower_word);
-            upper_word = Self::mod_65521(upper_word);
+            lower_16bit = Self::mod_65521(lower_16bit);
+            upper_16bit = Self::mod_65521(upper_16bit);
         }
-        self.checksum = (upper_word << 16) | lower_word;
+        self.checksum = (upper_16bit << 16) | lower_16bit;
     }
 }
 
