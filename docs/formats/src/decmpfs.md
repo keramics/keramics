@@ -40,6 +40,8 @@ The decmpfs header is 16 bytes in size and consists of:
 
 #### Compression methods {#compression_methods}
 
+<!-- rumdl-disable MD033 MD056 -->
+
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 1 | CMP_Type1 | Unknown (uncompressed extended attribute data) |
@@ -64,6 +66,8 @@ The decmpfs header is 16 bytes in size and consists of:
 | | | |
 | 0x80000001 | DATALESS_CMPFS_TYPE | Unknown (faulting file or dataless file or directory) |
 | 0x80000002 | DATALESS_PKG_CMPFS_TYPE | Unknown (dataless package) |
+
+<!-- rumdl-enable MD033 MD056 -->
 
 > Note that [copyfile.c](https://github.com/apple-oss-distributions/copyfile/blob/main/copyfile.c)
 > indicates faulting files are deprecated since Mac OS X Yosemite (10.10).
