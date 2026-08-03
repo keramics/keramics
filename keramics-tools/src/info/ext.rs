@@ -38,7 +38,7 @@ impl ExtCompatibleFeatureFlagsInfo {
 }
 
 impl fmt::Display for ExtCompatibleFeatureFlagsInfo {
-    /// Formats partition compatible feature flags information for display.
+    /// Formats compatible feature flags information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if self.flags & 0x00000001 != 0 {
             writeln!(
@@ -119,7 +119,7 @@ impl<'a> ExtDateTimeInfo<'a> {
 }
 
 impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
-    /// Formats partition date and time information for display.
+    /// Formats date and time information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.date_time {
             DateTime::NotSet => write!(formatter, "Not set (0)"),
@@ -134,7 +134,7 @@ impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
     }
 }
 
-/// Extended File System (ext) compatible file entry information.
+/// Extended File System (ext) file entry information.
 struct ExtFileEntryInfo {
     /// The inode number.
     pub inode_number: u32,
@@ -282,6 +282,140 @@ impl fmt::Display for ExtFileEntryInfo {
     }
 }
 
+/// Extended File System (ext) file system information.
+struct ExtFileSystemInfo {
+    /// Format version.
+    format_version: u8,
+
+    /// Compatible feature flags.
+    compatible_feature_flags: u32,
+
+    /// Read-only compatible feature flags.
+    read_only_compatible_feature_flags: u32,
+
+    /// Incompatible feature flags.
+    incompatible_feature_flags: u32,
+
+    /// Volume label.
+    volume_label: Option<ByteString>,
+
+    /// Block size.
+    block_size: u32,
+
+    /// Inode size.
+    inode_size: u16,
+
+    /// Number of inodes.
+    number_of_inodes: u32,
+
+    /// Last mount path.
+    last_mount_path: Option<ByteString>,
+
+    /// Last mount time.
+    last_mount_time: DateTime,
+
+    /// Last written time.
+    last_written_time: DateTime,
+}
+
+impl ExtFileSystemInfo {
+    /// Creates new file system information.
+    fn new() -> Self {
+        Self {
+            format_version: 0,
+            compatible_feature_flags: 0,
+            read_only_compatible_feature_flags: 0,
+            incompatible_feature_flags: 0,
+            volume_label: None,
+            block_size: 0,
+            inode_size: 0,
+            number_of_inodes: 0,
+            last_mount_path: None,
+            last_mount_time: DateTime::NotSet,
+            last_written_time: DateTime::NotSet,
+        }
+    }
+}
+
+impl fmt::Display for ExtFileSystemInfo {
+    /// Formats file sytem information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "Extended File System (ext) information:")?;
+
+        writeln!(
+            formatter,
+            "    Format version\t\t\t\t: ext{}",
+            self.format_version
+        )?;
+        writeln!(
+            formatter,
+            "    Compatible features\t\t\t\t: 0x{:08x}",
+            self.compatible_feature_flags
+        )?;
+        let flags_info: ExtCompatibleFeatureFlagsInfo =
+            ExtCompatibleFeatureFlagsInfo::new(self.compatible_feature_flags);
+        writeln!(formatter, "{}", flags_info)?;
+
+        writeln!(
+            formatter,
+            "    Read-only compatible features\t\t: 0x{:08x}",
+            self.read_only_compatible_feature_flags
+        )?;
+        let flags_info: ExtReadOnlyCompatibleFeatureFlagsInfo =
+            ExtReadOnlyCompatibleFeatureFlagsInfo::new(self.read_only_compatible_feature_flags);
+        writeln!(formatter, "{}", flags_info)?;
+
+        writeln!(
+            formatter,
+            "    Incompatible features\t\t\t: 0x{:08x}",
+            self.incompatible_feature_flags
+        )?;
+        let flags_info: ExtIncompatibleFeatureFlagsInfo =
+            ExtIncompatibleFeatureFlagsInfo::new(self.incompatible_feature_flags);
+        writeln!(formatter, "{}", flags_info)?;
+
+        let volume_label: String = match &self.volume_label {
+            Some(volume_label) => volume_label.to_string(),
+            None => String::new(),
+        };
+        writeln!(formatter, "    Volume label\t\t\t\t: {}", volume_label)?;
+
+        let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
+        writeln!(formatter, "    Block size\t\t\t\t\t: {}", byte_size)?;
+
+        let byte_size: ByteSize = ByteSize::new(self.inode_size as u64, 1024);
+        writeln!(formatter, "    Inode size\t\t\t\t\t: {}", byte_size)?;
+
+        writeln!(
+            formatter,
+            "    Number of inodes\t\t\t\t: {}",
+            self.number_of_inodes
+        )?;
+        let last_mount_path: String = match &self.last_mount_path {
+            Some(last_mount_path) => last_mount_path.to_string(),
+            None => String::new(),
+        };
+        writeln!(
+            formatter,
+            "    Last mount path\t\t\t\t: {}",
+            last_mount_path
+        )?;
+        let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.last_mount_time);
+
+        writeln!(formatter, "    Last mount time\t\t\t\t: {}", date_time_info)?;
+
+        let date_time_info: ExtDateTimeInfo = ExtDateTimeInfo::new(&self.last_written_time);
+
+        writeln!(
+            formatter,
+            "    Last written time\t\t\t\t: {}",
+            date_time_info
+        )?;
+
+        writeln!(formatter)
+    }
+}
+
 /// Extended File System (ext) incompatible feature flags information.
 struct ExtIncompatibleFeatureFlagsInfo {
     /// Flags.
@@ -296,7 +430,7 @@ impl ExtIncompatibleFeatureFlagsInfo {
 }
 
 impl fmt::Display for ExtIncompatibleFeatureFlagsInfo {
-    /// Formats partition incompatible feature flags information for display.
+    /// Formats incompatible feature flags information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if self.flags & 0x00000001 != 0 {
             writeln!(
@@ -411,7 +545,7 @@ impl ExtReadOnlyCompatibleFeatureFlagsInfo {
 }
 
 impl fmt::Display for ExtReadOnlyCompatibleFeatureFlagsInfo {
-    /// Formats partition read-only compatible feature flags information for display.
+    /// Formats read-only compatible feature flags information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         if self.flags & 0x00000001 != 0 {
             writeln!(
@@ -563,6 +697,28 @@ impl ExtInfo {
             }
         }
         Ok(file_entry_information)
+    }
+
+    /// Retrieves the file system information.
+    fn get_file_system_information(ext_file_system: &ExtFileSystem) -> ExtFileSystemInfo {
+        let mut file_system_information: ExtFileSystemInfo = ExtFileSystemInfo::new();
+
+        file_system_information.format_version = ext_file_system.get_format_version();
+        file_system_information.compatible_feature_flags =
+            ext_file_system.get_compatible_feature_flags();
+        file_system_information.read_only_compatible_feature_flags =
+            ext_file_system.get_read_only_compatible_feature_flags();
+        file_system_information.incompatible_feature_flags =
+            ext_file_system.get_incompatible_feature_flags();
+        file_system_information.volume_label = ext_file_system.get_volume_label().cloned();
+        file_system_information.block_size = ext_file_system.get_block_size();
+        file_system_information.inode_size = ext_file_system.get_inode_size();
+        file_system_information.number_of_inodes = ext_file_system.get_number_of_inodes();
+        file_system_information.last_mount_path = ext_file_system.get_last_mount_path().cloned();
+        file_system_information.last_mount_time = ext_file_system.get_last_mount_time().clone();
+        file_system_information.last_written_time = ext_file_system.get_last_written_time().clone();
+
+        file_system_information
     }
 
     /// Opens a file system.
@@ -744,76 +900,10 @@ impl ExtInfo {
                     return Err(error);
                 }
             };
-        println!("Extended File System (ext) information:");
+        let file_system_information: ExtFileSystemInfo =
+            Self::get_file_system_information(&ext_file_system);
 
-        let format_version: u8 = ext_file_system.get_format_version();
-        println!("    Format version\t\t\t\t: ext{}", format_version);
-
-        let feature_flags: u32 = ext_file_system.get_compatible_feature_flags();
-        println!("    Compatible features\t\t\t\t: 0x{:08x}", feature_flags);
-
-        let flags_info: ExtCompatibleFeatureFlagsInfo =
-            ExtCompatibleFeatureFlagsInfo::new(feature_flags);
-        println!("{}", flags_info);
-
-        let feature_flags: u32 = ext_file_system.get_incompatible_feature_flags();
-        println!("    Incompatible features\t\t\t: 0x{:08x}", feature_flags);
-
-        let flags_info: ExtIncompatibleFeatureFlagsInfo =
-            ExtIncompatibleFeatureFlagsInfo::new(feature_flags);
-        println!("{}", flags_info);
-
-        let feature_flags: u32 = ext_file_system.get_read_only_compatible_feature_flags();
-        println!(
-            "    Read-only compatible features\t\t: 0x{:08x}",
-            feature_flags
-        );
-
-        let flags_info: ExtReadOnlyCompatibleFeatureFlagsInfo =
-            ExtReadOnlyCompatibleFeatureFlagsInfo::new(feature_flags);
-        println!("{}", flags_info);
-
-        let volume_label: String = match ext_file_system.get_volume_label() {
-            Some(volume_label) => volume_label.to_string(),
-            None => String::new(),
-        };
-        println!("    Volume label\t\t\t\t: {}", volume_label);
-
-        let byte_size: ByteSize = ByteSize::new(ext_file_system.block_size as u64, 1024);
-        println!("    Block size\t\t\t\t\t: {}", byte_size);
-
-        let byte_size: ByteSize = ByteSize::new(ext_file_system.inode_size as u64, 1024);
-        println!("    Inode size\t\t\t\t\t: {}", byte_size);
-
-        println!(
-            "    Number of inodes\t\t\t\t: {}",
-            ext_file_system.number_of_inodes
-        );
-        println!(
-            "    Last mount path\t\t\t\t: {}",
-            ext_file_system.last_mount_path
-        );
-        let date_time_string: String = match ext_file_system.last_mount_time {
-            DateTime::NotSet => String::from("Not set (0)"),
-            DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
-            _ => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported last mount time"
-                ));
-            }
-        };
-        println!("    Last mount time\t\t\t\t: {}", date_time_string);
-        let date_time_string: String = match ext_file_system.last_written_time {
-            DateTime::NotSet => String::from("Not set (0)"),
-            DateTime::PosixTime32(posix_time32) => posix_time32.to_iso8601_string(),
-            _ => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported last written time"
-                ));
-            }
-        };
-        println!("    Last written time\t\t\t\t: {}", date_time_string);
-        println!();
+        print!("{}", file_system_information);
 
         Ok(())
     }
@@ -1055,6 +1145,20 @@ mod tests {
         assert_eq!(test_struct.file_mode, 0o100644);
         assert_eq!(test_struct.device_identifier, None);
         assert_eq!(test_struct.symbolic_link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_system_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/ext/ext2.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let ext_file_system: ExtFileSystem =
+            ExtInfo::open_file_system(&data_stream, Some(&CharacterEncoding::Utf8))?;
+
+        let test_struct: ExtFileSystemInfo = ExtInfo::get_file_system_information(&ext_file_system);
+
+        assert_eq!(test_struct.format_version, 2);
 
         Ok(())
     }

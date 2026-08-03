@@ -13,6 +13,8 @@
 
 mod adler32;
 mod crc32;
+mod fletcher64;
 
 pub use adler32::Adler32Context;
 pub use crc32::{Crc32Context, ReversedCrc32Context};
+pub use fletcher64::Fletcher64Context;
