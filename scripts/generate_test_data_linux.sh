@@ -97,7 +97,7 @@ set -e
 
 if test ${RESULT} -eq ${EXIT_SUCCESS}
 then
-	ewfacquire -u -c best -C case -D description -e examiner -E evidence -M logical -N notes -t test_data/ewf/ext2 test_data/ext/ext2.raw
+    ewfacquire -u -c best -C case -D description -e examiner -E evidence -M logical -N notes -t test_data/ewf/ext2 test_data/ext/ext2.raw
 fi
 
 # Create a QCOW image with an ext2 file system.
