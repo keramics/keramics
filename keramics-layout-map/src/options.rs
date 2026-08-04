@@ -97,6 +97,7 @@ impl Parse for FieldDataTypeOption {
             }
         }
         let value: DataType = match data_type_str {
+            "ApfsTime" => DataType::ApfsTime,
             "BitField8" => DataType::BitField8,
             "BitField16" => DataType::BitField16,
             "BitField32" => DataType::BitField32,

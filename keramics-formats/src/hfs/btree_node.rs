@@ -140,8 +140,8 @@ impl HfsBtreeNode {
         Ok(())
     }
 
-    /// Reads a data stream.
-    pub fn read_data_stream(
+    /// Reads the B-tree node from a specific position in a data stream.
+    pub fn read_at_position(
         &mut self,
         data_stream: &DataStreamReference,
         offset: u64,

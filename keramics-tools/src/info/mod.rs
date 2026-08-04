@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod apfs;
 mod apm;
 mod constants;
 mod ewf;
@@ -30,6 +31,7 @@ mod vhd;
 mod vhdx;
 mod vmdk;
 
+pub use apfs::ApfsInfo;
 pub use apm::ApmInfo;
 pub use ewf::EwfInfo;
 pub use ext::ExtInfo;

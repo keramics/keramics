@@ -18,7 +18,7 @@ use keramics_types::{bytes_to_i32_be, bytes_to_i32_le};
 use super::epoch::Epoch;
 use super::util::{get_date_values, get_time_values};
 
-const POSIX_EPOCH: Epoch = Epoch {
+pub(super) const POSIX_EPOCH: Epoch = Epoch {
     year: 1970,
     month: 1,
     day_of_month: 1,

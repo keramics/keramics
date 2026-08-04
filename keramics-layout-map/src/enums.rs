@@ -26,6 +26,7 @@ pub enum ByteOrder {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum DataType {
+    ApfsTime,
     BitField8,
     BitField16,
     BitField32,

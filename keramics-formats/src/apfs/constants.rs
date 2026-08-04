@@ -11,24 +11,8 @@
  * under the License.
  */
 
-use std::time::SystemTime;
+/// APFS container superblock signature.
+pub(crate) const APFS_CONTAINER_SUPERBLOCK_SIGNATURE: &[u8] = b"NXSB";
 
-use super::apfs::ApfsTime;
-use super::fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
-use super::filetime::Filetime;
-use super::hfs::HfsTime;
-use super::posix::{PosixTime32, PosixTime64Ns};
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum DateTime {
-    ApfsTime(ApfsTime),
-    FakeTime(SystemTime),
-    FatDate(FatDate),
-    FatTimeDate(FatTimeDate),
-    FatTimeDate10Ms(FatTimeDate10Ms),
-    Filetime(Filetime),
-    HfsTime(HfsTime),
-    NotSet,
-    PosixTime32(PosixTime32),
-    PosixTime64Ns(PosixTime64Ns),
-}
+/// APFS volume superblock signature.
+pub(crate) const APFS_VOLUME_SUPERBLOCK_SIGNATURE: &[u8] = b"APSB";

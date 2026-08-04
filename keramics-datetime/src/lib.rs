@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod apfs;
 pub mod constants;
 mod enums;
 mod epoch;
@@ -20,6 +21,7 @@ mod hfs;
 mod posix;
 mod util;
 
+pub use apfs::ApfsTime;
 pub use enums::DateTime;
 pub use fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
 pub use filetime::Filetime;

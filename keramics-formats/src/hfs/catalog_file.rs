@@ -244,14 +244,14 @@ impl HfsCatalogFile {
                         }
                     }
                 }
-                if key.parent_identifier > parent_identifier {
-                    break;
-                }
             }
-            record_index += 1;
-
+            if key.parent_identifier > parent_identifier {
+                break;
+            }
             last_key = key;
             last_record_data = record_data;
+
+            record_index += 1;
         }
         if is_branch {
             if record_index == 0 {
@@ -580,10 +580,10 @@ impl HfsCatalogFile {
                     }
                 }
             }
-            record_index += 1;
-
             last_key = key;
             last_record_data = record_data;
+
+            record_index += 1;
         }
         if is_branch {
             if record_index == 0 {
@@ -750,10 +750,10 @@ impl HfsCatalogFile {
                     }
                 }
             }
-            record_index += 1;
-
             last_key = key;
             last_record_data = record_data;
+
+            record_index += 1;
         }
         if is_branch {
             if record_index == 0 {

@@ -32,8 +32,8 @@ mod storage_media_image;
 
 use crate::enums::EncodingType;
 use crate::info::{
-    ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo, NtfsInfo, PdiInfo, QcowInfo,
-    SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    ApfsInfo, ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo, NtfsInfo, PdiInfo,
+    QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
 };
 use crate::range_stream::RangeDataStream;
 use crate::storage_media_image::StorageMediaImage;
@@ -209,6 +209,7 @@ impl InfoTool {
             // TODO: add support for individual VMDK sparse file.
             // TODO: add support for individual VMDK sparse COWD file.
         }
+        format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
@@ -382,6 +383,7 @@ fn main() -> ExitCode {
             }
         }
         None => match &format_identifier {
+            FormatIdentifier::Apfs => ApfsInfo::print_container(&data_stream),
             FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
             // TODO: add support for individual EWF segment file.
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),

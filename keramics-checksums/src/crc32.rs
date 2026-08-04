@@ -76,7 +76,6 @@ impl Crc32Context {
         if !self.table_initilized {
             self.initialize_table(self.polynomial);
         }
-        let data_size: usize = data.len();
         let mut checksum: u32 = self.checksum;
 
         for byte_value in data.iter() {

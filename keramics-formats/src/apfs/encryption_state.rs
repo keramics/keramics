@@ -13,39 +13,35 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_le;
 
-#[derive(Debug, LayoutMap)]
+#[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "offset", data_type = "u32"),
-        field(name = "size", data_type = "u32"),
+        field(name = "major_format_version", data_type = "u16"),
+        field(name = "minor_format_version", data_type = "u16"),
+        field(name = "flags", data_type = "u32", format = "hex"),
+        field(name = "unknown1", data_type = "u32"),
+        field(name = "unknown2", data_type = "u32", format = "hex"),
+        field(name = "unknown3", data_type = "u16"),
+        field(name = "unknown4", data_type = "u16"),
     ),
     methods("debug_read_data")
 )]
-/// Apple File System Compression (decmpfs) zlib (compressed) block descriptor.
-pub struct DecmpfsZlibBlockDescriptor {
-    /// Offset.
-    pub offset: u32,
+/// Apple File System (APFS) encryption state.
+pub struct ApfsEncryptionState {}
 
-    /// Size.
-    pub size: u32,
-}
-
-impl DecmpfsZlibBlockDescriptor {
-    /// Creates a new block descriptor.
+impl ApfsEncryptionState {
+    /// Creates a new encryption state.
     pub fn new() -> Self {
-        Self { offset: 0, size: 0 }
+        Self {}
     }
 
-    /// Reads the fork descriptor from a buffer.
+    /// Reads the encryption state from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 8 {
+        if data.len() < 20 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.offset = bytes_to_u32_le!(data, 0);
-        self.size = bytes_to_u32_le!(data, 4);
         Ok(())
     }
 }
@@ -55,14 +51,17 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        return vec![0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00];
+        return vec![
+            0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        ];
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = DecmpfsZlibBlockDescriptor::new();
+        let mut test_struct = ApfsEncryptionState::new();
         test_struct.read_data(&test_data)?;
 
         Ok(())
@@ -70,10 +69,10 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = DecmpfsZlibBlockDescriptor::new();
+        let mut test_struct = ApfsEncryptionState::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..7]);
+        let result = test_struct.read_data(&test_data[0..19]);
         assert!(result.is_err());
     }
 }

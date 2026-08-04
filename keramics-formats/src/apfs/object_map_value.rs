@@ -13,39 +13,49 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_le;
+use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
-#[derive(Debug, LayoutMap)]
+#[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "offset", data_type = "u32"),
+        field(name = "flags", data_type = "u32", format = "hex"),
         field(name = "size", data_type = "u32"),
+        field(name = "physical_address", data_type = "u64"),
     ),
     methods("debug_read_data")
 )]
-/// Apple File System Compression (decmpfs) zlib (compressed) block descriptor.
-pub struct DecmpfsZlibBlockDescriptor {
-    /// Offset.
-    pub offset: u32,
+/// Apple File System (APFS) object map value.
+pub struct ApfsObjectMapValue {
+    /// Flags.
+    pub flags: u32,
 
     /// Size.
     pub size: u32,
+
+    /// Physical address.
+    pub physical_address: u64,
 }
 
-impl DecmpfsZlibBlockDescriptor {
-    /// Creates a new block descriptor.
+impl ApfsObjectMapValue {
+    /// Creates a new value.
     pub fn new() -> Self {
-        Self { offset: 0, size: 0 }
+        Self {
+            flags: 0,
+            size: 0,
+            physical_address: 0,
+        }
     }
 
-    /// Reads the fork descriptor from a buffer.
+    /// Reads the value from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 8 {
+        if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.offset = bytes_to_u32_le!(data, 0);
+        self.flags = bytes_to_u32_le!(data, 0);
         self.size = bytes_to_u32_le!(data, 4);
+        self.physical_address = bytes_to_u64_le!(data, 8);
+
         Ok(())
     }
 }
@@ -55,25 +65,32 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        return vec![0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00];
+        return vec![
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x93, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ];
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = DecmpfsZlibBlockDescriptor::new();
+        let mut test_struct = ApfsObjectMapValue::new();
         test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.flags, 0x00000000);
+        assert_eq!(test_struct.size, 4096);
+        assert_eq!(test_struct.physical_address, 147);
 
         Ok(())
     }
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = DecmpfsZlibBlockDescriptor::new();
+        let mut test_struct = ApfsObjectMapValue::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..7]);
+        let result = test_struct.read_data(&test_data[0..15]);
         assert!(result.is_err());
     }
 }

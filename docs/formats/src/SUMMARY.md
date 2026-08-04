@@ -15,6 +15,7 @@
   * [VMWare Virtual Disk Format (VMDK)](vmdk.md)
 * [Volume system formats](volume_system.md)
   * [Apple Partition Map (APM)](apm.md)
+  * [Core Storage](core_storage.md)
   * [GUID Partition Table (GPT)](gpt.md)
   * [Master Boot Record (MBR)](mbr.md)
 * [File system formats](file_system.md)

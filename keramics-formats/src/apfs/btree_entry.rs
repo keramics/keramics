@@ -11,24 +11,29 @@
  * under the License.
  */
 
-use std::time::SystemTime;
+/// Apple File System (APFS) B-Tree entry.
+pub struct ApfsBtreeEntry {
+    /// Key data offset.
+    pub key_data_offset: usize,
 
-use super::apfs::ApfsTime;
-use super::fat::{FatDate, FatTimeDate, FatTimeDate10Ms};
-use super::filetime::Filetime;
-use super::hfs::HfsTime;
-use super::posix::{PosixTime32, PosixTime64Ns};
+    /// Key data size.
+    pub key_data_size: usize,
 
-#[derive(Clone, Debug, PartialEq)]
-pub enum DateTime {
-    ApfsTime(ApfsTime),
-    FakeTime(SystemTime),
-    FatDate(FatDate),
-    FatTimeDate(FatTimeDate),
-    FatTimeDate10Ms(FatTimeDate10Ms),
-    Filetime(Filetime),
-    HfsTime(HfsTime),
-    NotSet,
-    PosixTime32(PosixTime32),
-    PosixTime64Ns(PosixTime64Ns),
+    /// Value data offset.
+    pub value_data_offset: usize,
+
+    /// Value data size.
+    pub value_data_size: usize,
+}
+
+impl ApfsBtreeEntry {
+    /// Creates a new B-tree entry.
+    pub fn new() -> Self {
+        Self {
+            key_data_offset: 0,
+            key_data_size: 0,
+            value_data_offset: 0,
+            value_data_size: 0,
+        }
+    }
 }
