@@ -18,7 +18,7 @@ use keramics_types::{bytes_to_i64_be, bytes_to_i64_le};
 use super::posix::POSIX_EPOCH;
 use super::util::{get_date_values, get_time_values};
 
-/// 64-bit Apple File System (APFS) timestamp.
+/// Apple File System (APFS) timestamp.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ApfsTime {
     /// Number of nanoseconds since January 1, 1970 (POSIX epoch).

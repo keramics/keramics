@@ -96,7 +96,7 @@ fn fat_get_time_values_with_fraction(time: u16, fraction: u8) -> (u8, u8, u8, u8
     )
 }
 
-/// FAT date.
+/// File Allocation Table (FAT) date.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FatDate {
     /// Date.
@@ -140,7 +140,7 @@ impl fmt::Display for FatDate {
     }
 }
 
-/// FAT time and date.
+/// File Allocation Table (FAT) time and date.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FatTimeDate {
     /// Date.
@@ -193,7 +193,7 @@ impl fmt::Display for FatTimeDate {
     }
 }
 
-/// FAT time and date in 10 millisecond intervals.
+/// File Allocation Table (FAT) time and date in 10 millisecond intervals.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FatTimeDate10Ms {
     /// Date.

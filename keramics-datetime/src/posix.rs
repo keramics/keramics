@@ -74,7 +74,7 @@ impl fmt::Display for PosixTime32 {
     }
 }
 
-/// 64-bit POSIX timestamp in nanoseconds (struct timespec).
+/// 64-bit POSIX timestamp with nanoseconds fraction (struct timespec).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct PosixTime64Ns {
     /// Number of seconds since January 1, 1970 (POSIX epoch).

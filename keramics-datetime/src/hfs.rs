@@ -18,7 +18,7 @@ use keramics_types::{bytes_to_u32_be, bytes_to_u32_le};
 use super::epoch::Epoch;
 use super::util::{get_date_values, get_time_values};
 
-/// 32-bit MFS or Hierarchical File System (HFS) timestamp.
+/// Macintosh File System (MFS) or Hierarchical File System (HFS) timestamp.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct HfsTime {
     /// Number of seconds since January 1, 1904.
