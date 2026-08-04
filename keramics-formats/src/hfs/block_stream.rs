@@ -242,13 +242,11 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let block_ranges: Vec<HfsBlockRange> = vec![
-            HfsBlockRange {
-                logical_block_number: 0,
-                physical_block_number: 275,
-                number_of_blocks: 3,
-            },
-        ];
+        let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange {
+            logical_block_number: 0,
+            physical_block_number: 275,
+            number_of_blocks: 3,
+        }];
         block_stream.open(&data_stream, 26, &block_ranges)?;
 
         Ok(block_stream)
@@ -262,13 +260,11 @@ mod tests {
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let block_ranges: Vec<HfsBlockRange> = vec![
-            HfsBlockRange {
-                logical_block_number: 0,
-                physical_block_number: 275,
-                number_of_blocks: 3,
-            },
-        ];
+        let block_ranges: Vec<HfsBlockRange> = vec![HfsBlockRange {
+            logical_block_number: 0,
+            physical_block_number: 275,
+            number_of_blocks: 3,
+        }];
         block_stream.open(&data_stream, 26, &block_ranges)?;
 
         Ok(())
