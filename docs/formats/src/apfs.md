@@ -372,15 +372,15 @@ The container consists of:
 
 * current container superblock
 * stored in the container checkpoint descriptor area:
-** current checkpoint map
-** previous checkpoint map(s)
-** previous container superblock(s)
+  * current checkpoint map
+  * previous checkpoint map(s)
+  * previous container superblock(s)
 * stored in the container:
-** space manager
-** container object map
-** reaper
-** crypto key
-** zero or more volumes
+  * space manager
+  * container object map
+  * reaper
+  * crypto key
+  * zero or more volumes
 * Unknown: backup of current container superblock?
 
 ### Container superblock {#container_superblock}
@@ -1549,10 +1549,6 @@ The data stream value data (j_dstream_id_val_t) is 4 bytes in size and consists 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | Reference count (refcnt) |
-
-### Encryption state {#encryption_state}
-
-TODO: complete this section.
 
 ### File extent {#file_extent}
 

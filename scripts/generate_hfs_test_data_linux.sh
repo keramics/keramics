@@ -31,54 +31,54 @@ set +e
 sudo modprobe hfs
 if [ $? -eq 0 ];
 then
-	set -e
+    set -e
 
-	# Create a HFS standard file system.
-	IMAGE_FILE="test_data/hfs/hfs.raw"
-	IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
-	SECTOR_SIZE=512
+    # Create a HFS standard file system.
+    IMAGE_FILE="test_data/hfs/hfs.raw"
+    IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
+    SECTOR_SIZE=512
 
-	dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+    dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-	hformat -f -l "hfs_test" ${IMAGE_FILE} 0
+    hformat -f -l "hfs_test" ${IMAGE_FILE} 0
 
-	sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+    sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
 
-	sudo chown ${USERNAME} ${MOUNT_POINT}
+    sudo chown ${USERNAME} ${MOUNT_POINT}
 
-	create_test_file_entries ${MOUNT_POINT}
+    create_test_file_entries ${MOUNT_POINT}
 
-	sudo umount ${MOUNT_POINT}
+    sudo umount ${MOUNT_POINT}
 
-	set +e
+    set +e
 fi
 
 sudo modprobe hfsplus
 if [ $? -eq 0 ];
 then
-	set -e
+    set -e
 
-	# Create a HFS+ file system.
+    # Create a HFS+ file system.
+    IMAGE_FILE="test_data/hfs/hfsplus.raw"
+    IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
+    SECTOR_SIZE=512
 
-	IMAGE_FILE="test_data/hfs/hfsplus.raw"
-	IMAGE_SIZE=$(( 4 * 1024 * 1024 ))
-	SECTOR_SIZE=512
+    dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
 
-	dd if=/dev/zero of=${IMAGE_FILE} bs=${SECTOR_SIZE} count=$(( ${IMAGE_SIZE} / ${SECTOR_SIZE} )) 2> /dev/null
+    mkfs.hfsplus -v "hfsplus_test" ${IMAGE_FILE}
 
-	mkfs.hfsplus -v "hfsplus_test" ${IMAGE_FILE}
+    sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
 
-	sudo mount -o loop,rw,gid=${CURRENT_GID},uid=${CURRENT_UID} ${IMAGE_FILE} ${MOUNT_POINT}
+    sudo chown ${USERNAME} ${MOUNT_POINT}
 
-	sudo chown ${USERNAME} ${MOUNT_POINT}
+    create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
 
-	create_test_file_entries_with_extended_attributes ${MOUNT_POINT}
+    sudo umount ${MOUNT_POINT}
 
-	sudo umount ${MOUNT_POINT}
-
-	set +e
+    set +e
 fi
 
+# Create a HFS-wrapped HFS+ file system.
 # dd if=/dev/zero of=hfs_wrapped_hfsplus.raw bs=512 count=$(( ( 8 * 1024 * 1024 ) / 512 ))
 # ./newfs_hfs -w -v "TestWrappedHFS" hfs_wrapped_hfsplus.raw
 

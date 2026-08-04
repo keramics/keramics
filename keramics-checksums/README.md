@@ -8,6 +8,7 @@ Supported checksums:
 
 * Adler-32
 * CRC-32
+* Fletcher-64
 
 ## License
 

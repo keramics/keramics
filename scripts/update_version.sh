@@ -19,9 +19,9 @@ EXIT_FAILURE=1
 
 if test $# -ne 1
 then
-	echo "Usage: ./scripts/update_version.sh VERSION"
+    echo "Usage: ./scripts/update_version.sh VERSION"
 
-	exit ${EXIT_FAILURE}
+    exit ${EXIT_FAILURE}
 fi
 
 VERSION=$1

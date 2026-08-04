@@ -491,7 +491,7 @@ mod tests {
 
         assert_eq!(
             test_struct.identifier.to_string(),
-            "ff9765c4-2187-4167-a484-416859c64f86"
+            "34d0674d-da87-4991-a3de-27eb13011c3e"
         );
         assert_eq!(test_struct.block_size, 4096);
         assert_eq!(test_struct.feature_flags, 0x00000000);
@@ -513,7 +513,7 @@ mod tests {
         assert_eq!(test_struct.index, 0);
         assert_eq!(
             test_struct.identifier.to_string(),
-            "b0a66853-26ca-4885-9c31-7644390cd3aa"
+            "33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2"
         );
         assert_eq!(test_struct.feature_flags, 0x00000002);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);

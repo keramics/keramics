@@ -3097,7 +3097,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686544
             }))
         );
         Ok(())
@@ -3111,7 +3111,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686545
             }))
         );
         Ok(())
@@ -3125,7 +3125,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686544
             }))
         );
         Ok(())
@@ -3194,7 +3194,7 @@ mod tests {
         assert_eq!(
             result,
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686544
             }))
         );
         Ok(())
@@ -3406,7 +3406,7 @@ mod tests {
         let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1")?;
 
         let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
-        assert_eq!(number_of_sub_file_entries, 12);
+        assert_eq!(number_of_sub_file_entries, 13);
 
         let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
 
@@ -3447,7 +3447,7 @@ mod tests {
         assert!(result.unwrap().is_ok());
 
         let result: Option<Result<VfsFileEntry, ErrorTrace>> =
-            sub_file_entries_iterator.skip(11).next();
+            sub_file_entries_iterator.skip(12).next();
         assert!(result.is_none());
 
         Ok(())

@@ -407,7 +407,7 @@ mod tests {
 
         assert_eq!(
             container.identifier.to_string(),
-            "ff9765c4-2187-4167-a484-416859c64f86"
+            "34d0674d-da87-4991-a3de-27eb13011c3e"
         );
         assert_eq!(container.block_size, 4096);
         assert_eq!(container.feature_flags, 0x00000000);

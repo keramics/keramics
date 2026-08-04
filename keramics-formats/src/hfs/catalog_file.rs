@@ -1133,7 +1133,7 @@ mod tests {
             19,
             &mut directory_entries,
         )?;
-        assert_eq!(directory_entries.get_number_of_entries(), 12);
+        assert_eq!(directory_entries.get_number_of_entries(), 13);
 
         Ok(())
     }

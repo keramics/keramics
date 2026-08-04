@@ -6,6 +6,8 @@ Data formats for Keramics.
 
 Supported data formats:
 
+* [Apple File System (APFS) format](https://keramics.github.io/apfs.html)
+* [Apple File System Compression (decmpfs) format](https://keramics.github.io/decmpfs.html)
 * [Apple Partition Map (APM) format](https://keramics.github.io/apm.html)
 * [Expert Witness Compression Format (EWF)](https://keramics.github.io/ewf.html)
 * [Extended File System (ext) format](https://keramics.github.io/ext.html)

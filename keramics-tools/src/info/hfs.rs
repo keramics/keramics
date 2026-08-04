@@ -488,10 +488,10 @@ mod tests {
             "    Identifier\t\t\t\t\t: 20\n",
             "    Name\t\t\t\t\t: testfile1\n",
             "    Size\t\t\t\t\t: 9 bytes\n",
-            "    Creation time\t\t\t\t: 2026-08-01T09:43:28\n",
-            "    Modification time\t\t\t\t: 2026-08-01T09:43:28\n",
-            "    Access time\t\t\t\t\t: 2026-08-01T09:43:28\n",
-            "    Change time\t\t\t\t\t: 2026-08-01T09:43:28\n",
+            "    Creation time\t\t\t\t: 2026-08-04T11:09:04\n",
+            "    Modification time\t\t\t\t: 2026-08-04T11:09:04\n",
+            "    Access time\t\t\t\t\t: 2026-08-04T11:09:04\n",
+            "    Change time\t\t\t\t\t: 2026-08-04T11:09:05\n",
             "    Backup time\t\t\t\t\t: Not set (0)\n",
             "    Number of links\t\t\t\t: 1\n",
             "    Owner identifier\t\t\t\t: 501\n",
@@ -523,25 +523,25 @@ mod tests {
         assert_eq!(
             test_struct.creation_time,
             DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686544
             })
         );
         assert_eq!(
             test_struct.modification_time,
             DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686544
             })
         );
         assert_eq!(
             test_struct.access_time,
             Some(DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686544
             }))
         );
         assert_eq!(
             test_struct.change_time,
             Some(DateTime::HfsTime(HfsTime {
-                timestamp: 3868422208
+                timestamp: 3868686545
             }))
         );
         assert_eq!(test_struct.backup_time, DateTime::NotSet);

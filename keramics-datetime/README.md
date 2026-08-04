@@ -7,9 +7,11 @@ Date and time types for Keramics.
 Supported date and time formats:
 
 * 32-bit POSIX timestamp (time_t)
-* 64-bit POSIX timestamp in nanoseconds (struct timespec)
-* FAT date and time
-* Windows FILETIME
+* 64-bit POSIX timestamp with nanoseconds fraction (struct timespec)
+* Apple File System (APFS) timestamp
+* File Allocation Table (FAT) date and time
+* Macintosh File System (MFS) or Hierarchical File System (HFS) timestamp
+* Windows FILETIME timestamp
 
 ## License
 
