@@ -101,7 +101,7 @@ impl HfsBtreeFile {
         };
         let mut node: HfsBtreeNode = HfsBtreeNode::new();
 
-        match node.read_data_stream(data_stream, node_physical_offset, self.node_size) {
+        match node.read_at_position(data_stream, node_physical_offset, self.node_size) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

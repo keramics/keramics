@@ -98,8 +98,6 @@ impl ExtDirectoryEntries {
 mod tests {
     use super::*;
 
-    use keramics_core::open_fake_data_stream;
-
     use crate::ext::directory_tree::ExtDirectoryTree;
 
     fn get_directory_entries() -> Result<ExtDirectoryEntries, ErrorTrace> {

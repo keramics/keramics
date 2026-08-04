@@ -245,6 +245,7 @@ impl StructureLayoutField {
     /// Retrieves the byte size.
     pub fn get_byte_size(&self) -> Option<usize> {
         match &self.data_type {
+            DataType::ApfsTime => Some(8),
             DataType::ByteString => Some(1),
             DataType::FatDate => Some(2),
             DataType::FatTimeDate => Some(4),
@@ -423,6 +424,15 @@ impl StructureLayoutField {
         data_offset: TokenStream,
     ) -> TokenStream {
         match &self.data_type {
+            DataType::ApfsTime => match *byte_order {
+                ByteOrder::BigEndian => {
+                    quote!(keramics_datetime::ApfsTime::from_be_bytes(&data[#data_offset..#data_offset + 8]))
+                }
+                ByteOrder::LittleEndian => {
+                    quote!(keramics_datetime::ApfsTime::from_le_bytes(&data[#data_offset..#data_offset + 8]))
+                }
+                _ => panic!("Unsupported byte order"),
+            },
             DataType::FatDate => {
                 quote!(keramics_datetime::FatDate::from_bytes(&data[#data_offset..#data_offset + 2]))
             }
@@ -537,6 +547,7 @@ impl StructureLayoutField {
     /// Retrieves a token stream of the type.
     pub fn get_type_token_stream(&self) -> TokenStream {
         match &self.data_type {
+            DataType::ApfsTime => quote!(keramics_datetime::ApfsTime),
             DataType::ByteString => quote!(keramics_types::ByteString),
             DataType::FatDate => quote!(keramics_datetime::FatDate),
             DataType::FatTimeDate => quote!(keramics_datetime::FatTimeDate),

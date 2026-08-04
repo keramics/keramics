@@ -13,39 +13,31 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_le;
+use keramics_types::bytes_to_u16_le;
 
-#[derive(Debug, LayoutMap)]
+use super::btree_entry::ApfsBtreeEntry;
+
+#[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
-        field(name = "offset", data_type = "u32"),
-        field(name = "size", data_type = "u32"),
+        field(name = "key_data_offset", data_type = "u16", format = "hex"),
+        field(name = "value_data_offset", data_type = "u16", format = "hex"),
     ),
     methods("debug_read_data")
 )]
-/// Apple File System Compression (decmpfs) zlib (compressed) block descriptor.
-pub struct DecmpfsZlibBlockDescriptor {
-    /// Offset.
-    pub offset: u32,
+/// Apple File System (APFS) B-Tree fixed size entry.
+pub struct ApfsBtreeEntryFixedSize {}
 
-    /// Size.
-    pub size: u32,
-}
-
-impl DecmpfsZlibBlockDescriptor {
-    /// Creates a new block descriptor.
-    pub fn new() -> Self {
-        Self { offset: 0, size: 0 }
-    }
-
-    /// Reads the fork descriptor from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 8 {
+impl ApfsBtreeEntryFixedSize {
+    /// Reads the B-Tree fixed size entry from a buffer.
+    pub fn read_data(entry: &mut ApfsBtreeEntry, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < 4 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        self.offset = bytes_to_u32_le!(data, 0);
-        self.size = bytes_to_u32_le!(data, 4);
+        entry.key_data_offset = bytes_to_u16_le!(data, 0) as usize;
+        entry.value_data_offset = bytes_to_u16_le!(data, 2) as usize;
+
         Ok(())
     }
 }
@@ -55,25 +47,28 @@ mod tests {
     use super::*;
 
     fn get_test_data() -> Vec<u8> {
-        return vec![0x01, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00];
+        return vec![0x00, 0x00, 0x10, 0x00];
     }
 
     #[test]
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = DecmpfsZlibBlockDescriptor::new();
-        test_struct.read_data(&test_data)?;
+        let mut test_struct = ApfsBtreeEntry::new();
+        ApfsBtreeEntryFixedSize::read_data(&mut test_struct, &test_data)?;
+
+        assert_eq!(test_struct.key_data_offset, 0x0000);
+        assert_eq!(test_struct.value_data_offset, 0x0010);
 
         Ok(())
     }
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = DecmpfsZlibBlockDescriptor::new();
+        let mut test_struct = ApfsBtreeEntry::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..7]);
+        let result = ApfsBtreeEntryFixedSize::read_data(&mut test_struct, &test_data[0..3]);
         assert!(result.is_err());
     }
 }

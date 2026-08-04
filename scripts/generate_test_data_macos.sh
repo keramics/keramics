@@ -273,4 +273,19 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDZO -o ${IMAGE_FILE}
 
+# Create a raw image with an APFS container and single volume with a case-insensitive file system
+IMAGE_FILE="test_data/apfs/apfs"
+IMAGE_SIZE="4M"
+
+mkdir -p test_data/apfs
+rm -f ${IMAGE_FILE}.dmg
+
+hdiutil create -fs 'APFS' -size ${IMAGE_SIZE} -type UDIF -volname apfs_test ${IMAGE_FILE}
+
+hdiutil attach ${IMAGE_FILE}.dmg -noautoopen -nobrowse
+
+create_file_entries "/Volumes/apfs_test"
+
+detach_image ${IMAGE_FILE}.dmg
+
 exit ${EXIT_SUCCESS}

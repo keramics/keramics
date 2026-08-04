@@ -18,6 +18,7 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{PatternType, ScanContext, Scanner, Signature};
 
+use super::apfs::constants::*;
 use super::enums::FormatIdentifier;
 use super::ewf::constants::*;
 use super::ext::constants::*;
@@ -43,6 +44,16 @@ impl FormatScanner {
         Self {
             signature_scanner: Scanner::new(),
         }
+    }
+
+    /// Adds Apple File System (APFS) signatures.
+    pub fn add_apfs_signatures(&mut self) {
+        self.signature_scanner.add_signature(Signature::new(
+            "apfs1",
+            PatternType::BoundToStart,
+            32,
+            APFS_CONTAINER_SUPERBLOCK_SIGNATURE,
+        ));
     }
 
     /// Adds Apple Partition Map (APM) signatures.
@@ -355,6 +366,7 @@ impl FormatScanner {
         let mut scan_results: HashSet<FormatIdentifier> = HashSet::new();
         for signature in scan_context.results.values() {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
+                "apfs1" => FormatIdentifier::Apfs,
                 "apm1" | "apm2" => FormatIdentifier::Apm,
                 "ewf1" => FormatIdentifier::Ewf,
                 "ext1" => FormatIdentifier::Ext,
@@ -391,6 +403,7 @@ mod tests {
     #[test]
     fn test_build() -> Result<(), ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
+        format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_ext_signatures();
@@ -412,6 +425,7 @@ mod tests {
     #[test]
     fn test_scan_data_stream() -> Result<(), ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
+        format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_ext_signatures();

@@ -1,0 +1,96 @@
+/* Copyright 2024-2026 Joachim Metz <joachim.metz@gmail.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+ * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+ * License for the specific language governing permissions and limitations
+ * under the License.
+ */
+
+use keramics_core::ErrorTrace;
+use keramics_layout_map::LayoutMap;
+use keramics_types::bytes_to_u32_le;
+
+#[derive(LayoutMap)]
+#[layout_map(
+    structure(
+        byte_order = "little",
+        field(name = "flags", data_type = "u32", format = "hex"),
+        field(name = "node_size", data_type = "u32"),
+        field(name = "key_size", data_type = "u32"),
+        field(name = "value_size", data_type = "u32"),
+        field(name = "maximum_key_size", data_type = "u32"),
+        field(name = "maximum_value_size", data_type = "u32"),
+        field(name = "total_number_of_keys", data_type = "u64"),
+        field(name = "total_number_of_nodes", data_type = "u64"),
+    ),
+    methods("debug_read_data")
+)]
+/// Apple File System (APFS) B-Tree footer.
+pub struct ApfsBtreeFooter {
+    /// Flags.
+    pub flags: u32,
+
+    /// Node size.
+    pub node_size: u32,
+}
+
+impl ApfsBtreeFooter {
+    /// Creates a new B-Tree footer.
+    pub fn new() -> Self {
+        Self {
+            flags: 0,
+            node_size: 0,
+        }
+    }
+
+    /// Reads the B-Tree footer from a buffer.
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
+        if data.len() < 40 {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        self.flags = bytes_to_u32_le!(data, 0);
+        self.node_size = bytes_to_u32_le!(data, 4);
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn get_test_data() -> Vec<u8> {
+        return vec![
+            0x12, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x00,
+            0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+    }
+
+    #[test]
+    fn test_read_data() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+
+        let mut test_struct = ApfsBtreeFooter::new();
+        test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.flags, 0x00000012);
+        assert_eq!(test_struct.node_size, 4096);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_data_with_unsupported_data_size() {
+        let mut test_struct = ApfsBtreeFooter::new();
+
+        let test_data: Vec<u8> = get_test_data();
+        let result = test_struct.read_data(&test_data[0..39]);
+        assert!(result.is_err());
+    }
+}

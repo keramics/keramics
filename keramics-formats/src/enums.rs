@@ -16,6 +16,7 @@ use std::fmt;
 /// Format identifier.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FormatIdentifier {
+    Apfs,
     Apm,
     Ewf,
     Ext,
@@ -40,6 +41,7 @@ impl fmt::Display for FormatIdentifier {
     /// Formats the format identifier for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let string: &str = match self {
+            FormatIdentifier::Apfs => "apfs",
             FormatIdentifier::Apm => "apm",
             FormatIdentifier::Ewf => "ewf",
             FormatIdentifier::Ext => "ext",
@@ -69,6 +71,10 @@ mod tests {
 
     #[test]
     fn test_format_identifier_fmt() {
+        let format_identifier: FormatIdentifier = FormatIdentifier::Apfs;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "apfs");
+
         let format_identifier: FormatIdentifier = FormatIdentifier::Apm;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "apm");
