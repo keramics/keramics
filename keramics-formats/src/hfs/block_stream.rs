@@ -236,22 +236,17 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_block_stream() -> Result<HfsBlockStream, ErrorTrace> {
-        let mut block_stream = HfsBlockStream::new(1024, 11358);
+        let mut block_stream = HfsBlockStream::new(4096, 11358);
 
-        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let path_string: String = get_test_data_path("hfs/hfsplus.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let block_ranges: Vec<HfsBlockRange> = vec![
             HfsBlockRange {
                 logical_block_number: 0,
-                physical_block_number: 3073,
-                number_of_blocks: 12,
-            },
-            HfsBlockRange {
-                logical_block_number: 12,
-                physical_block_number: 0,
-                number_of_blocks: 14,
+                physical_block_number: 275,
+                number_of_blocks: 3,
             },
         ];
         block_stream.open(&data_stream, 26, &block_ranges)?;
@@ -261,22 +256,17 @@ mod tests {
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let mut block_stream = HfsBlockStream::new(1024, 11358);
+        let mut block_stream = HfsBlockStream::new(4096, 11358);
 
-        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let path_string: String = get_test_data_path("hfs/hfsplus.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
         let block_ranges: Vec<HfsBlockRange> = vec![
             HfsBlockRange {
                 logical_block_number: 0,
-                physical_block_number: 3073,
-                number_of_blocks: 12,
-            },
-            HfsBlockRange {
-                logical_block_number: 12,
-                physical_block_number: 0,
-                number_of_blocks: 14,
+                physical_block_number: 275,
+                number_of_blocks: 3,
             },
         ];
         block_stream.open(&data_stream, 26, &block_ranges)?;
