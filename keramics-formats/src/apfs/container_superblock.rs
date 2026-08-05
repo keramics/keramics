@@ -45,36 +45,48 @@ use super::object_header::ApfsObjectHeader;
         field(name = "checkpoint_data_area_number_of_blocks", data_type = "u32"),
         field(name = "checkpoint_descriptor_area_block_number", data_type = "u64"),
         field(name = "checkpoint_data_area_block_number", data_type = "u64"),
-        field(name = "unknown1", data_type = "u32"),
-        field(name = "unknown2", data_type = "u32"),
-        field(name = "unknown3", data_type = "u32"),
-        field(name = "unknown4", data_type = "u32"),
-        field(name = "unknown5", data_type = "u32"),
-        field(name = "unknown6", data_type = "u32"),
+        field(
+            name = "next_available_checkpoint_descriptor_area_index",
+            data_type = "u32"
+        ),
+        field(name = "next_available_checkpoint_data_area_index", data_type = "u32"),
+        field(
+            name = "checkpoint_descriptor_area_checkpoint_index",
+            data_type = "u32"
+        ),
+        field(
+            name = "checkpoint_descriptor_area_checkpoint_number_of_block",
+            data_type = "u32"
+        ),
+        field(name = "checkpoint_data_area_checkpoint_index", data_type = "u32"),
+        field(
+            name = "checkpoint_data_area_checkpoint_number_of_block",
+            data_type = "u32"
+        ),
         field(name = "space_manager_object_identifier", data_type = "u64"),
         field(name = "object_map_block_number", data_type = "u64"),
         field(name = "reaper_object_identifier", data_type = "u64"),
-        field(name = "unknown7", data_type = "u32"),
+        field(name = "unknown1", data_type = "u32"),
         field(name = "maximum_number_of_volumes", data_type = "u32"),
         field(name = "volume_object_identifiers", data_type = "[u64; 100]"),
         field(name = "container_counters", data_type = "[u64; 32]"),
         field(name = "reserved_data_area", data_type = "Struct<ApfsBlockRange; 16>"),
-        field(name = "unknown9", data_type = "u64"),
-        field(name = "unknown10", data_type = "u64"),
-        field(name = "unknown11", data_type = "u64"),
+        field(name = "eviction_tree_object_identifier", data_type = "u64"),
+        field(name = "container_flags", data_type = "u64", format = "hex"),
+        field(name = "efi_jumpstart_object_identifier", data_type = "u64"),
         field(name = "fusion_set_identifier", data_type = "Uuid", byte_order = "big"),
         field(name = "key_bag_area", data_type = "Struct<ApfsBlockRange; 16>"),
-        field(name = "unknown12", data_type = "[u64; 4]"),
-        field(name = "unknown13", data_type = "u64"),
+        field(name = "ephemeral_information", data_type = "[u64; 4]"),
+        field(name = "unknown2", data_type = "u64"),
         field(name = "fusion_middle_tree_block_number", data_type = "u64"),
         field(name = "fusion_write_back_cache_object_identifier", data_type = "u64"),
         field(
             name = "fusion_write_back_cache_area",
             data_type = "Struct<ApfsBlockRange; 16>"
         ),
-        field(name = "unknown15", data_type = "u64"),
-        field(name = "unknown16", data_type = "[u8; 16]"),
-        field(name = "unknown17", data_type = "[u8; 2688]"),
+        field(name = "newest_mount_version", data_type = "u64"),
+        field(name = "media_key_area", data_type = "Struct<ApfsBlockRange; 16>"),
+        field(name = "unknown3", data_type = "[u8; 2688]"),
     ),
     methods("debug_read_data", "read_at_position")
 )]

@@ -1159,7 +1159,32 @@ mod tests {
         let test_struct: ExtFileSystemInfo = ExtInfo::get_file_system_information(&ext_file_system);
 
         assert_eq!(test_struct.format_version, 2);
-
+        assert_eq!(test_struct.compatible_feature_flags, 0x00000038);
+        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000003);
+        assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
+        assert_eq!(
+            test_struct.volume_label,
+            Some(ByteString::from("ext2_test"))
+        );
+        assert_eq!(test_struct.block_size, 1024);
+        assert_eq!(test_struct.inode_size, 128);
+        assert_eq!(test_struct.number_of_inodes, 1024);
+        assert_eq!(
+            test_struct.last_mount_path,
+            Some(ByteString::from("/mnt/keramics"))
+        );
+        assert_eq!(
+            test_struct.last_mount_time,
+            DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977482
+            })
+        );
+        assert_eq!(
+            test_struct.last_written_time,
+            DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977482
+            })
+        );
         Ok(())
     }
 

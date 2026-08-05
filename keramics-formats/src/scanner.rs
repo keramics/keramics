@@ -249,11 +249,26 @@ impl FormatScanner {
 
     /// Adds Universal Disk Image Format (UDIF) signatures.
     pub fn add_udif_signatures(&mut self) {
+        // Unencrypted UDIF.
         self.signature_scanner.add_signature(Signature::new(
             "udif1",
             PatternType::BoundToEnd,
             512,
             UDIF_FILE_FOOTER_SIGNATURE,
+        ));
+        // Encrypted UDIF with version 1 footer.
+        self.signature_scanner.add_signature(Signature::new(
+            "udif2",
+            PatternType::BoundToEnd,
+            8,
+            UDIF_ENCRYPTED_FILE_FOOTER_SIGNATURE,
+        ));
+        // Encrypted UDIF with version 2 header.
+        self.signature_scanner.add_signature(Signature::new(
+            "udif3",
+            PatternType::BoundToStart,
+            0,
+            UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE,
         ));
     }
 
@@ -378,7 +393,7 @@ impl FormatScanner {
                 "pdi1" => FormatIdentifier::Pdi,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
                 "sparseimage1" => FormatIdentifier::SparseImage,
-                "udif1" => FormatIdentifier::Udif,
+                "udif1" | "udif2" | "udif3" => FormatIdentifier::Udif,
                 "vhd1" => FormatIdentifier::Vhd,
                 "vhdx1" => FormatIdentifier::Vhdx,
                 "vmdk1" | "vmdk2" => FormatIdentifier::Vmdk,

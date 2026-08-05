@@ -37,6 +37,25 @@ pub enum FormatIdentifier {
     Vmdk,
 }
 
+impl FormatIdentifier {
+    /// Determines if the format identifier represents a storage media image format.
+    pub fn is_storage_media_image_format(&self) -> bool {
+        match self {
+            FormatIdentifier::Ewf
+            | FormatIdentifier::Pdi
+            | FormatIdentifier::Qcow
+            | FormatIdentifier::SparseBundle
+            | FormatIdentifier::SparseImage
+            | FormatIdentifier::SplitRaw
+            | FormatIdentifier::Udif
+            | FormatIdentifier::Vhd
+            | FormatIdentifier::Vhdx
+            | FormatIdentifier::Vmdk => true,
+            _ => false,
+        }
+    }
+}
+
 impl fmt::Display for FormatIdentifier {
     /// Formats the format identifier for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {

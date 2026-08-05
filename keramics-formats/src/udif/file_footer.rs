@@ -25,14 +25,14 @@ use super::constants::*;
         field(name = "format_version", data_type = "u32"),
         field(name = "footer_size", data_type = "u32"),
         field(name = "image_flags", data_type = "u32", format = "hex"),
-        field(name = "unknown1", data_type = "[u8; 8]"),
+        field(name = "segment_offset", data_type = "u64", format = "hex"),
         field(name = "data_fork_offset", data_type = "u64", format = "hex"),
         field(name = "data_fork_size", data_type = "u64"),
         field(name = "resource_fork_offset", data_type = "u64", format = "hex"),
         field(name = "resource_fork_size", data_type = "u64"),
-        field(name = "unknown2", data_type = "[u8; 4]"),
+        field(name = "segment_number", data_type = "u32"),
         field(name = "number_of_segments", data_type = "u32"),
-        field(name = "segment_identifier", data_type = "uuid"),
+        field(name = "segment_set_identifier", data_type = "uuid"),
         field(name = "data_checksum_type", data_type = "u32"),
         field(name = "data_checksum_size", data_type = "u32"),
         field(name = "data_checksum", data_type = "[u8; 128]"),
@@ -50,11 +50,23 @@ use super::constants::*;
 )]
 /// Universal Disk Image Format (UDIF) file footer.
 pub struct UdifFileFooter {
+    /// Format version.
+    pub format_version: u32,
+
     /// Data fork offset.
     pub data_fork_offset: u64,
 
     /// Data fork size.
     pub data_fork_size: u64,
+
+    /// Resource fork offset.
+    pub resource_fork_offset: u64,
+
+    /// Resource fork size.
+    pub resource_fork_size: u64,
+
+    /// Number of segments.
+    pub number_of_segments: u32,
 
     /// Plist offset.
     pub plist_offset: u64,
@@ -67,8 +79,12 @@ impl UdifFileFooter {
     /// Creates a new file footer.
     pub fn new() -> Self {
         Self {
+            format_version: 0,
             data_fork_offset: 0,
             data_fork_size: 0,
+            resource_fork_offset: 0,
+            resource_fork_size: 0,
+            number_of_segments: 0,
             plist_offset: 0,
             plist_size: 0,
         }
@@ -76,22 +92,25 @@ impl UdifFileFooter {
 
     /// Reads the file footer from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 512 {
+        if data.len() < 512 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != UDIF_FILE_FOOTER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
-        let format_version: u32 = bytes_to_u32_be!(data, 4);
+        self.format_version = bytes_to_u32_be!(data, 4);
 
-        if format_version != 4 {
+        if self.format_version != 4 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format version: {}",
-                format_version
+                self.format_version
             )));
         }
         self.data_fork_offset = bytes_to_u64_be!(data, 24);
         self.data_fork_size = bytes_to_u64_be!(data, 32);
+        self.resource_fork_offset = bytes_to_u64_be!(data, 40);
+        self.resource_fork_size = bytes_to_u64_be!(data, 48);
+        self.number_of_segments = bytes_to_u32_be!(data, 60);
         self.plist_offset = bytes_to_u64_be!(data, 216);
         self.plist_size = bytes_to_u64_be!(data, 224);
 
@@ -156,8 +175,12 @@ mod tests {
         let mut test_struct = UdifFileFooter::new();
         test_struct.read_data(&test_data)?;
 
+        assert_eq!(test_struct.format_version, 4);
         assert_eq!(test_struct.data_fork_offset, 0);
         assert_eq!(test_struct.data_fork_size, 8236);
+        assert_eq!(test_struct.resource_fork_offset, 0);
+        assert_eq!(test_struct.resource_fork_size, 0);
+        assert_eq!(test_struct.number_of_segments, 0);
         assert_eq!(test_struct.plist_offset, 8236);
         assert_eq!(test_struct.plist_size, 8034);
 
@@ -201,8 +224,12 @@ mod tests {
         let mut test_struct = UdifFileFooter::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
+        assert_eq!(test_struct.format_version, 4);
         assert_eq!(test_struct.data_fork_offset, 0);
         assert_eq!(test_struct.data_fork_size, 8236);
+        assert_eq!(test_struct.resource_fork_offset, 0);
+        assert_eq!(test_struct.resource_fork_size, 0);
+        assert_eq!(test_struct.number_of_segments, 0);
         assert_eq!(test_struct.plist_offset, 8236);
         assert_eq!(test_struct.plist_size, 8034);
 

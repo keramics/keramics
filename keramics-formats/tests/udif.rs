@@ -81,7 +81,7 @@ fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
     let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "08c32fd5d0fc1c2274d1c2d34185312a");
 
     Ok(())
@@ -93,7 +93,7 @@ fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
     let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "7ec785450bbc17de417be373fd5d2159");
 
     Ok(())
@@ -105,7 +105,7 @@ fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
     let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "c2c160c788676641725fd1a4b8da733b");
 
     Ok(())
@@ -117,7 +117,7 @@ fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
     let mut file: UdifFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())

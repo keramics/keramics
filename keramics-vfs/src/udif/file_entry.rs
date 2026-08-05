@@ -95,7 +95,7 @@ impl UdifFileEntry {
                     )));
                 }
                 let media_size: u64 = match file.read() {
-                    Ok(udif_file) => udif_file.media_size,
+                    Ok(udif_file) => udif_file.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on UDIF file",
@@ -152,7 +152,6 @@ mod tests {
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
         };
-
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
@@ -162,14 +161,13 @@ mod tests {
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
         let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.media_size;
+        let media_size: u64 = udif_file.get_media_size();
 
         let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
         };
-
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
@@ -177,7 +175,6 @@ mod tests {
             file: test_file.clone(),
             size: media_size,
         };
-
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("udif1"));
 
@@ -187,14 +184,13 @@ mod tests {
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.media_size;
+        let media_size: u64 = udif_file.get_media_size();
 
         let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
         };
-
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
@@ -202,7 +198,6 @@ mod tests {
             file: test_file.clone(),
             size: media_size,
         };
-
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 1964032);
 
@@ -212,14 +207,13 @@ mod tests {
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.media_size;
+        let media_size: u64 = udif_file.get_media_size();
 
         let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
         };
-
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
@@ -227,7 +221,6 @@ mod tests {
             file: test_file.clone(),
             size: media_size,
         };
-
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
@@ -242,7 +235,6 @@ mod tests {
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
         };
-
         let sub_file_entry: UdifFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
         let name: PathComponent = sub_file_entry.get_name();
@@ -257,21 +249,19 @@ mod tests {
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.media_size;
+        let media_size: u64 = udif_file.get_media_size();
 
         let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
         };
-
         assert_eq!(file_entry.is_root_file_entry(), true);
 
         let file_entry = UdifFileEntry::Layer {
             file: test_file.clone(),
             size: media_size,
         };
-
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

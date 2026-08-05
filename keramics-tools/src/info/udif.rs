@@ -20,6 +20,9 @@ use crate::formatters::ByteSize;
 
 /// Information about an Universal Disk Image Format (UDIF) file.
 struct UdifFileInfo {
+    /// Format version.
+    pub format_version: u32,
+
     /// Compression method.
     pub compression_method: UdifCompressionMethod,
 
@@ -43,6 +46,7 @@ impl UdifFileInfo {
     /// Creates new file information.
     fn new() -> Self {
         Self {
+            format_version: 0,
             media_size: 0,
             bytes_per_sector: 0,
             compression_method: UdifCompressionMethod::None,
@@ -62,6 +66,11 @@ impl fmt::Display for UdifFileInfo {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Universal Disk Image Format (UDIF) information:")?;
 
+        writeln!(
+            formatter,
+            "    Format version\t\t\t\t: {}",
+            self.format_version
+        )?;
         let compression_method_string: &str = self.get_compression_method_string();
         writeln!(
             formatter,
@@ -90,9 +99,10 @@ impl UdifInfo {
     fn get_file_information(udif_file: &UdifFile) -> UdifFileInfo {
         let mut file_information: UdifFileInfo = UdifFileInfo::new();
 
-        file_information.compression_method = udif_file.compression_method.clone();
-        file_information.media_size = udif_file.media_size;
-        file_information.bytes_per_sector = udif_file.bytes_per_sector;
+        file_information.format_version = udif_file.get_format_version();
+        file_information.compression_method = udif_file.get_compression_method().clone();
+        file_information.media_size = udif_file.get_media_size();
+        file_information.bytes_per_sector = udif_file.get_bytes_per_sector();
 
         file_information
     }
@@ -146,6 +156,7 @@ mod tests {
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Universal Disk Image Format (UDIF) information:\n",
+            "    Format version\t\t\t\t: 4\n",
             "    Compression method\t\t\t\t: zlib\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 1.9 MiB (1964032 bytes)\n",
@@ -164,6 +175,7 @@ mod tests {
         let udif_file: UdifFile = UdifInfo::open_file(&data_stream)?;
         let test_struct: UdifFileInfo = UdifInfo::get_file_information(&udif_file);
 
+        assert_eq!(test_struct.format_version, 4);
         assert_eq!(test_struct.compression_method, UdifCompressionMethod::Zlib);
         assert_eq!(test_struct.media_size, 1964032);
         assert_eq!(test_struct.bytes_per_sector, 512);

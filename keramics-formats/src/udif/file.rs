@@ -15,6 +15,7 @@ use std::io::SeekFrom;
 
 use keramics_compression::{AdcContext, Bzip2Context, LzfseContext};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_types::bytes_to_u32_be;
 
 use crate::block_tree::BlockTree;
 use crate::lru_cache::LruCache;
@@ -22,15 +23,26 @@ use crate::plist::{PlistObject, XmlPlist};
 
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table::UdifBlockTable;
+use super::block_table_reader::UdifBlockTableReader;
+use super::constants::*;
+use super::encrypted_file_footer::UdifEncryptedFileFooter;
+use super::encrypted_file_header::UdifEncryptedFileHeader;
 use super::enums::UdifCompressionMethod;
 use super::file_footer::UdifFileFooter;
-
-const MAXIMUM_NUMBER_OF_SECTORS: u64 = u64::MAX / 512;
+use super::resource_fork_header::UdifResourceForkHeader;
+use super::resource_map::UdifResourceMap;
+use super::resource_map_item::UdifResourceMapItem;
 
 /// Universal Disk Image Format (UDIF) file.
 pub struct UdifFile {
     /// Data stream.
     data_stream: Option<DataStreamReference>,
+
+    /// Format version.
+    format_version: u32,
+
+    /// Number of segments.
+    number_of_segments: u32,
 
     /// Data fork offset.
     data_fork_offset: u64,
@@ -45,16 +57,16 @@ pub struct UdifFile {
     block_cache: LruCache<u64, Vec<u8>>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
     /// Compression method.
-    pub compression_method: UdifCompressionMethod,
+    compression_method: UdifCompressionMethod,
 
     /// The current offset.
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    media_size: u64,
 }
 
 impl UdifFile {
@@ -62,6 +74,8 @@ impl UdifFile {
     pub fn new() -> Self {
         Self {
             data_stream: None,
+            format_version: 0,
+            number_of_segments: 0,
             data_fork_offset: 0,
             has_block_ranges: false,
             block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
@@ -73,16 +87,84 @@ impl UdifFile {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the compression method.
+    pub fn get_compression_method(&self) -> &UdifCompressionMethod {
+        &self.compression_method
+    }
+
+    /// Retrieves the format version.
+    pub fn get_format_version(&self) -> u32 {
+        self.format_version
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
+    }
+
     /// Reads a file from a data stream.
     pub fn read_data_stream(
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        match self.read_metadata(data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
-                return Err(error);
+        // TODO: read first 8 bytes to check for encrypted v2 header.
+        let mut signature: [u8; 8] = [0; 8];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut signature,
+            SeekFrom::Start(0)
+        );
+        if &signature == UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE {
+            let mut encrypted_file_header: UdifEncryptedFileHeader = UdifEncryptedFileHeader::new();
+
+            match encrypted_file_header.read_at_position(data_stream, SeekFrom::Start(0)) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read encrypted file header"
+                    );
+                    return Err(error);
+                }
+            }
+            self.format_version = encrypted_file_header.format_version;
+            // self.block_size = encrypted_file_header.block_size;
+        } else {
+            keramics_core::data_stream_read_exact_at_position!(
+                data_stream,
+                &mut signature,
+                SeekFrom::End(-8)
+            );
+            if &signature == UDIF_ENCRYPTED_FILE_FOOTER_SIGNATURE {
+                let mut encrypted_file_footer: UdifEncryptedFileFooter =
+                    UdifEncryptedFileFooter::new();
+
+                match encrypted_file_footer.read_at_position(data_stream, SeekFrom::End(-1276)) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read encrypted file footer"
+                        );
+                        return Err(error);
+                    }
+                }
+                self.format_version = encrypted_file_footer.format_version;
+                // self.block_size = encrypted_file_footer.block_size;
+            } else {
+                match self.read_metadata(data_stream) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                        return Err(error);
+                    }
+                }
             }
         }
         self.data_stream = Some(data_stream.clone());
@@ -90,7 +172,7 @@ impl UdifFile {
         Ok(())
     }
 
-    /// Reads the file footer and XML plist.
+    /// Reads the file footer and resource fork or XML plist.
     fn read_metadata(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let mut file_footer: UdifFileFooter = UdifFileFooter::new();
 
@@ -101,17 +183,121 @@ impl UdifFile {
                 return Err(error);
             }
         }
+        self.format_version = file_footer.format_version;
+        self.number_of_segments = file_footer.number_of_segments;
         self.bytes_per_sector = 512;
 
         let data_fork_end_offset: u64 = file_footer.data_fork_offset + file_footer.data_fork_size;
 
-        if file_footer.plist_size == 0 {
+        if file_footer.plist_size == 0 && file_footer.resource_fork_size == 0 {
             self.data_fork_offset = file_footer.data_fork_offset;
             self.has_block_ranges = false;
             self.media_size = file_footer.data_fork_size;
+        } else if file_footer.plist_size == 0 {
+            let mut resource_fork_header: UdifResourceForkHeader = UdifResourceForkHeader::new();
+
+            match resource_fork_header.read_at_position(
+                data_stream,
+                SeekFrom::Start(file_footer.resource_fork_offset),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read resource fork header"
+                    );
+                    return Err(error);
+                }
+            }
+            let offset: u64 = file_footer.resource_fork_offset
+                + (resource_fork_header.resource_map_offset as u64);
+
+            let mut resource_map: UdifResourceMap = UdifResourceMap::new();
+
+            match resource_map.read_at_position(
+                data_stream,
+                resource_fork_header.resource_map_size,
+                SeekFrom::Start(offset),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read resource map");
+                    return Err(error);
+                }
+            }
+            let mut lookup_item: Option<&UdifResourceMapItem> = None;
+
+            for resource_map_item in resource_map.items.iter() {
+                if resource_map_item.name == "blkx" {
+                    lookup_item = Some(resource_map_item);
+                    break;
+                }
+            }
+            let blkx_item: &UdifResourceMapItem = match lookup_item {
+                Some(resource_map_item) => resource_map_item,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to retrieve blkx item from resource map"
+                    ));
+                }
+            };
+            let mut block_table_reader: UdifBlockTableReader = UdifBlockTableReader::new(
+                self.bytes_per_sector,
+                file_footer.data_fork_offset,
+                file_footer.data_fork_size,
+            );
+            let mut data: [u8; 4] = [0; 4];
+
+            for blkx_value in blkx_item.values.iter() {
+                let offset: u64 = file_footer.resource_fork_offset
+                    + (resource_fork_header.resource_data_offset as u64)
+                    + (blkx_value.data_offset as u64);
+
+                keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut data,
+                    SeekFrom::Start(offset)
+                );
+                let block_table_data_size: u32 = bytes_to_u32_be!(data, 0);
+
+                let mut block_table = UdifBlockTable::new();
+
+                match block_table.read_at_position(
+                    data_stream,
+                    block_table_data_size,
+                    SeekFrom::Start(offset + 4),
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read block table");
+                        return Err(error);
+                    }
+                }
+                match block_table_reader.process_block_table(&block_table) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to process block table"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            self.compression_method = block_table_reader.get_compression_method();
+            self.media_size = block_table_reader.get_media_size();
+
+            self.block_tree = match block_table_reader.get_block_tree() {
+                Ok(block_tree) => block_tree,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to determine block tree");
+                    return Err(error);
+                }
+            };
+            self.has_block_ranges = true;
         } else {
             // Note that 16777216 is an arbitrary chosen limit.
-            if file_footer.plist_size == 0 || file_footer.plist_size > 16777216 {
+            if file_footer.plist_size > 16777216 {
                 return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
             let mut data: Vec<u8> = vec![0; file_footer.plist_size as usize];
@@ -156,26 +342,26 @@ impl UdifFile {
                         ));
                     }
                 };
-            let blkx_array: &[PlistObject] = match resource_fork_object.get_slice_by_key("blkx") {
+            let blkx_item: &[PlistObject] = match resource_fork_object.get_slice_by_key("blkx") {
                 Some(string) => string,
                 None => {
                     return Err(keramics_core::error_trace_new!(
-                        "Unable to retrieve blkx value from plist"
+                        "Unable to retrieve blkx item from plist"
                     ));
                 }
             };
-            let mut block_ranges: Vec<UdifBlockRange> = Vec::new();
-            let mut media_sector: u64 = 0;
-            let mut media_offset: u64 = 0;
-            let mut compressed_entry_type: u32 = 0;
-
-            for (table_index, blkx_array_entry) in blkx_array.iter().enumerate() {
-                let data: &[u8] = match blkx_array_entry.get_bytes_by_key("Data") {
+            let mut block_table_reader: UdifBlockTableReader = UdifBlockTableReader::new(
+                self.bytes_per_sector,
+                file_footer.data_fork_offset,
+                file_footer.data_fork_size,
+            );
+            for (value_index, blkx_value) in blkx_item.iter().enumerate() {
+                let data: &[u8] = match blkx_value.get_bytes_by_key("Data") {
                     Some(data) => data,
                     None => {
                         return Err(keramics_core::error_trace_new!(format!(
-                            "Unable to retrieve Data value from blkx array entry: {}",
-                            table_index
+                            "Unable to retrieve Data value from blkx value: {}",
+                            value_index
                         )));
                     }
                 };
@@ -191,143 +377,28 @@ impl UdifFile {
                         return Err(error);
                     }
                 }
-                if block_table.start_sector != media_sector {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported block table: {} start sector value out of bounds",
-                        table_index,
-                    )));
-                }
-                for (entry_index, block_table_entry) in block_table.entries.iter().enumerate() {
-                    if block_table_entry.entry_type == 0xffffffff {
-                        break;
-                    }
-                    if block_table_entry.entry_type == 0x7ffffffe {
-                        continue;
-                    }
-                    if block_table_entry.start_sector
-                        > MAXIMUM_NUMBER_OF_SECTORS - block_table.start_sector
-                        || block_table.start_sector + block_table_entry.start_sector != media_sector
-                    {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unsupported block table: {} entry: {} start sector value out of bounds",
-                            table_index, entry_index,
-                        )));
-                    }
-                    if block_table_entry.number_of_sectors == 0
-                        || block_table_entry.number_of_sectors > MAXIMUM_NUMBER_OF_SECTORS
-                    {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unsupported block table: {} entry: {} number of sectors value out of bounds",
-                            table_index, entry_index,
-                        )));
-                    }
-                    if block_table_entry.entry_type != 0x00000000
-                        && block_table_entry.entry_type != 0x00000002
-                    {
-                        if block_table_entry.data_offset < file_footer.data_fork_offset
-                            || block_table_entry.data_offset >= data_fork_end_offset
-                        {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported block table: {} entry: {} data offset value out of bounds",
-                                table_index, entry_index,
-                            )));
-                        }
-                        if block_table_entry.data_size
-                            > data_fork_end_offset - block_table_entry.data_offset
-                        {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported block table: {} entry: {} data size value out of bounds",
-                                table_index, entry_index,
-                            )));
-                        }
-                    }
-                    let media_size: u64 =
-                        block_table_entry.number_of_sectors * self.bytes_per_sector as u64;
-
-                    let block_range: UdifBlockRange = match block_table_entry.entry_type {
-                        0x00000000 | 0x00000002 => UdifBlockRange::new(
-                            media_offset,
-                            0,
-                            media_size,
-                            0,
-                            UdifBlockRangeType::Sparse,
-                        ),
-                        0x00000001 => UdifBlockRange::new(
-                            media_offset,
-                            block_table_entry.data_offset,
-                            media_size,
-                            0,
-                            UdifBlockRangeType::InFile,
-                        ),
-                        0x80000004..0x80000008 => {
-                            if block_table_entry.number_of_sectors > 2048 {
-                                return Err(keramics_core::error_trace_new!(format!(
-                                    "Unsupported compressed block table: {} entry: {} number of sectors value out of bounds",
-                                    table_index, entry_index,
-                                )));
-                            }
-                            if compressed_entry_type == 0 {
-                                compressed_entry_type = block_table_entry.entry_type;
-                            } else if block_table_entry.entry_type != compressed_entry_type {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Unsupported mixed compression methods"
-                                ));
-                            }
-                            UdifBlockRange::new(
-                                media_offset,
-                                block_table_entry.data_offset,
-                                media_size,
-                                block_table_entry.data_size as u32,
-                                UdifBlockRangeType::Compressed,
-                            )
-                        }
-                        _ => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Unsupported block table entry type: 0x{:08x}",
-                                block_table_entry.entry_type
-                            )));
-                        }
-                    };
-                    block_ranges.push(block_range);
-
-                    media_offset += media_size;
-                    media_sector += block_table_entry.number_of_sectors;
-                }
-            }
-            self.compression_method = match compressed_entry_type {
-                0x80000004 => UdifCompressionMethod::Adc,
-                0x80000005 => UdifCompressionMethod::Zlib,
-                0x80000006 => UdifCompressionMethod::Bzip2,
-                0x80000007 => UdifCompressionMethod::Lzfse,
-                0x80000008 => UdifCompressionMethod::Lzma,
-                _ => UdifCompressionMethod::None,
-            };
-            self.has_block_ranges = true;
-            self.media_size = media_offset;
-
-            let block_tree_data_size: u64 = media_sector * (self.bytes_per_sector as u64);
-
-            self.block_tree = BlockTree::<UdifBlockRange>::new(
-                block_tree_data_size,
-                0,
-                self.bytes_per_sector as u64,
-            );
-            while let Some(block_range) = block_ranges.pop() {
-                match self.block_tree.insert_value(
-                    block_range.media_offset,
-                    block_range.size,
-                    block_range,
-                ) {
+                match block_table_reader.process_block_table(&block_table) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to insert block range into block tree"
+                            "Unable to process block table"
                         );
                         return Err(error);
                     }
                 }
             }
+            self.compression_method = block_table_reader.get_compression_method();
+            self.media_size = block_table_reader.get_media_size();
+
+            self.block_tree = match block_table_reader.get_block_tree() {
+                Ok(block_tree) => block_tree,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to determine block tree");
+                    return Err(error);
+                }
+            };
+            self.has_block_ranges = true;
         }
         Ok(())
     }
@@ -620,6 +691,11 @@ mod tests {
 
         Ok(file)
     }
+
+    // TODO add tests for bytes_per_sector
+    // TODO add tests for get_compression_method
+    // TODO add tests for get_format_version
+    // TODO add tests for get_media_size
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

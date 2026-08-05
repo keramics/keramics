@@ -11,25 +11,24 @@
  * under the License.
  */
 
-mod block_range;
-mod block_table;
-mod block_table_entry;
-mod block_table_header;
-mod block_table_reader;
-pub(crate) mod constants;
-mod encrypted_file_footer;
-mod encrypted_file_header;
-mod enums;
-mod file;
-mod file_footer;
-mod item_descriptor;
-mod resource_descriptor;
-mod resource_fork_header;
-mod resource_map;
-mod resource_map_entry;
-mod resource_map_header;
-mod resource_map_item;
-mod resource_map_value;
+use keramics_types::ByteString;
 
-pub use enums::UdifCompressionMethod;
-pub use file::UdifFile;
+/// Universal Disk Image Format (UDIF) resource map value.
+#[derive(Debug)]
+pub struct UdifResourceMapValue {
+    /// Name.
+    pub name: Option<ByteString>,
+
+    /// Data offset.
+    pub data_offset: u32,
+}
+
+impl UdifResourceMapValue {
+    /// Creates a new resource map value.
+    pub fn new(data_offset: u32) -> Self {
+        Self {
+            name: None,
+            data_offset,
+        }
+    }
+}

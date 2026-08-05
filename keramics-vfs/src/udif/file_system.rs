@@ -71,7 +71,7 @@ impl UdifFileSystem {
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
         match self.file.read() {
-            Ok(udif_file) => Ok(udif_file.bytes_per_sector as u32),
+            Ok(udif_file) => Ok(udif_file.get_bytes_per_sector() as u32),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain read lock on UDIF file",
@@ -95,7 +95,7 @@ impl UdifFileSystem {
                     return Ok(None);
                 }
                 let media_size: u64 = match self.file.read() {
-                    Ok(udif_file) => udif_file.media_size,
+                    Ok(udif_file) => udif_file.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on UDIF file",

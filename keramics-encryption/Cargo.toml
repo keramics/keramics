@@ -1,0 +1,19 @@
+[package]
+name = "keramics-encryption"
+description = "Keramics encryption support"
+authors = { workspace = true }
+categories = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+repository = { workspace = true }
+version = { workspace = true }
+
+[lib]
+name = "keramics_encryption"
+path = "src/lib.rs"
+
+[dependencies]
+keramics-core = { version = "0.0.1", path = "../keramics-core" }
+keramics-types = { version = "0.0.1", path = "../keramics-types" }
