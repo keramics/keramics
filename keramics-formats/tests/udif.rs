@@ -112,6 +112,18 @@ fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
+fn read_media_zlib_compressed_with_resource_fork() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_rsrc.dmg");
+    let mut file: UdifFile = open_file(&path_buf)?;
+
+    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    assert_eq!(media_offset, file.get_media_size());
+    assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
+
+    Ok(())
+}
+
+#[test]
 fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
     let mut file: UdifFile = open_file(&path_buf)?;
