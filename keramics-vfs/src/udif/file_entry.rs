@@ -15,7 +15,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
-use keramics_formats::udif::UdifFile;
+use keramics_formats::udif::UdifImage;
 
 use crate::enums::VfsFileType;
 
@@ -24,7 +24,7 @@ pub enum UdifFileEntry {
     /// Layer file entry.
     Layer {
         /// File.
-        file: Arc<RwLock<UdifFile>>,
+        file: Arc<RwLock<UdifImage>>,
 
         /// Size.
         size: u64,
@@ -33,7 +33,7 @@ pub enum UdifFileEntry {
     /// Root file entry.
     Root {
         /// File.
-        file: Arc<RwLock<UdifFile>>,
+        file: Arc<RwLock<UdifImage>>,
     },
 }
 
@@ -95,10 +95,10 @@ impl UdifFileEntry {
                     )));
                 }
                 let media_size: u64 = match file.read() {
-                    Ok(udif_file) => udif_file.get_media_size(),
+                    Ok(udif_image) => udif_image.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on UDIF file",
+                            "Unable to obtain read lock on UDIF image",
                             error
                         ));
                     }
@@ -126,28 +126,29 @@ mod tests {
 
     use std::path::PathBuf;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
     use crate::tests::get_test_data_path;
 
-    fn get_file() -> Result<UdifFile, ErrorTrace> {
-        let mut file: UdifFile = UdifFile::new();
+    fn get_file() -> Result<UdifImage, ErrorTrace> {
+        let mut image: UdifImage = UdifImage::new();
 
-        let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
+        let path_string: String = get_test_data_path("udif");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        file.read_data_stream(&data_stream)?;
+        let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
+        let file_name: PathComponent = PathComponent::from("hfsplus_zlib.dmg");
+        image.open(&file_resolver, &file_name)?;
 
-        Ok(file)
+        Ok(image)
     }
 
     // TODO: add tests for get_data_stream
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = get_file()?;
+        let udif_image: UdifImage = get_file()?;
 
-        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
@@ -160,10 +161,10 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.get_media_size();
+        let udif_image: UdifImage = get_file()?;
+        let media_size: u64 = udif_image.get_media_size();
 
-        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
@@ -183,10 +184,10 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.get_media_size();
+        let udif_image: UdifImage = get_file()?;
+        let media_size: u64 = udif_image.get_media_size();
 
-        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
@@ -206,10 +207,10 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.get_media_size();
+        let udif_image: UdifImage = get_file()?;
+        let media_size: u64 = udif_image.get_media_size();
 
-        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
@@ -229,8 +230,8 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = get_file()?;
-        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+        let udif_image: UdifImage = get_file()?;
+        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),
@@ -248,10 +249,10 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = get_file()?;
-        let media_size: u64 = udif_file.get_media_size();
+        let udif_image: UdifImage = get_file()?;
+        let media_size: u64 = udif_image.get_media_size();
 
-        let test_file: Arc<RwLock<UdifFile>> = Arc::new(RwLock::new(udif_file));
+        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
             file: test_file.clone(),

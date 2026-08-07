@@ -25,11 +25,8 @@ pub struct UdifBlockTableReader {
     /// Bytes per sector.
     bytes_per_sector: u16,
 
-    /// Data fork offset.
-    data_fork_offset: u64,
-
-    /// Data fork end offset.
-    data_fork_end_offset: u64,
+    /// Segment data size.
+    segment_data_size: u64,
 
     /// Block ranges.
     block_ranges: Vec<UdifBlockRange>,
@@ -38,7 +35,7 @@ pub struct UdifBlockTableReader {
     media_sector: u64,
 
     /// Current media offset.
-    media_offset: u64,
+    pub(super) media_offset: u64,
 
     /// Compressed entry type.
     compressed_entry_type: u32,
@@ -48,11 +45,10 @@ impl UdifBlockTableReader {
     const MAXIMUM_NUMBER_OF_SECTORS: u64 = u64::MAX / 512;
 
     /// Creates a new block table reader.
-    pub fn new(bytes_per_sector: u16, data_fork_offset: u64, data_fork_size: u64) -> Self {
+    pub fn new(bytes_per_sector: u16, segment_data_size: u64) -> Self {
         Self {
             bytes_per_sector,
-            data_fork_offset,
-            data_fork_end_offset: data_fork_offset + data_fork_size,
+            segment_data_size,
             block_ranges: Vec::new(),
             media_sector: 0,
             media_offset: 0,
@@ -99,6 +95,11 @@ impl UdifBlockTableReader {
         self.media_offset
     }
 
+    /// Determines if the block table reader has block ranges.
+    pub fn has_block_ranges(&self) -> bool {
+        !self.block_ranges.is_empty()
+    }
+
     /// Processes a block table.
     pub fn process_block_table(&mut self, block_table: &UdifBlockTable) -> Result<(), ErrorTrace> {
         if block_table.start_sector != self.media_sector {
@@ -133,16 +134,14 @@ impl UdifBlockTableReader {
             if block_table_entry.entry_type != 0x00000000
                 && block_table_entry.entry_type != 0x00000002
             {
-                if block_table_entry.data_offset < self.data_fork_offset
-                    || block_table_entry.data_offset >= self.data_fork_end_offset
-                {
+                if block_table_entry.data_offset >= self.segment_data_size {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported block table entry: {} - data offset value out of bounds",
                         entry_index
                     )));
                 }
                 if block_table_entry.data_size
-                    > self.data_fork_end_offset - block_table_entry.data_offset
+                    > self.segment_data_size - block_table_entry.data_offset
                 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported block table entry: {} - data size value out of bounds",

@@ -114,8 +114,6 @@ impl UdifBlockTable {
 mod tests {
     use super::*;
 
-    use keramics_core::open_fake_data_stream;
-
     fn get_test_data() -> Vec<u8> {
         return vec![
             0x6d, 0x69, 0x73, 0x68, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -25,7 +25,7 @@ use keramics_formats::qcow::QcowImage;
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
-use keramics_formats::udif::UdifFile;
+use keramics_formats::udif::UdifImage;
 use keramics_formats::vhd::VhdImage;
 use keramics_formats::vhdx::VhdxImage;
 use keramics_formats::vmdk::VmdkImage;
@@ -850,12 +850,12 @@ impl VfsScanner {
                 }
             }
             VfsType::Udif => {
-                let mut udif_file: UdifFile = UdifFile::new();
+                let mut udif_image: UdifImage = UdifImage::new();
 
-                match UdifFileSystem::open_file(&mut udif_file, file_system, path) {
+                match UdifFileSystem::open_image(&mut udif_image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
+                        keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");
                         return Err(error);
                     }
                 }
@@ -868,7 +868,7 @@ impl VfsScanner {
                 ) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to scan UDIF file");
+                        keramics_core::error_trace_add_frame!(error, "Unable to scan UDIF image");
                         return Err(error);
                     }
                 }

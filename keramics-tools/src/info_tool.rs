@@ -438,7 +438,8 @@ fn main() -> ExitCode {
             FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
-            FormatIdentifier::Udif => UdifInfo::print_file(&data_stream),
+            // TODO: add support for individual UDIF segment file.
+            FormatIdentifier::Udif => UdifInfo::print_image(&arguments.source),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             // TODO: add support for VHDX image.

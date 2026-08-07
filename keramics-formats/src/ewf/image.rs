@@ -299,7 +299,7 @@ impl EwfImage {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!("Unable to open segment file: {}", segment_file_name)
+                    format!("Unable to read segment file: {}", segment_file_name)
                 );
                 return Err(error);
             }
@@ -764,7 +764,7 @@ impl EwfImage {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to open segment file: {}", segment_file_name)
+                        format!("Unable to read segment file: {}", segment_file_name)
                     );
                     return Err(error);
                 }
@@ -1208,11 +1208,10 @@ mod tests {
 
     #[test]
     fn test_get_segment_file_name() -> Result<(), ErrorTrace> {
-        let name: String = EwfImage::get_segment_file_name(
-            &String::from("image"),
-            1,
-            &EwfNamingSchema::E01UpperCase,
-        )?;
+        let base_name: String = String::from("image");
+
+        let name: String =
+            EwfImage::get_segment_file_name(&base_name, 1, &EwfNamingSchema::E01UpperCase)?;
         assert_eq!(name, "image.E01");
 
         Ok(())

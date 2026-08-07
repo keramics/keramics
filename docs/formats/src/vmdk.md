@@ -727,7 +727,7 @@ TODO: complete section
 | 44 | 16 | | Unknown (UUID?) |
 | 60 | ... | | Unknown (empty values?) |
 
-## Corruption scenarios
+## Format edge cases and corruption scenarios
 
 The total size specified by the number of grain table entries is lager than
 size specified by the maximum number of sectors. Seen in VMDK images generated

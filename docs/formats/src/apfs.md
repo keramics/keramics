@@ -2065,7 +2065,7 @@ TODO: complete this section.
 
 <!-- rumdl-enable MD033 MD056 -->
 
-## Corruption scenarios
+## Format edge cases and corruption scenarios
 
 ### Container key bag is hardware encrypted but volume is not encrypted
 

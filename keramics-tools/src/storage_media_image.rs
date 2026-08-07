@@ -22,7 +22,7 @@ use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
-use keramics_formats::udif::UdifFile;
+use keramics_formats::udif::UdifImage;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
@@ -51,7 +51,7 @@ pub enum StorageMediaImage {
         splitraw_image: Arc<RwLock<SplitRawImage>>,
     },
     Udif {
-        udif_file: Arc<RwLock<UdifFile>>,
+        udif_image: Arc<RwLock<UdifImage>>,
     },
     Vhd {
         vhd_image_layer: VhdImageLayer,
@@ -103,7 +103,7 @@ impl StorageMediaImage {
             Self::SparseBundle { sparsebundle_image } => sparsebundle_image.clone(),
             Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
             Self::SplitRaw { splitraw_image } => splitraw_image.clone(),
-            Self::Udif { udif_file } => udif_file.clone(),
+            Self::Udif { udif_image } => udif_image.clone(),
             Self::Vhd {
                 vhd_image_layer, ..
             } => vhd_image_layer.clone(),
@@ -169,7 +169,7 @@ impl StorageMediaImage {
                 FormatIdentifier::Pdi => Self::open_pdi_image(path),
                 FormatIdentifier::Qcow => Self::open_qcow_image(path),
                 FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
-                FormatIdentifier::Udif => Self::open_udif_file(path),
+                FormatIdentifier::Udif => Self::open_udif_image(path),
                 FormatIdentifier::Vhd => Self::open_vhd_image(path),
                 FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
                 FormatIdentifier::Vmdk => Self::open_vmdk_image(path),
@@ -449,33 +449,48 @@ impl StorageMediaImage {
         })
     }
 
-    /// Opens an UDIF file.
-    fn open_udif_file(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
-        let data_stream: DataStreamReference = match open_os_data_stream(path) {
-            Ok(data_stream) => data_stream,
+    /// Opens an UDIF image.
+    fn open_udif_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
+            Ok(result) => result,
             Err(mut error) => {
                 // TODO: get printable version of path instead of using display().
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!("Unable to open data stream: {}", path.display())
+                    format!(
+                        "Unable to determine base path and file name of path: {}",
+                        path.display()
+                    )
                 );
                 return Err(error);
             }
         };
-        let mut udif_file: UdifFile = UdifFile::new();
-
-        match udif_file.read_data_stream(&data_stream) {
-            Ok(_) => {}
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to read UDIF file from data stream"
+                    format!(
+                        "Unable to create file resolver for path: {}",
+                        base_path.display()
+                    )
                 );
+                return Err(error);
+            }
+        };
+        let mut udif_image: UdifImage = UdifImage::new();
+
+        let path_component: PathComponent = PathComponent::from(file_name);
+
+        match udif_image.open(&file_resolver, &path_component) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");
                 return Err(error);
             }
         }
         Ok(Self::Udif {
-            udif_file: Arc::new(RwLock::new(udif_file)),
+            udif_image: Arc::new(RwLock::new(udif_image)),
         })
     }
 

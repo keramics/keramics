@@ -11,29 +11,30 @@
  * under the License.
  */
 
-mod block_range;
-mod block_table;
-mod block_table_entry;
-mod block_table_header;
-mod block_table_reader;
-pub(crate) mod constants;
-mod encrypted_file_footer;
-mod encrypted_file_header;
-mod enums;
-mod file;
-mod file_footer;
-mod image;
-mod item_descriptor;
-mod resource_descriptor;
-mod resource_fork_header;
-mod resource_map;
-mod resource_map_entry;
-mod resource_map_header;
-mod resource_map_item;
-mod resource_map_value;
-mod segment_range;
-mod segment_stream;
+/// Universal Disk Image Format (UDIF) segment range.
+#[derive(Debug)]
+pub struct UdifSegmentRange {
+    /// Segment offset.
+    pub segment_offset: u64,
 
-pub use enums::UdifCompressionMethod;
-pub use file::UdifFile;
-pub use image::UdifImage;
+    /// Segment number.
+    pub segment_number: u32,
+
+    /// Data offset.
+    pub data_offset: u64,
+
+    /// Size.
+    pub size: u64,
+}
+
+impl UdifSegmentRange {
+    /// Creates a new segment range.
+    pub fn new(segment_offset: u64, segment_number: u32, data_offset: u64, size: u64) -> Self {
+        Self {
+            segment_offset,
+            segment_number,
+            data_offset,
+            size,
+        }
+    }
+}

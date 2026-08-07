@@ -23,7 +23,13 @@ An UDIF image can consists of one or more segment files, where:
 
 * the first segment file is named: "image.dmg"
 * successive segment files are named: "image.###.dmgpart", where "###" represents a numeric value
-  starting with 2, e.g. "image.002.dmgpart"
+  starting with 2 with 0 padding, e.g. "image.002.dmgpart". Segment files after 999 are assumed to
+  be named without the 0 padding, e.g. "image.1234.dmgpart".
+
+The data forks of the segment files are used as a contiguous data stream. A compressed block can
+be stored across multiple segment files.
+
+Only the first segment file contains a resource fork or XML plist.
 
 ### Terminology
 
@@ -47,8 +53,7 @@ An uncompressed UDIF image consist of:
 A compressed UDIF image consist of:
 
 * Data fork
-* Optional resource fork
-* Optional XML plist
+* Optional resource fork or XML plist
 * [File footer](#file_footer) at the end of the image file
 
 ### Encrypted image format
@@ -92,9 +97,9 @@ and consists of:
 | 12 | 4 | | [Image flags](#image_flags) |
 | 16 | 8 | | Segment logical offset |
 | 24 | 8 | | Data fork offset, where the offset is relative from the start of the image file |
-| 32 | 8 | | Data fork size |
+| 32 | 8 | | Data fork size, in number of bytes |
 | 40 | 8 | | Resource fork offset, where the offset is relative from the start of the image file |
-| 48 | 8 | | Resource fork size |
+| 48 | 8 | | Resource fork size, in number of bytes |
 | 56 | 4 | | Segment number, where 1 represents the first segment and contains 0 if not set |
 | 60 | 4 | | Number of segments, which contains 0 if not set |
 | 64 | 16 | | Segment set identifier, which contains an UUID |
@@ -334,20 +339,25 @@ The resource-fork dictionary contains the following key-value pairs:
 
 | Identifier | Description |
 | --- | --- |
-| blkx | array of dictionaries |
-| plst | array of dictionaries |
+| blkx | array of dictionaries | [Block table](#udif_block_table) (or block extents) values
+| LPic | array of dictionaries | Optional values related to license information
+| plst | array of dictionaries | Values related to image properties
+| STR# | array of dictionaries | Optional values related to license information
+| TEXT | array of dictionaries | Optional values related to license information
 
-### XML plist blkx array entry
+### XML plist array entry
 
-A blkx array entry contains the following key-value pairs:
+An array entry contains the following key-value pairs:
 
 | Identifier | Description |
 | --- | --- |
 | Attributes | string that contains a hexadecimal formatted integer value |
 | CFName | string |
-| Data | string that contains base-64 encoded data of a [block table](#udif_block_table) |
+| Data | string that contains base-64 encoded data |
 | ID | string that contains a decimal formatted integer value |
 | Name | string |
+
+> Note the the blkx array appears the only one that uses CFName.
 
 ## Block table {#udif_block_table}
 
@@ -368,13 +378,8 @@ The block table header is 204 bytes in size and consists of:
 | 16 | 8 | | Number of sectors |
 | 24 | 8 | | Unknown (DataOffset), which seems to be always 0 |
 | 32 | 4 | | Unknown (BuffersNeeded) |
-| 36 | 4 | | Unknown (BlockDescriptors). Does this value correspond to the number of block table entries? |
-| 40 | 4 | 0 | Unknown (reserved) |
-| 44 | 4 | 0 | Unknown (reserved) |
-| 48 | 4 | 0 | Unknown (reserved) |
-| 52 | 4 | 0 | Unknown (reserved) |
-| 56 | 4 | 0 | Unknown (reserved) |
-| 60 | 4 | 0 | Unknown (reserved) |
+| 36 | 4 | | Unknown (BlockDescriptors) |
+| 40 | 6 x 4 = 24 | 0 | Unknown (reserved) |
 | 64 | 4 | | Checksum type |
 | 68 | 4 | | Checksum size |
 | 72 | 128 | | Checksum |
@@ -387,10 +392,10 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | [Entry type](#udif_block_table_entry_types) |
-| 4 | 4 | | Unknown (comment) |
+| 4 | 4 | | Unknown (comment?) |
 | 8 | 8 | | Start sector, which contains the sector number relative to the start of the start sector of the block table |
 | 16 | 8 | | Number of sectors |
-| 24 | 8 | | Data offset, which contains the byte offset relative to the start of the UDIF image file |
+| 24 | 8 | | Data offset, which contains the byte offset relative to the start of the segment data stream |
 | 32 | 8 | | Data size, which contain the number of bytes of data stored, which is 0 for sparse data |
 
 #### UDIF block table entry types {#udif_block_table_entry_types}
@@ -412,14 +417,6 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | 0xffffffff | | Block table entries terminator |
 
 ## UDIF comment
-
-TODO: complete section
-
-## UDIF data fork
-
-TODO: complete section
-
-## UDIF resource fork
 
 TODO: complete section
 
@@ -690,3 +687,18 @@ Defined in cssmapple.h
 | 40 | CSSM_ALGMODE_PKCS1_EMSA_V15 | |
 | 41 | CSSM_ALGMODE_ISO_9796 | |
 | 42 | CSSM_ALGMODE_X9_31 | |
+
+## Format edge cases and corruption scenarios
+
+### Non-sequential segment files
+
+It is currently unknown if non-sequential segment files are supported.
+
+### XML plist and resource fork both in use
+
+The XML plist and resource fork could be used simultaneously, allowing for a single UDIF to
+contain multiple images.
+
+### XML plist and/or resource fork in non-first segment files
+
+The XML plist and/or resource fork could be used in non-first segment files.

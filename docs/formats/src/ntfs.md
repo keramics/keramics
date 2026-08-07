@@ -2043,7 +2043,7 @@ not updated. For now the latter is assumed.
 | 0x10000000 | | Unknown (Is directory or has $I30 index? Note that an $Extend directory without this flag has been observed) |
 | 0x20000000 | | Is index view |
 
-## Corruption scenarios {#corruption_scenarios}
+## Format edge cases and corruption scenarios {#corruption_scenarios}
 
 ### Data steam with inconsistent data flags
 

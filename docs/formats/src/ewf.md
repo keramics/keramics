@@ -2345,7 +2345,7 @@ containing the hash values.
 
 EWF-X uses a random based version of the GUID
 
-## Corruption scenarios
+## Format edge cases and corruption scenarios
 
 This chapter contains several corruption scenarios that have been encountered
 "in the wild".

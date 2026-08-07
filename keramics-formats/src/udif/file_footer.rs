@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
+use keramics_types::{Uuid, bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
 
@@ -32,7 +32,7 @@ use super::constants::*;
         field(name = "resource_fork_size", data_type = "u64"),
         field(name = "segment_number", data_type = "u32"),
         field(name = "number_of_segments", data_type = "u32"),
-        field(name = "segment_set_identifier", data_type = "uuid"),
+        field(name = "segment_set_identifier", data_type = "Uuid"),
         field(name = "data_checksum_type", data_type = "u32"),
         field(name = "data_checksum_size", data_type = "u32"),
         field(name = "data_checksum", data_type = "[u8; 128]"),
@@ -53,6 +53,9 @@ pub struct UdifFileFooter {
     /// Format version.
     pub format_version: u32,
 
+    /// Segment offset.
+    pub segment_offset: u64,
+
     /// Data fork offset.
     pub data_fork_offset: u64,
 
@@ -65,8 +68,14 @@ pub struct UdifFileFooter {
     /// Resource fork size.
     pub resource_fork_size: u64,
 
+    /// Segment number.
+    pub segment_number: u32,
+
     /// Number of segments.
     pub number_of_segments: u32,
+
+    /// Segment set identifier.
+    pub segment_set_identifier: Uuid,
 
     /// Plist offset.
     pub plist_offset: u64,
@@ -80,11 +89,14 @@ impl UdifFileFooter {
     pub fn new() -> Self {
         Self {
             format_version: 0,
+            segment_offset: 0,
             data_fork_offset: 0,
             data_fork_size: 0,
             resource_fork_offset: 0,
             resource_fork_size: 0,
+            segment_number: 0,
             number_of_segments: 0,
+            segment_set_identifier: Uuid::new(),
             plist_offset: 0,
             plist_size: 0,
         }
@@ -106,11 +118,14 @@ impl UdifFileFooter {
                 self.format_version
             )));
         }
+        self.segment_offset = bytes_to_u64_be!(data, 16);
         self.data_fork_offset = bytes_to_u64_be!(data, 24);
         self.data_fork_size = bytes_to_u64_be!(data, 32);
         self.resource_fork_offset = bytes_to_u64_be!(data, 40);
         self.resource_fork_size = bytes_to_u64_be!(data, 48);
+        self.segment_number = bytes_to_u32_be!(data, 56);
         self.number_of_segments = bytes_to_u32_be!(data, 60);
+        self.segment_set_identifier = Uuid::from_be_bytes(&data[64..80]);
         self.plist_offset = bytes_to_u64_be!(data, 216);
         self.plist_size = bytes_to_u64_be!(data, 224);
 
@@ -180,7 +195,12 @@ mod tests {
         assert_eq!(test_struct.data_fork_size, 8236);
         assert_eq!(test_struct.resource_fork_offset, 0);
         assert_eq!(test_struct.resource_fork_size, 0);
+        assert_eq!(test_struct.segment_number, 0);
         assert_eq!(test_struct.number_of_segments, 0);
+        assert_eq!(
+            test_struct.segment_set_identifier.to_string(),
+            "00000000-0000-0000-0000-000000000000"
+        );
         assert_eq!(test_struct.plist_offset, 8236);
         assert_eq!(test_struct.plist_size, 8034);
 
@@ -225,6 +245,7 @@ mod tests {
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.format_version, 4);
+        assert_eq!(test_struct.segment_offset, 0);
         assert_eq!(test_struct.data_fork_offset, 0);
         assert_eq!(test_struct.data_fork_size, 8236);
         assert_eq!(test_struct.resource_fork_offset, 0);
