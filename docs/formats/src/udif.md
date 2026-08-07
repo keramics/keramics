@@ -339,11 +339,11 @@ The resource-fork dictionary contains the following key-value pairs:
 
 | Identifier | Description |
 | --- | --- |
-| blkx | array of dictionaries | [Block table](#udif_block_table) (or block extents) values
-| LPic | array of dictionaries | Optional values related to license information
-| plst | array of dictionaries | Values related to image properties
-| STR# | array of dictionaries | Optional values related to license information
-| TEXT | array of dictionaries | Optional values related to license information
+| blkx | array of dictionaries, which contains [Block table](#udif_block_table) (or block extents) values |
+| LPic | optional array of dictionaries, which contains values related to license information |
+| plst | array of dictionaries, which contains values related to image properties |
+| STR# | optional array of dictionaries, which contains values related to license information |
+| TEXT | optional array of dictionaries, which contains values related to license information |
 
 ### XML plist array entry
 
