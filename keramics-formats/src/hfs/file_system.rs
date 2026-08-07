@@ -83,6 +83,16 @@ impl HfsFileSystem {
         self.embedded_volume_extent.as_ref()
     }
 
+    /// Retrieves the format.
+    pub fn get_format(&self) -> &HfsFormat {
+        &self.format
+    }
+
+    /// Retrieves the volume label.
+    pub fn get_volume_label(&self) -> Option<&HfsString> {
+        self.volume_label.as_ref()
+    }
+
     /// Retrieves the file entry for a specific identifier (CNID).
     pub fn get_file_entry_by_identifier(
         &self,
@@ -173,11 +183,6 @@ impl HfsFileSystem {
         Ok(Some(file_entry))
     }
 
-    /// Retrieves the format.
-    pub fn get_format(&self) -> &HfsFormat {
-        &self.format
-    }
-
     /// Retrieves the root directory (file entry).
     pub fn get_root_directory(&self) -> Result<HfsFileEntry, ErrorTrace> {
         match self.get_file_entry_by_identifier(HFS_ROOT_DIRECTORY_IDENTIFIER) {
@@ -197,11 +202,6 @@ impl HfsFileSystem {
                 Err(error)
             }
         }
-    }
-
-    /// Retrieves the volume label.
-    pub fn get_volume_label(&self) -> Option<&HfsString> {
-        self.volume_label.as_ref()
     }
 
     /// Reads the attributes file.
@@ -569,6 +569,8 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_encodings::CharacterEncoding;
+    use keramics_types::{ByteString, Utf16String};
 
     use crate::tests::get_test_data_path;
 
@@ -607,6 +609,21 @@ mod tests {
     }
 
     #[test]
+    fn test_get_volume_label_with_hfs() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let volume_label: Option<&HfsString> = file_system.get_volume_label();
+        assert_eq!(
+            volume_label,
+            Some(HfsString::ByteString(
+                ByteString::from_string_with_encoding(&CharacterEncoding::MacRoman, "hfs_test")?
+            ))
+            .as_ref()
+        );
+        Ok(())
+    }
+
+    #[test]
     fn test_get_file_entry_by_identifier_with_hfs() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
 
@@ -628,8 +645,6 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for get_volume_label
 
     #[test]
     fn test_read_data_stream_with_hfs() -> Result<(), ErrorTrace> {
@@ -671,19 +686,6 @@ mod tests {
     // Tests with HFS+.
 
     #[test]
-    fn test_get_file_entry_by_identifier_with_hfsplus() -> Result<(), ErrorTrace> {
-        let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
-
-        let file_entry: HfsFileEntry = file_system.get_file_entry_by_identifier(21)?.unwrap();
-        assert_eq!(file_entry.identifier, 21);
-
-        let result: Option<HfsFileEntry> = file_system.get_file_entry_by_identifier(0xffffffff)?;
-        assert!(result.is_none());
-
-        Ok(())
-    }
-
-    #[test]
     fn test_get_embedded_volume_extent_with_hfsplus() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
@@ -705,6 +707,31 @@ mod tests {
     }
 
     #[test]
+    fn test_get_volume_label_with_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let volume_label: Option<&HfsString> = file_system.get_volume_label();
+        assert_eq!(
+            volume_label,
+            Some(HfsString::Utf16String(Utf16String::from("hfsplus_test"))).as_ref()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_identifier_with_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let file_entry: HfsFileEntry = file_system.get_file_entry_by_identifier(21)?.unwrap();
+        assert_eq!(file_entry.identifier, 21);
+
+        let result: Option<HfsFileEntry> = file_system.get_file_entry_by_identifier(0xffffffff)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_root_directory_with_hfsplus() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
@@ -713,8 +740,6 @@ mod tests {
 
         Ok(())
     }
-
-    // TODO: add tests for get_volume_label
 
     #[test]
     fn test_read_data_stream_with_hfsplus() -> Result<(), ErrorTrace> {

@@ -549,6 +549,7 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_datetime::PosixTime32;
 
     use crate::tests::get_test_data_path;
 
@@ -564,6 +565,16 @@ mod tests {
     }
 
     #[test]
+    fn test_get_block_size() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let block_size: u32 = file_system.get_block_size();
+        assert_eq!(block_size, 1024);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_format_version() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
@@ -574,14 +585,78 @@ mod tests {
     }
 
     #[test]
-    fn test_get_feature_flags() -> Result<(), ErrorTrace> {
+    fn test_get_compatible_feature_flags() -> Result<(), ErrorTrace> {
         let file_system: ExtFileSystem = get_file_system()?;
 
         let feature_flags: u32 = file_system.get_compatible_feature_flags();
         assert_eq!(feature_flags, 0x00000038);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_incompatible_feature_flags() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
         let feature_flags: u32 = file_system.get_incompatible_feature_flags();
         assert_eq!(feature_flags, 0x00000002);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_size() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let inode_size: u16 = file_system.get_inode_size();
+        assert_eq!(inode_size, 128);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_last_mount_time() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let last_mount_time: &DateTime = file_system.get_last_mount_time();
+        assert_eq!(
+            last_mount_time,
+            &DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977482
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_last_written_time() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let last_written_time: &DateTime = file_system.get_last_written_time();
+        assert_eq!(
+            last_written_time,
+            &DateTime::PosixTime32(PosixTime32 {
+                timestamp: 1735977482
+            })
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_inodes() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
+
+        let number_of_inodes: u32 = file_system.get_number_of_inodes();
+        assert_eq!(number_of_inodes, 1024);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_read_only_compatible_feature_flags() -> Result<(), ErrorTrace> {
+        let file_system: ExtFileSystem = get_file_system()?;
 
         let feature_flags: u32 = file_system.get_read_only_compatible_feature_flags();
         assert_eq!(feature_flags, 0x00000003);

@@ -12,9 +12,9 @@
  */
 
 use keramics_core::ErrorTrace;
-// use keramics_datetime::ApfsTime;
+use keramics_datetime::DateTime;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{Uuid, bytes_to_u32_le, bytes_to_u64_le};
+use keramics_types::{ByteString, Uuid, bytes_to_u32_le, bytes_to_u64_le};
 
 use super::change_information::ApfsChangeInformation;
 use super::constants::*;
@@ -28,7 +28,7 @@ use super::object_header::ApfsObjectHeader;
         byte_order = "little",
         field(name = "object_header", data_type = "Struct<ApfsObjectHeader; 32>"),
         field(name = "signature", data_type = "ByteString<4>"),
-        field(name = "unknown1", data_type = "u32"),
+        field(name = "file_system_index", data_type = "u32"),
         field(name = "feature_flags", data_type = "u64", format = "hex"),
         field(
             name = "read_only_compatible_feature_flags",
@@ -63,8 +63,8 @@ use super::object_header::ApfsObjectHeader;
         field(name = "file_system_root_object_identifier", data_type = "u64"),
         field(name = "extent_reference_tree_block_number", data_type = "u64"),
         field(name = "snapshot_metadata_tree_block_number", data_type = "u64"),
-        field(name = "unknown7", data_type = "u64"),
-        field(name = "unknown8", data_type = "u64"),
+        field(name = "rollback_transaction_identifier", data_type = "u64"),
+        field(name = "rollback_object_identifier", data_type = "u64"),
         field(name = "next_file_system_object_identifier", data_type = "u64"),
         field(name = "number_of_files", data_type = "u64"),
         field(name = "number_of_directories", data_type = "u64"),
@@ -84,27 +84,30 @@ use super::object_header::ApfsObjectHeader;
             name = "modification_change_information",
             data_type = "[Struct<ApfsChangeInformation; 48>; 8]"
         ),
-        field(name = "volume_name", data_type = "ByteString<256>"),
+        field(name = "volume_label", data_type = "ByteString<256>"),
         field(name = "next_document_identifier", data_type = "u32"),
-        field(name = "unknown9", data_type = "u16"),
-        field(name = "unknown10", data_type = "u16"),
-        field(name = "unknown11", data_type = "u64"),
-        field(name = "unknown12", data_type = "u64"),
-        field(name = "unknown13", data_type = "u64"),
-        field(name = "unknown14", data_type = "u64"),
-        field(name = "unknown15", data_type = "u64"),
+        field(name = "volume_role_flags", data_type = "u16"),
+        field(name = "unknown1", data_type = "u16"),
+        field(name = "active_snapshot_transaction_identifier", data_type = "u64"),
+        field(name = "encryption_progress_state", data_type = "u64"),
+        field(name = "largest_clone_object_identifier", data_type = "u64"),
+        field(name = "largest_clone_transaction_identifier", data_type = "u64"),
+        field(
+            name = "extended_snapshot_metadata_object_identifier",
+            data_type = "u64"
+        ),
         field(
             name = "volume_group_identifier",
             data_type = "Uuid",
             byte_order = "big"
         ),
-        field(name = "unknown16", data_type = "u64"),
-        field(name = "unknown17", data_type = "u64"),
-        field(name = "unknown18", data_type = "u32", format = "hex"),
-        field(name = "unknown19", data_type = "u32", format = "hex"),
-        field(name = "unknown20", data_type = "u64"),
-        field(name = "unknown21", data_type = "[u8; 80]"),
-        field(name = "unknown22", data_type = "[u8; 2960]"),
+        field(name = "integrity_metadata_object_identifier", data_type = "u64"),
+        field(name = "extent_tree_object_identifier", data_type = "u64"),
+        field(name = "extent_tree_object_type", data_type = "u32", format = "hex"),
+        field(name = "unknown2", data_type = "u32", format = "hex"),
+        field(name = "unknown3", data_type = "u64"),
+        field(name = "unknown4", data_type = "[u8; 80]"),
+        field(name = "unknown5", data_type = "[u8; 2960]"),
     ),
     methods("debug_read_data", "read_at_position")
 )]
@@ -127,6 +130,9 @@ pub struct ApfsVolumeSuperblock {
 
     /// Volume identifier.
     pub volume_identifier: Uuid,
+
+    /// Volume label.
+    pub volume_label: ByteString,
 }
 
 impl ApfsVolumeSuperblock {
@@ -139,6 +145,7 @@ impl ApfsVolumeSuperblock {
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
             volume_identifier: Uuid::new(),
+            volume_label: ByteString::new(),
         }
     }
 
@@ -184,6 +191,7 @@ impl ApfsVolumeSuperblock {
         self.read_only_compatible_feature_flags = bytes_to_u64_le!(data, 48);
         self.incompatible_feature_flags = bytes_to_u64_le!(data, 56);
         self.volume_identifier = Uuid::from_be_bytes(&data[240..256]);
+        self.volume_label.read_data(&data[704..960]);
 
         Ok(())
     }
@@ -514,6 +522,8 @@ mod tests {
             test_struct.volume_identifier.to_string(),
             "b0a66853-26ca-4885-9c31-7644390cd3aa"
         );
+        assert_eq!(test_struct.volume_label, ByteString::from("SingleVolume"));
+
         Ok(())
     }
 
@@ -586,6 +596,8 @@ mod tests {
             test_struct.volume_identifier.to_string(),
             "b0a66853-26ca-4885-9c31-7644390cd3aa"
         );
+        assert_eq!(test_struct.volume_label, ByteString::from("SingleVolume"));
+
         Ok(())
     }
 }

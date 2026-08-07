@@ -15,7 +15,7 @@ use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
-use keramics_types::Uuid;
+use keramics_types::{ByteString, Uuid};
 
 use crate::formatters::ByteSize;
 
@@ -129,8 +129,6 @@ impl fmt::Display for ApfsContainerInfo {
     /// Formats container information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Apple File System (APFS) information:")?;
-        writeln!(formatter)?;
-        writeln!(formatter, "Container:")?;
 
         println!("    Features\t\t\t\t\t: 0x{:016x}", self.feature_flags);
         let flags_info: ApfsContainerFeatureFlagsInfo =
@@ -190,24 +188,6 @@ impl fmt::Display for ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo {
 
         Ok(())
     }
-}
-
-/// Apple File System (APFS) volume information.
-struct ApfsVolumeInfo {
-    /// The volume index.
-    pub index: usize,
-
-    /// Identifier.
-    pub identifier: Uuid,
-
-    /// Features flags.
-    pub feature_flags: u64,
-
-    /// Read-only compatible feature flags.
-    pub read_only_compatible_feature_flags: u64,
-
-    /// Incompatible feature flags.
-    pub incompatible_feature_flags: u64,
 }
 
 /// Apple File System (APFS) volume feature flags information.
@@ -322,12 +302,34 @@ impl fmt::Display for ApfsVolumeIncompatibilityFeatureFlagsInfo {
     }
 }
 
+/// Apple File System (APFS) volume information.
+struct ApfsVolumeInfo {
+    /// The volume index.
+    pub index: usize,
+
+    /// Identifier.
+    pub identifier: Uuid,
+
+    /// Volume label.
+    pub volume_label: Option<ByteString>,
+
+    /// Features flags.
+    pub feature_flags: u64,
+
+    /// Read-only compatible feature flags.
+    pub read_only_compatible_feature_flags: u64,
+
+    /// Incompatible feature flags.
+    pub incompatible_feature_flags: u64,
+}
+
 impl ApfsVolumeInfo {
     /// Creates new volume information.
     fn new() -> Self {
         Self {
             index: 0,
             identifier: Uuid::new(),
+            volume_label: None,
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
@@ -364,6 +366,12 @@ impl fmt::Display for ApfsVolumeInfo {
         println!("{}", flags_info);
 
         writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
+
+        let volume_label: String = match &self.volume_label {
+            Some(volume_label) => volume_label.to_string(),
+            None => String::new(),
+        };
+        writeln!(formatter, "    Volume label\t\t\t\t: {}", volume_label)?;
 
         writeln!(formatter)
     }
@@ -418,6 +426,7 @@ impl ApfsInfo {
 
         volume_information.index = volume_index;
         volume_information.identifier = apfs_volume.get_identifier().clone();
+        volume_information.volume_label = apfs_volume.get_volume_label().cloned();
         volume_information.feature_flags = apfs_volume.get_feature_flags();
         volume_information.read_only_compatible_feature_flags =
             apfs_volume.get_read_only_compatible_feature_flags();
@@ -514,6 +523,10 @@ mod tests {
         assert_eq!(
             test_struct.identifier.to_string(),
             "33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2"
+        );
+        assert_eq!(
+            test_struct.volume_label,
+            Some(ByteString::from("apfs_test"))
         );
         assert_eq!(test_struct.feature_flags, 0x00000002);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);

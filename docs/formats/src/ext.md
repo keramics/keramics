@@ -1179,7 +1179,7 @@ TODO: complete section
 
 > Note that the excluded bitmap is used for snapshots.
 
-## Corruption scenarios {#corruption_scenarios}
+## Format edge cases and corruption scenarios {#corruption_scenarios}
 
 ### File entry with invalid extents header signature
 

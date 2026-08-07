@@ -12,14 +12,16 @@
  */
 
 use std::fmt;
+use std::path::PathBuf;
 
-use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::udif::{UdifCompressionMethod, UdifFile};
+use keramics_core::ErrorTrace;
+use keramics_formats::udif::{UdifCompressionMethod, UdifImage};
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
 use crate::formatters::ByteSize;
 
-/// Information about an Universal Disk Image Format (UDIF) file.
-struct UdifFileInfo {
+/// Information about an Universal Disk Image Format (UDIF) image.
+struct UdifImageInfo {
     /// Compression method.
     pub compression_method: UdifCompressionMethod,
 
@@ -30,7 +32,7 @@ struct UdifFileInfo {
     pub bytes_per_sector: u16,
 }
 
-impl UdifFileInfo {
+impl UdifImageInfo {
     const COMPRESSION_METHODS: &[(UdifCompressionMethod, &'static str); 6] = &[
         (UdifCompressionMethod::Adc, "ADC"),
         (UdifCompressionMethod::Bzip2, "bzip2"),
@@ -57,7 +59,7 @@ impl UdifFileInfo {
     }
 }
 
-impl fmt::Display for UdifFileInfo {
+impl fmt::Display for UdifImageInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Universal Disk Image Format (UDIF) information:")?;
@@ -86,43 +88,64 @@ impl fmt::Display for UdifFileInfo {
 pub struct UdifInfo {}
 
 impl UdifInfo {
-    /// Retrieves the file information.
-    fn get_file_information(udif_file: &UdifFile) -> UdifFileInfo {
-        let mut file_information: UdifFileInfo = UdifFileInfo::new();
+    /// Retrieves the image information.
+    fn get_image_information(udif_image: &UdifImage) -> UdifImageInfo {
+        let mut image_information: UdifImageInfo = UdifImageInfo::new();
 
-        file_information.compression_method = udif_file.compression_method.clone();
-        file_information.media_size = udif_file.media_size;
-        file_information.bytes_per_sector = udif_file.bytes_per_sector;
+        image_information.compression_method = udif_image.get_compression_method().clone();
+        image_information.media_size = udif_image.get_media_size();
+        image_information.bytes_per_sector = udif_image.get_bytes_per_sector();
 
-        file_information
+        image_information
     }
 
-    /// Opens a file.
-    fn open_file(data_stream: &DataStreamReference) -> Result<UdifFile, ErrorTrace> {
-        let mut udif_file: UdifFile = UdifFile::new();
+    /// Opens an image.
+    fn open_image(path_buf: &PathBuf) -> Result<UdifImage, ErrorTrace> {
+        let mut base_path: PathBuf = path_buf.clone();
+        base_path.pop();
 
-        match udif_file.read_data_stream(data_stream) {
-            Ok(_) => {}
+        let file_resolver: FileResolverReference = match open_os_file_resolver(&base_path) {
+            Ok(file_resolver) => file_resolver,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
-                return Err(error);
-            }
-        }
-        Ok(udif_file)
-    }
-
-    /// Prints information about a file.
-    pub fn print_file(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
-        let udif_file: UdifFile = match Self::open_file(data_stream) {
-            Ok(udif_file) => udif_file,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open file");
+                keramics_core::error_trace_add_frame!(error, "Unable to create file resolver");
                 return Err(error);
             }
         };
-        let file_information: UdifFileInfo = Self::get_file_information(&udif_file);
+        let mut udif_image: UdifImage = UdifImage::new();
 
-        print!("{}", file_information);
+        let file_name: PathComponent = match path_buf.file_name() {
+            Some(file_name) => match file_name.to_str() {
+                Some(file_name) => PathComponent::from(file_name),
+                None => {
+                    return Err(keramics_core::error_trace_new!("Unsupported file name"));
+                }
+            },
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing file name"));
+            }
+        };
+        match udif_image.open(&file_resolver, &file_name) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");
+                return Err(error);
+            }
+        }
+        Ok(udif_image)
+    }
+
+    /// Prints information about an image.
+    pub fn print_image(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
+        let udif_image: UdifImage = match Self::open_image(path_buf) {
+            Ok(udif_image) => udif_image,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open image");
+                return Err(error);
+            }
+        };
+        let image_information: UdifImageInfo = Self::get_image_information(&udif_image);
+
+        print!("{}", image_information);
 
         Ok(())
     }
@@ -132,16 +155,13 @@ impl UdifInfo {
 mod tests {
     use super::*;
 
-    use std::path::PathBuf;
-
     use keramics_core::open_os_data_stream;
 
     #[test]
-    fn test_file_information_fmt() -> Result<(), ErrorTrace> {
+    fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let udif_file: UdifFile = UdifInfo::open_file(&data_stream)?;
-        let test_struct: UdifFileInfo = UdifInfo::get_file_information(&udif_file);
+        let udif_image: UdifImage = UdifInfo::open_image(&path_buf)?;
+        let test_struct: UdifImageInfo = UdifInfo::get_image_information(&udif_image);
 
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
@@ -158,11 +178,10 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_information() -> Result<(), ErrorTrace> {
+    fn test_get_image_information() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
-        let udif_file: UdifFile = UdifInfo::open_file(&data_stream)?;
-        let test_struct: UdifFileInfo = UdifInfo::get_file_information(&udif_file);
+        let udif_image: UdifImage = UdifInfo::open_image(&path_buf)?;
+        let test_struct: UdifImageInfo = UdifInfo::get_image_information(&udif_image);
 
         assert_eq!(test_struct.compression_method, UdifCompressionMethod::Zlib);
         assert_eq!(test_struct.media_size, 1964032);
@@ -171,6 +190,6 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_file
-    // TODO: add tests for print_file
+    // TODO: add tests for open_image
+    // TODO: add tests for print_image
 }

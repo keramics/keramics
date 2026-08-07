@@ -11,17 +11,15 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use std::io::SeekFrom;
+
+use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::block_table_entry::UdifBlockTableEntry;
 use super::block_table_header::UdifBlockTableHeader;
 
 /// Universal Disk Image Format (UDIF) block table.
 pub struct UdifBlockTable {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Start sector.
     pub start_sector: u64,
 
@@ -33,7 +31,6 @@ impl UdifBlockTable {
     /// Creates a new block table.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             start_sector: 0,
             entries: Vec::new(),
         }
@@ -41,58 +38,75 @@ impl UdifBlockTable {
 
     /// Reads the block table from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        let data_size: usize = data.len();
-        if data_size < 204 {
-            return Err(keramics_core::error_trace_new!("Unsupported data size"));
-        }
+        keramics_core::debug_trace_structure!(UdifBlockTableHeader::debug_read_data(data));
+
         let mut block_table_header: UdifBlockTableHeader = UdifBlockTableHeader::new();
 
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(UdifBlockTableHeader::debug_read_data(&data[0..204]));
-        }
-        match block_table_header.read_data(&data[0..204]) {
+        match block_table_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read block table header");
                 return Err(error);
             }
         }
+        let data_end_offset: usize = 204 + ((block_table_header.number_of_entries as usize) * 40);
+
+        if data_end_offset > data.len() {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid block table number of entries: {} value out of bounds",
+                block_table_header.number_of_entries
+            )));
+        }
         self.start_sector = block_table_header.start_sector;
 
         let mut data_offset: usize = 204;
 
-        for _ in 0..block_table_header.number_of_entries {
-            let data_end_offset: usize = data_offset + 40;
-            if data_end_offset > data_size {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid block table number of entries: {} value out of bounds",
-                    block_table_header.number_of_entries
-                )));
-            }
+        for entry_index in 0..block_table_header.number_of_entries {
+            keramics_core::debug_trace_structure!(UdifBlockTableEntry::debug_read_data(
+                &data[data_offset..]
+            ));
+
             let mut block_table_entry: UdifBlockTableEntry = UdifBlockTableEntry::new();
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(UdifBlockTableEntry::debug_read_data(
-                        &data[data_offset..data_end_offset],
-                    ));
-            }
-            match block_table_entry.read_data(&data[data_offset..data_end_offset]) {
+            match block_table_entry.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read block table entry"
+                        format!("Unable to read block table entry: {}", entry_index)
                     );
                     return Err(error);
                 }
             }
-            data_offset = data_end_offset;
+            data_offset += 40;
 
             self.entries.push(block_table_entry);
         }
         Ok(())
+    }
+
+    /// Reads the block table from a specific position in a data stream.
+    pub fn read_at_position(
+        &mut self,
+        data_stream: &DataStreamReference,
+        data_size: u32,
+        position: SeekFrom,
+    ) -> Result<(), ErrorTrace> {
+        // Note that 65536 is an arbitrary chosen limit.
+        if data_size < 204 || data_size > 65536 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Unsupported block table data size: {} value out of bounds",
+                data_size
+            )));
+        }
+        let mut data: Vec<u8> = vec![0; data_size as usize];
+
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
+
+        keramics_core::debug_trace_data!("UdifBlockTable", offset, &data, data_size);
+
+        self.read_data(&data)
     }
 }
 

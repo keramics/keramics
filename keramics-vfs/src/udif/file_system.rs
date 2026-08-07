@@ -13,10 +13,11 @@
 
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::Path;
-use keramics_formats::udif::UdifFile;
+use keramics_core::ErrorTrace;
+use keramics_formats::udif::UdifImage;
+use keramics_formats::{FileResolverReference, Path, PathComponent};
 
+use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
 use crate::types::VfsFileSystemReference;
 
@@ -25,7 +26,7 @@ use super::file_entry::UdifFileEntry;
 /// Universal Disk Image Format (UDIF) storage media image file system.
 pub struct UdifFileSystem {
     /// File.
-    file: Arc<RwLock<UdifFile>>,
+    file: Arc<RwLock<UdifImage>>,
 
     /// Number of layers.
     number_of_layers: usize,
@@ -37,7 +38,7 @@ impl UdifFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            file: Arc::new(RwLock::new(UdifFile::new())),
+            file: Arc::new(RwLock::new(UdifImage::new())),
             number_of_layers: 0,
         }
     }
@@ -71,10 +72,10 @@ impl UdifFileSystem {
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
         match self.file.read() {
-            Ok(udif_file) => Ok(udif_file.bytes_per_sector as u32),
+            Ok(udif_image) => Ok(udif_image.get_bytes_per_sector() as u32),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain read lock on UDIF file",
+                    "Unable to obtain read lock on UDIF image",
                     error
                 ));
             }
@@ -95,10 +96,10 @@ impl UdifFileSystem {
                     return Ok(None);
                 }
                 let media_size: u64 = match self.file.read() {
-                    Ok(udif_file) => udif_file.media_size,
+                    Ok(udif_image) => udif_image.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on UDIF file",
+                            "Unable to obtain read lock on UDIF image",
                             error
                         ));
                     }
@@ -142,10 +143,10 @@ impl UdifFileSystem {
 
         match self.file.write() {
             Ok(mut file) => {
-                match Self::open_file(&mut file, file_system, path) {
+                match Self::open_image(&mut file, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open UDIF file");
+                        keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");
                         return Err(error);
                     }
                 }
@@ -153,7 +154,7 @@ impl UdifFileSystem {
             }
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to obtain write lock on UDIF file",
+                    "Unable to obtain write lock on UDIF image",
                     error
                 ));
             }
@@ -161,29 +162,37 @@ impl UdifFileSystem {
         Ok(())
     }
 
-    /// Opens an UDIF file.
-    pub(crate) fn open_file(
-        file: &mut UdifFile,
+    /// Opens an UDIF image.
+    pub(crate) fn open_image(
+        image: &mut UdifImage,
         file_system: &VfsFileSystemReference,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
-        let data_stream: DataStreamReference = match file_system.get_data_stream_by_path(path) {
-            Ok(Some(data_stream)) => data_stream,
-            Ok(None) => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                return Err(error);
+        let parent_path: Path = path.new_with_parent_directory();
+
+        let file_resolver: FileResolverReference =
+            match new_vfs_file_resolver(file_system, parent_path) {
+                Ok(file_resolver) => file_resolver,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to create VFS file resolver"
+                    );
+                    return Err(error);
+                }
+            };
+        let file_name: &PathComponent = match path.file_name() {
+            Some(file_name) => file_name,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve file name"
+                ));
             }
         };
-        match file.read_data_stream(&data_stream) {
-            Ok(()) => {}
+        match image.open(&file_resolver, file_name) {
+            Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read UDIF file from data stream"
-                );
+                keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");
                 return Err(error);
             }
         }
@@ -308,5 +317,5 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for open_file
+    // TODO: add tests for open_image
 }

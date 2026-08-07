@@ -396,6 +396,109 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
+    fn get_container() -> Result<ApfsContainer, ErrorTrace> {
+        let mut container: ApfsContainer = ApfsContainer::new();
+
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        container.read_data_stream(&data_stream)?;
+
+        Ok(container)
+    }
+
+    #[test]
+    fn test_get_block_size() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let block_size: u32 = container.get_block_size();
+        assert_eq!(block_size, 4096);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_feature_flags() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let feature_flags: u64 = container.get_feature_flags();
+        assert_eq!(feature_flags, 0x00000000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let identifier: &Uuid = container.get_identifier();
+        assert_eq!(
+            identifier.to_string(),
+            "34d0674d-da87-4991-a3de-27eb13011c3e"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_incompatible_feature_flags() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let feature_flags: u64 = container.get_incompatible_feature_flags();
+        assert_eq!(feature_flags, 0x00000002);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_read_only_compatible_feature_flags() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let feature_flags: u64 = container.get_read_only_compatible_feature_flags();
+        assert_eq!(feature_flags, 0x00000000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_volumes() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let number_of_volumes: usize = container.get_number_of_volumes();
+        assert_eq!(number_of_volumes, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_volume_by_index() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let volume: ApfsVolume = container.get_volume_by_index(0)?;
+
+        let identifier: &Uuid = volume.get_identifier();
+        assert_eq!(
+            identifier.to_string(),
+            "33d13da9-f1c8-4d2a-b9c7-71ab9dbe5fe2"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_volumes() -> Result<(), ErrorTrace> {
+        let container: ApfsContainer = get_container()?;
+
+        let mut volumes_iterator: ApfsVolumesIterator = container.volumes();
+
+        let result: Option<Result<ApfsVolume, ErrorTrace>> = volumes_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<ApfsVolume, ErrorTrace>> = volumes_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {
         let mut container: ApfsContainer = ApfsContainer::new();
@@ -416,4 +519,6 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read_checkpoint_descriptor_area
 }

@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 use std::iter::Rev;
 use std::str::Chars;
@@ -355,7 +356,7 @@ impl SplitRawImage {
     }
 
     /// Reads media data based on the segment files.
-    fn read_data_from_segment(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
+    fn read_data_from_segments(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.current_offset;
@@ -398,6 +399,7 @@ impl SplitRawImage {
                     }
                 };
                 let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
+
                 let data_stream: DataStreamReference =
                     match self.file_resolver.get_data_stream(&path_components) {
                         Ok(Some(data_stream)) => data_stream,
@@ -427,10 +429,11 @@ impl SplitRawImage {
                         )));
                     }
                 };
-            let mut range_read_size: usize = read_size - data_offset;
+            let range_read_size: usize =
+                min(read_size - data_offset, range_remainder_size as usize);
 
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
+            if range_read_size == 0 {
+                break;
             }
             let data_end_offset: usize = data_offset + range_read_size;
 
@@ -475,10 +478,10 @@ impl DataStream for SplitRawImage {
         if (read_size as u64) > remaining_media_size {
             read_size = remaining_media_size as usize;
         }
-        let read_count: usize = match self.read_data_from_segment(&mut buf[..read_size]) {
+        let read_count: usize = match self.read_data_from_segments(&mut buf[..read_size]) {
             Ok(read_count) => read_count,
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read data from segment");
+                keramics_core::error_trace_add_frame!(error, "Unable to read data from segments");
                 return Err(error);
             }
         };
@@ -668,7 +671,7 @@ mod tests {
     }
 
     // TODO: add tests for read_segment_files
-    // TODO: add tests for read_data_from_segment
+    // TODO: add tests for read_data_from_segments
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {

@@ -1,7 +1,7 @@
 # Apple File System (APFS)
 
 The Apple File System (APFS) is a volume and file system mainly used on platforms such as Mac OS and
-iOS. APFS succeeds the [Hierarchical File System (HFS)](hfs.md) and was introduced in macOS High
+iOS. APFS supersedes the [Hierarchical File System (HFS)](hfs.md) and was introduced in macOS High
 Sierra (10.13) and iOS 10.3.
 
 ## Overview
@@ -413,14 +413,14 @@ The container superblock (nx_superblock_t) is 4096 bytes in size and consists of
 | 120 | 8 | | Checkpoint data area block number (nx_xp_data_base), where the block number is relative to the start of the container of the checkpoint data area if the MSB of nx_xp_data_blocks is not set |
 | 128 | 4 | | Next available index in the checkpoint descriptor area (nx_xp_desc_next) |
 | 132 | 4 | | Next available index in the checkpoint data area (nx_xp_data_next) |
-| 136 | 4 | | Start index in the checkpoint descriptor area used by the superblock (nx_xp_desc_index) |
-| 140 | 4 | | Number of blocks in the checkpoint descriptor area used by the superblock (nx_xp_desc_len) |
-| 144 | 4 | | Start index in the checkpoint data area used by the superblock (nx_xp_data_index) |
-| 148 | 4 | | Number of blocks in the checkpoint data area used by the superblock (nx_xp_data_len) |
+| 136 | 4 | | Index of the checkpoint in the checkpoint descriptor area (nx_xp_desc_index) |
+| 140 | 4 | | Size of the checkpoint in the checkpoint descriptor area, in number of blocks (nx_xp_desc_len) |
+| 144 | 4 | | Index of the checkpoint in the checkpoint data area (nx_xp_data_index) |
+| 148 | 4 | | Size of the checkpoint in the checkpoint data area, in number of blocks (nx_xp_data_len) |
 | 152 | 8 | | Space manager object identifier (nx_spaceman_oid), where the object identifier can be resolved in the [checkpoint map](#checkpoint_map) |
 | 160 | 8 | | Object map block number (nx_omap_oid), where the block number is relative to the start of the container of the [object map](#object_map) |
 | 168 | 8 | | Reaper object identifier (nx_reaper_oid), where the object identifier can be resolved in the [checkpoint map](#checkpoint_map) |
-| 176 | 4 | | Unknown (nx_test_type) |
+| 176 | 4 | | Unknown (reserved for testing) (nx_test_type) |
 | 180 | 4 | | Maximum number of volumes (nx_max_file_systems) supported by the container |
 | 184 | 100 x 8 = 800 | | Array of volume object identifiers (nx_fs_oid), which can be resolved to a "physical" location using the [object map](#object_map) |
 | 984 | 32 x 8 = 256 | | [Container counters](#container_counters) (nx_counters) |
@@ -428,24 +428,27 @@ The container superblock (nx_superblock_t) is 4096 bytes in size and consists of
 | 1240 | 8 | | Reserved data area block number (nx_blocked_out_base), which contains a block number relative to the start of the container |
 | 1248 | 8 | | Reserved data area number of blocks (nx_blocked_out_blocks) |
 | <td colspan="4">&nbsp;</td> |
-| 1256 | 8 | | Unknown (nx_evict_mapping_tree_oid) |
+| 1256 | 8 | | Eviction tree (physical) object identifier (nx_evict_mapping_tree_oid) |
 | 1264 | 8 | | [Container flags](#container_flags) (nx_flags) |
 | 1272 | 8 | | [EFI jumpstart](#efi_jumpstart) (physical) object identifier (nx_efi_jumpstart), which contains a block number relative to the start of the container |
 | 1280 | 16 | | Fusion set identifier (nx_fusion_uuid), which contains a big-endian UUID |
 | <td colspan="4">*[Container key bag](#key_bag) area (nx_keylocker)*</td> |
 | 1296 | 8 | | Container key bag area block number (nx_keybag_base), which contains a block number relative to the start of the container |
-| 1304 | 8 | | Contaner key bag area number of blocks (nx_keybag_blocks) |
+| 1304 | 8 | | Container key bag area number of blocks (nx_keybag_blocks) |
 | <td colspan="4">&nbsp;</td> |
-| 1312 | 4 x 8 = 32 | | Unknown (nx_ephemeral_info) |
-| 1344 | 8 | | Unknown (Test object identifier) (nx_test_oid) |
+| 1312 | 4 x 8 = 32 | | Ephemeral information (nx_ephemeral_info) |
+| 1344 | 8 | | Unknown (reserved for testing) (nx_test_oid) |
 | 1352 | 8 | | [Fusion middle tree](#fusion_middle_tree) block number (nx_fusion_mt_oid), which contains a block number relative to the start of the container |
 | 1360 | 8 | | Fusion write-back cache state object identifier (nx_fusion_wbc_oid), where the object identifier can be resolved in the [checkpoint map](#checkpoint_map) |
 | <td colspan="4">*Fusion write-back cache area (nx_fusion_wbc)*</td> |
 | 1368 | 8 | | Fusion write-back cache area block number (nx_fusion_wbc_base), which contains a block number relative to the start of the container |
 | 1376 | 8 | | Fusion write-back cache area number of blocks (nx_fusion_wbc_blocks) |
 | <td colspan="4">&nbsp;</td> |
-| 1384 | 8 | | Unknown (nx_newest_mounted_version) |
-| 1392 | 16 | | Unknown (nx_mkb_locker) |
+| 1384 | 8 | | Newest version of software that mounted the container (nx_newest_mounted_version) |
+| <td colspan="4">*Media key area (nx_mkb_locker)*</td> |
+| 1392 | 8 | | Media key area block number, which contains a block number relative to the start of the container |
+| 1400 | 8 | | Media key area number of blocks |
+| <td colspan="4">&nbsp;</td> |
 | 1408 | 2688 | | Unknown (empty values) |
 
 <!-- rumdl-enable MD033 MD056 -->
@@ -1094,7 +1097,7 @@ The volume superblock (apfs_superblock_t) is 4096 bytes in size and consists of:
 | 28 | 4 | 0x00000000 | [Object subtype](#object_subtypes) |
 | <td colspan="4">*Object values*</td> |
 | 32 | 4 | "APSB" | Signature (apfs_magic) |
-| 36 | 4 | | Unknown (apfs_fs_index) |
+| 36 | 4 | | File system index (apfs_fs_index) |
 | 40 | 8 | | [Volume feature flags](#volume_feature_flags) (apfs_features) |
 | 48 | 8 | | [Read-only compatible feature flags](#volume_read_only_compatible_feature_flags) (apfs_readonly_compatible_features) |
 | 56 | 8 | | [Incompatible feature flags](#volume_incompatible_feature_flags) (apfs_incompatible_features) |
@@ -1110,8 +1113,8 @@ The volume superblock (apfs_superblock_t) is 4096 bytes in size and consists of:
 | 136 | 8 | | File system root tree object identifier (apfs_root_tree_oid) |
 | 144 | 8 | | [Extent-reference tree](#extent_reference_tree) block number (apfs_extentref_tree_oid) |
 | 152 | 8 | | [Snapshot metadata tree](#snapshot_metadata_tree) block number (apfs_snap_meta_tree_oid) |
-| 160 | 8 | | Unknown (apfs_revert_to_xid) |
-| 168 | 8 | | Unknown (apfs_revert_to_sblock_oid) |
+| 160 | 8 | | Rollback transaction identifier (apfs_revert_to_xid) |
+| 168 | 8 | | Rollback (physical) object identifier (apfs_revert_to_sblock_oid) |
 | 176 | 8 | | Next (available) file system object identifier (apfs_next_obj_id), where the upper 32-bit can contain 0xffffffff |
 | 184 | 8 | | Number of files (apfs_num_files) |
 | 192 | 8 | | Number of directories (apfs_num_directories) |
@@ -1125,19 +1128,19 @@ The volume superblock (apfs_superblock_t) is 4096 bytes in size and consists of:
 | 264 | 8 | | [Volume flags](#volume_superblock_flags) (apfs_fs_flags) |
 | 272 | 48 | | Creation [change information](#change_information) (apfs_formatted_by) |
 | 320 | 8 x 48 = 384 | | 8 most recent modification [change information](#change_information) (apfs_modified_by) |
-| 704 | 256 | | Volume name (apfs_volname) |
+| 704 | 256 | | Volume label (or name) (apfs_volname) |
 | 960 | 4 | | Next (available) document identifier (apfs_next_doc_id) |
-| 964 | 2 | | Unknown (apfs_role) |
+| 964 | 2 | | [Volume role flags](#volume_role_flags) (apfs_role) |
 | 966 | 2 | | Unknown (reserved) |
-| 968 | 8 | | Unknown (apfs_root_to_xid) |
-| 976 | 8 | | Unknown (apfs_er_state_oid) |
-| 984 | 8 | | Unknown (apfs_cloneinfo_id_epoch) |
-| 992 | 8 | | Unknown (apfs_cloneinfo_xid) |
-| 1000 | 8 | | Unknown (apfs_snap_meta_ext_oid) |
+| 968 | 8 | | Active snapshot transaction identifier (apfs_root_to_xid) |
+| 976 | 8 | | Encryption progress state (apfs_er_state_oid) |
+| 984 | 8 | | Largest clone object identifier (apfs_cloneinfo_id_epoch) |
+| 992 | 8 | | Largest clone transaction identifier (apfs_cloneinfo_xid) |
+| 1000 | 8 | | Extended snapsnot metadata (virtual) object identifier (apfs_snap_meta_ext_oid) |
 | 1008 | 16 | | Volume group identifier (apfs_volume_group_id), which contains a big-endian UUID |
-| 1024 | 8 | | Unknown (apfs_integrity_meta_oid) |
-| 1032 | 8 | | Unknown (apfs_fext_tree_oid) |
-| 1040 | 4 | | Unknown (apfs_fext_tree_type) |
+| 1024 | 8 | | Integrity metadata (virtual) object identifier (apfs_integrity_meta_oid) |
+| 1032 | 8 | | Extent tree (virtual) object identifier (apfs_fext_tree_oid) |
+| 1040 | 4 | | Extent tree [object type](#object_types) (apfs_fext_tree_type) |
 | 1044 | 4 | | Unknown (reserved_type) |
 | 1048 | 8 | | Unknown (reserved_oid) |
 | 1056 | 80 | | Unknown |
@@ -1212,6 +1215,18 @@ Current no read-only compatible feature flags are defined
 | 0x0000000000000010 | APFS_INCOMPAT_INCOMPLETE_RESTORE | Unknown |
 | 0x0000000000000020 | APFS_INCOMPAT_SEALED_VOLUME | Unknown |
 | 0x0000000000000040 | APFS_INCOMPAT_RESERVED_40 | Unknown |
+
+#### Volume role flags {#volume_role_flags}
+
+| Value | Identifier | Description |
+| --- | --- | --- |
+| 0x0000 | APFS_VOL_ROLE_NONE | None |
+| 0x0001 | APFS_VOL_ROLE_SYSTEM | System |
+| 0x0002 | APFS_VOL_ROLE_USER | User |
+| 0x0004 | APFS_VOL_ROLE_RECOVERY | Recovery |
+| 0x0008 | APFS_VOL_ROLE_VM | VM |
+| 0x0010 | APFS_VOL_ROLE_PREBOOT | Preboot |
+| 0x0020 | APFS_VOL_ROLE_INSTALLER | Installer |
 
 ## File system {#file_system}
 
@@ -2050,7 +2065,7 @@ TODO: complete this section.
 
 <!-- rumdl-enable MD033 MD056 -->
 
-## Corruption scenarios
+## Format edge cases and corruption scenarios
 
 ### Container key bag is hardware encrypted but volume is not encrypted
 

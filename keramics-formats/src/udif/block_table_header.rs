@@ -25,7 +25,10 @@ use super::constants::*;
         field(name = "format_version", data_type = "u32"),
         field(name = "start_sector", data_type = "u64"),
         field(name = "number_of_sectors", data_type = "u64"),
-        field(name = "unknown1", data_type = "[u8; 40]"),
+        field(name = "unknown1", data_type = "u64"),
+        field(name = "unknown2", data_type = "u32", format = "hex"),
+        field(name = "unknown3", data_type = "u32"),
+        field(name = "unknown4", data_type = "[u32; 6]"),
         field(name = "checksum_type", data_type = "u32"),
         field(name = "checksum_size", data_type = "u32"),
         field(name = "checksum", data_type = "[u8; 128]"),
@@ -57,7 +60,7 @@ impl UdifBlockTableHeader {
 
     /// Reads the block table header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 204 {
+        if data.len() < 204 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..4] != UDIF_BLOCK_TABLE_HEADER_SIGNATURE {

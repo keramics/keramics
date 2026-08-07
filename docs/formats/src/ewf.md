@@ -7,7 +7,7 @@ forensics in proprietary tooling like EnCase en FTK.
 The [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html) is the earliest
 known specification of the format was provided by ASR Data for the SMART application.
 
-The EWF format was succeeded by the [Expert Witness Compression Format version 2](ewf2.md) in
+The EWF format was superseded by the [Expert Witness Compression Format version 2](ewf2.md) in
 EnCase 7 (EWF2-Ex01 and EWF2-Lx01). EnCase 7 also uses a different version of EWF-L01 then its
 predecessors.
 
@@ -2345,7 +2345,7 @@ containing the hash values.
 
 EWF-X uses a random based version of the GUID
 
-## Corruption scenarios
+## Format edge cases and corruption scenarios
 
 This chapter contains several corruption scenarios that have been encountered
 "in the wild".

@@ -20,7 +20,7 @@ use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
     structure(
         byte_order = "big",
         field(name = "entry_type", data_type = "u32", format = "hex"),
-        field(name = "unknown1", data_type = "[u8; 4]"),
+        field(name = "unknown1", data_type = "u32"),
         field(name = "start_sector", data_type = "u64"),
         field(name = "number_of_sectors", data_type = "u64"),
         field(name = "data_offset", data_type = "u64", format = "hex"),
@@ -60,7 +60,7 @@ impl UdifBlockTableEntry {
 
     /// Reads the block table entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 40 {
+        if data.len() < 40 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.entry_type = bytes_to_u32_be!(data, 0);
@@ -79,7 +79,7 @@ mod tests {
 
     fn get_test_data() -> Vec<u8> {
         return vec![
-            0x80, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x80, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x20, 0x0d, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1f,
         ];

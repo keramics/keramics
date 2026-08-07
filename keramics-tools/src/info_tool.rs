@@ -234,16 +234,53 @@ impl InfoTool {
                     return Err(error);
                 }
             };
-        let mut result: Option<FormatIdentifier>;
+        let mut result: Option<FormatIdentifier> = None;
 
         if scan_results.len() > 1 {
-            // Check if VHD footer was detected.
-            if scan_results.contains(&FormatIdentifier::Vhd) {
-                result = Some(FormatIdentifier::Vhd);
-            } else {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported multiple known format signatures"
-                ));
+            if scan_results.contains(&FormatIdentifier::Udif) {
+                // Check if UDIF footer was detected.
+                let mut scan_results_copy: HashSet<FormatIdentifier> = scan_results.clone();
+                scan_results_copy.remove(&FormatIdentifier::Udif);
+
+                if scan_results_copy.len() == 1 {
+                    result = match scan_results_copy.iter().next() {
+                        Some(format_identifier) => {
+                            if format_identifier == &FormatIdentifier::Unknown {
+                                None
+                            } else if !format_identifier.is_storage_media_image_format() {
+                                Some(FormatIdentifier::Udif)
+                            } else {
+                                None
+                            }
+                        }
+                        None => None,
+                    }
+                }
+            } else if scan_results.contains(&FormatIdentifier::Vhd) {
+                // Check if VHD footer was detected.
+                let mut scan_results_copy: HashSet<FormatIdentifier> = scan_results.clone();
+                scan_results_copy.remove(&FormatIdentifier::Vhd);
+
+                if scan_results_copy.len() == 1 {
+                    result = match scan_results_copy.iter().next() {
+                        Some(format_identifier) => {
+                            if format_identifier == &FormatIdentifier::Unknown {
+                                None
+                            } else if !format_identifier.is_storage_media_image_format() {
+                                Some(FormatIdentifier::Vhd)
+                            } else {
+                                None
+                            }
+                        }
+                        None => None,
+                    }
+                }
+            }
+            if result.is_none() {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported multiple known format signatures {:?}",
+                    scan_results
+                )));
             }
         } else {
             result = scan_results.iter().next().cloned();
@@ -401,7 +438,8 @@ fn main() -> ExitCode {
             FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
-            FormatIdentifier::Udif => UdifInfo::print_file(&data_stream),
+            // TODO: add support for individual UDIF segment file.
+            FormatIdentifier::Udif => UdifInfo::print_image(&arguments.source),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             // TODO: add support for VHDX image.

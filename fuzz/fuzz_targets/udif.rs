@@ -13,15 +13,50 @@
 
 #![no_main]
 
+use std::sync::Arc;
+
 use libfuzzer_sys::fuzz_target;
 
-use keramics_core::{DataStreamReference, open_fake_data_stream};
-use keramics_formats::udif::UdifFile;
+use keramics_core::{DataStreamReference, ErrorTrace, open_fake_data_stream};
+use keramics_formats::udif::UdifImage;
+use keramics_formats::{FileResolver, FileResolverReference, PathComponent};
 
-// Universal Disk Image Format (UDIF) file fuzz target.
+pub struct UdifFuzzFileResolver {
+    file_name: PathComponent,
+    data: Vec<u8>,
+}
+
+impl UdifFuzzFileResolver {
+    pub fn new(file_name: &str, data: &[u8]) -> Self {
+        Self {
+            file_name: PathComponent::from(file_name),
+            data: data.to_vec(),
+        }
+    }
+}
+
+impl FileResolver for UdifFuzzFileResolver {
+    fn get_data_stream(
+        &self,
+        path_components: &[PathComponent],
+    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        if path_components[0] == self.file_name {
+            let data_stream: DataStreamReference = open_fake_data_stream(&self.data);
+
+            Ok(Some(data_stream))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+// Expert Witness Compression Format (EWF) image fuzz target.
 fuzz_target!(|data: &[u8]| {
-    let mut udif_file: UdifFile = UdifFile::new();
+    let mut udif_image: UdifImage = UdifImage::new();
 
-    let data_stream: DataStreamReference = open_fake_data_stream(&data);
-    _ = udif_file.read_data_stream(&data_stream);
+    let file_resolver: UdifFuzzFileResolver = UdifFuzzFileResolver::new("fuzz.dmg", &data);
+    let file_resolver_reference: FileResolverReference = Arc::new(Box::new(file_resolver));
+    let file_name: PathComponent = PathComponent::from("fuzz.dmg");
+
+    _ = udif_image.open(&file_resolver_reference, &file_name);
 });
