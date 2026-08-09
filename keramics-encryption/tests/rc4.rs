@@ -32,8 +32,8 @@ struct TestVector {
     data_segments: &'static [TestDataSegment],
 }
 
-// RFC 6229 test vectors.
-const RFC6229_TEST_VECTORS: &'static [TestVector] = &[
+const TEST_VECTORS: &'static [TestVector] = &[
+    // RFC 6229
     TestVector {
         key: &[0x01, 0x02, 0x03, 0x04, 0x05],
         data_segments: &[
@@ -1136,7 +1136,7 @@ const RFC6229_TEST_VECTORS: &'static [TestVector] = &[
 
 #[test]
 fn test_crypt_with_rfc6229_test_vectors() -> Result<(), ErrorTrace> {
-    for test_vector in RFC6229_TEST_VECTORS.iter() {
+    for test_vector in TEST_VECTORS.iter() {
         let key_bit_size: usize = test_vector.key.len() * 8;
 
         let mut rc4_context: Rc4Context = Rc4Context::new();

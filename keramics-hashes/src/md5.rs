@@ -131,6 +131,14 @@ impl Md5Context {
 }
 
 impl DigestHashContext for Md5Context {
+    /// Creates a new context.
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Self::new()
+    }
+
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
         let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;

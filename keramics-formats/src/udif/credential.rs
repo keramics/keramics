@@ -11,22 +11,29 @@
  * under the License.
  */
 
-/// Universal Disk Image Format (UDIF) compression methods.
+/// Universal Disk Image Format (UDIF) credential types.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum UdifCompressionMethod {
-    Adc,
-    Bzip2,
-    Lzfse,
-    Lzma,
-    None,
-    Zlib,
+pub enum UdifCredentialType {
+    Certificate,
+    Passphrase,
 }
 
-/// Universal Disk Image Format (UDIF) key protector types.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum UdifKeyProtectorType {
-    KeybagWrappedKey,
-    PassphraseWrappedKey,
-    PublicKeyWrappedKey,
-    Unknown(u32),
+/// Universal Disk Image Format (UDIF) credential.
+#[derive(Debug)]
+pub struct UdifCredential {
+    /// Credential type.
+    pub(super) credential_type: UdifCredentialType,
+
+    /// Data.
+    pub(super) data: Vec<u8>,
+}
+
+impl UdifCredential {
+    /// Creates a new credential.
+    pub fn new(credential_type: UdifCredentialType, data: &[u8]) -> Self {
+        Self {
+            credential_type,
+            data: data.to_vec(),
+        }
+    }
 }

@@ -18,6 +18,15 @@
 use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u64_be;
 
+use super::cbc::CbcContext;
+use super::traits::{CryptCbc, CryptContext};
+
+/// DES3 block size.
+const DES3_BLOCK_SIZE: usize = 8;
+
+/// DES3 supported key sizes.
+const DES3_SUPPORTED_KEY_SIZES: [usize; 6] = [7, 8, 14, 16, 21, 24];
+
 /// DES3 permutation values.
 const DES3_PERMUTATION_VALUES: [u8; 64] = [
     58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4, 62, 54, 46, 38, 30, 22, 14, 6,
@@ -110,15 +119,6 @@ pub struct Des3Context {
 }
 
 impl Des3Context {
-    const SUPPORTED_KEY_SIZES: [usize; 6] = [7, 8, 14, 16, 21, 24];
-
-    /// Creates a new context.
-    pub fn new() -> Self {
-        Self {
-            key_values: Vec::new(),
-        }
-    }
-
     /// Calculates the initial permutation value.
     #[inline(always)]
     fn calculate_initial_permutation_value(&self, input_value: u64) -> (u64, u64) {
@@ -230,95 +230,9 @@ impl Des3Context {
         sub_keys
     }
 
-    /// Decrypts data using CBC (Cipher Block Chaining) mode.
-    pub fn decrypt_cbc(
-        &self,
-        initialization_vector: &[u8],
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        if self.key_values.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        if initialization_vector.len() < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid initialization vector value too small"
-            ));
-        }
-        let encrypted_data_size: usize = encrypted_data.len();
-
-        if encrypted_data_size % 8 != 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data size value not a multitude of block size: 8"
-            ));
-        }
-        if encrypted_data_size > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data value too small"
-            ));
-        }
-        let mut initialization_vector_64bit: u64 = bytes_to_u64_be!(initialization_vector, 0);
-        let mut data_offset: usize = 0;
-
-        while data_offset < encrypted_data_size {
-            let value_64bit: u64 = bytes_to_u64_be!(encrypted_data, data_offset);
-
-            let mut block_value: u64 = self.decrypt_value(self.key_values[2], value_64bit);
-            block_value = self.encrypt_value(self.key_values[1], block_value);
-            block_value = self.decrypt_value(self.key_values[0], block_value);
-
-            block_value ^= initialization_vector_64bit;
-
-            let data_end_offset: usize = data_offset + 8;
-            data[data_offset..data_end_offset].copy_from_slice(&block_value.to_be_bytes());
-
-            initialization_vector_64bit = value_64bit;
-            data_offset = data_end_offset;
-        }
-        Ok(())
-    }
-
-    /// Decrypts data using ECB (Electronic CodeBook) mode.
-    pub fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
-        if self.key_values.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        let encrypted_data_size: usize = encrypted_data.len();
-
-        if encrypted_data_size % 8 != 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data size value not a multitude of block size: 8"
-            ));
-        }
-        if encrypted_data_size > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data value too small"
-            ));
-        }
-        let mut data_offset: usize = 0;
-
-        while data_offset < encrypted_data_size {
-            let mut block_value: u64 = bytes_to_u64_be!(encrypted_data, data_offset);
-
-            block_value = self.decrypt_value(self.key_values[2], block_value);
-            block_value = self.encrypt_value(self.key_values[1], block_value);
-            block_value = self.decrypt_value(self.key_values[0], block_value);
-
-            let data_end_offset: usize = data_offset + 8;
-            data[data_offset..data_end_offset].copy_from_slice(&block_value.to_be_bytes());
-
-            data_offset = data_end_offset;
-        }
-        Ok(())
-    }
-
     /// Decrypts a 64-bit value (or 8 byte block).
     #[inline(always)]
-    fn decrypt_value(&self, key_value: u64, input_value: u64) -> u64 {
+    fn decrypt_block(&self, key_value: u64, input_value: u64) -> u64 {
         let sub_keys: [u64; 16] = self.calculate_sub_keys(key_value);
 
         let (mut permutation_lower_32bit, mut permutation_upper_32bit): (u64, u64) =
@@ -336,87 +250,37 @@ impl Des3Context {
         self.calculate_inverse_permutation(permutation_upper_32bit, permutation_lower_32bit)
     }
 
-    /// Encrypts data using CBC (Cipher Block Chaining) mode.
-    pub fn encrypt_cbc(
-        &self,
-        initialization_vector: &[u8],
-        data: &[u8],
-        encrypted_data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
+    /// Decrypts data using ECB (Electronic CodeBook) mode.
+    pub fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
         if self.key_values.is_empty() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid context - key was not set"
             ));
         }
-        if initialization_vector.len() < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid initialization vector value too small"
-            ));
+        let encrypted_data_size: usize = encrypted_data.len();
+
+        if encrypted_data_size % DES3_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data size value not a multitude of block size: {}",
+                DES3_BLOCK_SIZE
+            ),));
         }
-        let data_size: usize = data.len();
-
-        if data_size % 8 != 0 {
+        if encrypted_data_size > data.len() {
             return Err(keramics_core::error_trace_new!(
-                "Invalid data size value not a multitude of block size: 8"
-            ));
-        }
-        if data_size > encrypted_data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data value too small"
-            ));
-        }
-        let mut initialization_vector_64bit: u64 = bytes_to_u64_be!(initialization_vector, 0);
-        let mut data_offset: usize = 0;
-
-        while data_offset < data_size {
-            let mut block_value: u64 = bytes_to_u64_be!(data, data_offset);
-            block_value ^= initialization_vector_64bit;
-
-            block_value = self.encrypt_value(self.key_values[0], block_value);
-            block_value = self.decrypt_value(self.key_values[1], block_value);
-            block_value = self.encrypt_value(self.key_values[2], block_value);
-
-            let data_end_offset: usize = data_offset + 8;
-            encrypted_data[data_offset..data_end_offset]
-                .copy_from_slice(&block_value.to_be_bytes());
-
-            initialization_vector_64bit = block_value;
-            data_offset = data_end_offset;
-        }
-        Ok(())
-    }
-
-    /// Encrypts data using ECB (Electronic CodeBook) mode.
-    pub fn encrypt_ecb(&self, data: &[u8], encrypted_data: &mut [u8]) -> Result<(), ErrorTrace> {
-        if self.key_values.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        let data_size: usize = data.len();
-
-        if data_size % 8 != 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data size value not a multitude of block size: 8"
-            ));
-        }
-        if data_size > encrypted_data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data value too small"
+                "Invalid data value too small"
             ));
         }
         let mut data_offset: usize = 0;
 
-        while data_offset < data_size {
-            let mut block_value: u64 = bytes_to_u64_be!(data, data_offset);
+        for block_data in encrypted_data.chunks_exact(DES3_BLOCK_SIZE) {
+            let mut block_value: u64 = bytes_to_u64_be!(block_data, 0);
 
-            block_value = self.encrypt_value(self.key_values[0], block_value);
-            block_value = self.decrypt_value(self.key_values[1], block_value);
-            block_value = self.encrypt_value(self.key_values[2], block_value);
+            block_value = self.decrypt_block(self.key_values[2], block_value);
+            block_value = self.encrypt_block(self.key_values[1], block_value);
+            block_value = self.decrypt_block(self.key_values[0], block_value);
 
-            let data_end_offset: usize = data_offset + 8;
-            encrypted_data[data_offset..data_end_offset]
-                .copy_from_slice(&block_value.to_be_bytes());
+            let data_end_offset: usize = data_offset + DES3_BLOCK_SIZE;
+            data[data_offset..data_end_offset].copy_from_slice(&block_value.to_be_bytes());
 
             data_offset = data_end_offset;
         }
@@ -425,7 +289,7 @@ impl Des3Context {
 
     /// Encrypts a 64-bit value (or 8 byte block).
     #[inline(always)]
-    fn encrypt_value(&self, key_value: u64, input_value: u64) -> u64 {
+    fn encrypt_block(&self, key_value: u64, input_value: u64) -> u64 {
         let sub_keys: [u64; 16] = self.calculate_sub_keys(key_value);
 
         let (mut permutation_lower_32bit, mut permutation_upper_32bit): (u64, u64) =
@@ -443,11 +307,58 @@ impl Des3Context {
         self.calculate_inverse_permutation(permutation_upper_32bit, permutation_lower_32bit)
     }
 
+    /// Encrypts data using ECB (Electronic CodeBook) mode.
+    pub fn encrypt_ecb(&self, data: &[u8], encrypted_data: &mut [u8]) -> Result<(), ErrorTrace> {
+        if self.key_values.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        let data_size: usize = data.len();
+
+        if data_size % DES3_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data size value not a multitude of block size: {}",
+                DES3_BLOCK_SIZE
+            )));
+        }
+        if data_size > encrypted_data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data value too small"
+            ));
+        }
+        let mut data_offset: usize = 0;
+
+        for block_data in data.chunks_exact(DES3_BLOCK_SIZE) {
+            let mut block_value: u64 = bytes_to_u64_be!(block_data, 0);
+
+            block_value = self.encrypt_block(self.key_values[0], block_value);
+            block_value = self.decrypt_block(self.key_values[1], block_value);
+            block_value = self.encrypt_block(self.key_values[2], block_value);
+
+            let data_end_offset: usize = data_offset + DES3_BLOCK_SIZE;
+            encrypted_data[data_offset..data_end_offset]
+                .copy_from_slice(&block_value.to_be_bytes());
+
+            data_offset = data_end_offset;
+        }
+        Ok(())
+    }
+}
+
+impl CryptContext for Des3Context {
+    /// Creates a new context.
+    fn new() -> Self {
+        Self {
+            key_values: Vec::new(),
+        }
+    }
+
     /// Sets the key.
-    pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
+    fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
         let key_size: usize = key.len();
 
-        if !Self::SUPPORTED_KEY_SIZES.contains(&key_size) {
+        if !DES3_SUPPORTED_KEY_SIZES.contains(&key_size) {
             return Err(keramics_core::error_trace_new!("Unsupported key size"));
         }
         self.key_values = vec![0; 3];
@@ -479,9 +390,124 @@ impl Des3Context {
     }
 }
 
+impl CryptCbc for Des3Context {
+    /// Decrypts data using CBC (Cipher Block Chaining) mode.
+    fn decrypt_cbc(
+        &self,
+        initialization_vector: &[u8],
+        encrypted_data: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.key_values.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        if initialization_vector.len() < 8 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid initialization vector value too small"
+            ));
+        }
+        let encrypted_data_size: usize = encrypted_data.len();
+
+        if encrypted_data_size % 8 != 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data size value not a multitude of block size: 8"
+            ));
+        }
+        if encrypted_data_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data value too small"
+            ));
+        }
+        let mut initialization_vector_64bit: u64 = bytes_to_u64_be!(initialization_vector, 0);
+        let mut data_offset: usize = 0;
+
+        for block_data in encrypted_data.chunks_exact(DES3_BLOCK_SIZE) {
+            let input_value: u64 = bytes_to_u64_be!(block_data, 0);
+
+            let mut block_value: u64 = self.decrypt_block(self.key_values[2], input_value);
+            block_value = self.encrypt_block(self.key_values[1], block_value);
+            block_value = self.decrypt_block(self.key_values[0], block_value);
+
+            block_value ^= initialization_vector_64bit;
+
+            let data_end_offset: usize = data_offset + 8;
+            data[data_offset..data_end_offset].copy_from_slice(&block_value.to_be_bytes());
+
+            initialization_vector_64bit = input_value;
+            data_offset = data_end_offset;
+        }
+        Ok(())
+    }
+
+    /// Encrypts data using CBC (Cipher Block Chaining) mode.
+    fn encrypt_cbc(
+        &self,
+        initialization_vector: &[u8],
+        data: &[u8],
+        encrypted_data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.key_values.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        if initialization_vector.len() < 8 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid initialization vector value too small"
+            ));
+        }
+        let data_size: usize = data.len();
+
+        if data_size % 8 != 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data size value not a multitude of block size: 8"
+            ));
+        }
+        if data_size > encrypted_data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data value too small"
+            ));
+        }
+        let mut initialization_vector_64bit: u64 = bytes_to_u64_be!(initialization_vector, 0);
+        let mut data_offset: usize = 0;
+
+        for block_data in data.chunks_exact(DES3_BLOCK_SIZE) {
+            let mut block_value: u64 = bytes_to_u64_be!(block_data, 0);
+            block_value ^= initialization_vector_64bit;
+
+            block_value = self.encrypt_block(self.key_values[0], block_value);
+            block_value = self.decrypt_block(self.key_values[1], block_value);
+            block_value = self.encrypt_block(self.key_values[2], block_value);
+
+            let data_end_offset: usize = data_offset + 8;
+            encrypted_data[data_offset..data_end_offset]
+                .copy_from_slice(&block_value.to_be_bytes());
+
+            initialization_vector_64bit = block_value;
+            data_offset = data_end_offset;
+        }
+        Ok(())
+    }
+}
+
+/// Context for DES3-CBC
+pub type Des3CbcContext = CbcContext<Des3Context, 8>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_encrypt_block() -> Result<(), ErrorTrace> {
+        let des3_context: Des3Context = Des3Context::new();
+
+        let output_value: u64 = des3_context.encrypt_block(0x9837239487, 0x2983123819080ac1);
+        assert_eq!(output_value, 0xa9494d9bbdc2873f);
+
+        Ok(())
+    }
 
     #[test]
     fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
@@ -520,10 +546,10 @@ mod tests {
     }
 
     #[test]
-    fn test_decrypt_value() -> Result<(), ErrorTrace> {
+    fn test_decrypt_block() -> Result<(), ErrorTrace> {
         let des3_context: Des3Context = Des3Context::new();
 
-        let output_value: u64 = des3_context.decrypt_value(0x3719827398, 0x344720e90cdc908f);
+        let output_value: u64 = des3_context.decrypt_block(0x3719827398, 0x344720e90cdc908f);
         assert_eq!(output_value, 0x6d0ee7e5792e2a93);
 
         Ok(())
@@ -565,16 +591,6 @@ mod tests {
 
         let expected_encrypted_data: [u8; 8] = [0xc2, 0x0d, 0x08, 0x10, 0x9a, 0x04, 0x04, 0xbf];
         assert_eq!(&encrypted_data, &expected_encrypted_data);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_encrypt_value() -> Result<(), ErrorTrace> {
-        let des3_context: Des3Context = Des3Context::new();
-
-        let output_value: u64 = des3_context.encrypt_value(0x9837239487, 0x2983123819080ac1);
-        assert_eq!(output_value, 0xa9494d9bbdc2873f);
 
         Ok(())
     }

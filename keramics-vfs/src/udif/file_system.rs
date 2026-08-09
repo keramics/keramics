@@ -25,8 +25,8 @@ use super::file_entry::UdifFileEntry;
 
 /// Universal Disk Image Format (UDIF) storage media image file system.
 pub struct UdifFileSystem {
-    /// File.
-    file: Arc<RwLock<UdifImage>>,
+    /// Image.
+    image: Arc<RwLock<UdifImage>>,
 
     /// Number of layers.
     number_of_layers: usize,
@@ -38,7 +38,7 @@ impl UdifFileSystem {
     /// Creates a new file system.
     pub fn new() -> Self {
         Self {
-            file: Arc::new(RwLock::new(UdifImage::new())),
+            image: Arc::new(RwLock::new(UdifImage::new())),
             number_of_layers: 0,
         }
     }
@@ -71,7 +71,7 @@ impl UdifFileSystem {
 
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        match self.file.read() {
+        match self.image.read() {
             Ok(udif_image) => Ok(udif_image.get_bytes_per_sector() as u32),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
@@ -95,8 +95,20 @@ impl UdifFileSystem {
                 if path_component != "udif1" {
                     return Ok(None);
                 }
-                let media_size: u64 = match self.file.read() {
-                    Ok(udif_image) => udif_image.get_media_size(),
+                let media_size: u64 = match self.image.read() {
+                    Ok(udif_image) => {
+                        if udif_image.is_locked() {
+                            return Err(keramics_core::error_trace_new!("UDIF image is locked"));
+                        }
+                        match udif_image.get_media_size() {
+                            Some(media_size) => media_size,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unable to determine media size"
+                                ));
+                            }
+                        }
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on UDIF image",
@@ -105,7 +117,7 @@ impl UdifFileSystem {
                     }
                 };
                 Ok(Some(UdifFileEntry::Layer {
-                    file: self.file.clone(),
+                    image: self.image.clone(),
                     size: media_size,
                 }))
             }
@@ -121,7 +133,7 @@ impl UdifFileSystem {
     /// Retrieves the root file entry.
     pub fn get_root_file_entry(&self) -> UdifFileEntry {
         UdifFileEntry::Root {
-            file: self.file.clone(),
+            image: self.image.clone(),
         }
     }
 
@@ -141,9 +153,9 @@ impl UdifFileSystem {
         };
         let path: &Path = vfs_location.get_path();
 
-        match self.file.write() {
-            Ok(mut file) => {
-                match Self::open_image(&mut file, file_system, path) {
+        match self.image.write() {
+            Ok(mut image) => {
+                match Self::open_image(&mut image, file_system, path) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");

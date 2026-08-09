@@ -13,31 +13,48 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
+use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "item_type", data_type = "u32"),
-        field(name = "offset", data_type = "u64"),
-        field(name = "size", data_type = "u64"),
+        field(name = "unlock_type", data_type = "u32"),
+        field(name = "data_offset", data_type = "u64"),
+        field(name = "data_size", data_type = "u64"),
     ),
     methods("debug_read_data")
 )]
-/// Universal Disk Image Format (UDIF) item descriptor.
-pub struct UdifItemDescriptor {}
+/// Universal Disk Image Format (UDIF) key protector descriptor.
+pub struct UdifKeyProtectorDescriptor {
+    /// Unlock type.
+    pub unlock_type: u32,
 
-impl UdifItemDescriptor {
-    /// Creates a new item descriptor.
+    /// Data offset.
+    pub data_offset: u64,
+
+    /// Data size.
+    pub data_size: u64,
+}
+
+impl UdifKeyProtectorDescriptor {
+    /// Creates a new key protector descriptor.
     pub fn new() -> Self {
-        Self {}
+        Self {
+            unlock_type: 0,
+            data_offset: 0,
+            data_size: 0,
+        }
     }
 
-    /// Reads the item descriptor from a buffer.
+    /// Reads the key protector descriptor from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 20 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
+        self.unlock_type = bytes_to_u32_be!(data, 0);
+        self.data_offset = bytes_to_u64_be!(data, 4);
+        self.data_size = bytes_to_u64_be!(data, 12);
 
         Ok(())
     }
@@ -49,7 +66,8 @@ mod tests {
 
     fn get_test_data() -> Vec<u8> {
         return vec![
-            0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 96, 0, 0, 0, 0, 0, 0, 2, 104,
+            0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x60, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x02, 0x68,
         ];
     }
 
@@ -57,15 +75,19 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifItemDescriptor::new();
+        let mut test_struct = UdifKeyProtectorDescriptor::new();
         test_struct.read_data(&test_data)?;
+
+        assert_eq!(test_struct.unlock_type, 0x0001);
+        assert_eq!(test_struct.data_offset, 96);
+        assert_eq!(test_struct.data_size, 616);
 
         Ok(())
     }
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = UdifItemDescriptor::new();
+        let mut test_struct = UdifKeyProtectorDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..19]);

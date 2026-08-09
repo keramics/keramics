@@ -14,7 +14,7 @@
 /// Debug print data.
 #[macro_export]
 macro_rules! debug_trace_data {
-    ( $description:expr, $offset:expr, $data:expr, $data_size:expr ) => {
+    ( $description:expr, $offset:expr, $data:expr, $data_size:expr $(,)? ) => {
         let mediator = $crate::mediator::Mediator::current();
 
         if mediator.debug_output {
@@ -30,7 +30,7 @@ macro_rules! debug_trace_data {
 /// Debug print data and a structure representation.
 #[macro_export]
 macro_rules! debug_trace_data_and_structure {
-    ( $description:expr, $offset:expr, $data:expr, $data_size:expr, $structure:expr ) => {
+    ( $description:expr, $offset:expr, $data:expr, $data_size:expr, $structure:expr $(,)? ) => {
         let mediator = $crate::mediator::Mediator::current();
 
         if mediator.debug_output {
@@ -47,7 +47,7 @@ macro_rules! debug_trace_data_and_structure {
 /// Debug print a structure representation.
 #[macro_export]
 macro_rules! debug_trace_structure {
-    ( $structure:expr ) => {
+    ( $structure:expr $(,)? ) => {
         let mediator = $crate::mediator::Mediator::current();
 
         if mediator.debug_output {
@@ -72,7 +72,7 @@ macro_rules! error_trace_function {
 /// Creates a new [`ErrorTrace`].
 #[macro_export]
 macro_rules! error_trace_new {
-    ( $message:expr ) => {
+    ( $message:expr $(,)? ) => {
         $crate::ErrorTrace::new(format!("{}: {}", $crate::error_trace_function!(), $message,))
     };
 }
@@ -80,7 +80,7 @@ macro_rules! error_trace_new {
 /// Creates a new [`ErrorTrace`] based on an existing error.
 #[macro_export]
 macro_rules! error_trace_new_with_error {
-    ( $message:expr, $error:expr ) => {
+    ( $message:expr, $error:expr $(,)? ) => {
         $crate::ErrorTrace::new(format!(
             "{}: {} with error: {}",
             $crate::error_trace_function!(),
@@ -93,7 +93,7 @@ macro_rules! error_trace_new_with_error {
 /// Adds a frame to an existing [`ErrorTrace`].
 #[macro_export]
 macro_rules! error_trace_add_frame {
-    ( $error:expr, $message:expr ) => {
+    ( $error:expr, $message:expr $(,)? ) => {
         $error.add_frame(format!("{}: {}", $crate::error_trace_function!(), $message,))
     };
 }
@@ -101,7 +101,7 @@ macro_rules! error_trace_add_frame {
 /// Retrieves the size of a [`DataStreamReference`].
 #[macro_export]
 macro_rules! data_stream_get_size {
-    ( $data_stream:expr ) => {
+    ( $data_stream:expr $(,)? ) => {
         match $data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_size() {
                 Ok(size) => size,
@@ -126,7 +126,7 @@ macro_rules! data_stream_get_size {
 /// Reads data at a specific position from a [`DataStreamReference`].
 #[macro_export]
 macro_rules! data_stream_read_at_position {
-    ( $data_stream:expr, $buf:expr, $pos:expr ) => {
+    ( $data_stream:expr, $buf:expr, $pos:expr $(,)? ) => {
         match $data_stream.write() {
             Ok(mut data_stream) => match data_stream.read_at_position($buf, $pos) {
                 Ok(read_count) => read_count,
@@ -148,7 +148,7 @@ macro_rules! data_stream_read_at_position {
 /// Reads an exact amount of data at a specific position from a [`DataStreamReference`].
 #[macro_export]
 macro_rules! data_stream_read_exact_at_position {
-    ( $data_stream:expr, $buf:expr, $pos:expr ) => {
+    ( $data_stream:expr, $buf:expr, $pos:expr $(,)? ) => {
         match $data_stream.write() {
             Ok(mut data_stream) => match data_stream.read_exact_at_position($buf, $pos) {
                 Ok(offset) => offset,

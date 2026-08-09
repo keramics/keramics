@@ -11,16 +11,27 @@
  * under the License.
  */
 
-/// Digest hash context trait.
-pub trait DigestHashContext {
-    /// Creates a new context.
-    fn new() -> Self
-    where
-        Self: Sized;
+use super::enums::UdifKeyProtectorType;
 
-    /// Finalizes the digest hash calculation.
-    fn finalize(&mut self) -> Vec<u8>;
+/// Universal Disk Image Format (UDIF) key protector.
+pub struct UdifKeyProtector {
+    /// Protector type.
+    pub(super) protector_type: UdifKeyProtectorType,
 
-    /// Calculates the digest hash of the data.
-    fn update(&mut self, data: &[u8]);
+    /// Offset.
+    pub(super) offset: u64,
+
+    /// Size.
+    pub(super) size: u64,
+}
+
+impl UdifKeyProtector {
+    /// Creates a new key protector.
+    pub fn new(protector_type: UdifKeyProtectorType, offset: u64, size: u64) -> Self {
+        Self {
+            protector_type,
+            offset,
+            size,
+        }
+    }
 }

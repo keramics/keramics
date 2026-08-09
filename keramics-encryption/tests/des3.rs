@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_encryption::Des3Context;
+use keramics_encryption::{CryptCbc, CryptContext, Des3Context};
 
 /// Test vector.
 struct TestVector {
@@ -29,9 +29,8 @@ struct TestVector {
     ciphertext: &'static [u8],
 }
 
-// NIST Cryptographic Algorithm Validation Program (CAVP) CBC test vectors.
-const NIST_CAVS_CBC_TEST_VECTORS: &'static [TestVector] = &[
-    // TCBCpermop.rsp
+const CBC_TEST_VECTORS: &'static [TestVector] = &[
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TCBCpermop.rsp
     TestVector {
         key: &[0x10, 0x46, 0x91, 0x34, 0x89, 0x98, 0x01, 0x31],
         initialization_vector: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -224,7 +223,7 @@ const NIST_CAVS_CBC_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
         ciphertext: &[0x1a, 0xea, 0xc3, 0x9a, 0x61, 0xf0, 0xa4, 0x64],
     },
-    // TCBCsubtab.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TCBCsubtab.rsp
     TestVector {
         key: &[0x7c, 0xa1, 0x10, 0x45, 0x4a, 0x1a, 0x6e, 0x57],
         initialization_vector: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -339,7 +338,7 @@ const NIST_CAVS_CBC_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x30, 0x55, 0x32, 0x28, 0x6d, 0x6f, 0x29, 0x5a],
         ciphertext: &[0x63, 0xfa, 0xc0, 0xd0, 0x34, 0xd9, 0xf7, 0x93],
     },
-    // TCBCvarkey.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TCBCvarkey.rsp
     TestVector {
         key: &[0x80, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         initialization_vector: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -676,7 +675,7 @@ const NIST_CAVS_CBC_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
         ciphertext: &[0x86, 0x9e, 0xfd, 0x7f, 0x9f, 0x26, 0x5a, 0x09],
     },
-    // TCBCvartext.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TCBCvartext.rsp
     TestVector {
         key: &[0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         initialization_vector: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -1063,9 +1062,8 @@ const NIST_CAVS_CBC_TEST_VECTORS: &'static [TestVector] = &[
     },
 ];
 
-// NIST Cryptographic Algorithm Validation Program (CAVP) ECB test vectors.
-const NIST_CAVS_ECB_TEST_VECTORS: &'static [TestVector] = &[
-    // TECBinvperm.rsp
+const ECB_TEST_VECTORS: &'static [TestVector] = &[
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TECBinvperm.rsp
     TestVector {
         key: &[0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         initialization_vector: &[],
@@ -1450,7 +1448,7 @@ const NIST_CAVS_ECB_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x16, 0x6b, 0x40, 0xb4, 0x4a, 0xba, 0x4b, 0xd6],
         ciphertext: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01],
     },
-    // TECBpermop.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TECBpermop.rsp
     TestVector {
         key: &[0x10, 0x46, 0x91, 0x34, 0x89, 0x98, 0x01, 0x31],
         initialization_vector: &[],
@@ -1643,7 +1641,7 @@ const NIST_CAVS_ECB_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
         ciphertext: &[0x1a, 0xea, 0xc3, 0x9a, 0x61, 0xf0, 0xa4, 0x64],
     },
-    // TECBsubtab.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TECBsubtab.rsp
     TestVector {
         key: &[0x7c, 0xa1, 0x10, 0x45, 0x4a, 0x1a, 0x6e, 0x57],
         initialization_vector: &[],
@@ -1758,7 +1756,7 @@ const NIST_CAVS_ECB_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x30, 0x55, 0x32, 0x28, 0x6d, 0x6f, 0x29, 0x5a],
         ciphertext: &[0x63, 0xfa, 0xc0, 0xd0, 0x34, 0xd9, 0xf7, 0x93],
     },
-    // TECBvarkey.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TECBvarkey.rsp
     TestVector {
         key: &[0x80, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         initialization_vector: &[],
@@ -2095,7 +2093,7 @@ const NIST_CAVS_ECB_TEST_VECTORS: &'static [TestVector] = &[
         plaintext: &[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
         ciphertext: &[0x86, 0x9e, 0xfd, 0x7f, 0x9f, 0x26, 0x5a, 0x09],
     },
-    // TECBvartext.rsp
+    // NIST Cryptographic Algorithm Validation Program (CAVP) TECBvartext.rsp
     TestVector {
         key: &[0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
         initialization_vector: &[],
@@ -2484,7 +2482,7 @@ const NIST_CAVS_ECB_TEST_VECTORS: &'static [TestVector] = &[
 
 #[test]
 fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
-    for test_vector in NIST_CAVS_CBC_TEST_VECTORS.iter() {
+    for test_vector in CBC_TEST_VECTORS.iter() {
         let mut des3_context: Des3Context = Des3Context::new();
         des3_context.set_key(&test_vector.key)?;
 
@@ -2501,7 +2499,7 @@ fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
 
 #[test]
 fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
-    for test_vector in NIST_CAVS_CBC_TEST_VECTORS.iter() {
+    for test_vector in CBC_TEST_VECTORS.iter() {
         let mut des3_context: Des3Context = Des3Context::new();
         des3_context.set_key(&test_vector.key)?;
 
@@ -2518,7 +2516,7 @@ fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
 
 #[test]
 fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
-    for test_vector in NIST_CAVS_ECB_TEST_VECTORS.iter() {
+    for test_vector in ECB_TEST_VECTORS.iter() {
         let mut des3_context: Des3Context = Des3Context::new();
         des3_context.set_key(&test_vector.key)?;
 
@@ -2532,7 +2530,7 @@ fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
 
 #[test]
 fn test_encrypt_ecb() -> Result<(), ErrorTrace> {
-    for test_vector in NIST_CAVS_ECB_TEST_VECTORS.iter() {
+    for test_vector in ECB_TEST_VECTORS.iter() {
         let mut des3_context: Des3Context = Des3Context::new();
         des3_context.set_key(&test_vector.key)?;
 

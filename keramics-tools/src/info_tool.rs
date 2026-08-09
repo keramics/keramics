@@ -57,6 +57,10 @@ struct CommandLineArguments {
     /// Offset within the source file or storage media
     offset: u64,
 
+    #[arg(long)]
+    /// Password to unlock format
+    password: Vec<String>,
+
     /// Path of the source file
     source: PathBuf,
 
@@ -154,9 +158,13 @@ impl InfoTool {
     }
 
     /// Retrieves a data stream.
-    pub fn get_data_stream(&self, path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
+    pub fn get_data_stream(
+        &self,
+        path: &PathBuf,
+        passwords: &Vec<String>,
+    ) -> Result<DataStreamReference, ErrorTrace> {
         let data_stream: DataStreamReference = if self.image_mode {
-            match StorageMediaImage::open(path) {
+            match StorageMediaImage::open(path, passwords) {
                 Ok(storage_media_image) => storage_media_image.get_data_stream(),
                 Err(error) => {
                     return Err(keramics_core::error_trace_new_with_error!(
@@ -333,13 +341,15 @@ fn main() -> ExitCode {
     };
     let info_tool: InfoTool = InfoTool::new(&arguments.encoding, arguments.image, arguments.offset);
 
-    let data_stream: DataStreamReference = match info_tool.get_data_stream(&arguments.source) {
-        Ok(data_stream) => data_stream,
-        Err(error) => {
-            println!("Unable to open data stream with error:\n{}", error);
-            return ExitCode::FAILURE;
-        }
-    };
+    // TODO: bundle all credentials into 1 credential store argument.
+    let data_stream: DataStreamReference =
+        match info_tool.get_data_stream(&arguments.source, &arguments.password) {
+            Ok(data_stream) => data_stream,
+            Err(error) => {
+                println!("Unable to open data stream with error:\n{}", error);
+                return ExitCode::FAILURE;
+            }
+        };
     let format_identifier: FormatIdentifier = if !arguments.image
         && arguments.source.is_dir()
         && arguments.source.extension() == Some("sparsebundle".as_ref())
@@ -438,8 +448,8 @@ fn main() -> ExitCode {
             FormatIdentifier::Qcow => QcowInfo::print_file(&data_stream),
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
-            // TODO: add support for individual UDIF segment file.
-            FormatIdentifier::Udif => UdifInfo::print_image(&arguments.source),
+            // TODO: bundle all credentials into 1 credential store argument.
+            FormatIdentifier::Udif => UdifInfo::print(&arguments.source, &arguments.password),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             // TODO: add support for VHDX image.

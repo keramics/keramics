@@ -13,10 +13,10 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_be;
+use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
-use super::item_descriptor::UdifItemDescriptor;
+use super::key_protector_descriptor::UdifKeyProtectorDescriptor;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -28,15 +28,14 @@ use super::item_descriptor::UdifItemDescriptor;
         field(name = "block_encryption_mode", data_type = "u32"),
         field(name = "block_encryption_method", data_type = "u32", format = "hex"),
         field(name = "block_key_size", data_type = "u32"),
-        field(name = "initialization_vector_encryption_method", data_type = "u32"),
-        field(name = "initialization_vector_size", data_type = "u32"),
-        field(name = "unknown1", data_type = "Uuid"),
+        field(name = "initialization_vector_hmac_method", data_type = "u32"),
+        field(name = "initialization_vector_hmac_key_size", data_type = "u32"),
+        field(name = "identifier", data_type = "Uuid"),
         field(name = "block_size", data_type = "u32"),
-        field(name = "data_area_offset", data_type = "u64"),
-        field(name = "data_area_size", data_type = "u64"),
-        field(name = "unknown2", data_type = "u32"),
-        field(name = "unknown3", data_type = "Struct<UdifItemDescriptor; 20>"),
-        field(name = "unknown4", data_type = "[u8; 416]"),
+        field(name = "data_fork_size", data_type = "u64"),
+        field(name = "data_fork_offset", data_type = "u64"),
+        field(name = "number_of_key_protectors", data_type = "u32"),
+        field(name = "unknown3", data_type = "[u8; 436]", format = "hex"),
     ),
     methods("debug_read_data", "read_at_position")
 )]
@@ -48,8 +47,32 @@ pub struct UdifEncryptedFileHeader {
     /// Block size.
     pub block_size: u32,
 
+    /// Initialization vector size.
+    pub initialization_vector_size: u32,
+
+    /// Encryption mode.
+    pub encryption_mode: u32,
+
     /// Encryption method.
     pub encryption_method: u32,
+
+    /// Key size.
+    pub key_size: u32,
+
+    /// HMAC method.
+    pub hmac_method: u32,
+
+    /// Initialization vector encryption method.
+    pub hmac_key_size: u32,
+
+    /// Data fork size.
+    pub data_fork_size: u64,
+
+    /// Data fork offset.
+    pub data_fork_offset: u64,
+
+    /// Key protector descriptors.
+    pub key_protector_descriptors: Vec<UdifKeyProtectorDescriptor>,
 }
 
 impl UdifEncryptedFileHeader {
@@ -58,13 +81,23 @@ impl UdifEncryptedFileHeader {
         Self {
             format_version: 0,
             block_size: 0,
+            initialization_vector_size: 0,
+            encryption_mode: 0,
             encryption_method: 0,
+            key_size: 0,
+            hmac_method: 0,
+            hmac_key_size: 0,
+            data_fork_size: 0,
+            data_fork_offset: 0,
+            key_protector_descriptors: Vec::new(),
         }
     }
 
     /// Reads the file encrypted header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 512 {
+        let data_size: usize = data.len();
+
+        if data_size < 512 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[0..8] != UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE {
@@ -78,9 +111,48 @@ impl UdifEncryptedFileHeader {
                 self.format_version
             )));
         }
-        self.block_size = bytes_to_u32_be!(data, 52);
+        self.initialization_vector_size = bytes_to_u32_be!(data, 12);
+        self.encryption_mode = bytes_to_u32_be!(data, 16);
         self.encryption_method = bytes_to_u32_be!(data, 20);
+        self.key_size = bytes_to_u32_be!(data, 24);
+        self.hmac_method = bytes_to_u32_be!(data, 28);
+        self.hmac_key_size = bytes_to_u32_be!(data, 32);
 
+        self.block_size = bytes_to_u32_be!(data, 52);
+        self.data_fork_size = bytes_to_u64_be!(data, 56);
+        self.data_fork_offset = bytes_to_u64_be!(data, 64);
+
+        let number_of_key_protectors: u32 = bytes_to_u32_be!(data, 72);
+
+        if (number_of_key_protectors as usize) > (data_size - 76) / 20 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid number of key protectors value out of bounds"
+            ));
+        }
+        let mut data_offset: usize = 76;
+
+        for value_index in 0..number_of_key_protectors {
+            keramics_core::debug_trace_structure!(UdifKeyProtectorDescriptor::debug_read_data(
+                &data[data_offset..]
+            ));
+            let mut key_protector_descriptor: UdifKeyProtectorDescriptor =
+                UdifKeyProtectorDescriptor::new();
+
+            match key_protector_descriptor.read_data(&data[data_offset..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to read key protector descriptor: {}", value_index)
+                    );
+                    return Err(error);
+                }
+            }
+            data_offset += 20;
+
+            self.key_protector_descriptors
+                .push(key_protector_descriptor);
+        }
         Ok(())
     }
 }
@@ -143,8 +215,16 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.format_version, 2);
-        assert_eq!(test_struct.block_size, 4096);
+        assert_eq!(test_struct.initialization_vector_size, 16);
+        assert_eq!(test_struct.encryption_mode, 5);
         assert_eq!(test_struct.encryption_method, 0x80000001);
+        assert_eq!(test_struct.key_size, 128);
+        assert_eq!(test_struct.hmac_method, 91);
+        assert_eq!(test_struct.hmac_key_size, 160);
+        assert_eq!(test_struct.block_size, 4096);
+        assert_eq!(test_struct.data_fork_size, 65536);
+        assert_eq!(test_struct.data_fork_offset, 122880);
+        assert_eq!(test_struct.key_protector_descriptors.len(), 1);
 
         Ok(())
     }
@@ -187,8 +267,16 @@ mod tests {
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.format_version, 2);
-        assert_eq!(test_struct.block_size, 4096);
+        assert_eq!(test_struct.initialization_vector_size, 16);
+        assert_eq!(test_struct.encryption_mode, 5);
         assert_eq!(test_struct.encryption_method, 0x80000001);
+        assert_eq!(test_struct.key_size, 128);
+        assert_eq!(test_struct.hmac_method, 0x0000005b);
+        assert_eq!(test_struct.hmac_key_size, 160);
+        assert_eq!(test_struct.block_size, 4096);
+        assert_eq!(test_struct.data_fork_size, 65536);
+        assert_eq!(test_struct.data_fork_offset, 122880);
+        assert_eq!(test_struct.key_protector_descriptors.len(), 1);
 
         Ok(())
     }

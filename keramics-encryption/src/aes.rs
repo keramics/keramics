@@ -18,6 +18,9 @@
 use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u32_le;
 
+use super::cbc::CbcContext;
+use super::traits::{CryptCbc, CryptContext};
+
 /// Calculate the next GF(2^8) value using the generator polynomial 0x1b.
 const fn calculate_next_gf28_value(value: usize) -> usize {
     if value & 0x80 == 0 {
@@ -187,18 +190,34 @@ const fn generate_round_constants() -> [u32; 10] {
     round_constants
 }
 
+/// AES block size.
+const AES_BLOCK_SIZE: usize = 16;
+
+/// AES supported key sizes.
+const AES_SUPPORTED_KEY_SIZES: [usize; 3] = [16, 24, 32];
+
+/// AES powers table.
 const AES_POWERS_TABLE: [u8; 256] = generate_powers_table();
+
+/// AES logs table.
 const AES_LOGS_TABLE: [u8; 256] = generate_logs_table(&AES_POWERS_TABLE);
+
+/// AES round constants.
 const AES_ROUND_CONSTANTS: [u32; 10] = generate_round_constants();
 
+/// AES forward (encryption) S-Box.
 const AES_FORWARD_SBOX: [u8; 256] = generate_forward_sbox(&AES_POWERS_TABLE, &AES_LOGS_TABLE);
+
+/// AES reverse (decryption) S-Box.
 const AES_REVERSE_SBOX: [u8; 256] = generate_reverse_sbox(&AES_FORWARD_SBOX);
 
+/// AES forward (encryption) tables.
 const AES_FORWARD_TABLE0: [u32; 256] = generate_forward_table0(&AES_FORWARD_SBOX);
 const AES_FORWARD_TABLE1: [u32; 256] = generate_derived_table(&AES_FORWARD_TABLE0, 8);
 const AES_FORWARD_TABLE2: [u32; 256] = generate_derived_table(&AES_FORWARD_TABLE0, 16);
 const AES_FORWARD_TABLE3: [u32; 256] = generate_derived_table(&AES_FORWARD_TABLE0, 24);
 
+/// AES reverse (decryption) tables.
 const AES_REVERSE_TABLE0: [u32; 256] =
     generate_reverse_table0(&AES_POWERS_TABLE, &AES_LOGS_TABLE, &AES_REVERSE_SBOX);
 const AES_REVERSE_TABLE1: [u32; 256] = generate_derived_table(&AES_REVERSE_TABLE0, 8);
@@ -221,18 +240,6 @@ pub struct AesContext {
 }
 
 impl AesContext {
-    const SUPPORTED_KEY_SIZES: [usize; 3] = [16, 24, 32];
-
-    /// Creates a new context.
-    pub fn new() -> Self {
-        Self {
-            decryption_round_keys: Vec::new(),
-            number_of_decryption_round_keys: 0,
-            encryption_round_keys: Vec::new(),
-            number_of_encryption_round_keys: 0,
-        }
-    }
-
     /// Calculates a forward substitution round.
     #[inline(always)]
     fn calculate_forward_substitution_round(
@@ -501,6 +508,47 @@ impl AesContext {
             ^ AES_REVERSE_TABLE3[index3]
     }
 
+    /// Decrypts a 16 byte block (4 32-bit values).
+    #[inline(always)]
+    fn decrypt_block(&self, block_values: &mut [u32], cipher_values: &mut [u32]) {
+        let mut round_key_index: usize = 0;
+
+        for _ in 0..4 {
+            block_values[round_key_index] ^= self.decryption_round_keys[round_key_index];
+            round_key_index += 1;
+        }
+        // Note that below the cipher_values and block_values deliberately alternate between calls.
+        let number_of_iterations: usize = self.number_of_decryption_round_keys / 2;
+
+        for _ in 1..number_of_iterations {
+            self.calculate_reverse_table_round(
+                &self.decryption_round_keys[round_key_index..],
+                cipher_values,
+                block_values,
+            );
+            round_key_index += 4;
+
+            self.calculate_reverse_table_round(
+                &self.decryption_round_keys[round_key_index..],
+                block_values,
+                cipher_values,
+            );
+            round_key_index += 4;
+        }
+        self.calculate_reverse_table_round(
+            &self.decryption_round_keys[round_key_index..],
+            cipher_values,
+            block_values,
+        );
+        round_key_index += 4;
+
+        self.calculate_reverse_substitution_round(
+            &self.decryption_round_keys[round_key_index..],
+            block_values,
+            cipher_values,
+        );
+    }
+
     /// Decrypts data using ECB (Electronic CodeBook) mode.
     pub fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
         if self.decryption_round_keys.is_empty() {
@@ -510,10 +558,16 @@ impl AesContext {
         }
         let encrypted_data_size: usize = encrypted_data.len();
 
-        if encrypted_data_size % 16 != 0 {
+        if encrypted_data_size < AES_BLOCK_SIZE {
             return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data size value not a multitude of block size: 16"
+                "Invalid encrypted data size value too small"
             ));
+        }
+        if encrypted_data_size % AES_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data size value not a multitude of block size: {}",
+                AES_BLOCK_SIZE
+            )));
         }
         if encrypted_data_size > data.len() {
             return Err(keramics_core::error_trace_new!(
@@ -523,58 +577,64 @@ impl AesContext {
         let mut block_values: [u32; 4] = [0; 4];
         let mut cipher_values: [u32; 4] = [0; 4];
         let mut data_offset: usize = 0;
-        let mut round_key_index: usize = 0;
-        let number_of_iterations: usize = self.number_of_decryption_round_keys / 2;
 
-        while data_offset < encrypted_data_size {
-            let mut block_offset: usize = data_offset;
-            for index in 0..4 {
-                let value_32bit: u32 = bytes_to_u32_le!(encrypted_data, block_offset);
-                block_offset += 4;
+        for block_data in encrypted_data.chunks_exact(AES_BLOCK_SIZE) {
+            block_values[0] = bytes_to_u32_le!(block_data, 0);
+            block_values[1] = bytes_to_u32_le!(block_data, 4);
+            block_values[2] = bytes_to_u32_le!(block_data, 8);
+            block_values[3] = bytes_to_u32_le!(block_data, 12);
 
-                let round_key: u32 = self.decryption_round_keys[round_key_index];
-                round_key_index += 1;
+            self.decrypt_block(&mut block_values, &mut cipher_values);
 
-                block_values[index] = value_32bit ^ round_key;
-            }
-            // Note that below the cipher_values and block_values deliberately alternate between
-            // calls.
-            for _ in 1..number_of_iterations {
-                self.calculate_reverse_table_round(
-                    &self.decryption_round_keys[round_key_index..],
-                    &mut cipher_values,
-                    &block_values,
-                );
-                round_key_index += 4;
-
-                self.calculate_reverse_table_round(
-                    &self.decryption_round_keys[round_key_index..],
-                    &mut block_values,
-                    &cipher_values,
-                );
-                round_key_index += 4;
-            }
-            self.calculate_reverse_table_round(
-                &self.decryption_round_keys[round_key_index..],
-                &mut cipher_values,
-                &block_values,
-            );
-            round_key_index += 4;
-
-            self.calculate_reverse_substitution_round(
-                &self.decryption_round_keys[round_key_index..],
-                &mut block_values,
-                &cipher_values,
-            );
-            for index in 0..4 {
+            for block_value in block_values.iter() {
                 let data_end_offset: usize = data_offset + 4;
-                data[data_offset..data_end_offset]
-                    .copy_from_slice(&block_values[index].to_le_bytes());
+                data[data_offset..data_end_offset].copy_from_slice(&block_value.to_le_bytes());
 
                 data_offset = data_end_offset;
             }
         }
         Ok(())
+    }
+
+    /// Encrypts a 16 byte block (4 32-bit values).
+    #[inline(always)]
+    fn encrypt_block(&self, block_values: &mut [u32], cipher_values: &mut [u32]) {
+        let mut round_key_index: usize = 0;
+
+        for _ in 0..4 {
+            block_values[round_key_index] ^= self.encryption_round_keys[round_key_index];
+            round_key_index += 1;
+        }
+        // Note that below the cipher_values and block_values deliberately alternate between calls.
+        let number_of_iterations: usize = self.number_of_encryption_round_keys / 2;
+
+        for _ in 1..number_of_iterations {
+            self.calculate_forward_table_round(
+                &self.encryption_round_keys[round_key_index..],
+                cipher_values,
+                block_values,
+            );
+            round_key_index += 4;
+
+            self.calculate_forward_table_round(
+                &self.encryption_round_keys[round_key_index..],
+                block_values,
+                cipher_values,
+            );
+            round_key_index += 4;
+        }
+        self.calculate_forward_table_round(
+            &self.encryption_round_keys[round_key_index..],
+            cipher_values,
+            block_values,
+        );
+        round_key_index += 4;
+
+        self.calculate_forward_substitution_round(
+            &self.encryption_round_keys[round_key_index..],
+            block_values,
+            cipher_values,
+        );
     }
 
     /// Encrypts data using ECB (Electronic CodeBook) mode.
@@ -586,10 +646,16 @@ impl AesContext {
         }
         let data_size: usize = data.len();
 
-        if data_size % 16 != 0 {
+        if data_size < AES_BLOCK_SIZE {
             return Err(keramics_core::error_trace_new!(
-                "Invalid data size value not a multitude of block size: 16"
+                "Invalid data size value too small"
             ));
+        }
+        if data_size % AES_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data size value not a multitude of block size: {}",
+                AES_BLOCK_SIZE
+            )));
         }
         if data_size > encrypted_data.len() {
             return Err(keramics_core::error_trace_new!(
@@ -599,53 +665,19 @@ impl AesContext {
         let mut block_values: [u32; 4] = [0; 4];
         let mut cipher_values: [u32; 4] = [0; 4];
         let mut data_offset: usize = 0;
-        let mut round_key_index: usize = 0;
-        let number_of_iterations: usize = self.number_of_encryption_round_keys / 2;
 
-        while data_offset < data_size {
-            let mut block_offset: usize = data_offset;
-            for index in 0..4 {
-                let value_32bit: u32 = bytes_to_u32_le!(data, block_offset);
-                block_offset += 4;
+        for block_data in data.chunks_exact(AES_BLOCK_SIZE) {
+            block_values[0] = bytes_to_u32_le!(block_data, 0);
+            block_values[1] = bytes_to_u32_le!(block_data, 4);
+            block_values[2] = bytes_to_u32_le!(block_data, 8);
+            block_values[3] = bytes_to_u32_le!(block_data, 12);
 
-                let round_key: u32 = self.encryption_round_keys[round_key_index];
-                round_key_index += 1;
+            self.encrypt_block(&mut block_values, &mut cipher_values);
 
-                block_values[index] = value_32bit ^ round_key;
-            }
-            // Note that below the cipher_values and block_values deliberately alternate between
-            // calls.
-            for _ in 1..number_of_iterations {
-                self.calculate_forward_table_round(
-                    &self.encryption_round_keys[round_key_index..],
-                    &mut cipher_values,
-                    &block_values,
-                );
-                round_key_index += 4;
-
-                self.calculate_forward_table_round(
-                    &self.encryption_round_keys[round_key_index..],
-                    &mut block_values,
-                    &cipher_values,
-                );
-                round_key_index += 4;
-            }
-            self.calculate_forward_table_round(
-                &self.encryption_round_keys[round_key_index..],
-                &mut cipher_values,
-                &block_values,
-            );
-            round_key_index += 4;
-
-            self.calculate_forward_substitution_round(
-                &self.encryption_round_keys[round_key_index..],
-                &mut block_values,
-                &cipher_values,
-            );
-            for index in 0..4 {
+            for block_value in block_values.iter() {
                 let data_end_offset: usize = data_offset + 4;
                 encrypted_data[data_offset..data_end_offset]
-                    .copy_from_slice(&block_values[index].to_le_bytes());
+                    .copy_from_slice(&block_value.to_le_bytes());
 
                 data_offset = data_end_offset;
             }
@@ -817,12 +849,24 @@ impl AesContext {
         }
         self.number_of_encryption_round_keys = 14;
     }
+}
+
+impl CryptContext for AesContext {
+    /// Creates a new context.
+    fn new() -> Self {
+        Self {
+            decryption_round_keys: Vec::new(),
+            number_of_decryption_round_keys: 0,
+            encryption_round_keys: Vec::new(),
+            number_of_encryption_round_keys: 0,
+        }
+    }
 
     /// Sets the key.
-    pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
+    fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
         let key_size: usize = key.len();
 
-        if !Self::SUPPORTED_KEY_SIZES.contains(&key_size) {
+        if !AES_SUPPORTED_KEY_SIZES.contains(&key_size) {
             return Err(keramics_core::error_trace_new!("Unsupported key size"));
         }
         self.encryption_round_keys = vec![0; 68];
@@ -892,14 +936,222 @@ impl AesContext {
     }
 }
 
+impl CryptCbc for AesContext {
+    /// Decrypts data using CBC (Cipher Block Chaining) mode.
+    fn decrypt_cbc(
+        &self,
+        initialization_vector: &[u8],
+        encrypted_data: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.decryption_round_keys.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        if initialization_vector.len() < AES_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid initialization vector value too small"
+            ));
+        }
+        let encrypted_data_size: usize = encrypted_data.len();
+
+        if encrypted_data_size < AES_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data size value too small"
+            ));
+        }
+        if encrypted_data_size % AES_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data size value not a multitude of block size: {}",
+                AES_BLOCK_SIZE
+            )));
+        }
+        if encrypted_data_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data value too small"
+            ));
+        }
+        let mut block_values: [u32; 4] = [0; 4];
+        let mut cipher_values: [u32; 4] = [0; 4];
+        let mut initialization_vector_values: [u32; 4] = [0; 4];
+        let mut data_offset: usize = 0;
+
+        initialization_vector_values[0] = bytes_to_u32_le!(initialization_vector, 0);
+        initialization_vector_values[1] = bytes_to_u32_le!(initialization_vector, 4);
+        initialization_vector_values[2] = bytes_to_u32_le!(initialization_vector, 8);
+        initialization_vector_values[3] = bytes_to_u32_le!(initialization_vector, 12);
+
+        for block_data in encrypted_data.chunks_exact(AES_BLOCK_SIZE) {
+            let input_value0: u32 = bytes_to_u32_le!(block_data, 0);
+            let input_value1: u32 = bytes_to_u32_le!(block_data, 4);
+            let input_value2: u32 = bytes_to_u32_le!(block_data, 8);
+            let input_value3: u32 = bytes_to_u32_le!(block_data, 12);
+
+            block_values[0] = input_value0;
+            block_values[1] = input_value1;
+            block_values[2] = input_value2;
+            block_values[3] = input_value3;
+
+            self.decrypt_block(&mut block_values, &mut cipher_values);
+
+            for (index, block_value) in block_values.iter().enumerate() {
+                let output_value: u32 = *block_value ^ initialization_vector_values[index];
+
+                let data_end_offset: usize = data_offset + 4;
+                data[data_offset..data_end_offset].copy_from_slice(&output_value.to_le_bytes());
+
+                data_offset = data_end_offset;
+            }
+            initialization_vector_values[0] = input_value0;
+            initialization_vector_values[1] = input_value1;
+            initialization_vector_values[2] = input_value2;
+            initialization_vector_values[3] = input_value3;
+        }
+        Ok(())
+    }
+
+    /// Encrypts data using CBC (Cipher Block Chaining) mode.
+    fn encrypt_cbc(
+        &self,
+        initialization_vector: &[u8],
+        data: &[u8],
+        encrypted_data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.encryption_round_keys.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        if initialization_vector.len() < AES_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid initialization vector value too small"
+            ));
+        }
+        let data_size: usize = data.len();
+
+        if data_size < AES_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data size value too small"
+            ));
+        }
+        if data_size % AES_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data size value not a multitude of block size: {}",
+                AES_BLOCK_SIZE
+            )));
+        }
+        if data_size > encrypted_data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data value too small"
+            ));
+        }
+        let mut block_values: [u32; 4] = [0; 4];
+        let mut cipher_values: [u32; 4] = [0; 4];
+        let mut initialization_vector_values: [u32; 4] = [0; 4];
+        let mut data_offset: usize = 0;
+
+        initialization_vector_values[0] = bytes_to_u32_le!(initialization_vector, 0);
+        initialization_vector_values[1] = bytes_to_u32_le!(initialization_vector, 4);
+        initialization_vector_values[2] = bytes_to_u32_le!(initialization_vector, 8);
+        initialization_vector_values[3] = bytes_to_u32_le!(initialization_vector, 12);
+
+        for block_data in data.chunks_exact(AES_BLOCK_SIZE) {
+            block_values[0] = bytes_to_u32_le!(block_data, 0) ^ initialization_vector_values[0];
+            block_values[1] = bytes_to_u32_le!(block_data, 4) ^ initialization_vector_values[1];
+            block_values[2] = bytes_to_u32_le!(block_data, 8) ^ initialization_vector_values[2];
+            block_values[3] = bytes_to_u32_le!(block_data, 12) ^ initialization_vector_values[3];
+
+            self.encrypt_block(&mut block_values, &mut cipher_values);
+
+            for block_value in block_values.iter() {
+                let data_end_offset: usize = data_offset + 4;
+                encrypted_data[data_offset..data_end_offset]
+                    .copy_from_slice(&block_value.to_le_bytes());
+
+                data_offset = data_end_offset;
+            }
+            initialization_vector_values[0] = block_values[0];
+            initialization_vector_values[1] = block_values[1];
+            initialization_vector_values[2] = block_values[2];
+            initialization_vector_values[3] = block_values[3];
+        }
+        Ok(())
+    }
+}
+
+/// Context for AES-CBC
+pub type AesCbcContext = CbcContext<AesContext, 16>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+        aes_context.set_key(&key)?;
+
+        let initialization_vector: [u8; 16] = [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+        let encrypted_data: [u8; 16] = [
+            0x76, 0x49, 0xab, 0xac, 0x81, 0x19, 0xb2, 0x46, 0xce, 0xe9, 0x8e, 0x9b, 0x12, 0xe9,
+            0x19, 0x7d,
+        ];
+        let mut data: Vec<u8> = vec![0; 16];
+        aes_context.decrypt_cbc(&initialization_vector, &encrypted_data, &mut data)?;
+
+        let expected_data: [u8; 16] = [
+            0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93,
+            0x17, 0x2a,
+        ];
+        assert_eq!(&data, &expected_data);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
+        let mut aes_context: AesContext = AesContext::new();
+
+        let key: [u8; 16] = [
+            0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6, 0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf,
+            0x4f, 0x3c,
+        ];
+        aes_context.set_key(&key)?;
+
+        let initialization_vector: [u8; 16] = [
+            0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
+            0x0e, 0x0f,
+        ];
+        let data: [u8; 16] = [
+            0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e, 0x11, 0x73, 0x93,
+            0x17, 0x2a,
+        ];
+        let mut encrypted_data: Vec<u8> = vec![0; 16];
+        aes_context.encrypt_cbc(&initialization_vector, &data, &mut encrypted_data)?;
+
+        let expected_encrypted_data: [u8; 16] = [
+            0x76, 0x49, 0xab, 0xac, 0x81, 0x19, 0xb2, 0x46, 0xce, 0xe9, 0x8e, 0x9b, 0x12, 0xe9,
+            0x19, 0x7d,
+        ];
+        assert_eq!(&encrypted_data, &expected_encrypted_data);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_decrypt_ecb_with_128bits_key() -> Result<(), ErrorTrace> {
         let mut aes_context: AesContext = AesContext::new();
 
+        // This test uses the FIPS-197 test vector.
         let key: [u8; 16] = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f,
@@ -926,6 +1178,7 @@ mod tests {
     fn test_decrypt_ecb_with_192bits_key() -> Result<(), ErrorTrace> {
         let mut aes_context: AesContext = AesContext::new();
 
+        // This test uses the FIPS-197 test vector.
         let key: [u8; 24] = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17,
@@ -952,6 +1205,7 @@ mod tests {
     fn test_decrypt_ecb_with_256bits_key() -> Result<(), ErrorTrace> {
         let mut aes_context: AesContext = AesContext::new();
 
+        // This test uses the FIPS-197 test vector.
         let key: [u8; 32] = [
             0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
             0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,

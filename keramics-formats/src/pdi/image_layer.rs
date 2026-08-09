@@ -164,32 +164,26 @@ impl PdiImageLayer {
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.current_offset;
 
-        let mut extent_index: usize = 0;
-        let mut extent_offset: u64 = self.current_offset;
-
-        // TODO: optimize extent lookup
-        for extent in self.extents.iter() {
-            if extent_offset < extent.size {
-                break;
-            }
-            extent_index += 1;
-            extent_offset -= extent.size;
-        }
-        if extent_index >= self.extents.len() {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid media offset: {} (0x{:08x}) value out of bounds",
-                media_offset, media_offset
-            )));
-        }
+        let mut extent_offset: u64 = 0;
+        let mut extent_index: usize = self.extents.partition_point(|extent| {
+            extent_offset += extent.size;
+            media_offset >= extent_offset
+        });
         let mut extent_size: u64 = match self.extents.get(extent_index) {
             Some(extent) => extent.size,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unable to retrieve extent: {}",
-                    extent_index
+                    "Unable to retrieve extent: {} for media offset: {} (0x{:08x})",
+                    extent_index, media_offset, media_offset
                 )));
             }
         };
+        extent_offset = self.extents[0..extent_index]
+            .iter()
+            .map(|extent| extent.size)
+            .sum::<u64>();
+        extent_offset = media_offset - extent_offset;
+
         while data_offset < read_size {
             let extent_file: &mut PdiExtentFile = match self.get_extent_file(extent_index) {
                 Ok(extent_file) => extent_file,

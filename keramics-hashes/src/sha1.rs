@@ -11,21 +11,21 @@
  * under the License.
  */
 
-//! Secure Hash Algorithm 1 (SHA1).
+//! Secure Hash Algorithm 1 (SHA-1).
 //!
-//! Provides support for calculating a SHA1 hash (RFC 1321, FIPS 180-1).
+//! Provides support for calculating a SHA-1 hash (RFC 1321, FIPS 180-1).
 
 use keramics_types::bytes_to_u32_be;
 
 use super::traits::DigestHashContext;
 
-/// SHA1 block size.
+/// SHA-1 block size.
 const SHA1_BLOCK_SIZE: usize = 64;
 
-/// SHA1 initial hash values.
+/// SHA-1 initial hash values.
 const SHA1_HASH_VALUES: [u32; 5] = [0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0];
 
-/// Context for calculating a SHA1 hash.
+/// Context for calculating a SHA-1 hash.
 pub struct Sha1Context {
     /// Hash values.
     hash_values: [u32; 5],
@@ -115,6 +115,14 @@ impl Sha1Context {
 }
 
 impl DigestHashContext for Sha1Context {
+    /// Creates a new context.
+    fn new() -> Self
+    where
+        Self: Sized,
+    {
+        Self::new()
+    }
+
     /// Finalizes the hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
         let bit_size: u64 = (self.number_of_bytes_hashed + self.block_offset as u64) * 8;
