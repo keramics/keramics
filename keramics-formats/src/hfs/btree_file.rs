@@ -67,22 +67,12 @@ impl HfsBtreeFile {
     ) -> Result<HfsBtreeNode, ErrorTrace> {
         let node_logical_offset: u64 = (node_number as u64) * (self.node_size as u64);
 
-        // TODO: optimize block range lookup
-        let block_range_index: usize = match self.block_ranges.iter().position(|block_range| {
+        let block_range_index: usize = self.block_ranges.partition_point(|block_range| {
             let range_logical_end_offset: u64 = ((block_range.logical_block_number as u64)
                 + (block_range.number_of_blocks as u64))
                 * (self.block_size as u64);
-
-            node_logical_offset < range_logical_end_offset
-        }) {
-            Some(index) => index,
-            None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Invalid node number: {} value out of bounds",
-                    node_number
-                )));
-            }
-        };
+            node_logical_offset >= range_logical_end_offset
+        });
         let node_physical_offset: u64 = match self.block_ranges.get(block_range_index) {
             Some(block_range) => {
                 let range_logical_offset: u64 =
@@ -94,8 +84,8 @@ impl HfsBtreeFile {
             }
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unable to retrieve block range: {}",
-                    block_range_index
+                    "Unable to retrieve block range: {} of node: {}",
+                    block_range_index, node_number
                 )));
             }
         };

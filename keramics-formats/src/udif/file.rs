@@ -23,7 +23,9 @@ use super::block_table_reader::UdifBlockTableReader;
 use super::constants::*;
 use super::encrypted_file_footer::UdifEncryptedFileFooter;
 use super::encrypted_file_header::UdifEncryptedFileHeader;
+use super::enums::UdifKeyProtectorType;
 use super::file_footer::UdifFileFooter;
+use super::key_protector::UdifKeyProtector;
 use super::resource_fork_header::UdifResourceForkHeader;
 use super::resource_map::UdifResourceMap;
 use super::resource_map_item::UdifResourceMapItem;
@@ -34,7 +36,7 @@ pub struct UdifFile {
     data_stream: Option<DataStreamReference>,
 
     /// Format version.
-    format_version: u32,
+    pub(super) format_version: u32,
 
     /// Segment offset.
     pub(super) segment_offset: u64,
@@ -47,6 +49,9 @@ pub struct UdifFile {
 
     /// Segment set identifier.
     pub(super) segment_set_identifier: Uuid,
+
+    /// Number of sectors.
+    pub(super) number_of_sectors: u64,
 
     /// Data fork offset.
     pub(super) data_fork_offset: u64,
@@ -65,6 +70,33 @@ pub struct UdifFile {
 
     /// Plist size.
     pub(super) plist_size: u64,
+
+    /// Block size.
+    pub(super) block_size: u32,
+
+    /// Value to indicate the (encrypted) file is locked.
+    pub(super) is_locked: bool,
+
+    /// Encryption method.
+    pub(super) encryption_method: u32,
+
+    /// Encryption mode.
+    pub(super) encryption_mode: u32,
+
+    /// Key size.
+    pub(super) key_size: usize,
+
+    /// Initialization vector size.
+    pub(super) initialization_vector_size: usize,
+
+    /// HMAC method.
+    pub(super) hmac_method: u32,
+
+    /// HMAC method.
+    pub(super) hmac_key_size: usize,
+
+    /// Key key_protectors.
+    pub(super) key_protectors: Vec<UdifKeyProtector>,
 }
 
 impl UdifFile {
@@ -77,12 +109,22 @@ impl UdifFile {
             segment_number: 0,
             number_of_segments: 0,
             segment_set_identifier: Uuid::new(),
+            number_of_sectors: 0,
             data_fork_offset: 0,
             data_fork_size: 0,
             resource_fork_offset: 0,
             resource_fork_size: 0,
             plist_offset: 0,
             plist_size: 0,
+            block_size: 0,
+            is_locked: false,
+            encryption_method: 0,
+            encryption_mode: 0,
+            key_size: 0,
+            initialization_vector_size: 0,
+            hmac_method: 0,
+            hmac_key_size: 0,
+            key_protectors: Vec::new(),
         }
     }
 
@@ -106,7 +148,6 @@ impl UdifFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        // TODO: read first 8 bytes to check for encrypted v2 header.
         let mut signature: [u8; 8] = [0; 8];
 
         keramics_core::data_stream_read_exact_at_position!(
@@ -128,9 +169,35 @@ impl UdifFile {
                 }
             }
             self.format_version = encrypted_file_header.format_version;
-            // self.block_size = encrypted_file_header.block_size;
+            self.data_fork_offset = encrypted_file_header.data_fork_offset;
+            self.data_fork_size = encrypted_file_header.data_fork_size;
+            self.block_size = encrypted_file_header.block_size;
+            self.is_locked = true;
+            self.encryption_method = encrypted_file_header.encryption_method;
+            self.encryption_mode = encrypted_file_header.encryption_mode;
+            self.key_size = (encrypted_file_header.key_size / 8) as usize;
+            self.initialization_vector_size =
+                encrypted_file_header.initialization_vector_size as usize;
+            self.hmac_method = encrypted_file_header.hmac_method;
+            self.hmac_key_size = (encrypted_file_header.hmac_key_size / 8) as usize;
+
+            for key_protector_descriptor in encrypted_file_header.key_protector_descriptors.iter() {
+                let key_protector_type: UdifKeyProtectorType =
+                    match key_protector_descriptor.unlock_type {
+                        0x00000001 => UdifKeyProtectorType::PassphraseWrappedKey,
+                        0x00000002 => UdifKeyProtectorType::PublicKeyWrappedKey,
+                        0x00000003 => UdifKeyProtectorType::KeybagWrappedKey,
+                        _ => UdifKeyProtectorType::Unknown(key_protector_descriptor.unlock_type),
+                    };
+                let key_protector: UdifKeyProtector = UdifKeyProtector::new(
+                    key_protector_type,
+                    key_protector_descriptor.data_offset,
+                    key_protector_descriptor.data_size,
+                );
+                self.key_protectors.push(key_protector);
+            }
         } else {
-            keramics_core::data_stream_read_exact_at_position!(
+            let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
                 data_stream,
                 &mut signature,
                 SeekFrom::End(-8)
@@ -150,7 +217,24 @@ impl UdifFile {
                     }
                 }
                 self.format_version = encrypted_file_footer.format_version;
-                // self.block_size = encrypted_file_footer.block_size;
+                self.data_fork_offset = encrypted_file_footer.data_fork_offset as u64;
+                self.data_fork_size = encrypted_file_footer.data_fork_size as u64;
+                self.block_size = encrypted_file_footer.block_size;
+                self.is_locked = true;
+                self.encryption_method = encrypted_file_footer.encryption_method;
+                self.encryption_mode = encrypted_file_footer.encryption_mode;
+                self.key_size = (encrypted_file_footer.key_size / 8) as usize;
+                self.initialization_vector_size =
+                    encrypted_file_footer.initialization_vector_size as usize;
+                // self.hmac_method = encrypted_file_footer.hmac_method;
+                // self.hmac_key_size = (encrypted_file_footer.hmac_key_size / 8) as usize;
+
+                let key_protector: UdifKeyProtector = UdifKeyProtector::new(
+                    UdifKeyProtectorType::PassphraseWrappedKey,
+                    (offset + 8) - 1276,
+                    1276,
+                );
+                self.key_protectors.push(key_protector);
             } else {
                 let mut file_footer: UdifFileFooter = UdifFileFooter::new();
 
@@ -166,12 +250,14 @@ impl UdifFile {
                 self.segment_number = file_footer.segment_number;
                 self.number_of_segments = file_footer.number_of_segments;
                 self.segment_set_identifier = file_footer.segment_set_identifier;
+                self.number_of_sectors = file_footer.number_of_sectors;
                 self.data_fork_offset = file_footer.data_fork_offset;
                 self.data_fork_size = file_footer.data_fork_size;
                 self.resource_fork_offset = file_footer.resource_fork_offset;
                 self.resource_fork_size = file_footer.resource_fork_size;
                 self.plist_offset = file_footer.plist_offset;
                 self.plist_size = file_footer.plist_size;
+                self.block_size = 512;
             }
         }
         self.data_stream = Some(data_stream.clone());
@@ -360,7 +446,7 @@ impl UdifFile {
                 // TODO: determine data offset relative to start of plist
                 keramics_core::debug_trace_data!("UdifBlockTable", 0, &data, data.len());
 
-                let mut block_table = UdifBlockTable::new();
+                let mut block_table: UdifBlockTable = UdifBlockTable::new();
 
                 match block_table.read_data(&data) {
                     Ok(_) => {}
@@ -396,9 +482,48 @@ mod tests {
     use crate::tests::get_test_data_path;
     use crate::udif::segment_range::UdifSegmentRange;
 
-    // TODO add tests for get_format_version
-    // TODO add tests for get_segment_set_identifier
-    // TODO add tests for get_segment_number
+    fn get_file(path_string: &str) -> Result<UdifFile, ErrorTrace> {
+        let mut file: UdifFile = UdifFile::new();
+
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file.read_data_stream(&data_stream)?;
+
+        Ok(file)
+    }
+
+    #[test]
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
+        let file: UdifFile = get_file("udif/hfsplus_zlib.dmg")?;
+
+        let format_version: u32 = file.get_format_version();
+        assert_eq!(format_version, 4);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_segment_set_identifier() -> Result<(), ErrorTrace> {
+        let file: UdifFile = get_file("udif/hfsplus_zlib.dmg")?;
+
+        let segment_set_identifier: &Uuid = file.get_segment_set_identifier();
+        assert_eq!(
+            segment_set_identifier.to_string(),
+            "00000000-0000-0000-0000-000000000000"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_segment_number() -> Result<(), ErrorTrace> {
+        let file: UdifFile = get_file("udif/hfsplus_zlib.dmg")?;
+
+        let segment_number: u32 = file.get_segment_number();
+        assert_eq!(segment_number, 0);
+
+        Ok(())
+    }
 
     #[test]
     fn test_read_data_stream() -> Result<(), ErrorTrace> {

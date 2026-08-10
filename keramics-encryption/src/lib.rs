@@ -13,10 +13,24 @@
 
 mod aes;
 mod blowfish;
+mod cbc;
 mod des3;
+mod hmac;
+mod pbkdf2;
+mod pkcs7;
 mod rc4;
+mod traits;
 
-pub use aes::AesContext;
-pub use blowfish::BlowfishContext;
-pub use des3::Des3Context;
+pub use aes::{AesCbcContext, AesContext};
+pub use blowfish::{BlowfishCbcContext, BlowfishContext};
+pub use des3::{Des3CbcContext, Des3Context};
+pub use hmac::{
+    HmacSha1Context, HmacSha224Context, HmacSha256Context, HmacSha384Context, HmacSha512Context,
+};
+pub use pbkdf2::{
+    Pbkdf2HmacSha1Context, Pbkdf2HmacSha224Context, Pbkdf2HmacSha256Context,
+    Pbkdf2HmacSha384Context, Pbkdf2HmacSha512Context,
+};
+pub use pkcs7::Pkcs7Context;
 pub use rc4::Rc4Context;
+pub use traits::{CryptCbc, CryptContext};

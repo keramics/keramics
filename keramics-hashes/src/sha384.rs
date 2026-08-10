@@ -11,40 +11,42 @@
  * under the License.
  */
 
-//! 512-bit Secure Hash Algorithm 2 (SHA-512).
+//! 384-bit Secure Hash Algorithm 2 (SHA-384).
 //!
-//! Provides support for calculating a SHA-512 hash (RFC 6234, FIPS 180-2).
+//! Provides support for calculating a SHA-384 hash (RFC 6234, FIPS 180-2).
 
 use super::internal_sha512::InternalSha512Context;
 use super::traits::DigestHashContext;
 
-/// The first 64-bits of the fractional parts of the square roots of the primes in [2, 19]
+/// The first 64-bits of the fractional parts of the square roots of the primes in [23, 53]
 #[rustfmt::skip]
-const SHA512_PRIME_SQUARE_ROOTS: [u64; 8] = [
-    0x6a09e667f3bcc908, 0xbb67ae8584caa73b, 0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
-    0x510e527fade682d1, 0x9b05688c2b3e6c1f, 0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,
+const SHA384_PRIME_SQUARE_ROOTS: [u64; 8] = [
+    0xcbbb9d5dc1059ed8, 0x629a292a367cd507, 0x9159015a3070dd17, 0x152fecd8f70e5939,
+    0x67332667ffc00b31, 0x8eb44a8768581511, 0xdb0c2e0d64f98fa7, 0x47b5481dbefa4fa4,
 ];
 
-/// Context for calculating a SHA-512 hash.
-pub struct Sha512Context {
+/// Context for calculating a SHA-384 hash.
+pub struct Sha384Context {
     /// Internal context.
     internal_context: InternalSha512Context,
 }
 
-impl DigestHashContext for Sha512Context {
+impl DigestHashContext for Sha384Context {
     /// Creates a new context.
     fn new() -> Self
     where
         Self: Sized,
     {
         Self {
-            internal_context: InternalSha512Context::new(SHA512_PRIME_SQUARE_ROOTS),
+            internal_context: InternalSha512Context::new(SHA384_PRIME_SQUARE_ROOTS),
         }
     }
 
     /// Finalizes the digest hash calculation.
     fn finalize(&mut self) -> Vec<u8> {
-        self.internal_context.finalize(&SHA512_PRIME_SQUARE_ROOTS)
+        let mut hash: Vec<u8> = self.internal_context.finalize(&SHA384_PRIME_SQUARE_ROOTS);
+        hash.drain(48..64);
+        hash
     }
 
     /// Calculates the digest hash of the data.
@@ -63,14 +65,14 @@ mod tests {
     fn test_update_and_finalize_with_empty_block() {
         let test_data: [u8; 0] = [];
 
-        let mut test_context: Sha512Context = Sha512Context::new();
+        let mut test_context: Sha384Context = Sha384Context::new();
         test_context.update(&test_data);
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
         assert_eq!(
             test_hash_string,
-            "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e"
+            "38b060a751ac96384cd9327eb1b1e36a21fdb71114be07434c0cc7bf63f6e1da274edebfe76f65fbd51ad2f14898b95b"
         );
     }
 
@@ -88,15 +90,14 @@ mod tests {
             0x00, 0x00, 0x00, 0x03, 0xe0, 0x07, 0xff, 0xc0, 0x03, 0xfc, 0x00, 0x07, 0xff, 0xff,
             0xff,
         ];
-
-        let mut test_context: Sha512Context = Sha512Context::new();
+        let mut test_context: Sha384Context = Sha384Context::new();
         test_context.update(&test_data);
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
         assert_eq!(
             test_hash_string,
-            "c6a5f4bbdb075c17ebcf4131de0fe33d3e2bb6edb5af7c277b472ea7847b11d2aa2598cb7ca75e4fe94c264bd2942bd82fc60b5045bd7c5cbc31325954713dfc"
+            "c031380e2e4421d0436dc51d54706b909128d6ee9dba1e2605e15c67f7fae03f6f3dc5ff7695a0f2471f7140aae57dde"
         );
     }
 
@@ -123,15 +124,14 @@ mod tests {
             0xff, 0xf0, 0x00, 0x00, 0x3f, 0xff, 0xff, 0xff, 0xfe, 0x00, 0x00, 0x07, 0xff, 0xff,
             0xff, 0xe0, 0x00, 0x00, 0x00,
         ];
-
-        let mut test_context: Sha512Context = Sha512Context::new();
+        let mut test_context: Sha384Context = Sha384Context::new();
         test_context.update(&test_data);
         let test_hash: Vec<u8> = test_context.finalize();
 
         let test_hash_string: String = format_as_string(&test_hash);
         assert_eq!(
             test_hash_string,
-            "8a006a0a1e2dd36ba57aa0325b2c9532db7649a4c3c6214ee0f004ecabcf1eef89a91b225ffc52a4f811791d20f6faddd900b863386da65daec18e00c48412d6"
+            "09396174128d49b61ff435be0ec147dec1146cbd3b890087b8b01f24f0dfeb7c7608b035b4380dfaf1b3333d2d85a212"
         );
     }
 
@@ -158,8 +158,7 @@ mod tests {
             0xff, 0xf0, 0x00, 0x00, 0x3f, 0xff, 0xff, 0xff, 0xfe, 0x00, 0x00, 0x07, 0xff, 0xff,
             0xff, 0xe0, 0x00, 0x00, 0x00,
         ];
-
-        let mut test_context: Sha512Context = Sha512Context::new();
+        let mut test_context: Sha384Context = Sha384Context::new();
 
         let data_size: usize = test_data.len();
         let mut data_offset: usize = 0;
@@ -177,7 +176,7 @@ mod tests {
         let test_hash_string: String = format_as_string(&test_hash);
         assert_eq!(
             test_hash_string,
-            "8a006a0a1e2dd36ba57aa0325b2c9532db7649a4c3c6214ee0f004ecabcf1eef89a91b225ffc52a4f811791d20f6faddd900b863386da65daec18e00c48412d6"
+            "09396174128d49b61ff435be0ec147dec1146cbd3b890087b8b01f24f0dfeb7c7608b035b4380dfaf1b3333d2d85a212"
         );
     }
 }

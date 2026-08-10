@@ -14,7 +14,7 @@
 /// Decompresses DEFLATE compressed data.
 #[macro_export]
 macro_rules! deflate_decompress {
-    ($compressed:expr, $uncompressed:expr, $error_message:expr) => {{
+    ( $compressed:expr, $uncompressed:expr, $error_message:expr $(,)? ) => {{
         #[cfg(feature = "zlib")]
         use zlib_rs::{InflateConfig, ReturnCode, decompress_slice};
 
@@ -52,7 +52,7 @@ macro_rules! deflate_decompress {
 /// Decompresses zlib compressed data.
 #[macro_export]
 macro_rules! zlib_decompress {
-    ($compressed:expr, $uncompressed:expr, $error_message:expr) => {{
+    ( $compressed:expr, $uncompressed:expr, $error_message:expr $(,)? ) => {{
         #[cfg(feature = "zlib")]
         use zlib_rs::{InflateConfig, ReturnCode, decompress_slice};
 

@@ -6,6 +6,18 @@ X 10.0 (Cheetah).
 
 ## Overview
 
+An UDIF image can consists of one or more segment files, where:
+
+* the first segment file is named: "image.dmg"
+* successive segment files are named: "image.###.dmgpart", where "###" represents a numeric value
+  starting with 2 with 0 padding, e.g. "image.002.dmgpart". Segment files after 999 are assumed to
+  be named without the 0 padding, e.g. "image.1234.dmgpart".
+
+The data forks of the segment files are used as a contiguous data stream. A compressed block can
+be stored across multiple segment files.
+
+Only the first segment file contains a resource fork or XML plist.
+
 Known UDIF image types are:
 
 | Identifier | Description |
@@ -19,17 +31,7 @@ Known UDIF image types are:
 | ULFO | LZFSE compressed UDIF |
 | ULMO | LZMA compressed UDIF |
 
-An UDIF image can consists of one or more segment files, where:
-
-* the first segment file is named: "image.dmg"
-* successive segment files are named: "image.###.dmgpart", where "###" represents a numeric value
-  starting with 2 with 0 padding, e.g. "image.002.dmgpart". Segment files after 999 are assumed to
-  be named without the 0 padding, e.g. "image.1234.dmgpart".
-
-The data forks of the segment files are used as a contiguous data stream. A compressed block can
-be stored across multiple segment files.
-
-Only the first segment file contains a resource fork or XML plist.
+An UDIF image can also be encrypted.
 
 ### Terminology
 
@@ -40,37 +42,39 @@ Only the first segment file contains a resource fork or XML plist.
 
 ### Uncompressed image format
 
-An uncompressed UDIF image consist of:
+An uncompressed UDIF segment file consist of:
 
-* data
-* optional file footer
+* Image data
+* [File footer](#file_footer) at the end of the file
 
 > Note that an uncompressed UDIF image without file footer is equivalent to a RAW storage media
 > image (CRawDiskImage).
 
 ### Compressed image format
 
-A compressed UDIF image consist of:
+A compressed UDIF segment file consist of:
 
-* Data fork
+* Data fork, containing the image data
 * Optional resource fork or XML plist
-* [File footer](#file_footer) at the end of the image file
+* [File footer](#file_footer) at the end of the file
 
 ### Encrypted image format
 
 #### Encrypted image format version 1
 
-An encrypted UDIF image (version 1) consist of:
+A version 1 encrypted segment file consist of:
 
-* Encyrypted uncompressed or compressed UDIF image data
-* [Encrypted file footer](#encypted_file_footer) at the end of the image file
+* Data fork, containing encyrypted UDIF data
+* [Encrypted file footer](#encypted_file_footer) at the end of the file
 
 #### Encrypted image format version 2
 
-An encrypted UDIF image (version 2) consist of:
+A version 2 encrypted segment file consist of:
 
-* [Encrypted file header](#encypted_file_header) at the start of the image file
-* Encyrypted uncompressed or compressed UDIF image data
+* [Encrypted file header](#encypted_file_header) at the start of the file
+* Key protectors
+* Unknown (empty values), probably reserved for the key protectors
+* Data fork, containing encyrypted UDIF data
 
 ### Characteristics
 
@@ -114,7 +118,7 @@ and consists of:
 | 356 | 4 | | Master checksum size, in number of bits |
 | 360 | 128 | | Master checksum |
 | 488 | 4 | | [Image type](#image_types) (or variant) |
-| 492 | 8 | | Number of sectors |
+| 492 | 8 | | Media size, in number of sectors, which contains the total number of sectors in the (uncompressed) image |
 | 500 | 4 | | Unknown (reserved) |
 | 504 | 4 | | Unknown (reserved) |
 | 508 | 4 | | Unknown (reserved) |
@@ -149,8 +153,8 @@ and consists of:
 
 ## Resource fork
 
-In older UDIF images the resource fork contains the [block table](#udif_block_table). The
-resource fork consists of:
+In older UDIF images the resource fork contains the image metadata, such as the
+[block table](#udif_block_table). The resource fork consists of:
 
 * Resource fork header
 * Resource data
@@ -241,7 +245,7 @@ The resource name is of variable size and consists of:
 
 ## XML plist
 
-TODO: complete section
+The XML plist contains image metadata such as the [block table](#udif_block_table).
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -400,7 +404,7 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 
 #### UDIF block table entry types {#udif_block_table_entry_types}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0x00000000 | | Unknown (sparse) |
 | 0x00000001 | | Uncompressed (raw) data |
@@ -410,8 +414,8 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | | | |
 | 0x80000004 | | ADC compressed data |
 | 0x80000005 | | zlib compressed data |
-| 0x80000006 | | bzip2 compressed data  |
-| 0x80000007 | | LZFSE compressed data  |
+| 0x80000006 | | bzip2 compressed data |
+| 0x80000007 | | LZFSE compressed data |
 | 0x80000008 | | LZMA compressed data |
 | | | |
 | 0xffffffff | | Block table entries terminator |
@@ -434,143 +438,202 @@ The encrypted file footer is 1276 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | Unknown (UUID) |
+| 0 | 16 | | Identifier (UUID), used in Mac OS keychain as account identifier |
 | 16 | 4 | | Block size, in number of bytes |
-| 20 | 4 | | Blob [encryption method](#encryption_methods) (or algorithm) |
-| 24 | 4 | | Blob [encryption padding type](#encryption_padding_types) |
-| 28 | 4 | | Blob [encryption mode](#encryption_modes) |
-| 32 | 4 | | Blob key size, in number of bits |
-| 36 | 4 | | Blob initialization vector size |
-| 40 | 4 | | Key derivation [encryption method](#encryption_methods) (or algorithm) |
-| 44 | 4 | | Key derivation iteration count |
+| 20 | 4 | | Key protector [encryption method](#algorithm_identifiers) |
+| 24 | 4 | | Key protector [padding type](#padding_types) |
+| 28 | 4 | | Key protector [encryption mode](#encryption_modes) |
+| 32 | 4 | | Key protector key size, in number of bits |
+| 36 | 4 | | Key protector initialization vector size |
+| 40 | 4 | | [Key derivation method](#algorithm_identifiers) |
+| 44 | 4 | | Key derivation number of iterations |
 | 48 | 4 | | Unknown |
-| 52 | 4 | | Key derivation salt size |
+| 52 | 4 | | Key derivation salt size, in number of bytes |
 | 56 | 32 | | Key derivation salt |
 | 88 | 4 | | Block initialization vector size |
 | 92 | 4 | | Block [encryption mode](#encryption_modes) |
-| 96 | 4 | | Data (or block) [encryption method](#encryption_methods) (or algorithm) |
+| 96 | 4 | | Data (or block) [encryption method](#algorithm_identifiers) |
 | 100 | 4 | | Block key size, in number of bits |
 | 104 | 32 | | Block initialization vector |
 | 136 | 4 | | Wrapped AES key size |
 | 140 | 256 | | Wrapped AES key |
-| 396 | 4 | | HMAC [encryption method](#encryption_methods) (or algorithm) |
+| 396 | 4 | | [HMAC method](#algorithm_identifiers) |
 | 400 | 4 | | Unknown (HMAC number of bits?) |
 | 404 | 32 | | HMAC initialization vector |
 | 436 | 4 | | Wrapped HMAC key size |
 | 440 | 256 | | Wrapped HMAC key |
-| 696 | 4 | | Integrity [encryption method](#encryption_methods) (or algorithm) |
+| 696 | 4 | | Integrity [encryption method](#algorithm_identifiers) |
 | 700 | 4 | | Unknown (Integrity number of bits?) |
 | 704 | 32 | | Integrity initialization vector |
 | 736 | 4 | | Wrapped integrity key size |
 | 740 | 256 | | Wrapped integrity key |
 | 996 | 4 | | Unknown (data size) |
 | 1000 | 256 | | Unknown (data) |
-| 1256 | 4 | | Data area offset, where the offset is relative from the start of the image file |
-| 1260 | 4 | | Data area size, in number of bytes |
+| 1256 | 4 | | Data fork offset, where the offset is relative from the start of the image file |
+| 1260 | 4 | | Data fork size, in number of bytes |
 | 1264 | 4 | 1 | Encrypted file format version |
 | 1268 | 8 | "cdsaencr" | Signature |
 
 ### Encrypted file header {#encypted_file_header}
 
-The encrypted file header is 512 bytes in size and consists of:
+The encrypted file header is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | "encrcdsa" | Signature |
 | 8 | 4 | 2 | Encrypted file format version |
-| 12 | 4 | | Block initialization vector size |
+| 12 | 4 | | Block initialization vector size, in number of bytes |
 | 16 | 4 | | Block [encryption mode](#encryption_modes) |
-| 20 | 4 | | Data (or block) [encryption method](#encryption_methods) (or algorithm) |
+| 20 | 4 | | Data (or block) [encryption method](#algorithm_identifiers) |
 | 24 | 4 | | Block key size, in number of bits |
-| 28 | 4 | | initialization vector [encryption method](#encryption_methods) (or algorithm) |
-| 32 | 4 | | initialization vector size |
-| 36 | 16 | | Unknown (UUID) |
+| 28 | 4 | | Initialization vector [HMAC method](#algorithm_identifiers) |
+| 32 | 4 | | Initialization vector HMAC key size, in number of bits |
+| 36 | 16 | | Identifier (UUID), used in Mac OS keychain as account identifier |
 | 52 | 4 | | Block size, in number of bytes |
-| 56 | 8 | | Data area offset, where the offset is relative from the start of the image file |
-| 64 | 8 | | Data area size, in number of bytes |
-| 72 | 4 | | Number of item descriptors |
-| 76 | ... | | Array of item descriptors |
-| ... | 436 | | Unknown |
+| 56 | 8 | | Data fork size, in number of bytes |
+| 64 | 8 | | Data fork offset, where the offset is relative from the start of the image file |
+| 72 | 4 | | Number of key protector descriptors |
+| 76 | ... | | Array of [key protector descriptors](#encrypted_key_protector_descriptor) |
 
-#### Item descriptor
+#### Key protector descriptor {#encrypted_key_protector_descriptor}
 
-The item descriptor is 20 bytes in size and consists of:
+The key protector descriptor is 20 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 4 | | Type |
-| 4 | 8 | | Offset, where the offset is relative from the start of the image file |
-| 12 | 8 | | Size |
+| 0 | 4 | | [Unlock type](#encrypted_unlock_types) |
+| 4 | 8 | | Data offset, where the offset is relative from the start of the image file |
+| 12 | 8 | | Data size |
 
-#### Item types
+#### Unlock types {#encrypted_unlock_types}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
-| 1 | CSSM_APPLE_UNLOCK_TYPE_KEY_DIRECT | Master secret key stored directly |
-| 1 | CSSM_APPLE_UNLOCK_TYPE_WRAPPED_PRIVATE | Master key wrapped by public key |
+| 1 | CSSM_APPLE_UNLOCK_TYPE_KEY_DIRECT | Master key wrapped by passphrase, stored as [passphrase wrapped key](#passphrase_wrapped_key) |
+| 2 | CSSM_APPLE_UNLOCK_TYPE_WRAPPED_PRIVATE | Master key wrapped by a public key, stored as [public key wrapped key](#public_key_wrapped_key) |
 | 3 | CSSM_APPLE_UNLOCK_TYPE_KEYBAG | Master key wrapped by keybag |
 
-Defined in cssmapple.h
+#### Passphrase wrapped key {#passphrase_wrapped_key}
 
-### Encryption methods {#encryption_methods}
+The passphrase wrapped key is 616 bytes in size and consists of:
 
-| Value | Identifier | Description  |
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | [Key derivation method](#algorithm_identifiers) |
+| 4 | 8 | | Key derivation number of iterations |
+| 12 | 4 | | Key derivation salt size, in number of bytes |
+| 16 | 32 | | Key derivation salt |
+| 48 | 4 | | Encryption initialization vector size, in number of bytes |
+| 52 | 32 | | Encryption initialization vector |
+| 84 | 4 | | Encryption key size, in number of bits |
+| 88 | 4 | | [Encryption method](#algorithm_identifiers) |
+| 92 | 4 | | [Padding type](#padding_types) |
+| 96 | 4 | | [Encryption mode](#encryption_modes) |
+| 100 | 4 | | Encrypted data size |
+| 104 | 64 | | Encrypted data |
+| 168 | 448 | | Unknown (empty values) |
+
+The encrypted data can be decrypted using the following approach:
+
+* Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
+  determine the key encryption key (KEK) based on a passphrase.
+* Pad the initialization vector with 0-byte values if necessesary, e.g. if initialization vector
+  is 8 bytes but the encryption method (AES) requires an initialization vector of 16 bytes.
+* Decrypt the encrypted data using the encryption method and mode, e.g. AES-CBC, with the number
+  of bits of the KEK (defined by encryption key size) and the initialization vector if applicable.
+* Remove the padding, specified by the padding type.
+
+The decypted data is of variable size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | ... | | Master data encryption key (DEK) |
+| ... | ... | | HMAC key |
+| ... | 5 | "CKIE\x00" | Signature |
+
+#### Public key wrapped key {#public_key_wrapped_key}
+
+TODO: complete section
+
+The public key wrapped key is 564 bytes in size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | | Public key hash size |
+| 4 | 20 | | Public key hash |
+| 24 | 4 | | Unknown |
+| 28 | 4 | | Unknown |
+| 32 | 4 | | Unknown |
+| 36 | 4 | | Unknown (encryption method?) |
+| 40 | 4 | | Unknown |
+| 44 | 4 | | Unknown |
+| 48 | 4 | | Unknown (size) |
+| 52 | 256 | | Unknown |
+| 308 | 256 | | Unknown (empty values) |
+
+#### Keybag wrapped key {#keybag_wrapped_key}
+
+TODO: complete section
+
+### Algorithm identifiers {#algorithm_identifiers}
+
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | CSSM_ALGID_NONE | None |
 | 1 | CSSM_ALGID_CUSTOM | |
-| 2 | CSSM_ALGID_DH | |
-| 3 | CSSM_ALGID_PH | |
-| 4 | CSSM_ALGID_KEA | |
-| 5 | CSSM_ALGID_MD2 | |
-| 6 | CSSM_ALGID_MD4 | |
-| 7 | CSSM_ALGID_MD5 | |
-| 8 | CSSM_ALGID_SHA1 | |
-| 9 | CSSM_ALGID_NHASH | |
-| 10 | CSSM_ALGID_HAVAL: | |
-| 11 | CSSM_ALGID_RIPEMD | |
-| 12 | CSSM_ALGID_IBCHASH | |
-| 13 | CSSM_ALGID_RIPEMAC | |
-| 14 | CSSM_ALGID_DES | |
-| 15 | CSSM_ALGID_DESX | |
-| 16 | CSSM_ALGID_RDES | |
-| 17 | CSSM_ALGID_3DES_3KEY_EDE | |
-| 18 | CSSM_ALGID_3DES_2KEY_EDE | |
-| 19 | CSSM_ALGID_3DES_1KEY_EEE | |
-| 20 | CSSM_ALGID_3DES_3KEY_EEE | |
-| 21 | CSSM_ALGID_3DES_2KEY_EEE | |
-| 22 | CSSM_ALGID_IDEA | |
-| 23 | CSSM_ALGID_RC2 | |
-| 24 | CSSM_ALGID_RC5 | |
-| 25 | CSSM_ALGID_RC4 | |
-| 26 | CSSM_ALGID_SEAL | |
-| 27 | CSSM_ALGID_CAST | |
-| 28 | CSSM_ALGID_BLOWFISH | |
-| 29 | CSSM_ALGID_SKIPJACK | |
-| 30 | CSSM_ALGID_LUCIFER | |
-| 31 | CSSM_ALGID_MADRYGA | |
-| 32 | CSSM_ALGID_FEAL | |
-| 33 | CSSM_ALGID_REDOC | |
-| 34 | CSSM_ALGID_REDOC3 | |
-| 35 | CSSM_ALGID_LOKI | |
-| 36 | CSSM_ALGID_KHUFU | |
-| 37 | CSSM_ALGID_KHAFRE | |
-| 38 | CSSM_ALGID_MMB | |
-| 39 | CSSM_ALGID_GOST | |
-| 40 | CSSM_ALGID_SAFER | |
-| 41 | CSSM_ALGID_CRAB | |
-| 42 | CSSM_ALGID_RSA | |
-| 43 | CSSM_ALGID_DSA | |
-| 44 | CSSM_ALGID_MD5WithRSA | |
-| 45 | CSSM_ALGID_MD2WithRSA | |
-| 46 | CSSM_ALGID_ElGamal | |
-| 47 | CSSM_ALGID_MD2Random | |
-| 48 | CSSM_ALGID_MD5Random | |
-| 49 | CSSM_ALGID_SHARandom | |
-| 50 | CSSM_ALGID_DESRandom | |
-| 51 | CSSM_ALGID_SHA1WithRSA | |
-| 52 | CSSM_ALGID_CDMF | |
-| 53 | CSSM_ALGID_CAST3 | |
-| 54 | CSSM_ALGID_CAST5 | |
+| 2 | CSSM_ALGID_DH | Diffie Hellman key exchange |
+| 3 | CSSM_ALGID_PH | Pohlig Hellman key exchange |
+| 4 | CSSM_ALGID_KEA | Key Exchange Algorithm |
+| 5 | CSSM_ALGID_MD2 | MD2 |
+| 6 | CSSM_ALGID_MD4 | MD4 |
+| 7 | CSSM_ALGID_MD5 | MD5 |
+| 8 | CSSM_ALGID_SHA1 | SHA-1 |
+| 9 | CSSM_ALGID_NHASH | N-Hash |
+| 10 | CSSM_ALGID_HAVAL | HAVAL |
+| 11 | CSSM_ALGID_RIPEMD | RIPE-MD |
+| 12 | CSSM_ALGID_IBCHASH | IBC-Hash |
+| 13 | CSSM_ALGID_RIPEMAC | RIPE-MAC |
+| 14 | CSSM_ALGID_DES | DES |
+| 15 | CSSM_ALGID_DESX | DESX |
+| 16 | CSSM_ALGID_RDES | RDES |
+| 17 | CSSM_ALGID_3DES_3KEY_EDE (or CSSM_ALGID_3DES_3KEY) | Triple-DES with 3 keys applied encrypt, decrypt, encrypt (EDE) |
+| 18 | CSSM_ALGID_3DES_2KEY_EDE (or CSSM_ALGID_3DES_2KEY) | Triple-DES with 2 keys applied encrypt, decrypt, encrypt (EDE), with the first key used for the first and last operation |
+| 19 | CSSM_ALGID_3DES_1KEY_EEE | Triple-DES with 1 keys applied encrypt, encrypt, encrypt (EEE), with the first key used for all operation |
+| 20 | CSSM_ALGID_3DES_3KEY_EEE | Triple-DES with 3 keys applied encrypt, encrypt, encrypt (EEE) |
+| 21 | CSSM_ALGID_3DES_2KEY_EEE | Triple-DES with 2 keys applied encrypt, encrypt, encrypt (EEE), with the first key used for the first and last operation |
+| 22 | CSSM_ALGID_IDEA | IDEA |
+| 23 | CSSM_ALGID_RC2 | RC2 |
+| 24 | CSSM_ALGID_RC5 | RC5 |
+| 25 | CSSM_ALGID_RC4 | RC4 |
+| 26 | CSSM_ALGID_SEAL | SEAL |
+| 27 | CSSM_ALGID_CAST | CAST |
+| 28 | CSSM_ALGID_BLOWFISH | Blowfish |
+| 29 | CSSM_ALGID_SKIPJACK | Skipjac |
+| 30 | CSSM_ALGID_LUCIFER | Lucifer |
+| 31 | CSSM_ALGID_MADRYGA | Madryga |
+| 32 | CSSM_ALGID_FEAL | FEAL |
+| 33 | CSSM_ALGID_REDOC | RECOD 2 |
+| 34 | CSSM_ALGID_REDOC3 | RECOD 3 |
+| 35 | CSSM_ALGID_LOKI | LOKI |
+| 36 | CSSM_ALGID_KHUFU | KHUFU |
+| 37 | CSSM_ALGID_KHAFRE | KHAFRE |
+| 38 | CSSM_ALGID_MMB | MMB |
+| 39 | CSSM_ALGID_GOST | GOST |
+| 40 | CSSM_ALGID_SAFER | SAFER (K-40, K-64, K-128) |
+| 41 | CSSM_ALGID_CRAB | CRAB |
+| 42 | CSSM_ALGID_RSA | RSA |
+| 43 | CSSM_ALGID_DSA | DSA |
+| 44 | CSSM_ALGID_MD5WithRSA | MD5/RSA |
+| 45 | CSSM_ALGID_MD2WithRSA | MD2/RSA |
+| 46 | CSSM_ALGID_ElGamal | ElGamal |
+| 47 | CSSM_ALGID_MD2Random | MD2-based random numbers |
+| 48 | CSSM_ALGID_MD5Random | MD5-based random numbers |
+| 49 | CSSM_ALGID_SHARandom | SHA-based random numbers |
+| 50 | CSSM_ALGID_DESRandom | DES-based random numbers |
+| 51 | CSSM_ALGID_SHA1WithRSA | SHA-1/RSA |
+| 52 | CSSM_ALGID_CDMF | CDMF |
+| 53 | CSSM_ALGID_CAST3 | CAST3 |
+| 54 | CSSM_ALGID_CAST5 | CAST5 |
 | 55 | CSSM_ALGID_GenericSecret | |
 | 56 | CSSM_ALGID_ConcatBaseAndKey | |
 | 57 | CSSM_ALGID_ConcatKeyAndBase | |
@@ -619,39 +682,39 @@ Defined in cssmapple.h
 | 100 | CSSM_ALGID_HAVAL5 | |
 | 101 | CSSM_ALGID_TIGER | |
 | 102 | CSSM_ALGID_MD5HMAC | |
-| 103 | CSSM_ALGID_PKCS5_PBKDF2 | |
+| 103 | CSSM_ALGID_PKCS5_PBKDF2 | PBKDF2-HMAC-SHA1 |
 | 104 | CSSM_ALGID_RUNNING_COUNTER | |
 | | | |
 | 0x80000000 | CSSM_ALGID_VENDOR_DEFINED | |
 | 0x80000001 | CSSM_ALGID_AES | |
 
-### Encryption padding types {#encryption_padding_types}
+### Padding types {#padding_types}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | CSSM_PADDING_NONE | |
+| 0 | CSSM_PADDING_NONE | No padding |
 | 1 | CSSM_PADDING_CUSTOM | |
-| 2 | CSSM_PADDING_ZERO | |
-| 3 | CSSM_PADDING_ONE | |
+| 2 | CSSM_PADDING_ZERO | Pad with 0 |
+| 3 | CSSM_PADDING_ONE | Pad with 1 |
 | 4 | CSSM_PADDING_ALTERNATE | |
 | 5 | CSSM_PADDING_FF | |
-| 6 | CSSM_PADDING_PKCS5 | |
-| 7 | CSSM_PADDING_PKCS7 | |
+| 6 | CSSM_PADDING_PKCS5 | Pad using Public-Key Cryptography Standard (PKCS) 5 (RFC 2898) |
+| 7 | CSSM_PADDING_PKCS7 | Pad using Public-Key Cryptography Standard (PKCS) 7 (RFC 2315) |
 | 8 | CSSM_PADDING_CIPHERSTEALING | |
 | 9 | CSSM_PADDING_RANDOM | |
-| 10 | CSSM_PADDING_PKCS1 | |
+| 10 | CSSM_PADDING_PKCS1 | Pad using Public-Key Cryptography Standard (PKCS) 1 |
 
 ### Encryption modes {#encryption_modes}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | CSSM_ALGMODE_NONE | |
 | 1 | CSSM_ALGMODE_CUSTOM | |
-| 2 | CSSM_ALGMODE_ECB | |
+| 2 | CSSM_ALGMODE_ECB | Electronic CodeBook (ECB) mode |
 | 3 | CSSM_ALGMODE_ECBPad | |
-| 4 | CSSM_ALGMODE_CBC | |
-| 5 | CSSM_ALGMODE_CBC_IV8 | |
-| 6 | CSSM_ALGMODE_CBCPadIV8 | |
+| 4 | CSSM_ALGMODE_CBC | Cipher Block Chaining (CBC) mode, without padding |
+| 5 | CSSM_ALGMODE_CBC_IV8 | Cipher Block Chaining (CBC) mode with 8 byte initialization vector, without padding |
+| 6 | CSSM_ALGMODE_CBCPadIV8 | Cipher Block Chaining (CBC) mode with 8 byte initialization vector, with padding |
 | 7 | CSSM_ALGMODE_CFB | |
 | 8 | CSSM_ALGMODE_CFB_IV8 | |
 | 9 | CSSM_ALGMODE_CFBPadIV8 | |

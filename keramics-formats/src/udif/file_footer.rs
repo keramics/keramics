@@ -82,6 +82,9 @@ pub struct UdifFileFooter {
 
     /// Plist size.
     pub plist_size: u64,
+
+    /// Number of sectors.
+    pub number_of_sectors: u64,
 }
 
 impl UdifFileFooter {
@@ -99,6 +102,7 @@ impl UdifFileFooter {
             segment_set_identifier: Uuid::new(),
             plist_offset: 0,
             plist_size: 0,
+            number_of_sectors: 0,
         }
     }
 
@@ -128,6 +132,7 @@ impl UdifFileFooter {
         self.segment_set_identifier = Uuid::from_be_bytes(&data[64..80]);
         self.plist_offset = bytes_to_u64_be!(data, 216);
         self.plist_size = bytes_to_u64_be!(data, 224);
+        self.number_of_sectors = bytes_to_u64_be!(data, 492);
 
         Ok(())
     }
@@ -203,6 +208,7 @@ mod tests {
         );
         assert_eq!(test_struct.plist_offset, 8236);
         assert_eq!(test_struct.plist_size, 8034);
+        assert_eq!(test_struct.number_of_sectors, 8192);
 
         Ok(())
     }
@@ -245,14 +251,19 @@ mod tests {
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.format_version, 4);
-        assert_eq!(test_struct.segment_offset, 0);
         assert_eq!(test_struct.data_fork_offset, 0);
         assert_eq!(test_struct.data_fork_size, 8236);
         assert_eq!(test_struct.resource_fork_offset, 0);
         assert_eq!(test_struct.resource_fork_size, 0);
+        assert_eq!(test_struct.segment_number, 0);
         assert_eq!(test_struct.number_of_segments, 0);
+        assert_eq!(
+            test_struct.segment_set_identifier.to_string(),
+            "00000000-0000-0000-0000-000000000000"
+        );
         assert_eq!(test_struct.plist_offset, 8236);
         assert_eq!(test_struct.plist_size, 8034);
+        assert_eq!(test_struct.number_of_sectors, 8192);
 
         Ok(())
     }

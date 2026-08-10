@@ -26,13 +26,15 @@ use crate::path_component::PathComponent;
 
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table_reader::UdifBlockTableReader;
+use super::credential::UdifCredential;
 use super::enums::UdifCompressionMethod;
+use super::file::UdifFile;
 use super::segment_stream::UdifSegmentStream;
 
 /// Universal Disk Image Format (UDIF) file.
 pub struct UdifImage {
-    /// The data stream.
-    data_stream: Option<DataStreamReference>,
+    /// The segment (data) stream.
+    segment_stream: Arc<RwLock<UdifSegmentStream>>,
 
     /// Segment file set identifier.
     set_identifier: Uuid,
@@ -52,6 +54,12 @@ pub struct UdifImage {
     /// Compression method.
     compression_method: UdifCompressionMethod,
 
+    /// Value to indicate the (encrypted) image is locked.
+    is_locked: bool,
+
+    /// Encryption method.
+    encryption_method: u32,
+
     /// The current offset.
     current_offset: u64,
 
@@ -63,13 +71,15 @@ impl UdifImage {
     /// Creates a new storage media image.
     pub fn new() -> Self {
         Self {
-            data_stream: None,
+            segment_stream: Arc::new(RwLock::new(UdifSegmentStream::new())),
             set_identifier: Uuid::new(),
             bytes_per_sector: 0,
             has_block_ranges: false,
             block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
             block_cache: LruCache::new(64),
             compression_method: UdifCompressionMethod::None,
+            is_locked: false,
+            encryption_method: 0,
             current_offset: 0,
             media_size: 0,
         }
@@ -85,9 +95,28 @@ impl UdifImage {
         &self.compression_method
     }
 
+    /// Retrieves the encryption method.
+    pub fn get_encryption_method(&self) -> u32 {
+        self.encryption_method
+    }
+
     /// Retrieves the media size.
-    pub fn get_media_size(&self) -> u64 {
-        self.media_size
+    pub fn get_media_size(&self) -> Option<u64> {
+        if self.is_locked {
+            None
+        } else {
+            Some(self.media_size)
+        }
+    }
+
+    /// Retrieves the (segment) set identifier.
+    pub fn get_set_identifier(&self) -> &Uuid {
+        &self.set_identifier
+    }
+
+    /// Determines if the (encrypted) image is locked.
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
     }
 
     /// Opens a storage media image.
@@ -96,42 +125,65 @@ impl UdifImage {
         file_resolver: &FileResolverReference,
         file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        let mut segment_stream: UdifSegmentStream = UdifSegmentStream::new();
+        match self.segment_stream.write() {
+            Ok(mut segment_stream) => {
+                match segment_stream.open(&file_resolver, file_name) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open segment stream"
+                        );
+                        return Err(error);
+                    }
+                }
+                self.bytes_per_sector = 512;
+                self.set_identifier = segment_stream.set_identifier.clone();
 
-        match segment_stream.open(&file_resolver, file_name) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open segment stream");
-                return Err(error);
+                let mut block_table_reader: UdifBlockTableReader =
+                    match segment_stream.read_metadata(self.bytes_per_sector) {
+                        Ok(block_table_reader) => block_table_reader,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                            return Err(error);
+                        }
+                    };
+                self.has_block_ranges = block_table_reader.has_block_ranges();
+
+                if self.has_block_ranges {
+                    self.block_tree = match block_table_reader.get_block_tree() {
+                        Ok(block_tree) => block_tree,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to determine block tree"
+                            );
+                            return Err(error);
+                        }
+                    };
+                }
+                self.media_size = block_table_reader.get_media_size();
+                self.compression_method = block_table_reader.get_compression_method();
+                self.is_locked = segment_stream.is_locked;
+                self.encryption_method = segment_stream.encryption_method;
+
+                if !self.is_locked {
+                    if self.media_size
+                        > (segment_stream.number_of_sectors * (self.bytes_per_sector as u64))
+                    {
+                        return Err(keramics_core::error_trace_new!(
+                            "Number of sectors value out of bounds",
+                        ));
+                    }
+                }
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on segment stream",
+                    error
+                ));
             }
         }
-        self.bytes_per_sector = 512;
-        self.set_identifier = segment_stream.set_identifier.clone();
-
-        let mut block_table_reader: UdifBlockTableReader =
-            match segment_stream.read_metadata(self.bytes_per_sector) {
-                Ok(block_table_reader) => block_table_reader,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
-                    return Err(error);
-                }
-            };
-        self.has_block_ranges = block_table_reader.has_block_ranges();
-
-        if self.has_block_ranges {
-            self.block_tree = match block_table_reader.get_block_tree() {
-                Ok(block_tree) => block_tree,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to determine block tree");
-                    return Err(error);
-                }
-            };
-        }
-        self.media_size = block_table_reader.get_media_size();
-        self.compression_method = block_table_reader.get_compression_method();
-
-        self.data_stream = Some(Arc::new(RwLock::new(segment_stream)));
-
         Ok(())
     }
 
@@ -240,25 +292,19 @@ impl UdifImage {
             }
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_read_count: usize = match block_range.range_type {
+            match block_range.range_type {
                 UdifBlockRangeType::Compressed => {
                     let range_data_offset: usize = range_relative_offset as usize;
                     let range_data_end_offset: usize = range_data_offset + range_read_size;
 
                     if !self.block_cache.contains(&block_range.data_offset) {
-                        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                            Some(data_stream) => data_stream,
-                            None => {
-                                return Err(keramics_core::error_trace_new!("Missing data stream"));
-                            }
-                        };
                         let mut compressed_data: Vec<u8> =
                             vec![0; block_range.compressed_data_size as usize];
 
-                        keramics_core::data_stream_read_at_position!(
-                            data_stream,
+                        keramics_core::data_stream_read_exact_at_position!(
+                            &self.segment_stream,
                             &mut compressed_data,
-                            SeekFrom::Start(block_range.data_offset)
+                            SeekFrom::Start(block_range.data_offset),
                         );
                         keramics_core::debug_trace_data!(
                             "UdifCompressedBlock",
@@ -293,37 +339,124 @@ impl UdifImage {
                     };
                     data[data_offset..data_end_offset]
                         .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
-
-                    range_read_size
                 }
                 UdifBlockRangeType::InFile => {
                     let range_data_offset: u64 = block_range.data_offset + range_relative_offset;
 
-                    let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                        Some(data_stream) => data_stream,
-                        None => {
-                            return Err(keramics_core::error_trace_new!("Missing data stream"));
-                        }
-                    };
-                    keramics_core::data_stream_read_at_position!(
-                        data_stream,
+                    keramics_core::data_stream_read_exact_at_position!(
+                        &self.segment_stream,
                         &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(range_data_offset)
-                    )
+                        SeekFrom::Start(range_data_offset),
+                    );
                 }
                 UdifBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
-
-                    range_read_size
                 }
-            };
-            if range_read_count == 0 {
-                break;
             }
-            data_offset += range_read_count;
-            media_offset += range_read_count as u64;
+            data_offset += range_read_size;
+            media_offset += range_read_size as u64;
         }
         Ok(data_offset)
+    }
+
+    /// Unlocks a locked (encrypted) volume.
+    pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
+        let result: bool = match self.segment_stream.write() {
+            Ok(mut segment_stream) => match segment_stream.unlock(credentials) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to unlock segment stream");
+                    return Err(error);
+                }
+            },
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on segment stream",
+                    error
+                ));
+            }
+        };
+        if result {
+            // Coerce the segment stream into a data stream reference.
+            let data_stream: DataStreamReference = self.segment_stream.clone();
+
+            let mut segment_file: UdifFile = UdifFile::new();
+
+            match segment_file.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read unencrypted file");
+                    return Err(error);
+                }
+            }
+            let segment_number: u32 = segment_file.segment_number;
+            let number_of_segments: u32 = segment_file.number_of_segments;
+
+            if (number_of_segments == 0 && segment_number != 0)
+                || (number_of_segments != 0 && segment_number != 1)
+            {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported segment file: 1 - segment number value out of bounds"
+                ));
+            }
+            if segment_file.plist_size != 0 && segment_file.resource_fork_size != 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported segment file: 1 - both XML plist and resource fork in use"
+                ));
+            }
+            if segment_file.segment_offset != 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported segment file: 1 - segment offset value out of bounds"
+                ));
+            }
+            let mut block_table_reader: UdifBlockTableReader =
+                UdifBlockTableReader::new(self.bytes_per_sector, segment_file.data_fork_size);
+
+            self.set_identifier = segment_file.segment_set_identifier.clone();
+
+            if segment_file.plist_size == 0 && segment_file.resource_fork_size == 0 {
+                block_table_reader.media_offset =
+                    segment_file.number_of_sectors * (self.bytes_per_sector as u64);
+            } else {
+                match segment_file.read_metadata(&mut block_table_reader) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to read metadata from segment file: {}",
+                                segment_number
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            self.has_block_ranges = block_table_reader.has_block_ranges();
+
+            if self.has_block_ranges {
+                self.block_tree = match block_table_reader.get_block_tree() {
+                    Ok(block_tree) => block_tree,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to determine block tree"
+                        );
+                        return Err(error);
+                    }
+                };
+            }
+            self.media_size = block_table_reader.get_media_size();
+            self.compression_method = block_table_reader.get_compression_method();
+            self.is_locked = false;
+
+            if self.media_size > (segment_file.number_of_sectors * (self.bytes_per_sector as u64)) {
+                return Err(keramics_core::error_trace_new!(
+                    "Number of sectors value out of bounds",
+                ));
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -335,11 +468,17 @@ impl DataStream for UdifImage {
 
     /// Retrieves the size of the data.
     fn get_size(&mut self) -> Result<u64, ErrorTrace> {
+        if self.is_locked {
+            return Err(keramics_core::error_trace_new!("Image is locked"));
+        }
         Ok(self.media_size)
     }
 
     /// Reads data at the current position.
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
+        if self.is_locked {
+            return Err(keramics_core::error_trace_new!("Image is locked"));
+        }
         if self.current_offset >= self.media_size {
             return Ok(0);
         }
@@ -358,14 +497,8 @@ impl DataStream for UdifImage {
                 }
             }
         } else {
-            let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(keramics_core::error_trace_new!("Missing data stream"));
-                }
-            };
             keramics_core::data_stream_read_at_position!(
-                data_stream,
+                &self.segment_stream,
                 &mut buf[..read_size],
                 SeekFrom::Start(self.current_offset)
             )
@@ -377,6 +510,9 @@ impl DataStream for UdifImage {
 
     /// Sets the current position of the data.
     fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
+        if self.is_locked {
+            return Err(keramics_core::error_trace_new!("Image is locked"));
+        }
         self.current_offset = match pos {
             SeekFrom::Current(relative_offset) => {
                 match self.current_offset.checked_add_signed(relative_offset) {
@@ -450,8 +586,8 @@ mod tests {
     fn test_get_media_size() -> Result<(), ErrorTrace> {
         let image: UdifImage = get_image()?;
 
-        let media_size: u64 = image.get_media_size();
-        assert_eq!(media_size, 1964032);
+        let media_size: Option<u64> = image.get_media_size();
+        assert_eq!(media_size, Some(1964032));
 
         Ok(())
     }

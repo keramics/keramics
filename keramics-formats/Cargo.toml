@@ -24,12 +24,11 @@ keramics-compression = { version = "0.0.1", path = "../keramics-compression" }
 keramics-core = { version = "0.0.1", path = "../keramics-core" }
 keramics-datetime = { version = "0.0.1", path = "../keramics-datetime" }
 keramics-encodings = { version = "0.0.1", path = "../keramics-encodings" }
+keramics-encryption = { version = "0.0.1", path = "../keramics-encryption" }
+keramics-hashes = { version = "0.0.1", path = "../keramics-hashes" }
 keramics-layout-map = { version = "0.0.1", path = "../keramics-layout-map" }
 keramics-sigscan = { version = "0.0.1", path = "../keramics-sigscan" }
 keramics-types = { version = "0.0.1", path = "../keramics-types" }
 pest = { version = "2.8.2" }
 pest_derive = { version = "2.8.2" }
 zlib-rs = { version = "0.6.6", optional = true }
-
-[dev-dependencies]
-keramics-hashes = { version = "0.0.1", path = "../keramics-hashes" }

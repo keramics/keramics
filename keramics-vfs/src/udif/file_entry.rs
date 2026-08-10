@@ -24,7 +24,7 @@ pub enum UdifFileEntry {
     /// Layer file entry.
     Layer {
         /// File.
-        file: Arc<RwLock<UdifImage>>,
+        image: Arc<RwLock<UdifImage>>,
 
         /// Size.
         size: u64,
@@ -33,7 +33,7 @@ pub enum UdifFileEntry {
     /// Root file entry.
     Root {
         /// File.
-        file: Arc<RwLock<UdifImage>>,
+        image: Arc<RwLock<UdifImage>>,
     },
 }
 
@@ -41,7 +41,7 @@ impl UdifFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         match self {
-            UdifFileEntry::Layer { file, .. } => Ok(Some(file.clone())),
+            UdifFileEntry::Layer { image, .. } => Ok(Some(image.clone())),
             UdifFileEntry::Root { .. } => Ok(None),
         }
     }
@@ -87,15 +87,27 @@ impl UdifFileEntry {
             UdifFileEntry::Layer { .. } => {
                 Err(keramics_core::error_trace_new!("No sub file entries"))
             }
-            UdifFileEntry::Root { file } => {
+            UdifFileEntry::Root { image } => {
                 if sub_file_entry_index != 0 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "No sub file entry with index: {}",
                         sub_file_entry_index
                     )));
                 }
-                let media_size: u64 = match file.read() {
-                    Ok(udif_image) => udif_image.get_media_size(),
+                let media_size: u64 = match image.read() {
+                    Ok(udif_image) => {
+                        if udif_image.is_locked() {
+                            return Err(keramics_core::error_trace_new!("UDIF image is locked"));
+                        }
+                        match udif_image.get_media_size() {
+                            Some(media_size) => media_size,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unable to determine media size"
+                                ));
+                            }
+                        }
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on UDIF image",
@@ -104,7 +116,7 @@ impl UdifFileEntry {
                     }
                 };
                 Ok(UdifFileEntry::Layer {
-                    file: file.clone(),
+                    image: image.clone(),
                     size: media_size,
                 })
             }
@@ -130,7 +142,7 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file() -> Result<UdifImage, ErrorTrace> {
+    fn get_image() -> Result<UdifImage, ErrorTrace> {
         let mut image: UdifImage = UdifImage::new();
 
         let path_string: String = get_test_data_path("udif");
@@ -146,12 +158,12 @@ mod tests {
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = get_file()?;
+        let udif_image: UdifImage = get_image()?;
 
-        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
+        let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
-            file: test_file.clone(),
+            image: test_image.clone(),
         };
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
@@ -161,19 +173,19 @@ mod tests {
 
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = get_file()?;
-        let media_size: u64 = udif_image.get_media_size();
+        let udif_image: UdifImage = get_image()?;
+        let media_size: u64 = udif_image.get_media_size().unwrap();
 
-        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
+        let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
-            file: test_file.clone(),
+            image: test_image.clone(),
         };
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
         let file_entry = UdifFileEntry::Layer {
-            file: test_file.clone(),
+            image: test_image.clone(),
             size: media_size,
         };
         let name: PathComponent = file_entry.get_name();
@@ -184,19 +196,19 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = get_file()?;
-        let media_size: u64 = udif_image.get_media_size();
+        let udif_image: UdifImage = get_image()?;
+        let media_size: u64 = udif_image.get_media_size().unwrap();
 
-        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
+        let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
-            file: test_file.clone(),
+            image: test_image.clone(),
         };
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
         let file_entry = UdifFileEntry::Layer {
-            file: test_file.clone(),
+            image: test_image.clone(),
             size: media_size,
         };
         let size: u64 = file_entry.get_size();
@@ -207,19 +219,19 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = get_file()?;
-        let media_size: u64 = udif_image.get_media_size();
+        let udif_image: UdifImage = get_image()?;
+        let media_size: u64 = udif_image.get_media_size().unwrap();
 
-        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
+        let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
-            file: test_file.clone(),
+            image: test_image.clone(),
         };
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
         let file_entry = UdifFileEntry::Layer {
-            file: test_file.clone(),
+            image: test_image.clone(),
             size: media_size,
         };
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
@@ -230,11 +242,11 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = get_file()?;
-        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
+        let udif_image: UdifImage = get_image()?;
+        let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
-            file: test_file.clone(),
+            image: test_image.clone(),
         };
         let sub_file_entry: UdifFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -249,18 +261,18 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = get_file()?;
-        let media_size: u64 = udif_image.get_media_size();
+        let udif_image: UdifImage = get_image()?;
+        let media_size: u64 = udif_image.get_media_size().unwrap();
 
-        let test_file: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
+        let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
         let file_entry = UdifFileEntry::Root {
-            file: test_file.clone(),
+            image: test_image.clone(),
         };
         assert_eq!(file_entry.is_root_file_entry(), true);
 
         let file_entry = UdifFileEntry::Layer {
-            file: test_file.clone(),
+            image: test_image.clone(),
             size: media_size,
         };
         assert_eq!(file_entry.is_root_file_entry(), false);

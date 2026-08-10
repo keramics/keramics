@@ -52,6 +52,10 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
+    #[arg(long)]
+    /// Password to unlock storage media image
+    password: Vec<String>,
+
     /// Path of the source file
     source: PathBuf,
 
@@ -897,8 +901,9 @@ fn main() -> ExitCode {
             }
         }
         Some(Commands::Hash) => {
+            // TODO: bundle all credentials into 1 credential store argument.
             let storage_media_image: StorageMediaImage =
-                match StorageMediaImage::open(&arguments.source) {
+                match StorageMediaImage::open(&arguments.source, &arguments.password) {
                     Ok(storage_media_image) => storage_media_image,
                     Err(error) => {
                         println!(

@@ -218,34 +218,29 @@ impl VmdkImageLayer {
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.current_offset;
 
-        let mut extent_index: usize = 0;
-        let mut extent_offset: u64 = self.current_offset;
+        let media_sector: u64 = media_offset / (self.bytes_per_sector as u64);
 
-        // TODO: optimize extent lookup
-        for extent in self.extents.iter() {
-            let extent_size: u64 = extent.number_of_sectors * (self.bytes_per_sector as u64);
-
-            if extent_offset < extent_size {
-                break;
-            }
-            extent_index += 1;
-            extent_offset -= extent_size;
-        }
-        if extent_index >= self.extents.len() {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid media offset: {} (0x{:08x}) value out of bounds",
-                media_offset, media_offset
-            )));
-        }
+        let mut extent_sector: u64 = 0;
+        let mut extent_index: usize = self.extents.partition_point(|extent| {
+            extent_sector += extent.number_of_sectors;
+            media_sector >= extent_sector
+        });
         let mut extent: &VmdkDescriptorExtent = match self.extents.get(extent_index) {
             Some(extent) => extent,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing extent for offset: {} (0x{:08x})",
-                    media_offset, media_offset
+                    "Unable to retrieve extent: {} for media offset: {} (0x{:08x})",
+                    extent_index, media_offset, media_offset
                 )));
             }
         };
+        extent_sector = self.extents[0..extent_index]
+            .iter()
+            .map(|extent| extent.number_of_sectors)
+            .sum::<u64>();
+
+        let mut extent_offset: u64 =
+            media_offset - (extent_sector * (self.bytes_per_sector as u64));
         let mut extent_size: u64 = extent.number_of_sectors * (self.bytes_per_sector as u64);
 
         while data_offset < read_size {

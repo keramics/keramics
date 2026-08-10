@@ -991,7 +991,7 @@ The volume master key is encryped with a volume key.
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 3 | | Volume key, which contains a [Key encrypted key (KEK) packed object](#key_bag_kek_packed_object) |
-| 4 | | Password Hint, which contains a string without end-of-string character |
+| 4 | | Password hint, which contains a string without end-of-string character |
 
 The volume key is encryped with an user key.
 
@@ -1024,9 +1024,9 @@ value tags:
 | 0x81 | | HMAC |
 | 0x82 | | Unknown (salt?) |
 | | | |
-| 0xa3 | | [Wrapped Key Encrypted Key (KEK) packed object](#key_bag_wrapped_kek_packed_object) |
+| 0xa3 | | [Wrapped Key Encryption Key (KEK) packed object](#key_bag_wrapped_kek_packed_object) |
 
-##### Wrapped Key Encrypted Key (KEK) packed object {#key_bag_wrapped_kek_packed_object}
+##### Wrapped Key Encryption Key (KEK) packed object {#key_bag_wrapped_kek_packed_object}
 
 The packed object value tag of a wrapped kek encrypted key is 0xa3 and contains the following
 attribute value tags:
@@ -1035,14 +1035,14 @@ attribute value tags:
 | --- | --- | --- |
 | 0x80 | | Unknown |
 | 0x81 | | Volume identifer, which contains a big-endian UUID |
-| 0x82 | | [Wrapped Key Encrypted Key (KEK) metadata](#wrapped_kek_metadata) |
-| 0x83 | | Wrapped Key Encrypted Key (KEK) data |
-| 0x84 | | Number of iterations |
+| 0x82 | | [Wrapped Key Encryption Key (KEK) metadata](#wrapped_kek_metadata) |
+| 0x83 | | Wrapped Key Encryption Key (KEK) data |
+| 0x84 | | Number of iterations for the PBKDF2 algorithm |
 | 0x85 | | Salt for the PBKDF2 algorithm |
 
-#### Wrapped Key Encrypted Key (KEK) metadata {#wrapped_kek_metadata}
+#### Wrapped Key Encryption Key (KEK) metadata {#wrapped_kek_metadata}
 
-The Wrapped Key Encrypted Key (KEK) metadata is 8 bytes in size and consists of:
+The Wrapped Key Encryption Key (KEK) metadata is 8 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |

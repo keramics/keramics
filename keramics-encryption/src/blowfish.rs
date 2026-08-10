@@ -20,6 +20,12 @@ use std::mem::swap;
 use keramics_core::ErrorTrace;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
+use super::cbc::CbcContext;
+use super::traits::{CryptCbc, CryptContext};
+
+/// Blowfish block size.
+const BLOWFISH_BLOCK_SIZE: usize = 8;
+
 /// Blowfish initial permutation values (P-array).
 const BLOWFISH_INITIAL_PERMUTATION_VALUES: [u32; 18] = [
     0x243f6a88, 0x85a308d3, 0x13198a2e, 0x03707344, 0xa4093822, 0x299f31d0, 0x082efa98, 0xec4e6c89,
@@ -181,17 +187,6 @@ pub struct BlowfishContext {
 }
 
 impl BlowfishContext {
-    /// Creates a new context.
-    pub fn new() -> Self {
-        Self {
-            permutation_values: Vec::new(),
-            sbox1: Vec::new(),
-            sbox2: Vec::new(),
-            sbox3: Vec::new(),
-            sbox4: Vec::new(),
-        }
-    }
-
     /// Decrypts a 8 byte block.
     #[inline(always)]
     fn decrypt_block(&self, encrypted_data: &[u8], data: &mut [u8]) {
@@ -222,53 +217,6 @@ impl BlowfishContext {
         data[4..8].copy_from_slice(&right_value.to_be_bytes());
     }
 
-    /// Decrypts data using CBC (Cipher Block Chaining) mode.
-    pub fn decrypt_cbc(
-        &self,
-        initialization_vector: &[u8],
-        encrypted_data: &[u8],
-        data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        if self.permutation_values.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        if initialization_vector.len() < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid initialization vector value too small"
-            ));
-        }
-        let encrypted_data_size: usize = encrypted_data.len();
-
-        if encrypted_data_size % 8 != 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data size value not a multitude of block size: 8"
-            ));
-        }
-        if encrypted_data_size > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data value too small"
-            ));
-        }
-        let mut initialization_vector_64bit: u64 = bytes_to_u64_be!(initialization_vector, 0);
-        let mut data_offset: usize = 0;
-
-        while data_offset < encrypted_data_size {
-            self.decrypt_block(&encrypted_data[data_offset..], &mut data[data_offset..]);
-
-            let mut block_value: u64 = bytes_to_u64_be!(data, data_offset);
-            block_value ^= initialization_vector_64bit;
-
-            let data_end_offset: usize = data_offset + 8;
-            data[data_offset..data_end_offset].copy_from_slice(&block_value.to_be_bytes());
-
-            initialization_vector_64bit = bytes_to_u64_be!(encrypted_data, data_offset);
-            data_offset = data_end_offset;
-        }
-        Ok(())
-    }
-
     /// Decrypts data using ECB (Electronic CodeBook) mode.
     pub fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
         if self.permutation_values.is_empty() {
@@ -278,17 +226,23 @@ impl BlowfishContext {
         }
         let encrypted_data_size: usize = encrypted_data.len();
 
-        if encrypted_data_size % 8 != 0 {
+        if encrypted_data_size < BLOWFISH_BLOCK_SIZE {
             return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data size value not a multitude of block size: 8"
+                "Invalid encrypted data size value too small"
             ));
+        }
+        if encrypted_data_size % BLOWFISH_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data size value not a multitude of block size: {}",
+                BLOWFISH_BLOCK_SIZE
+            )));
         }
         if encrypted_data_size > data.len() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid data value too small"
             ));
         }
-        for data_offset in (0..encrypted_data_size).step_by(8) {
+        for data_offset in (0..encrypted_data_size).step_by(BLOWFISH_BLOCK_SIZE) {
             self.decrypt_block(&encrypted_data[data_offset..], &mut data[data_offset..]);
         }
         Ok(())
@@ -324,51 +278,6 @@ impl BlowfishContext {
         encrypted_data[4..8].copy_from_slice(&right_value.to_be_bytes());
     }
 
-    /// Encrypts data using CBC (Cipher Block Chaining) mode.
-    pub fn encrypt_cbc(
-        &self,
-        initialization_vector: &[u8],
-        data: &[u8],
-        encrypted_data: &mut [u8],
-    ) -> Result<(), ErrorTrace> {
-        if self.permutation_values.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        if initialization_vector.len() < 8 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid initialization vector value too small"
-            ));
-        }
-        let data_size: usize = data.len();
-
-        if data_size % 8 != 0 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data size value not a multitude of block size: 8"
-            ));
-        }
-        if data_size > encrypted_data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data value too small"
-            ));
-        }
-        let mut block_data: [u8; 8] = [0; 8];
-        let mut initialization_vector_64bit: u64 = bytes_to_u64_be!(initialization_vector, 0);
-
-        for data_offset in (0..data_size).step_by(8) {
-            let mut block_value: u64 = bytes_to_u64_be!(data, data_offset);
-            block_value ^= initialization_vector_64bit;
-
-            block_data.copy_from_slice(&block_value.to_be_bytes());
-
-            self.encrypt_block(&block_data, &mut encrypted_data[data_offset..]);
-
-            initialization_vector_64bit = bytes_to_u64_be!(encrypted_data, data_offset);
-        }
-        Ok(())
-    }
-
     /// Encrypts data using ECB (Electronic CodeBook) mode.
     pub fn encrypt_ecb(&self, data: &[u8], encrypted_data: &mut [u8]) -> Result<(), ErrorTrace> {
         if self.permutation_values.is_empty() {
@@ -378,17 +287,23 @@ impl BlowfishContext {
         }
         let data_size: usize = data.len();
 
-        if data_size % 8 != 0 {
+        if data_size < BLOWFISH_BLOCK_SIZE {
             return Err(keramics_core::error_trace_new!(
-                "Invalid data size value not a multitude of block size: 8"
+                "Invalid data size value too small"
             ));
+        }
+        if data_size % BLOWFISH_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data size value not a multitude of block size: {}",
+                BLOWFISH_BLOCK_SIZE
+            )));
         }
         if data_size > encrypted_data.len() {
             return Err(keramics_core::error_trace_new!(
                 "Invalid encrypted data value too small"
             ));
         }
-        for data_offset in (0..data_size).step_by(8) {
+        for data_offset in (0..data_size).step_by(BLOWFISH_BLOCK_SIZE) {
             self.encrypt_block(&data[data_offset..], &mut encrypted_data[data_offset..]);
         }
         Ok(())
@@ -420,9 +335,22 @@ impl BlowfishContext {
         *right_value = safe_right_value ^ self.permutation_values[16];
         *left_value = safe_left_value ^ self.permutation_values[17];
     }
+}
+
+impl CryptContext for BlowfishContext {
+    /// Creates a new context.
+    fn new() -> Self {
+        Self {
+            permutation_values: Vec::new(),
+            sbox1: Vec::new(),
+            sbox2: Vec::new(),
+            sbox3: Vec::new(),
+            sbox4: Vec::new(),
+        }
+    }
 
     /// Sets the key.
-    pub fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
+    fn set_key(&mut self, key: &[u8]) -> Result<(), ErrorTrace> {
         let key_size: usize = key.len();
 
         if key_size < 1 || key_size > 56 {
@@ -510,6 +438,115 @@ impl BlowfishContext {
         Ok(())
     }
 }
+
+impl CryptCbc for BlowfishContext {
+    /// Decrypts data using CBC (Cipher Block Chaining) mode.
+    fn decrypt_cbc(
+        &self,
+        initialization_vector: &[u8],
+        encrypted_data: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.permutation_values.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        if initialization_vector.len() < BLOWFISH_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid initialization vector value too small"
+            ));
+        }
+        let encrypted_data_size: usize = encrypted_data.len();
+
+        if encrypted_data_size < BLOWFISH_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data size value too small"
+            ));
+        }
+        if encrypted_data_size % BLOWFISH_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data size value not a multitude of block size: {}",
+                BLOWFISH_BLOCK_SIZE
+            )));
+        }
+        if encrypted_data_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data value too small"
+            ));
+        }
+        let mut initialization_vector_value: u64 = bytes_to_u64_be!(initialization_vector, 0);
+        let mut data_offset: usize = 0;
+
+        while data_offset < encrypted_data_size {
+            self.decrypt_block(&encrypted_data[data_offset..], &mut data[data_offset..]);
+
+            let mut block_value: u64 = bytes_to_u64_be!(data, data_offset);
+            block_value ^= initialization_vector_value;
+
+            let data_end_offset: usize = data_offset + BLOWFISH_BLOCK_SIZE;
+            data[data_offset..data_end_offset].copy_from_slice(&block_value.to_be_bytes());
+
+            initialization_vector_value = bytes_to_u64_be!(encrypted_data, data_offset);
+            data_offset = data_end_offset;
+        }
+        Ok(())
+    }
+
+    /// Encrypts data using CBC (Cipher Block Chaining) mode.
+    fn encrypt_cbc(
+        &self,
+        initialization_vector: &[u8],
+        data: &[u8],
+        encrypted_data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        if self.permutation_values.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        if initialization_vector.len() < BLOWFISH_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid initialization vector value too small"
+            ));
+        }
+        let data_size: usize = data.len();
+
+        if data_size < BLOWFISH_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data size value too small"
+            ));
+        }
+        if data_size % BLOWFISH_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data size value not a multitude of block size: {}",
+                BLOWFISH_BLOCK_SIZE
+            )));
+        }
+        if data_size > encrypted_data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data value too small"
+            ));
+        }
+        let mut block_data: [u8; BLOWFISH_BLOCK_SIZE] = [0; BLOWFISH_BLOCK_SIZE];
+        let mut initialization_vector_value: u64 = bytes_to_u64_be!(initialization_vector, 0);
+
+        for data_offset in (0..data_size).step_by(BLOWFISH_BLOCK_SIZE) {
+            let mut block_value: u64 = bytes_to_u64_be!(data, data_offset);
+            block_value ^= initialization_vector_value;
+
+            block_data.copy_from_slice(&block_value.to_be_bytes());
+
+            self.encrypt_block(&block_data, &mut encrypted_data[data_offset..]);
+
+            initialization_vector_value = bytes_to_u64_be!(encrypted_data, data_offset);
+        }
+        Ok(())
+    }
+}
+
+/// Context for Blowfish-CBC
+pub type BlowfishCbcContext = CbcContext<BlowfishContext, 8>;
 
 #[cfg(test)]
 mod tests {

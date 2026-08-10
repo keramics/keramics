@@ -11,10 +11,13 @@
  * under the License.
  */
 
+mod internal_sha256;
+mod internal_sha512;
 mod md5;
 mod sha1;
 mod sha224;
 mod sha256;
+mod sha384;
 mod sha512;
 mod traits;
 
@@ -22,5 +25,6 @@ pub use md5::Md5Context;
 pub use sha1::Sha1Context;
 pub use sha224::Sha224Context;
 pub use sha256::Sha256Context;
+pub use sha384::Sha384Context;
 pub use sha512::Sha512Context;
 pub use traits::DigestHashContext;

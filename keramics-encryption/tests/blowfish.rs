@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_encryption::BlowfishContext;
+use keramics_encryption::{BlowfishContext, CryptCbc, CryptContext};
 
 /// Test vector.
 struct TestVector {

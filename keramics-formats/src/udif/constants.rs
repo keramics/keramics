@@ -22,3 +22,6 @@ pub(crate) const UDIF_FILE_FOOTER_SIGNATURE: &[u8] = b"koly";
 
 /// UDIF block table header signature.
 pub(super) const UDIF_BLOCK_TABLE_HEADER_SIGNATURE: &[u8] = b"mish";
+
+/// UDIF wrapped key signature.
+pub(super) const UDIF_WRAPPED_KEY_SIGNATURE: &[u8] = b"CKIE\x00";

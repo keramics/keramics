@@ -6,7 +6,7 @@ Encryption support for Keramics.
 
 Supported decryption methods:
 
-* AES (ECB)
+* AES (CBC and ECB)
 * Blowfish (CBC and ECB)
 * DES3 (CBC and ECB)
 * RC4

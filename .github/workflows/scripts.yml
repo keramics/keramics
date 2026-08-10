@@ -34,6 +34,6 @@ jobs:
     - name: Install dependencies
       run: |
         brew update -q
-        brew install -q afsctool || true
+        brew install -q afsctool openssl || true
     - name: Generate test data
       run: ./scripts/generate_test_data_macos.sh

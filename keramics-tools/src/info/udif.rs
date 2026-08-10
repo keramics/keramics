@@ -15,18 +15,26 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::udif::{UdifCompressionMethod, UdifImage};
+use keramics_formats::udif::{
+    UdifCompressionMethod, UdifCredential, UdifCredentialType, UdifImage,
+};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 
 use crate::formatters::ByteSize;
 
 /// Information about an Universal Disk Image Format (UDIF) image.
 struct UdifImageInfo {
+    /// Value to indicate the (encrypted) image is locked.
+    pub is_locked: bool,
+
     /// Compression method.
     pub compression_method: UdifCompressionMethod,
 
+    /// Encryption method.
+    pub encryption_method: u32,
+
     /// Media size.
-    pub media_size: u64,
+    pub media_size: Option<u64>,
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
@@ -45,9 +53,11 @@ impl UdifImageInfo {
     /// Creates new file information.
     fn new() -> Self {
         Self {
-            media_size: 0,
-            bytes_per_sector: 0,
+            is_locked: false,
             compression_method: UdifCompressionMethod::None,
+            encryption_method: 0,
+            media_size: None,
+            bytes_per_sector: 0,
         }
     }
 
@@ -62,18 +72,57 @@ impl UdifImageInfo {
 impl fmt::Display for UdifImageInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let locked_value_string: String = String::from("N/A locked");
+
         writeln!(formatter, "Universal Disk Image Format (UDIF) information:")?;
 
-        let compression_method_string: &str = self.get_compression_method_string();
+        // TODO: print (segment) set identifier
+        if self.encryption_method != 0 {
+            writeln!(formatter, "    Encryption information:")?;
+            writeln!(
+                formatter,
+                "        Encryption method\t\t\t: 0x{:08x}",
+                self.encryption_method
+            )?;
+            // TODO: print human readable encryption method
+            // TODO: print password protectors
+            // TODO: print identifier
+        }
+        writeln!(formatter, "    Compression information:")?;
+
+        let compression_method_string: &str = if self.is_locked {
+            locked_value_string.as_str()
+        } else {
+            self.get_compression_method_string()
+        };
         writeln!(
             formatter,
-            "    Compression method\t\t\t\t: {}",
+            "        Compression method\t\t\t: {}",
             compression_method_string
         )?;
         writeln!(formatter, "    Media information:")?;
+        // TODO: print identifier
 
-        let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
-        writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
+        let byte_value_string: String;
+        let media_size_string: &str = match self.media_size {
+            Some(media_size) => {
+                let byte_size: ByteSize = ByteSize::new(media_size, 1024);
+                byte_value_string = format!("{}", byte_size);
+                byte_value_string.as_str()
+            }
+            None => {
+                if self.is_locked {
+                    locked_value_string.as_str()
+                } else {
+                    "N/A"
+                }
+            }
+        };
+        writeln!(
+            formatter,
+            "        Media size\t\t\t\t: {}",
+            media_size_string
+        )?;
 
         writeln!(
             formatter,
@@ -92,7 +141,9 @@ impl UdifInfo {
     fn get_image_information(udif_image: &UdifImage) -> UdifImageInfo {
         let mut image_information: UdifImageInfo = UdifImageInfo::new();
 
+        image_information.is_locked = udif_image.is_locked();
         image_information.compression_method = udif_image.get_compression_method().clone();
+        image_information.encryption_method = udif_image.get_encryption_method();
         image_information.media_size = udif_image.get_media_size();
         image_information.bytes_per_sector = udif_image.get_bytes_per_sector();
 
@@ -134,15 +185,34 @@ impl UdifInfo {
         Ok(udif_image)
     }
 
-    /// Prints information about an image.
-    pub fn print_image(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
-        let udif_image: UdifImage = match Self::open_image(path_buf) {
+    /// Prints information about an image or file.
+    pub fn print(path_buf: &PathBuf, passwords: &Vec<String>) -> Result<(), ErrorTrace> {
+        // TODO: fallback to file if image open fails
+
+        let mut udif_image: UdifImage = match Self::open_image(path_buf) {
             Ok(udif_image) => udif_image,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open image");
                 return Err(error);
             }
         };
+        if udif_image.is_locked() {
+            let mut credentials: Vec<UdifCredential> = Vec::new();
+
+            for password in passwords.iter() {
+                credentials.push(UdifCredential::new(
+                    UdifCredentialType::Passphrase,
+                    password.as_bytes(),
+                ));
+            }
+            match udif_image.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to unlock image");
+                    return Err(error);
+                }
+            }
+        }
         let image_information: UdifImageInfo = Self::get_image_information(&udif_image);
 
         print!("{}", image_information);
@@ -155,8 +225,6 @@ impl UdifInfo {
 mod tests {
     use super::*;
 
-    use keramics_core::open_os_data_stream;
-
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/udif/hfsplus_zlib.dmg");
@@ -166,7 +234,8 @@ mod tests {
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Universal Disk Image Format (UDIF) information:\n",
-            "    Compression method\t\t\t\t: zlib\n",
+            "    Compression information:\n",
+            "        Compression method\t\t\t: zlib\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 1.9 MiB (1964032 bytes)\n",
             "        Bytes per sector\t\t\t: 512 bytes\n",
@@ -184,12 +253,13 @@ mod tests {
         let test_struct: UdifImageInfo = UdifInfo::get_image_information(&udif_image);
 
         assert_eq!(test_struct.compression_method, UdifCompressionMethod::Zlib);
-        assert_eq!(test_struct.media_size, 1964032);
+        assert_eq!(test_struct.encryption_method, 0);
+        assert_eq!(test_struct.media_size, Some(1964032));
         assert_eq!(test_struct.bytes_per_sector, 512);
 
         Ok(())
     }
 
     // TODO: add tests for open_image
-    // TODO: add tests for print_image
+    // TODO: add tests for print
 }

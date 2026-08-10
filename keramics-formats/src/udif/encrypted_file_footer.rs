@@ -21,39 +21,55 @@ use super::constants::*;
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "unknown1", data_type = "Uuid"),
+        field(name = "identifier", data_type = "Uuid"),
         field(name = "block_size", data_type = "u32"),
         field(name = "blob_encryption_method", data_type = "u32"),
-        field(name = "blob_encryption_padding_type", data_type = "u32"),
+        field(name = "blob_padding_type", data_type = "u32"),
         field(name = "blob_encryption_mode", data_type = "u32"),
         field(name = "blob_key_size", data_type = "u32"),
         field(name = "blob_initialization_vector_size", data_type = "u32"),
-        field(name = "key_derivation_encryption_method", data_type = "u32"),
-        field(name = "key_derivation_iteration_count", data_type = "u32"),
+        field(name = "key_derivation_method", data_type = "u32"),
+        field(name = "key_derivation_number_of_iterations", data_type = "u32"),
         field(name = "unknown2", data_type = "u32"),
         field(name = "key_derivation_salt_size", data_type = "u32"),
-        field(name = "key_derivation_salt", data_type = "[u8; 32]"),
+        field(name = "key_derivation_salt", data_type = "[u8; 32]", format = "hex"),
         field(name = "block_initialization_vector_size", data_type = "u32"),
         field(name = "block_encryption_mode", data_type = "u32"),
         field(name = "block_encryption_method", data_type = "u32", format = "hex"),
         field(name = "block_key_size", data_type = "u32"),
-        field(name = "block_initialization_vector", data_type = "[u8; 32]"),
+        field(
+            name = "block_initialization_vector",
+            data_type = "[u8; 32]",
+            format = "hex"
+        ),
         field(name = "wrapped_aes_key_size", data_type = "u32"),
-        field(name = "wrapped_aes_key", data_type = "[u8; 256]"),
-        field(name = "hmac_encryption_method", data_type = "u32"),
+        field(name = "wrapped_aes_key", data_type = "[u8; 256]", format = "hex"),
+        field(name = "hmac_method", data_type = "u32"),
         field(name = "unknown3", data_type = "u32"),
-        field(name = "hmac_initialization_vector", data_type = "[u8; 32]"),
+        field(
+            name = "hmac_initialization_vector",
+            data_type = "[u8; 32]",
+            format = "hex"
+        ),
         field(name = "wrapped_hmac_key_size", data_type = "u32"),
-        field(name = "wrapped_hmac_key", data_type = "[u8; 256]"),
+        field(name = "wrapped_hmac_key", data_type = "[u8; 256]", format = "hex"),
         field(name = "integrity_encryption_method", data_type = "u32"),
         field(name = "unknown4", data_type = "u32"),
-        field(name = "integrity_initialization_vector", data_type = "[u8; 32]"),
+        field(
+            name = "integrity_initialization_vector",
+            data_type = "[u8; 32]",
+            format = "hex"
+        ),
         field(name = "wrapped_integrity_key_size", data_type = "u32"),
-        field(name = "wrapped_integrity_key", data_type = "[u8; 256]"),
+        field(
+            name = "wrapped_integrity_key",
+            data_type = "[u8; 256]",
+            format = "hex"
+        ),
         field(name = "unknown5", data_type = "u32"),
-        field(name = "unknown6", data_type = "[u8; 256]"),
-        field(name = "data_area_offset", data_type = "u32"),
-        field(name = "data_area_size", data_type = "u32"),
+        field(name = "unknown6", data_type = "[u8; 256]", format = "hex"),
+        field(name = "data_fork_offset", data_type = "u32"),
+        field(name = "data_fork_size", data_type = "u32"),
         field(name = "format_version", data_type = "u32"),
         field(name = "signature", data_type = "ByteString<8>"),
     ),
@@ -64,11 +80,26 @@ pub struct UdifEncryptedFileFooter {
     /// Block size.
     pub block_size: u32,
 
-    /// Format version.
-    pub format_version: u32,
+    /// Initialization vector size.
+    pub initialization_vector_size: u32,
+
+    /// Encryption mode.
+    pub encryption_mode: u32,
 
     /// Encryption method.
     pub encryption_method: u32,
+
+    /// Key size.
+    pub key_size: u32,
+
+    /// Data fork offset.
+    pub data_fork_offset: u32,
+
+    /// Data fork size.
+    pub data_fork_size: u32,
+
+    /// Format version.
+    pub format_version: u32,
 }
 
 impl UdifEncryptedFileFooter {
@@ -76,8 +107,13 @@ impl UdifEncryptedFileFooter {
     pub fn new() -> Self {
         Self {
             block_size: 0,
-            format_version: 0,
+            initialization_vector_size: 0,
+            encryption_mode: 0,
             encryption_method: 0,
+            key_size: 0,
+            data_fork_offset: 0,
+            data_fork_size: 0,
+            format_version: 0,
         }
     }
 
@@ -98,7 +134,12 @@ impl UdifEncryptedFileFooter {
             )));
         }
         self.block_size = bytes_to_u32_be!(data, 16);
+        self.initialization_vector_size = bytes_to_u32_be!(data, 88);
+        self.encryption_mode = bytes_to_u32_be!(data, 92);
         self.encryption_method = bytes_to_u32_be!(data, 96);
+        self.key_size = bytes_to_u32_be!(data, 100);
+        self.data_fork_offset = bytes_to_u32_be!(data, 1256);
+        self.data_fork_size = bytes_to_u32_be!(data, 1260);
 
         Ok(())
     }
@@ -217,8 +258,13 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.block_size, 4096);
-        assert_eq!(test_struct.format_version, 1);
+        assert_eq!(test_struct.initialization_vector_size, 16);
+        assert_eq!(test_struct.encryption_mode, 5);
         assert_eq!(test_struct.encryption_method, 0x80000001);
+        assert_eq!(test_struct.key_size, 128);
+        assert_eq!(test_struct.data_fork_offset, 0);
+        assert_eq!(test_struct.data_fork_size, 65536);
+        assert_eq!(test_struct.format_version, 1);
 
         Ok(())
     }
@@ -262,7 +308,10 @@ mod tests {
 
         assert_eq!(test_struct.block_size, 4096);
         assert_eq!(test_struct.format_version, 1);
+        assert_eq!(test_struct.initialization_vector_size, 16);
+        assert_eq!(test_struct.encryption_mode, 5);
         assert_eq!(test_struct.encryption_method, 0x80000001);
+        assert_eq!(test_struct.key_size, 128);
 
         Ok(())
     }

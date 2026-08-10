@@ -276,6 +276,43 @@ rm -f ${IMAGE_FILE}.dmg
 
 hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDZO -o ${IMAGE_FILE}
 
+# Create a zlib compressed UDIF image with a resource fork.
+# Note this works with older versions of hdiutil that support flatten/unflatten.
+#
+# IMAGE_FILE="test_data/udif/hfsplus_rsrc"
+#
+# rm -f ${IMAGE_FILE}.dmg
+#
+# hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDZO -o ${IMAGE_FILE}
+#
+# hdiutil unflatten test.dmg
+# hdiutil flatten -noxml test.dmg
+
+# Create an AES-128 encrypted zlib compressed UDIF image.
+IMAGE_FILE="test_data/udif/hfsplus_zlib_aes128"
+
+rm -f ${IMAGE_FILE}.dmg
+
+echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE}.dmg -encryption AES-128 -format UDZO -stdinpass -o ${IMAGE_FILE}
+
+# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE}.dmg -encryption AES-128 -format UDZO -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
+
+# Create an uncompressed segmented UDIF image.
+#
+# IMAGE_FILE="test_data/udif/hfsplus_segments"
+# IMAGE_SIZE="4M"
+#
+# hdiutil attach -nomount test_data/udif/hfsplus_zlib
+# sudo hdiutil create -srcdevice /dev/rdisk# -format UDIF -segmentSize 10K ${IMAGE_FILE}
+
+# Create a zlib compressed segmented UDIF image.
+#
+# IMAGE_FILE="test_data/udif/hfsplus_zlib_segments"
+# IMAGE_SIZE="4M"
+#
+# hdiutil attach -nomount test_data/udif/hfsplus_zlib
+# sudo hdiutil create -srcdevice /dev/rdisk# -format UDZO -segmentSize 10K ${IMAGE_FILE}
+
 # Create a raw image with an APFS container and single volume with a case-insensitive file system
 IMAGE_FILE="test_data/apfs/apfs"
 IMAGE_SIZE="4M"
