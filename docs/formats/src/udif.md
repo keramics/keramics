@@ -18,8 +18,6 @@ be stored across multiple segment files.
 
 Only the first segment file contains a resource fork or XML plist.
 
-Currently it is assumed that an encrypted image cannot be segmented.
-
 Known UDIF image types are:
 
 | Identifier | Description |
@@ -33,6 +31,8 @@ Known UDIF image types are:
 | ULFO | LZFSE compressed UDIF |
 | ULMO | LZMA compressed UDIF |
 
+An UDIF image can also be encrypted.
+
 ### Terminology
 
 | Term | Description |
@@ -42,37 +42,39 @@ Known UDIF image types are:
 
 ### Uncompressed image format
 
-An uncompressed UDIF image consist of:
+An uncompressed UDIF segment file consist of:
 
-* data
-* optional file footer
+* Image data
+* [File footer](#file_footer) at the end of the file
 
 > Note that an uncompressed UDIF image without file footer is equivalent to a RAW storage media
 > image (CRawDiskImage).
 
 ### Compressed image format
 
-A compressed UDIF image consist of:
+A compressed UDIF segment file consist of:
 
-* Data fork
+* Data fork, containing the image data
 * Optional resource fork or XML plist
-* [File footer](#file_footer) at the end of the image file
+* [File footer](#file_footer) at the end of the file
 
 ### Encrypted image format
 
 #### Encrypted image format version 1
 
-An encrypted UDIF image (version 1) consist of:
+A version 1 encrypted segment file consist of:
 
-* Encyrypted uncompressed or compressed UDIF image data
-* [Encrypted file footer](#encypted_file_footer) at the end of the image file
+* Data fork, containing encyrypted UDIF data
+* [Encrypted file footer](#encypted_file_footer) at the end of the file
 
 #### Encrypted image format version 2
 
-An encrypted UDIF image (version 2) consist of:
+A version 2 encrypted segment file consist of:
 
-* [Encrypted file header](#encypted_file_header) at the start of the image file
-* Encyrypted uncompressed or compressed UDIF image data
+* [Encrypted file header](#encypted_file_header) at the start of the file
+* Key protectors
+* Unknown (empty values), probably reserved for the key protectors
+* Data fork, containing encyrypted UDIF data
 
 ### Characteristics
 
@@ -151,8 +153,8 @@ and consists of:
 
 ## Resource fork
 
-In older UDIF images the resource fork contains the [block table](#udif_block_table). The
-resource fork consists of:
+In older UDIF images the resource fork contains the image metadata, such as the
+[block table](#udif_block_table). The resource fork consists of:
 
 * Resource fork header
 * Resource data
@@ -243,7 +245,7 @@ The resource name is of variable size and consists of:
 
 ## XML plist
 
-TODO: complete section
+The XML plist contains image metadata such as the [block table](#udif_block_table).
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -402,7 +404,7 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 
 #### UDIF block table entry types {#udif_block_table_entry_types}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0x00000000 | | Unknown (sparse) |
 | 0x00000001 | | Uncompressed (raw) data |
@@ -412,8 +414,8 @@ The block table entry (BLKXChunkEntry) is 40 bytes in size and consists of:
 | | | |
 | 0x80000004 | | ADC compressed data |
 | 0x80000005 | | zlib compressed data |
-| 0x80000006 | | bzip2 compressed data  |
-| 0x80000007 | | LZFSE compressed data  |
+| 0x80000006 | | bzip2 compressed data |
+| 0x80000007 | | LZFSE compressed data |
 | 0x80000008 | | LZMA compressed data |
 | | | |
 | 0xffffffff | | Block table entries terminator |
@@ -505,7 +507,7 @@ The key protector descriptor is 20 bytes in size and consists of:
 
 #### Unlock types {#encrypted_unlock_types}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 1 | CSSM_APPLE_UNLOCK_TYPE_KEY_DIRECT | Master key wrapped by passphrase, stored as [passphrase wrapped key](#passphrase_wrapped_key) |
 | 2 | CSSM_APPLE_UNLOCK_TYPE_WRAPPED_PRIVATE | Master key wrapped by a public key, stored as [public key wrapped key](#public_key_wrapped_key) |
@@ -530,6 +532,24 @@ The passphrase wrapped key is 616 bytes in size and consists of:
 | 100 | 4 | | Encrypted data size |
 | 104 | 64 | | Encrypted data |
 | 168 | 448 | | Unknown (empty values) |
+
+The encrypted data can be decrypted using the following approach:
+
+* Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
+  determine the key encrypting key (KEK) based on a passphrase.
+* Pad the initialization vector with 0-byte values if necessesary, e.g. if initialization vector
+  is 8 bytes but the encryption method (AES) requires an initialization vector of 16 bytes.
+* Decrypt the encrypted data using the encryption method and mode, e.g. AES-CBC, with the number
+  of bits of the KEK (defined by encryption key size) and the initialization vector if applicable.
+* Remove the padding, specified by the padding type.
+
+The decypted data is of variable size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | ... | | Master key |
+| ... | ... | | HMAC key |
+| ... | 5 | "CKIE\x00" | Signature |
 
 #### Public key wrapped key {#public_key_wrapped_key}
 
@@ -557,7 +577,7 @@ TODO: complete section
 
 ### Algorithm identifiers {#algorithm_identifiers}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | CSSM_ALGID_NONE | None |
 | 1 | CSSM_ALGID_CUSTOM | |
@@ -576,9 +596,9 @@ TODO: complete section
 | 14 | CSSM_ALGID_DES | DES |
 | 15 | CSSM_ALGID_DESX | DESX |
 | 16 | CSSM_ALGID_RDES | RDES |
-| 17 | CSSM_ALGID_3DES_3KEY_EDE (or CSSM_ALGID_3DES_3KEY) | Triple-DES with 3 keys applied encrypt, decrypt, encrypt (EDE)  |
+| 17 | CSSM_ALGID_3DES_3KEY_EDE (or CSSM_ALGID_3DES_3KEY) | Triple-DES with 3 keys applied encrypt, decrypt, encrypt (EDE) |
 | 18 | CSSM_ALGID_3DES_2KEY_EDE (or CSSM_ALGID_3DES_2KEY) | Triple-DES with 2 keys applied encrypt, decrypt, encrypt (EDE), with the first key used for the first and last operation |
-| 19 | CSSM_ALGID_3DES_1KEY_EEE | Triple-DES with 1 keys applied encrypt, encrypt, encrypt (EEE), with the first key used for all operation  |
+| 19 | CSSM_ALGID_3DES_1KEY_EEE | Triple-DES with 1 keys applied encrypt, encrypt, encrypt (EEE), with the first key used for all operation |
 | 20 | CSSM_ALGID_3DES_3KEY_EEE | Triple-DES with 3 keys applied encrypt, encrypt, encrypt (EEE) |
 | 21 | CSSM_ALGID_3DES_2KEY_EEE | Triple-DES with 2 keys applied encrypt, encrypt, encrypt (EEE), with the first key used for the first and last operation |
 | 22 | CSSM_ALGID_IDEA | IDEA |
@@ -670,7 +690,7 @@ TODO: complete section
 
 ### Padding types {#padding_types}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | CSSM_PADDING_NONE | No padding |
 | 1 | CSSM_PADDING_CUSTOM | |
@@ -686,7 +706,7 @@ TODO: complete section
 
 ### Encryption modes {#encryption_modes}
 
-| Value | Identifier | Description  |
+| Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | CSSM_ALGMODE_NONE | |
 | 1 | CSSM_ALGMODE_CUSTOM | |
