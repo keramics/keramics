@@ -536,7 +536,7 @@ The passphrase wrapped key is 616 bytes in size and consists of:
 The encrypted data can be decrypted using the following approach:
 
 * Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
-  determine the key encrypting key (KEK) based on a passphrase.
+  determine the key encryption key (KEK) based on a passphrase.
 * Pad the initialization vector with 0-byte values if necessesary, e.g. if initialization vector
   is 8 bytes but the encryption method (AES) requires an initialization vector of 16 bytes.
 * Decrypt the encrypted data using the encryption method and mode, e.g. AES-CBC, with the number
@@ -547,7 +547,7 @@ The decypted data is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | ... | | Master key |
+| 0 | ... | | Master data encryption key (DEK) |
 | ... | ... | | HMAC key |
 | ... | 5 | "CKIE\x00" | Signature |
 
