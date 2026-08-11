@@ -135,7 +135,10 @@ and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that the XML plist size can be 0, such as in an UDIF stub (UDxx) image.
+In an encrypted image file the offsets are relative from the start of the unencrypted image file.
+
+> Note that both the XML plist and resource fork size can be 0, such as in an UDIF stub (UDxx)
+> image.
 
 ### Image flags {#image_flags}
 

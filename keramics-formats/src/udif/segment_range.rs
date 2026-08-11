@@ -12,7 +12,6 @@
  */
 
 /// Universal Disk Image Format (UDIF) segment range.
-#[derive(Debug)]
 pub struct UdifSegmentRange {
     /// Segment offset.
     pub segment_offset: u64,

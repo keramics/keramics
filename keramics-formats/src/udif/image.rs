@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
 use keramics_compression::{AdcContext, Bzip2Context, LzfseContext};
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
+use keramics_core::{DataStream, ErrorTrace};
 use keramics_types::Uuid;
 
 use crate::block_tree::BlockTree;
@@ -29,7 +29,6 @@ use super::block_table_reader::UdifBlockTableReader;
 use super::credential::UdifCredential;
 use super::encryption_type::UdifEncryptionType;
 use super::enums::UdifCompressionMethod;
-use super::file::UdifFile;
 use super::segment_stream::UdifSegmentStream;
 
 /// Universal Disk Image Format (UDIF) file.
@@ -150,7 +149,6 @@ impl UdifImage {
                 self.bytes_per_sector = 512;
                 self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                 self.number_of_segments = segment_stream.number_of_segments;
-
                 let mut block_table_reader: UdifBlockTableReader =
                     match segment_stream.read_metadata(self.bytes_per_sector) {
                         Ok(block_table_reader) => block_table_reader,
@@ -373,9 +371,48 @@ impl UdifImage {
 
     /// Unlocks a locked (encrypted) volume.
     pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
-        let result: bool = match self.segment_stream.write() {
+        match self.segment_stream.write() {
             Ok(mut segment_stream) => match segment_stream.unlock(credentials) {
-                Ok(result) => result,
+                Ok(true) => {
+                    self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
+                    self.number_of_segments = segment_stream.number_of_segments;
+
+                    let mut block_table_reader: UdifBlockTableReader = match segment_stream
+                        .read_metadata(self.bytes_per_sector)
+                    {
+                        Ok(block_table_reader) => block_table_reader,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
+                            return Err(error);
+                        }
+                    };
+                    self.has_block_ranges = block_table_reader.has_block_ranges();
+
+                    if self.has_block_ranges {
+                        self.block_tree = match block_table_reader.get_block_tree() {
+                            Ok(block_tree) => block_tree,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to determine block tree"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    }
+                    self.media_size = block_table_reader.get_media_size();
+                    self.compression_method = block_table_reader.get_compression_method();
+
+                    if self.media_size
+                        > (segment_stream.number_of_sectors * (self.bytes_per_sector as u64))
+                    {
+                        return Err(keramics_core::error_trace_new!(
+                            "Number of sectors value out of bounds",
+                        ));
+                    }
+                    self.is_locked = false;
+                }
+                Ok(false) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to unlock segment stream");
                     return Err(error);
@@ -385,87 +422,6 @@ impl UdifImage {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain write lock on segment stream",
                     error
-                ));
-            }
-        };
-        if result {
-            // Coerce the segment stream into a data stream reference.
-            let data_stream: DataStreamReference = self.segment_stream.clone();
-
-            let mut segment_file: UdifFile = UdifFile::new();
-
-            match segment_file.read_data_stream(&data_stream) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read unencrypted file");
-                    return Err(error);
-                }
-            }
-            let segment_number: u32 = segment_file.segment_number;
-            let number_of_segments: u32 = segment_file.number_of_segments;
-
-            if (number_of_segments == 0 && segment_number != 0)
-                || (number_of_segments != 0 && segment_number != 1)
-            {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported segment file: 1 - segment number value out of bounds"
-                ));
-            }
-            if segment_file.plist_size != 0 && segment_file.resource_fork_size != 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported segment file: 1 - both XML plist and resource fork in use"
-                ));
-            }
-            if segment_file.segment_offset != 0 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported segment file: 1 - segment offset value out of bounds"
-                ));
-            }
-            let mut block_table_reader: UdifBlockTableReader =
-                UdifBlockTableReader::new(self.bytes_per_sector, segment_file.data_fork_size);
-
-            self.segment_set_identifier = segment_file.segment_set_identifier.clone();
-            self.number_of_segments = segment_file.number_of_segments;
-
-            if segment_file.plist_size == 0 && segment_file.resource_fork_size == 0 {
-                block_table_reader.media_offset =
-                    segment_file.number_of_sectors * (self.bytes_per_sector as u64);
-            } else {
-                match segment_file.read_metadata(&mut block_table_reader) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read metadata from segment file: {}",
-                                segment_number
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            self.has_block_ranges = block_table_reader.has_block_ranges();
-
-            if self.has_block_ranges {
-                self.block_tree = match block_table_reader.get_block_tree() {
-                    Ok(block_tree) => block_tree,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to determine block tree"
-                        );
-                        return Err(error);
-                    }
-                };
-            }
-            self.media_size = block_table_reader.get_media_size();
-            self.compression_method = block_table_reader.get_compression_method();
-            self.is_locked = false;
-
-            if self.media_size > (segment_file.number_of_sectors * (self.bytes_per_sector as u64)) {
-                return Err(keramics_core::error_trace_new!(
-                    "Number of sectors value out of bounds",
                 ));
             }
         }
