@@ -20,14 +20,13 @@ use keramics_core::{DataStream, ErrorTrace};
 use keramics_types::Uuid;
 
 use crate::block_tree::BlockTree;
+use crate::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
 use crate::path_component::PathComponent;
 
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table_reader::UdifBlockTableReader;
-use super::credential::UdifCredential;
-use super::encryption_type::UdifEncryptionType;
 use super::enums::UdifCompressionMethod;
 use super::segment_stream::UdifSegmentStream;
 
@@ -61,7 +60,7 @@ pub struct UdifImage {
     is_locked: bool,
 
     /// Encryption type.
-    encryption_type: Option<UdifEncryptionType>,
+    encryption_type: Option<CdsaEncrEncryptionType>,
 
     /// The current offset.
     current_offset: u64,
@@ -100,7 +99,7 @@ impl UdifImage {
     }
 
     /// Retrieves the encryption type.
-    pub fn get_encryption_type(&self) -> Option<&UdifEncryptionType> {
+    pub fn get_encryption_type(&self) -> Option<&CdsaEncrEncryptionType> {
         self.encryption_type.as_ref()
     }
 
@@ -170,7 +169,6 @@ impl UdifImage {
                             return Err(error);
                         }
                     };
-                    segment_stream.has_block_ranges = self.has_block_ranges;
                 }
                 self.media_size = block_table_reader.get_media_size();
                 self.compression_method = block_table_reader.get_compression_method();
@@ -371,7 +369,7 @@ impl UdifImage {
     }
 
     /// Unlocks a locked (encrypted) volume.
-    pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
+    pub fn unlock(&mut self, credentials: &[CdsaEncrCredential]) -> Result<bool, ErrorTrace> {
         match self.segment_stream.write() {
             Ok(mut segment_stream) => match segment_stream
                 .unlock(self.bytes_per_sector, credentials)
@@ -402,7 +400,6 @@ impl UdifImage {
                                 return Err(error);
                             }
                         };
-                        segment_stream.has_block_ranges = self.has_block_ranges;
                     }
                     self.media_size = block_table_reader.get_media_size();
                     self.compression_method = block_table_reader.get_compression_method();

@@ -16,9 +16,11 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_be;
 
 use super::constants::*;
-use super::credential::UdifCredential;
-use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifKeyDerivationContext};
-use super::encryption_type::UdifEncryptionType;
+use super::credential::CdsaEncrCredential;
+use super::encryption::{
+    CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrKeyDerivationContext,
+};
+use super::encryption_type::CdsaEncrEncryptionType;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -78,13 +80,13 @@ use super::encryption_type::UdifEncryptionType;
     ),
     methods("debug_read_data", "read_at_position")
 )]
-/// Universal Disk Image Format (UDIF) encrypted file footer.
-pub struct UdifEncryptedFileFooter {
+/// Mac OS Encrypted Encoding (cdsaencr) encrypted container footer.
+pub struct CdsaEncrContainerFooter {
     /// Block size.
     pub block_size: u32,
 
     /// Key encryption key (KEK) encryption type.
-    pub kek_encryption_type: UdifEncryptionType,
+    pub kek_encryption_type: CdsaEncrEncryptionType,
 
     /// Key encryption key (KEK) padding type.
     pub kek_padding_type: u32,
@@ -105,7 +107,7 @@ pub struct UdifEncryptedFileFooter {
     pub initialization_vector_size: u32,
 
     /// Encryption type.
-    pub encryption_type: UdifEncryptionType,
+    pub encryption_type: CdsaEncrEncryptionType,
 
     /// Wrapped block key data.
     pub wrapped_block_key_data: Vec<u8>,
@@ -135,19 +137,19 @@ pub struct UdifEncryptedFileFooter {
     pub format_version: u32,
 }
 
-impl UdifEncryptedFileFooter {
-    /// Creates a new encrypted file footer.
+impl CdsaEncrContainerFooter {
+    /// Creates a new encrypted container footer.
     pub fn new() -> Self {
         Self {
             block_size: 0,
-            kek_encryption_type: UdifEncryptionType::new(),
+            kek_encryption_type: CdsaEncrEncryptionType::new(),
             kek_padding_type: 0,
             kek_initialization_vector_size: 0,
             key_derivation_method: 0,
             number_of_iterations: 0,
             salt: Vec::new(),
             initialization_vector_size: 0,
-            encryption_type: UdifEncryptionType::new(),
+            encryption_type: CdsaEncrEncryptionType::new(),
             wrapped_block_key_data: Vec::new(),
             block_key_data: Vec::new(),
             hmac_method: 0,
@@ -160,12 +162,12 @@ impl UdifEncryptedFileFooter {
         }
     }
 
-    /// Reads the file encrypted footer from a buffer.
+    /// Reads the container encrypted footer from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 1276 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[1268..1276] != UDIF_ENCRYPTED_FILE_FOOTER_SIGNATURE {
+        if &data[1268..1276] != CDSAENCR_CONTAINER_FOOTER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.format_version = bytes_to_u32_be!(data, 1264);
@@ -237,11 +239,11 @@ impl UdifEncryptedFileFooter {
     }
 
     /// Unlocks the key.
-    pub fn unlock(&mut self, credential: &UdifCredential) -> Result<bool, ErrorTrace> {
+    pub fn unlock(&mut self, credential: &CdsaEncrCredential) -> Result<bool, ErrorTrace> {
         match credential {
-            UdifCredential::Passphrase(passphrase) => {
-                let mut key_derivation_context: UdifKeyDerivationContext =
-                    match UdifEncryption::get_key_derivation_context(
+            CdsaEncrCredential::Passphrase(passphrase) => {
+                let mut key_derivation_context: CdsaEncrKeyDerivationContext =
+                    match CdsaEncrEncryption::get_key_derivation_context(
                         self.key_derivation_method,
                         &self.salt,
                         self.number_of_iterations as usize,
@@ -276,8 +278,11 @@ impl UdifEncryptedFileFooter {
                         return Err(error);
                     }
                 }
-                let encryption_context: UdifEncryptionContext =
-                    match UdifEncryption::get_encryption_context(&self.kek_encryption_type, &key) {
+                let encryption_context: CdsaEncrEncryptionContext =
+                    match CdsaEncrEncryption::get_encryption_context(
+                        &self.kek_encryption_type,
+                        &key,
+                    ) {
                         Ok(Some(context)) => context,
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
@@ -327,7 +332,7 @@ impl UdifEncryptedFileFooter {
     /// Unwraps a key.
     fn unwrap_key(
         &self,
-        encryption_context: &UdifEncryptionContext,
+        encryption_context: &CdsaEncrEncryptionContext,
         wrapped_key_data: &[u8],
     ) -> Result<Option<Vec<u8>>, ErrorTrace> {
         let mut initialization_vector: Vec<u8> = vec![
@@ -355,12 +360,12 @@ impl UdifEncryptedFileFooter {
             }
         }
         keramics_core::debug_trace_data!(
-            "UdifPaddedIntermediateKeyData",
+            "CdsaEncrPaddedIntermediateKeyData",
             0,
             &intermediate_key_data,
             intermediate_key_data_size,
         );
-        let result_key_data: &[u8] = match UdifEncryption::remove_padding(
+        let result_key_data: &[u8] = match CdsaEncrEncryption::remove_padding(
             self.kek_padding_type,
             self.kek_initialization_vector_size,
             &intermediate_key_data,
@@ -403,12 +408,12 @@ impl UdifEncryptedFileFooter {
             }
         }
         keramics_core::debug_trace_data!(
-            "UdifFinalKeyData",
+            "CdsaEncrFinalKeyData",
             0,
             &final_key_data,
             final_key_data_size,
         );
-        let result_key_data: &[u8] = match UdifEncryption::remove_padding(
+        let result_key_data: &[u8] = match CdsaEncrEncryption::remove_padding(
             self.kek_padding_type,
             self.kek_initialization_vector_size,
             &final_key_data,
@@ -539,7 +544,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifEncryptedFileFooter::new();
+        let mut test_struct = CdsaEncrContainerFooter::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.block_size, 4096);
@@ -570,7 +575,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifEncryptedFileFooter::new();
+        let mut test_struct = CdsaEncrContainerFooter::new();
         let result = test_struct.read_data(&test_data[0..1275]);
         assert!(result.is_err());
     }
@@ -580,7 +585,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[1268] = 0xff;
 
-        let mut test_struct = UdifEncryptedFileFooter::new();
+        let mut test_struct = CdsaEncrContainerFooter::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -590,7 +595,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[1264] = 0xff;
 
-        let mut test_struct = UdifEncryptedFileFooter::new();
+        let mut test_struct = CdsaEncrContainerFooter::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -600,7 +605,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = UdifEncryptedFileFooter::new();
+        let mut test_struct = CdsaEncrContainerFooter::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.block_size, 4096);

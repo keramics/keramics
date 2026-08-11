@@ -17,6 +17,7 @@ use std::io::SeekFrom;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
+use crate::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
@@ -24,8 +25,6 @@ use crate::path_component::PathComponent;
 
 use super::block_table_reader::UdifBlockTableReader;
 use super::constants::*;
-use super::credential::UdifCredential;
-use super::encryption_type::UdifEncryptionType;
 use super::file::UdifFile;
 use super::file_footer::UdifFileFooter;
 use super::segment_range::UdifSegmentRange;
@@ -56,17 +55,14 @@ pub struct UdifSegmentStream {
     /// Block size.
     pub block_size: u32,
 
-    /// Value to indicate the image has block ranges.
-    pub has_block_ranges: bool,
-
     /// Value to indicate the (encrypted) image is locked.
     pub is_locked: bool,
 
     /// Encryption type.
-    pub encryption_type: UdifEncryptionType,
+    pub encryption_type: CdsaEncrEncryptionType,
 
     /// Credentials.
-    credentials: Vec<UdifCredential>,
+    credentials: Vec<CdsaEncrCredential>,
 
     /// The current offset.
     current_offset: u64,
@@ -87,9 +83,8 @@ impl UdifSegmentStream {
             segment_file_cache: LruCache::new(16),
             number_of_sectors: 0,
             block_size: 0,
-            has_block_ranges: false,
             is_locked: false,
-            encryption_type: UdifEncryptionType::new(),
+            encryption_type: CdsaEncrEncryptionType::new(),
             credentials: Vec::new(),
             current_offset: 0,
             size: 0,
@@ -177,41 +172,17 @@ impl UdifSegmentStream {
             }
             segment_file.credentials.clear();
 
-            if self.has_block_ranges {
-                let footer_offset: u64 = segment_file.data_fork_size - 512;
-
-                let mut data: Vec<u8> = vec![0; 512];
-
-                match segment_file.read_exact_at_position(&mut data, footer_offset, true) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read footer from segment file: {} at offset: {} (0x{:08x})",
-                                segment_number, footer_offset, footer_offset
-                            )
-                        );
-                        return Err(error);
+            let segment_range: &UdifSegmentRange =
+                match self.segment_ranges.get(segment_number as usize) {
+                    Some(segment_range) => segment_range,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unable to retrieve segment range: {}",
+                            segment_number
+                        )));
                     }
-                }
-                let mut file_footer: UdifFileFooter = UdifFileFooter::new();
-
-                match file_footer.read_data(&data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read segment file: {} unencrypted footer",
-                                segment_number
-                            )
-                        );
-                        return Err(error);
-                    }
-                }
-                segment_file.segment_offset = file_footer.segment_offset;
-            }
+                };
+            segment_file.segment_offset = segment_range.segment_offset;
         }
         Ok(segment_file)
     }
@@ -544,7 +515,7 @@ impl UdifSegmentStream {
     pub fn unlock(
         &mut self,
         bytes_per_sector: u16,
-        credentials: &[UdifCredential],
+        credentials: &[CdsaEncrCredential],
     ) -> Result<bool, ErrorTrace> {
         if !self.is_locked {
             return Ok(true);
@@ -1096,8 +1067,8 @@ mod tests {
 
         assert_eq!(segment_stream.is_locked, true);
 
-        let credentials: Vec<UdifCredential> =
-            vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        let credentials: Vec<CdsaEncrCredential> =
+            vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
         segment_stream.unlock(512, &credentials)?;
 
         assert_eq!(segment_stream.is_locked, false);

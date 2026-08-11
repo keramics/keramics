@@ -877,7 +877,7 @@ impl StructureLayout {
         let name_string: String = format!("{}", self.name);
 
         quote! {
-            pub(super) fn read_at_position(
+            pub(crate) fn read_at_position(
                 &mut self,
                 data_stream: &keramics_core::DataStreamReference,
                 position: std::io::SeekFrom,
@@ -1343,7 +1343,7 @@ mod tests {
             .push(StructureLayoutMember::Sequence(sequence));
 
         let expected_token_stream = quote! {
-            pub(super) fn read_at_position(
+            pub(crate) fn read_at_position(
                 &mut self,
                 data_stream: &keramics_core::DataStreamReference,
                 position: std::io::SeekFrom,

@@ -16,8 +16,8 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
-use super::encryption_type::UdifEncryptionType;
-use super::key_protector_descriptor::UdifKeyProtectorDescriptor;
+use super::encryption_type::CdsaEncrEncryptionType;
+use super::key_protector_descriptor::CdsaEncrKeyProtectorDescriptor;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -40,8 +40,8 @@ use super::key_protector_descriptor::UdifKeyProtectorDescriptor;
     ),
     methods("debug_read_data", "read_at_position")
 )]
-/// Universal Disk Image Format (UDIF) encrypted file header.
-pub struct UdifEncryptedFileHeader {
+/// Mac OS Encrypted Encoding (cdsaencr) encrypted container header.
+pub struct CdsaEncrContainerHeader {
     /// Format version.
     pub format_version: u32,
 
@@ -52,7 +52,7 @@ pub struct UdifEncryptedFileHeader {
     pub initialization_vector_size: u32,
 
     /// Encryption type.
-    pub encryption_type: UdifEncryptionType,
+    pub encryption_type: CdsaEncrEncryptionType,
 
     /// HMAC method.
     pub hmac_method: u32,
@@ -67,17 +67,17 @@ pub struct UdifEncryptedFileHeader {
     pub data_fork_offset: u64,
 
     /// Key protector descriptors.
-    pub key_protector_descriptors: Vec<UdifKeyProtectorDescriptor>,
+    pub key_protector_descriptors: Vec<CdsaEncrKeyProtectorDescriptor>,
 }
 
-impl UdifEncryptedFileHeader {
-    /// Creates a new encrypted file header.
+impl CdsaEncrContainerHeader {
+    /// Creates a new encrypted container header.
     pub fn new() -> Self {
         Self {
             format_version: 0,
             block_size: 0,
             initialization_vector_size: 0,
-            encryption_type: UdifEncryptionType::new(),
+            encryption_type: CdsaEncrEncryptionType::new(),
             hmac_method: 0,
             hmac_key_size: 0,
             data_fork_size: 0,
@@ -86,14 +86,14 @@ impl UdifEncryptedFileHeader {
         }
     }
 
-    /// Reads the file encrypted header from a buffer.
+    /// Reads the container encrypted header from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         if data_size < 512 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..8] != UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE {
+        if &data[0..8] != CDSAENCR_CONTAINER_HEADER_SIGNATURE {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         self.format_version = bytes_to_u32_be!(data, 8);
@@ -125,11 +125,11 @@ impl UdifEncryptedFileHeader {
         let mut data_offset: usize = 76;
 
         for value_index in 0..number_of_key_protectors {
-            keramics_core::debug_trace_structure!(UdifKeyProtectorDescriptor::debug_read_data(
+            keramics_core::debug_trace_structure!(CdsaEncrKeyProtectorDescriptor::debug_read_data(
                 &data[data_offset..]
             ));
-            let mut key_protector_descriptor: UdifKeyProtectorDescriptor =
-                UdifKeyProtectorDescriptor::new();
+            let mut key_protector_descriptor: CdsaEncrKeyProtectorDescriptor =
+                CdsaEncrKeyProtectorDescriptor::new();
 
             match key_protector_descriptor.read_data(&data[data_offset..]) {
                 Ok(_) => {}
@@ -204,7 +204,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifEncryptedFileHeader::new();
+        let mut test_struct = CdsaEncrContainerHeader::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.format_version, 2);
@@ -226,7 +226,7 @@ mod tests {
     fn test_read_data_with_unsupported_data_size() {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifEncryptedFileHeader::new();
+        let mut test_struct = CdsaEncrContainerHeader::new();
         let result = test_struct.read_data(&test_data[0..511]);
         assert!(result.is_err());
     }
@@ -236,7 +236,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[0] = 0xff;
 
-        let mut test_struct = UdifEncryptedFileHeader::new();
+        let mut test_struct = CdsaEncrContainerHeader::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -246,7 +246,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[8] = 0xff;
 
-        let mut test_struct = UdifEncryptedFileHeader::new();
+        let mut test_struct = CdsaEncrContainerHeader::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
     }
@@ -256,7 +256,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = UdifEncryptedFileHeader::new();
+        let mut test_struct = CdsaEncrContainerHeader::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
         assert_eq!(test_struct.format_version, 2);

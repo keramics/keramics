@@ -19,6 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_sigscan::{PatternType, ScanContext, Scanner, Signature};
 
 use super::apfs::constants::*;
+use super::cdsaencr::constants::*;
 use super::enums::FormatIdentifier;
 use super::ewf::constants::*;
 use super::ext::constants::*;
@@ -256,19 +257,22 @@ impl FormatScanner {
             512,
             UDIF_FILE_FOOTER_SIGNATURE,
         ));
-        // Encrypted UDIF with version 1 footer.
+        // TODO: make Mac OS Encrypted Encoding container a separate type and add a helper to
+        // determine the contents of the container.
+
+        // Mac OS Encrypted Encoding container version 1 footer.
         self.signature_scanner.add_signature(Signature::new(
             "udif2",
             PatternType::BoundToEnd,
             8,
-            UDIF_ENCRYPTED_FILE_FOOTER_SIGNATURE,
+            CDSAENCR_CONTAINER_FOOTER_SIGNATURE,
         ));
-        // Encrypted UDIF with version 2 header.
+        // Mac OS Encrypted Encoding container version 2 header.
         self.signature_scanner.add_signature(Signature::new(
             "udif3",
             PatternType::BoundToStart,
             0,
-            UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE,
+            CDSAENCR_CONTAINER_HEADER_SIGNATURE,
         ));
     }
 

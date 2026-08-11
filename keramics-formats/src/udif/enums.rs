@@ -21,12 +21,3 @@ pub enum UdifCompressionMethod {
     None,
     Zlib,
 }
-
-/// Universal Disk Image Format (UDIF) key protector types.
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum UdifKeyProtectorType {
-    KeybagWrappedKey,
-    PassphraseWrappedKey,
-    PublicKeyWrappedKey,
-    Unknown(u32),
-}

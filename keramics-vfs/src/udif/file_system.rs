@@ -14,7 +14,8 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::ErrorTrace;
-use keramics_formats::udif::{UdifCredential, UdifImage};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
+use keramics_formats::udif::UdifImage;
 use keramics_formats::{FileResolverReference, Path, PathComponent};
 
 use crate::credential::VfsCredential;
@@ -212,12 +213,12 @@ impl UdifFileSystem {
         }
         if image.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
+            let mut udif_credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
                 match vfs_credential {
                     VfsCredential::Passphrase(passphrase) => {
-                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                        udif_credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                     }
                     _ => {}
                 }

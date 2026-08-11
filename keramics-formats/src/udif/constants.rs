@@ -11,17 +11,8 @@
  * under the License.
  */
 
-/// UDIF encrypted file footer signature.
-pub(crate) const UDIF_ENCRYPTED_FILE_FOOTER_SIGNATURE: &[u8] = b"cdsaencr";
-
-/// UDIF encrypted file header signature.
-pub(crate) const UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE: &[u8] = b"encrcdsa";
-
 /// UDIF file footer signature.
 pub(crate) const UDIF_FILE_FOOTER_SIGNATURE: &[u8] = b"koly";
 
 /// UDIF block table header signature.
 pub(super) const UDIF_BLOCK_TABLE_HEADER_SIGNATURE: &[u8] = b"mish";
-
-/// UDIF wrapped key signature.
-pub(super) const UDIF_WRAPPED_KEY_SIGNATURE: &[u8] = b"CKIE\x00";

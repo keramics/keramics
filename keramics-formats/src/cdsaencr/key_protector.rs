@@ -11,23 +11,23 @@
  * under the License.
  */
 
-use super::enums::UdifKeyProtectorType;
+use super::enums::CdsaEncrKeyProtectorType;
 
-/// Universal Disk Image Format (UDIF) key protector.
-pub struct UdifKeyProtector {
+/// Mac OS Encrypted Encoding (cdsaencr) key protector.
+pub struct CdsaEncrKeyProtector {
     /// Protector type.
-    pub(super) protector_type: UdifKeyProtectorType,
+    pub(crate) protector_type: CdsaEncrKeyProtectorType,
 
     /// Offset.
-    pub(super) offset: u64,
+    pub(crate) offset: u64,
 
     /// Size.
-    pub(super) size: u64,
+    pub(crate) size: u64,
 }
 
-impl UdifKeyProtector {
+impl CdsaEncrKeyProtector {
     /// Creates a new key protector.
-    pub fn new(protector_type: UdifKeyProtectorType, offset: u64, size: u64) -> Self {
+    pub fn new(protector_type: CdsaEncrKeyProtectorType, offset: u64, size: u64) -> Self {
         Self {
             protector_type,
             offset,
