@@ -11,26 +11,9 @@
  * under the License.
  */
 
-mod block_range;
-mod block_table;
-mod block_table_entry;
-mod block_table_header;
-mod block_table_reader;
-pub(crate) mod constants;
-mod enums;
-mod file;
-mod file_footer;
-mod image;
-mod resource_descriptor;
-mod resource_fork_header;
-mod resource_map;
-mod resource_map_entry;
-mod resource_map_header;
-mod resource_map_item;
-mod resource_map_value;
-mod segment_range;
-mod segment_stream;
-
-pub use enums::UdifCompressionMethod;
-pub use file::UdifFile;
-pub use image::UdifImage;
+/// Mac OS Encrypted Encoding (cdsaencr) credential.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CdsaEncrCredential {
+    None,
+    Passphrase(Vec<u8>),
+}

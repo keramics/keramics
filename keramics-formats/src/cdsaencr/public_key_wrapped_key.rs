@@ -33,13 +33,13 @@ use keramics_types::bytes_to_u32_be;
     ),
     methods("debug_read_data")
 )]
-/// Universal Disk Image Format (UDIF) public key wrapped key.
-pub struct UdifPublicKeyWrappedKey {
+/// Mac OS Encrypted Encoding (cdsaencr) public wrapped key.
+pub struct CdsaEncrPublicKeyWrappedKey {
     /// Key derivation method.
     pub key_derivation_method: u32,
 }
 
-impl UdifPublicKeyWrappedKey {
+impl CdsaEncrPublicKeyWrappedKey {
     /// Creates a new public key wrapped key.
     pub fn new() -> Self {
         Self {
@@ -112,7 +112,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifPublicKeyWrappedKey::new();
+        let mut test_struct = CdsaEncrPublicKeyWrappedKey::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.key_derivation_method, 0x00000014);
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = UdifPublicKeyWrappedKey::new();
+        let mut test_struct = CdsaEncrPublicKeyWrappedKey::new();
 
         let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..359]);

@@ -25,8 +25,8 @@ use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
     ),
     methods("debug_read_data")
 )]
-/// Universal Disk Image Format (UDIF) key protector descriptor.
-pub struct UdifKeyProtectorDescriptor {
+/// Mac OS Encrypted Encoding (cdsaencr) key protector descriptor.
+pub struct CdsaEncrKeyProtectorDescriptor {
     /// Unlock type.
     pub unlock_type: u32,
 
@@ -37,7 +37,7 @@ pub struct UdifKeyProtectorDescriptor {
     pub data_size: u64,
 }
 
-impl UdifKeyProtectorDescriptor {
+impl CdsaEncrKeyProtectorDescriptor {
     /// Creates a new key protector descriptor.
     pub fn new() -> Self {
         Self {
@@ -75,7 +75,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifKeyProtectorDescriptor::new();
+        let mut test_struct = CdsaEncrKeyProtectorDescriptor::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.unlock_type, 0x0001);
@@ -87,7 +87,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = UdifKeyProtectorDescriptor::new();
+        let mut test_struct = CdsaEncrKeyProtectorDescriptor::new();
 
         let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..19]);

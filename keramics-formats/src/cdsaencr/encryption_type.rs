@@ -13,9 +13,9 @@
 
 use std::fmt;
 
-/// Universal Disk Image Format (UDIF) encryption type.
+/// Mac OS Encrypted Encoding (cdsaencr) encryption type.
 #[derive(Clone, Debug, PartialEq)]
-pub struct UdifEncryptionType {
+pub struct CdsaEncrEncryptionType {
     /// Method.
     pub method: u32,
 
@@ -26,7 +26,7 @@ pub struct UdifEncryptionType {
     pub key_size: usize,
 }
 
-impl UdifEncryptionType {
+impl CdsaEncrEncryptionType {
     /// Creates a new encryption type.
     pub fn new() -> Self {
         Self {
@@ -37,7 +37,7 @@ impl UdifEncryptionType {
     }
 }
 
-impl fmt::Display for UdifEncryptionType {
+impl fmt::Display for CdsaEncrEncryptionType {
     /// Formats encryption type for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let method_string: String = match &self.method {

@@ -16,13 +16,14 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
-use keramics_formats::udif::{UdifCredential, UdifImage};
+use keramics_formats::udif::UdifImage;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
@@ -492,12 +493,12 @@ impl StorageMediaImage {
         }
         if udif_image.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
+            let mut udif_credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
                 match vfs_credential {
                     VfsCredential::Passphrase(passphrase) => {
-                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                        udif_credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                     }
                     _ => {}
                 }

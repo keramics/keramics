@@ -5,6 +5,7 @@
 * [Storage media image formats](storage_media_image.md)
   * [Expert Witness Compression Format (EWF)](ewf.md)
   * [Expert Witness Compression Format version 2 (EWF2)](ewf2.md)
+  * [Mac OS encrypted encoding](cdsaencr.md)
   * [Mac OS sparse bundle](sparsebundle.md)
   * [Mac OS sparse image](sparseimage.md)
   * [Parallels Disk Image (PDI)](pdi.md)

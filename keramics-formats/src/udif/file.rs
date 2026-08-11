@@ -17,22 +17,18 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Uuid, bytes_to_u32_be};
 
+use crate::cdsaencr::constants::*;
+use crate::cdsaencr::{
+    CdsaEncrContainerFooter, CdsaEncrContainerHeader, CdsaEncrCredential, CdsaEncrEncryption,
+    CdsaEncrEncryptionContext, CdsaEncrEncryptionType, CdsaEncrHmacContext, CdsaEncrKeyProtector,
+    CdsaEncrKeyProtectorType, CdsaEncrPassphraseWrappedKey, CdsaEncrPublicKeyWrappedKey,
+};
 use crate::lru_cache::LruCache;
 use crate::plist::{PlistObject, XmlPlist};
 
 use super::block_table::UdifBlockTable;
 use super::block_table_reader::UdifBlockTableReader;
-use super::constants::*;
-use super::credential::UdifCredential;
-use super::encrypted_file_footer::UdifEncryptedFileFooter;
-use super::encrypted_file_header::UdifEncryptedFileHeader;
-use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifHmacContext};
-use super::encryption_type::UdifEncryptionType;
-use super::enums::UdifKeyProtectorType;
 use super::file_footer::UdifFileFooter;
-use super::key_protector::UdifKeyProtector;
-use super::passphrase_wrapped_key::UdifPassphraseWrappedKey;
-use super::public_key_wrapped_key::UdifPublicKeyWrappedKey;
 use super::resource_fork_header::UdifResourceForkHeader;
 use super::resource_map::UdifResourceMap;
 use super::resource_map_item::UdifResourceMapItem;
@@ -85,7 +81,7 @@ pub struct UdifFile {
     pub(super) is_locked: bool,
 
     /// Encryption type.
-    pub(super) encryption_type: UdifEncryptionType,
+    pub(super) encryption_type: CdsaEncrEncryptionType,
 
     /// Initialization vector size.
     pub(super) initialization_vector_size: usize,
@@ -97,16 +93,16 @@ pub struct UdifFile {
     pub(super) hmac_key_size: usize,
 
     /// Key key_protectors.
-    pub(super) key_protectors: Vec<UdifKeyProtector>,
+    pub(super) key_protectors: Vec<CdsaEncrKeyProtector>,
 
     /// Credentials.
-    pub(super) credentials: Vec<UdifCredential>,
+    pub(super) credentials: Vec<CdsaEncrCredential>,
 
     /// Encryption context.
-    encryption_context: UdifEncryptionContext,
+    encryption_context: CdsaEncrEncryptionContext,
 
     /// HMAC context.
-    hmac_context: UdifHmacContext,
+    hmac_context: CdsaEncrHmacContext,
 
     /// Decrypted block cache.
     block_cache: LruCache<u64, Vec<u8>>,
@@ -131,14 +127,14 @@ impl UdifFile {
             plist_size: 0,
             block_size: 0,
             is_locked: false,
-            encryption_type: UdifEncryptionType::new(),
+            encryption_type: CdsaEncrEncryptionType::new(),
             initialization_vector_size: 0,
             hmac_method: 0,
             hmac_key_size: 0,
             key_protectors: Vec::new(),
             credentials: Vec::new(),
-            encryption_context: UdifEncryptionContext::None,
-            hmac_context: UdifHmacContext::None,
+            encryption_context: CdsaEncrEncryptionContext::None,
+            hmac_context: CdsaEncrHmacContext::None,
             block_cache: LruCache::new(64),
         }
     }
@@ -170,39 +166,43 @@ impl UdifFile {
             &mut signature,
             SeekFrom::Start(0)
         );
-        if &signature == UDIF_ENCRYPTED_FILE_HEADER_SIGNATURE {
-            let mut encrypted_file_header: UdifEncryptedFileHeader = UdifEncryptedFileHeader::new();
+        if &signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE {
+            let mut encrypted_container_header: CdsaEncrContainerHeader =
+                CdsaEncrContainerHeader::new();
 
-            match encrypted_file_header.read_at_position(data_stream, SeekFrom::Start(0)) {
+            match encrypted_container_header.read_at_position(data_stream, SeekFrom::Start(0)) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to read encrypted file header"
+                        "Unable to read encrypted container header"
                     );
                     return Err(error);
                 }
             }
-            self.format_version = encrypted_file_header.format_version;
-            self.data_fork_offset = encrypted_file_header.data_fork_offset;
-            self.data_fork_size = encrypted_file_header.data_fork_size;
-            self.block_size = encrypted_file_header.block_size;
+            self.format_version = encrypted_container_header.format_version;
+            self.data_fork_offset = encrypted_container_header.data_fork_offset;
+            self.data_fork_size = encrypted_container_header.data_fork_size;
+            self.block_size = encrypted_container_header.block_size;
             self.is_locked = true;
-            self.encryption_type = encrypted_file_header.encryption_type;
+            self.encryption_type = encrypted_container_header.encryption_type;
             self.initialization_vector_size =
-                encrypted_file_header.initialization_vector_size as usize;
-            self.hmac_method = encrypted_file_header.hmac_method;
-            self.hmac_key_size = (encrypted_file_header.hmac_key_size / 8) as usize;
+                encrypted_container_header.initialization_vector_size as usize;
+            self.hmac_method = encrypted_container_header.hmac_method;
+            self.hmac_key_size = (encrypted_container_header.hmac_key_size / 8) as usize;
 
-            for key_protector_descriptor in encrypted_file_header.key_protector_descriptors.iter() {
-                let key_protector_type: UdifKeyProtectorType =
-                    match key_protector_descriptor.unlock_type {
-                        0x00000001 => UdifKeyProtectorType::PassphraseWrappedKey,
-                        0x00000002 => UdifKeyProtectorType::PublicKeyWrappedKey,
-                        0x00000003 => UdifKeyProtectorType::KeybagWrappedKey,
-                        _ => UdifKeyProtectorType::Unknown(key_protector_descriptor.unlock_type),
-                    };
-                let key_protector: UdifKeyProtector = UdifKeyProtector::new(
+            for key_protector_descriptor in
+                encrypted_container_header.key_protector_descriptors.iter()
+            {
+                let key_protector_type: CdsaEncrKeyProtectorType = match key_protector_descriptor
+                    .unlock_type
+                {
+                    0x00000001 => CdsaEncrKeyProtectorType::PassphraseWrappedKey,
+                    0x00000002 => CdsaEncrKeyProtectorType::PublicKeyWrappedKey,
+                    0x00000003 => CdsaEncrKeyProtectorType::KeybagWrappedKey,
+                    _ => CdsaEncrKeyProtectorType::Unknown(key_protector_descriptor.unlock_type),
+                };
+                let key_protector: CdsaEncrKeyProtector = CdsaEncrKeyProtector::new(
                     key_protector_type,
                     key_protector_descriptor.data_offset,
                     key_protector_descriptor.data_size,
@@ -215,33 +215,34 @@ impl UdifFile {
                 &mut signature,
                 SeekFrom::End(-8)
             );
-            if &signature == UDIF_ENCRYPTED_FILE_FOOTER_SIGNATURE {
-                let mut encrypted_file_footer: UdifEncryptedFileFooter =
-                    UdifEncryptedFileFooter::new();
+            if &signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE {
+                let mut encrypted_container_footer: CdsaEncrContainerFooter =
+                    CdsaEncrContainerFooter::new();
 
-                match encrypted_file_footer.read_at_position(data_stream, SeekFrom::End(-1276)) {
+                match encrypted_container_footer.read_at_position(data_stream, SeekFrom::End(-1276))
+                {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to read encrypted file footer"
+                            "Unable to read encrypted container footer"
                         );
                         return Err(error);
                     }
                 }
-                self.format_version = encrypted_file_footer.format_version;
-                self.data_fork_offset = encrypted_file_footer.data_fork_offset as u64;
-                self.data_fork_size = encrypted_file_footer.data_fork_size as u64;
-                self.block_size = encrypted_file_footer.block_size;
+                self.format_version = encrypted_container_footer.format_version;
+                self.data_fork_offset = encrypted_container_footer.data_fork_offset as u64;
+                self.data_fork_size = encrypted_container_footer.data_fork_size as u64;
+                self.block_size = encrypted_container_footer.block_size;
                 self.is_locked = true;
-                self.encryption_type = encrypted_file_footer.encryption_type;
+                self.encryption_type = encrypted_container_footer.encryption_type;
                 self.initialization_vector_size =
-                    encrypted_file_footer.initialization_vector_size as usize;
-                self.hmac_method = encrypted_file_footer.hmac_method;
-                self.hmac_key_size = (encrypted_file_footer.hmac_key_size / 8) as usize;
+                    encrypted_container_footer.initialization_vector_size as usize;
+                self.hmac_method = encrypted_container_footer.hmac_method;
+                self.hmac_key_size = (encrypted_container_footer.hmac_key_size / 8) as usize;
 
-                let key_protector: UdifKeyProtector = UdifKeyProtector::new(
-                    UdifKeyProtectorType::PassphraseWrappedKey,
+                let key_protector: CdsaEncrKeyProtector = CdsaEncrKeyProtector::new(
+                    CdsaEncrKeyProtectorType::PassphraseWrappedKey,
                     (offset + 8) - 1276,
                     1276,
                 );
@@ -604,7 +605,7 @@ impl UdifFile {
     }
 
     /// Unlocks a locked (encrypted) file.
-    pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
+    pub fn unlock(&mut self, credentials: &[CdsaEncrCredential]) -> Result<bool, ErrorTrace> {
         if !self.is_locked {
             return Ok(true);
         }
@@ -634,17 +635,17 @@ impl UdifFile {
                 SeekFrom::Start(key_protector.offset)
             );
             match key_protector.protector_type {
-                UdifKeyProtectorType::PassphraseWrappedKey => {
+                CdsaEncrKeyProtectorType::PassphraseWrappedKey => {
                     if self.format_version == 1 {
                         keramics_core::debug_trace_data_and_structure!(
-                            "UdifEncryptedFileFooter",
+                            "CdsaEncrContainerFooter",
                             key_protector.offset,
                             &data,
                             key_protector.size,
-                            UdifEncryptedFileFooter::debug_read_data(&data)
+                            CdsaEncrContainerFooter::debug_read_data(&data)
                         );
-                        let mut file_footer: UdifEncryptedFileFooter =
-                            UdifEncryptedFileFooter::new();
+                        let mut file_footer: CdsaEncrContainerFooter =
+                            CdsaEncrContainerFooter::new();
 
                         match file_footer.read_data(&data) {
                             Ok(_) => {}
@@ -686,14 +687,14 @@ impl UdifFile {
                         }
                     } else if self.format_version == 2 {
                         keramics_core::debug_trace_data_and_structure!(
-                            "UdifPasspraseWrappedKey",
+                            "CdsaEncrPassphraseWrappedKey",
                             key_protector.offset,
                             &data,
                             key_protector.size,
-                            UdifPassphraseWrappedKey::debug_read_data(&data)
+                            CdsaEncrPassphraseWrappedKey::debug_read_data(&data)
                         );
-                        let mut wrapped_key: UdifPassphraseWrappedKey =
-                            UdifPassphraseWrappedKey::new();
+                        let mut wrapped_key: CdsaEncrPassphraseWrappedKey =
+                            CdsaEncrPassphraseWrappedKey::new();
 
                         match wrapped_key.read_data(&data) {
                             Ok(_) => {}
@@ -740,17 +741,17 @@ impl UdifFile {
                         break;
                     }
                 }
-                UdifKeyProtectorType::PublicKeyWrappedKey => {
+                CdsaEncrKeyProtectorType::PublicKeyWrappedKey => {
                     if self.format_version == 2 {
                         keramics_core::debug_trace_data_and_structure!(
-                            "UdifPublicKeyrappedKey",
+                            "CdsaEncrPublicKeyWrappedKey",
                             key_protector.offset,
                             &data,
                             key_protector.size,
-                            UdifPublicKeyWrappedKey::debug_read_data(&data)
+                            CdsaEncrPublicKeyWrappedKey::debug_read_data(&data)
                         );
-                        let mut wrapped_key: UdifPublicKeyWrappedKey =
-                            UdifPublicKeyWrappedKey::new();
+                        let mut wrapped_key: CdsaEncrPublicKeyWrappedKey =
+                            CdsaEncrPublicKeyWrappedKey::new();
 
                         match wrapped_key.read_data(&data) {
                             Ok(_) => {}
@@ -781,7 +782,8 @@ impl UdifFile {
             keramics_core::debug_trace_data!("UdifBlockHmacKey", 0, &hmac_key, hmac_key.len());
 
             self.encryption_context =
-                match UdifEncryption::get_encryption_context(&self.encryption_type, &block_key) {
+                match CdsaEncrEncryption::get_encryption_context(&self.encryption_type, &block_key)
+                {
                     Ok(Some(context)) => context,
                     Ok(None) => {
                         return Err(keramics_core::error_trace_new!(format!(
@@ -800,26 +802,26 @@ impl UdifFile {
                         return Err(error);
                     }
                 };
-            self.hmac_context = match UdifEncryption::get_hmac_context(self.hmac_method, &hmac_key)
-            {
-                Ok(Some(context)) => context,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported HMAC method: {}",
-                        self.hmac_method
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve HMAC context for method: {}",
+            self.hmac_context =
+                match CdsaEncrEncryption::get_hmac_context(self.hmac_method, &hmac_key) {
+                    Ok(Some(context)) => context,
+                    Ok(None) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported HMAC method: {}",
                             self.hmac_method
-                        )
-                    );
-                    return Err(error);
-                }
-            };
+                        )));
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve HMAC context for method: {}",
+                                self.hmac_method
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
             self.is_locked = false;
         }
         Ok(!self.is_locked)
@@ -943,8 +945,8 @@ mod tests {
 
         assert_eq!(file.is_locked, true);
 
-        let credentials: Vec<UdifCredential> =
-            vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        let credentials: Vec<CdsaEncrCredential> =
+            vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
         file.unlock(&credentials)?;
 
         assert_eq!(file.is_locked, false);

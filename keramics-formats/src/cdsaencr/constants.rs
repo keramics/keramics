@@ -11,9 +11,11 @@
  * under the License.
  */
 
-/// Universal Disk Image Format (UDIF) credential.
-#[derive(Clone, Debug, PartialEq)]
-pub enum UdifCredential {
-    None,
-    Passphrase(Vec<u8>),
-}
+/// Mac OS Encrypted Encoding container footer signature.
+pub(crate) const CDSAENCR_CONTAINER_FOOTER_SIGNATURE: &[u8] = b"cdsaencr";
+
+/// Mac OS Encrypted Encoding container header signature.
+pub(crate) const CDSAENCR_CONTAINER_HEADER_SIGNATURE: &[u8] = b"encrcdsa";
+
+/// Mac OS Encrypted Encoding wrapped key signature.
+pub(super) const CDSAENCR_WRAPPED_KEY_SIGNATURE: &[u8] = b"CKIE\x00";

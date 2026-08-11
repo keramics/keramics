@@ -15,9 +15,8 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::udif::{
-    UdifCompressionMethod, UdifCredential, UdifEncryptionType, UdifImage,
-};
+use keramics_formats::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
+use keramics_formats::udif::{UdifCompressionMethod, UdifImage};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_types::Uuid;
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
@@ -39,7 +38,7 @@ struct UdifImageInfo {
     pub compression_method: UdifCompressionMethod,
 
     /// Encryption type.
-    pub encryption_type: Option<UdifEncryptionType>,
+    pub encryption_type: Option<CdsaEncrEncryptionType>,
 
     /// Media size.
     pub media_size: Option<u64>,
@@ -229,12 +228,12 @@ impl UdifInfo {
         };
         if udif_image.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
+            let mut udif_credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
                 match vfs_credential {
                     VfsCredential::Passphrase(passphrase) => {
-                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                        udif_credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                     }
                     _ => {}
                 }

@@ -16,9 +16,11 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
-use super::credential::UdifCredential;
-use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifKeyDerivationContext};
-use super::encryption_type::UdifEncryptionType;
+use super::credential::CdsaEncrCredential;
+use super::encryption::{
+    CdsaEncrEncryption, CdsaEncrEncryptionContext, CdsaEncrKeyDerivationContext,
+};
+use super::encryption_type::CdsaEncrEncryptionType;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -40,8 +42,8 @@ use super::encryption_type::UdifEncryptionType;
     ),
     methods("debug_read_data")
 )]
-/// Universal Disk Image Format (UDIF) passphrase wrapped key.
-pub struct UdifPassphraseWrappedKey {
+/// Mac OS Encrypted Encoding (cdsaencr) passphrase wrapped key.
+pub struct CdsaEncrPassphraseWrappedKey {
     /// Key derivation method.
     pub key_derivation_method: u32,
 
@@ -58,7 +60,7 @@ pub struct UdifPassphraseWrappedKey {
     pub initialization_vector: Vec<u8>,
 
     /// Encryption type.
-    pub encryption_type: UdifEncryptionType,
+    pub encryption_type: CdsaEncrEncryptionType,
 
     /// Padding type.
     pub padding_type: u32,
@@ -70,7 +72,7 @@ pub struct UdifPassphraseWrappedKey {
     pub key_data: Vec<u8>,
 }
 
-impl UdifPassphraseWrappedKey {
+impl CdsaEncrPassphraseWrappedKey {
     /// Creates a new passphrase wrapped key.
     pub fn new() -> Self {
         Self {
@@ -79,7 +81,7 @@ impl UdifPassphraseWrappedKey {
             salt: Vec::new(),
             initialization_vector_size: 0,
             initialization_vector: Vec::new(),
-            encryption_type: UdifEncryptionType::new(),
+            encryption_type: CdsaEncrEncryptionType::new(),
             padding_type: 0,
             wrapped_key_data: Vec::new(),
             key_data: Vec::new(),
@@ -136,11 +138,11 @@ impl UdifPassphraseWrappedKey {
     }
 
     /// Unlocks the key.
-    pub fn unlock(&mut self, credential: &UdifCredential) -> Result<bool, ErrorTrace> {
+    pub fn unlock(&mut self, credential: &CdsaEncrCredential) -> Result<bool, ErrorTrace> {
         match credential {
-            UdifCredential::Passphrase(passphrase) => {
-                let mut key_derivation_context: UdifKeyDerivationContext =
-                    match UdifEncryption::get_key_derivation_context(
+            CdsaEncrCredential::Passphrase(passphrase) => {
+                let mut key_derivation_context: CdsaEncrKeyDerivationContext =
+                    match CdsaEncrEncryption::get_key_derivation_context(
                         self.key_derivation_method,
                         &self.salt,
                         self.number_of_iterations as usize,
@@ -177,7 +179,7 @@ impl UdifPassphraseWrappedKey {
                 }
                 let mut initialization_vector: Vec<u8> = self.initialization_vector.to_vec();
 
-                match UdifEncryption::add_padding(2, 16, &mut initialization_vector) {
+                match CdsaEncrEncryption::add_padding(2, 16, &mut initialization_vector) {
                     Ok(data) => data,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -187,8 +189,8 @@ impl UdifPassphraseWrappedKey {
                         return Err(error);
                     }
                 };
-                let encryption_context: UdifEncryptionContext =
-                    match UdifEncryption::get_encryption_context(&self.encryption_type, &key) {
+                let encryption_context: CdsaEncrEncryptionContext =
+                    match CdsaEncrEncryption::get_encryption_context(&self.encryption_type, &key) {
                         Ok(Some(context)) => context,
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
@@ -224,12 +226,12 @@ impl UdifPassphraseWrappedKey {
                     }
                 }
                 keramics_core::debug_trace_data!(
-                    "UdifPaddedKeyData",
+                    "CdsaEncrPaddedKeyData",
                     0,
                     &padded_key_data,
                     padded_key_data.len(),
                 );
-                let key_data: &[u8] = match UdifEncryption::remove_padding(
+                let key_data: &[u8] = match CdsaEncrEncryption::remove_padding(
                     self.padding_type,
                     self.initialization_vector_size,
                     &padded_key_data,
@@ -252,7 +254,7 @@ impl UdifPassphraseWrappedKey {
                 }
                 let signature_offset: usize = key_data_size - 5;
 
-                if &key_data[signature_offset..key_data_size] == UDIF_WRAPPED_KEY_SIGNATURE {
+                if &key_data[signature_offset..key_data_size] == CDSAENCR_WRAPPED_KEY_SIGNATURE {
                     self.key_data = key_data[0..signature_offset].to_vec();
 
                     Ok(true)
@@ -322,7 +324,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = UdifPassphraseWrappedKey::new();
+        let mut test_struct = CdsaEncrPassphraseWrappedKey::new();
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.key_derivation_method, 103);
@@ -341,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = UdifPassphraseWrappedKey::new();
+        let mut test_struct = CdsaEncrPassphraseWrappedKey::new();
 
         let test_data: Vec<u8> = get_test_data();
         let result = test_struct.read_data(&test_data[0..103]);

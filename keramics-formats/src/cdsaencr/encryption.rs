@@ -17,16 +17,16 @@ use keramics_encryption::{
     Pkcs7Context,
 };
 
-use super::encryption_type::UdifEncryptionType;
+use super::encryption_type::CdsaEncrEncryptionType;
 
-/// Universal Disk Image Format (UDIF) encryption context.
-pub enum UdifEncryptionContext {
+/// Mac OS Encrypted Encoding (cdsaencr) encryption context.
+pub enum CdsaEncrEncryptionContext {
     Aes(AesContext),
     Des3(Des3Context),
     None,
 }
 
-impl UdifEncryptionContext {
+impl CdsaEncrEncryptionContext {
     /// Decrypts data.
     pub fn decrypt_cbc(
         &self,
@@ -35,21 +35,21 @@ impl UdifEncryptionContext {
         data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
         match self {
-            UdifEncryptionContext::Aes(context) => {
+            CdsaEncrEncryptionContext::Aes(context) => {
                 context.decrypt_cbc(initialization_vector, encrypted_data, data)
             }
-            UdifEncryptionContext::Des3(context) => {
+            CdsaEncrEncryptionContext::Des3(context) => {
                 context.decrypt_cbc(initialization_vector, encrypted_data, data)
             }
-            UdifEncryptionContext::None => {
+            CdsaEncrEncryptionContext::None => {
                 return Err(keramics_core::error_trace_new!("Unable to decrypt data"));
             }
         }
     }
 }
 
-/// Universal Disk Image Format (UDIF) HMAC context.
-pub enum UdifHmacContext {
+/// Mac OS Encrypted Encoding (cdsaencr) HMAC context.
+pub enum CdsaEncrHmacContext {
     HmacSha1 {
         key: Vec<u8>,
         context: HmacSha1Context,
@@ -57,40 +57,42 @@ pub enum UdifHmacContext {
     None,
 }
 
-impl UdifHmacContext {
+impl CdsaEncrHmacContext {
     /// Calculates a HMAC.
     pub fn calculate_hmac(&mut self, data: &[u8]) -> Result<Vec<u8>, ErrorTrace> {
         match self {
-            UdifHmacContext::HmacSha1 { key, context } => {
+            CdsaEncrHmacContext::HmacSha1 { key, context } => {
                 let mut hmac: Vec<u8> = vec![0; 20];
                 context.calculate_hmac(key, data, &mut hmac)?;
                 Ok(hmac)
             }
-            UdifHmacContext::None => {
+            CdsaEncrHmacContext::None => {
                 return Err(keramics_core::error_trace_new!("Unable to calculate HMAC"));
             }
         }
     }
 }
 
-/// Universal Disk Image Format (UDIF) key derivation context.
-pub enum UdifKeyDerivationContext {
+/// Mac OS Encrypted Encoding (cdsaencr) key derivation context.
+pub enum CdsaEncrKeyDerivationContext {
     Pbkdf2HmacSha1(Pbkdf2HmacSha1Context),
 }
 
-impl UdifKeyDerivationContext {
+impl CdsaEncrKeyDerivationContext {
     /// Derives a key from the password.
     pub fn derive_key(&mut self, password: &[u8], key: &mut [u8]) -> Result<(), ErrorTrace> {
         match self {
-            UdifKeyDerivationContext::Pbkdf2HmacSha1(context) => context.derive_key(password, key),
+            CdsaEncrKeyDerivationContext::Pbkdf2HmacSha1(context) => {
+                context.derive_key(password, key)
+            }
         }
     }
 }
 
-/// Universal Disk Image Format (UDIF) encryption.
-pub struct UdifEncryption {}
+/// Mac OS Encrypted Encoding (cdsaencr) encryption.
+pub struct CdsaEncrEncryption {}
 
-impl UdifEncryption {
+impl CdsaEncrEncryption {
     /// Adds padding.
     pub fn add_padding(
         padding_type: u32,
@@ -135,9 +137,9 @@ impl UdifEncryption {
 
     /// Retrieve an encryption context.
     pub fn get_encryption_context(
-        encryption_type: &UdifEncryptionType,
+        encryption_type: &CdsaEncrEncryptionType,
         key: &[u8],
-    ) -> Result<Option<UdifEncryptionContext>, ErrorTrace> {
+    ) -> Result<Option<CdsaEncrEncryptionContext>, ErrorTrace> {
         match encryption_type.method {
             0x00000011 => match encryption_type.mode {
                 5 | 6 => {
@@ -153,7 +155,7 @@ impl UdifEncryption {
                             return Err(error);
                         }
                     }
-                    Ok(Some(UdifEncryptionContext::Des3(context)))
+                    Ok(Some(CdsaEncrEncryptionContext::Des3(context)))
                 }
                 _ => Ok(None),
             },
@@ -171,7 +173,7 @@ impl UdifEncryption {
                             return Err(error);
                         }
                     }
-                    Ok(Some(UdifEncryptionContext::Aes(context)))
+                    Ok(Some(CdsaEncrEncryptionContext::Aes(context)))
                 }
                 _ => Ok(None),
             },
@@ -183,9 +185,9 @@ impl UdifEncryption {
     pub fn get_hmac_context(
         hmac_method: u32,
         key: &[u8],
-    ) -> Result<Option<UdifHmacContext>, ErrorTrace> {
+    ) -> Result<Option<CdsaEncrHmacContext>, ErrorTrace> {
         match hmac_method {
-            91 => Ok(Some(UdifHmacContext::HmacSha1 {
+            91 => Ok(Some(CdsaEncrHmacContext::HmacSha1 {
                 key: key.to_vec(),
                 context: HmacSha1Context::new(),
             })),
@@ -198,9 +200,9 @@ impl UdifEncryption {
         key_derivation_method: u32,
         salt: &[u8],
         number_of_iterations: usize,
-    ) -> Result<Option<UdifKeyDerivationContext>, ErrorTrace> {
+    ) -> Result<Option<CdsaEncrKeyDerivationContext>, ErrorTrace> {
         match key_derivation_method {
-            103 => Ok(Some(UdifKeyDerivationContext::Pbkdf2HmacSha1(
+            103 => Ok(Some(CdsaEncrKeyDerivationContext::Pbkdf2HmacSha1(
                 Pbkdf2HmacSha1Context::new(salt, number_of_iterations),
             ))),
             _ => Ok(None),
