@@ -68,8 +68,10 @@ Encrypted image format version 1 supports the following key protectors:
 
 A version 1 encrypted segment file consist of:
 
-* Data fork, containing encyrypted UDIF data
+* Data fork, containing encrypted UDIF data
 * [Encrypted file footer](#encypted_file_footer) at the end of the file
+
+> Note that the encrypted UDIF data can contain an uncompressed UDIF image without file footer.
 
 #### Encrypted image format version 2
 
@@ -84,7 +86,9 @@ A version 2 encrypted segment file consist of:
 * [Encrypted file header](#encypted_file_header) at the start of the file
 * Key protectors
 * Unknown (empty values), probably reserved for the key protectors
-* Data fork, containing encyrypted UDIF data
+* Data fork, containing encrypted UDIF data
+
+> Note that the encrypted UDIF data can contain an uncompressed UDIF image without file footer.
 
 ### Characteristics
 

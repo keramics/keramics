@@ -40,7 +40,7 @@ mod resource_map_value;
 mod segment_range;
 mod segment_stream;
 
-pub use credential::{UdifCredential, UdifCredentialType};
+pub use credential::UdifCredential;
 pub use encryption_type::UdifEncryptionType;
 pub use enums::UdifCompressionMethod;
 pub use file::UdifFile;

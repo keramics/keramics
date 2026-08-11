@@ -16,10 +16,11 @@ use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::udif::{
-    UdifCompressionMethod, UdifCredential, UdifCredentialType, UdifEncryptionType, UdifImage,
+    UdifCompressionMethod, UdifCredential, UdifEncryptionType, UdifImage,
 };
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_types::Uuid;
+use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 use crate::formatters::ByteSize;
 
@@ -114,7 +115,7 @@ impl fmt::Display for UdifImageInfo {
                 encryption_type
             )?;
             // TODO: print human readable encryption method
-            // TODO: print password protectors
+            // TODO: print key protectors
             // TODO: print identifier
         }
         writeln!(formatter, "    Compression information:")?;
@@ -216,7 +217,7 @@ impl UdifInfo {
     }
 
     /// Prints information about an image or file.
-    pub fn print(path_buf: &PathBuf, passwords: &Vec<String>) -> Result<(), ErrorTrace> {
+    pub fn print(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
         // TODO: fallback to file if image open fails
 
         let mut udif_image: UdifImage = match Self::open_image(path_buf) {
@@ -227,15 +228,18 @@ impl UdifInfo {
             }
         };
         if udif_image.is_locked() {
-            let mut credentials: Vec<UdifCredential> = Vec::new();
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
 
-            for password in passwords.iter() {
-                credentials.push(UdifCredential::new(
-                    UdifCredentialType::Passphrase,
-                    password.as_bytes(),
-                ));
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
             }
-            match udif_image.unlock(&credentials) {
+            match udif_image.unlock(&udif_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to unlock image");

@@ -23,6 +23,7 @@ use crate::lru_cache::LruCache;
 use crate::path_component::PathComponent;
 
 use super::block_table_reader::UdifBlockTableReader;
+use super::constants::*;
 use super::credential::UdifCredential;
 use super::encryption_type::UdifEncryptionType;
 use super::file::UdifFile;
@@ -254,12 +255,8 @@ impl UdifSegmentStream {
         }
         self.size += segment_file.data_fork_size;
 
-        let segment_range: UdifSegmentRange = UdifSegmentRange::new(
-            segment_file.segment_offset,
-            1,
-            segment_file.data_fork_offset,
-            segment_file.data_fork_size,
-        );
+        let segment_range: UdifSegmentRange =
+            UdifSegmentRange::new(segment_file.segment_offset, 1, segment_file.data_fork_size);
         self.segment_ranges.push(segment_range);
 
         self.segment_set_identifier = segment_file.segment_set_identifier.clone();
@@ -337,7 +334,6 @@ impl UdifSegmentStream {
             let segment_range: UdifSegmentRange = UdifSegmentRange::new(
                 segment_file.segment_offset,
                 segment_number,
-                segment_file.data_fork_offset,
                 segment_file.data_fork_size,
             );
             self.segment_ranges.push(segment_range);
@@ -504,7 +500,11 @@ impl UdifSegmentStream {
     }
 
     /// Unlocks a locked (encrypted) segment stream.
-    pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
+    pub fn unlock(
+        &mut self,
+        bytes_per_sector: u16,
+        credentials: &[UdifCredential],
+    ) -> Result<bool, ErrorTrace> {
         if !self.is_locked {
             return Ok(true);
         }
@@ -545,146 +545,30 @@ impl UdifSegmentStream {
             }
         };
         if result {
-            let mut data: Vec<u8> = vec![0; 512];
-
             let footer_offset: u64 = segment_file.data_fork_size - 512;
 
-            match segment_file.read_exact_at_position(&mut data, footer_offset, true) {
+            let mut signature: [u8; 4] = [0; 4];
+
+            match segment_file.read_exact_at_position(&mut signature, footer_offset, true) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to read from segment file: {} at offset: {} (0x{:08x})",
+                            "Unable to read signature from segment file: {} at offset: {} (0x{:08x})",
                             segment_number, footer_offset, footer_offset
                         )
                     );
                     return Err(error);
                 }
             }
-            keramics_core::debug_trace_data_and_structure!(
-                "UdifFileFooter",
-                footer_offset,
-                &data,
-                512,
-                UdifFileFooter::debug_read_data(&data)
-            );
-            let mut file_footer: UdifFileFooter = UdifFileFooter::new();
-
-            match file_footer.read_data(&data) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to read segment file: {} unencrypted footer",
-                            segment_number
-                        )
-                    );
-                    return Err(error);
-                }
-            }
-            self.number_of_sectors = file_footer.number_of_sectors;
-            self.number_of_segments = file_footer.number_of_segments;
-            self.segment_ranges.clear();
-            self.size = 0;
-
-            let segment_number: u32 = file_footer.segment_number;
-
-            if self.number_of_segments == 0 && segment_number == 0 {
-                self.number_of_segments = 1
-            } else if self.number_of_segments != 0 && segment_number != 1 {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported segment file: {} - segment number value out of bounds",
-                    segment_number
-                )));
-            }
-            if file_footer.plist_size != 0 && file_footer.resource_fork_size != 0 {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported segment file: {} - both XML plist and resource fork in use",
-                    segment_number
-                )));
-            }
-            if file_footer.segment_offset != self.size {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported segment file: {} - segment offset value out of bounds",
-                    segment_number
-                )));
-            }
-            segment_file.segment_offset = file_footer.segment_offset;
-            segment_file.resource_fork_offset = file_footer.resource_fork_offset;
-            segment_file.resource_fork_size = file_footer.resource_fork_size;
-            segment_file.plist_offset = file_footer.plist_offset;
-            segment_file.plist_size = file_footer.plist_size;
-
-            self.size += file_footer.data_fork_size;
-
-            let segment_range: UdifSegmentRange = UdifSegmentRange::new(
-                file_footer.segment_offset,
-                1,
-                file_footer.data_fork_offset,
-                file_footer.data_fork_size,
-            );
-            self.segment_ranges.push(segment_range);
-
-            segment_file
-                .credentials
-                .retain(|credential| !self.credentials.contains(credential));
-            self.credentials.append(&mut segment_file.credentials);
-
-            self.segment_set_identifier = file_footer.segment_set_identifier.clone();
-
-            for segment_number in 2..=self.number_of_segments {
-                let segment_file_name: String =
-                    Self::get_segment_file_name(&self.name, segment_number);
-                let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
-
-                let data_stream: DataStreamReference =
-                    match self.file_resolver.get_data_stream(&path_components) {
-                        Ok(Some(data_stream)) => data_stream,
-                        Ok(None) => {
-                            return Err(keramics_core::error_trace_new!(format!(
-                                "Missing segment file: {}",
-                                segment_file_name
-                            )));
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to open segment file: {}", segment_file_name)
-                            );
-                            return Err(error);
-                        }
-                    };
-                let mut segment_file: UdifFile = UdifFile::new();
-
-                match segment_file.read_data_stream(&data_stream) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to read segment file: {}", segment_file_name)
-                        );
-                        return Err(error);
-                    }
-                }
-                match segment_file.unlock(credentials) {
-                    Ok(true) => {}
-                    Ok(false) => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unable to unlock segment file: {}",
-                            segment_number
-                        )));
-                    }
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Failed to unlock segment file: {}", segment_number)
-                        );
-                        return Err(error);
-                    }
-                }
-                let footer_offset: u64 = segment_file.data_fork_size - 512;
+            if &signature != UDIF_FILE_FOOTER_SIGNATURE {
+                // Unencrypted UDIF without footer.
+                self.number_of_sectors = segment_file
+                    .data_fork_size
+                    .div_ceil(bytes_per_sector as u64);
+            } else {
+                let mut data: Vec<u8> = vec![0; 512];
 
                 match segment_file.read_exact_at_position(&mut data, footer_offset, true) {
                     Ok(_) => {}
@@ -692,7 +576,7 @@ impl UdifSegmentStream {
                         keramics_core::error_trace_add_frame!(
                             error,
                             format!(
-                                "Unable to read from segment file: {} at offset: {} (0x{:08x})",
+                                "Unable to read footer from segment file: {} at offset: {} (0x{:08x})",
                                 segment_number, footer_offset, footer_offset
                             )
                         );
@@ -721,21 +605,24 @@ impl UdifSegmentStream {
                         return Err(error);
                     }
                 }
-                if file_footer.segment_number != segment_number {
+                self.number_of_sectors = file_footer.number_of_sectors;
+                self.number_of_segments = file_footer.number_of_segments;
+                self.segment_ranges.clear();
+                self.size = 0;
+
+                let segment_number: u32 = file_footer.segment_number;
+
+                if self.number_of_segments == 0 && segment_number == 0 {
+                    self.number_of_segments = 1
+                } else if self.number_of_segments != 0 && segment_number != 1 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported segment file: {} - segment number value out of bounds",
                         segment_number
                     )));
                 }
-                if &file_footer.segment_set_identifier != &self.segment_set_identifier {
+                if file_footer.plist_size != 0 && file_footer.resource_fork_size != 0 {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported segment file: {} - segment set identifier mismatch",
-                        segment_number
-                    )));
-                }
-                if file_footer.plist_size != 0 || file_footer.resource_fork_size != 0 {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported segment file: {} - XML plist and/or resource fork in use",
+                        "Unsupported segment file: {} - both XML plist and resource fork in use",
                         segment_number
                     )));
                 }
@@ -745,20 +632,17 @@ impl UdifSegmentStream {
                         segment_number
                     )));
                 }
-                if file_footer.number_of_sectors != self.number_of_sectors {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported segment file: {} - number of sectors value out of bounds",
-                        segment_number
-                    )));
-                }
                 segment_file.segment_offset = file_footer.segment_offset;
+                segment_file.resource_fork_offset = file_footer.resource_fork_offset;
+                segment_file.resource_fork_size = file_footer.resource_fork_size;
+                segment_file.plist_offset = file_footer.plist_offset;
+                segment_file.plist_size = file_footer.plist_size;
 
                 self.size += file_footer.data_fork_size;
 
                 let segment_range: UdifSegmentRange = UdifSegmentRange::new(
                     file_footer.segment_offset,
-                    segment_number,
-                    file_footer.data_fork_offset,
+                    1,
                     file_footer.data_fork_size,
                 );
                 self.segment_ranges.push(segment_range);
@@ -767,6 +651,143 @@ impl UdifSegmentStream {
                     .credentials
                     .retain(|credential| !self.credentials.contains(credential));
                 self.credentials.append(&mut segment_file.credentials);
+
+                self.segment_set_identifier = file_footer.segment_set_identifier.clone();
+
+                for segment_number in 2..=self.number_of_segments {
+                    let segment_file_name: String =
+                        Self::get_segment_file_name(&self.name, segment_number);
+                    let path_components: [PathComponent; 1] =
+                        [PathComponent::from(&segment_file_name)];
+
+                    let data_stream: DataStreamReference =
+                        match self.file_resolver.get_data_stream(&path_components) {
+                            Ok(Some(data_stream)) => data_stream,
+                            Ok(None) => {
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Missing segment file: {}",
+                                    segment_file_name
+                                )));
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to open segment file: {}", segment_file_name)
+                                );
+                                return Err(error);
+                            }
+                        };
+                    let mut segment_file: UdifFile = UdifFile::new();
+
+                    match segment_file.read_data_stream(&data_stream) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to read segment file: {}", segment_file_name)
+                            );
+                            return Err(error);
+                        }
+                    }
+                    match segment_file.unlock(credentials) {
+                        Ok(true) => {}
+                        Ok(false) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unable to unlock segment file: {}",
+                                segment_number
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Failed to unlock segment file: {}", segment_number)
+                            );
+                            return Err(error);
+                        }
+                    }
+                    let footer_offset: u64 = segment_file.data_fork_size - 512;
+
+                    match segment_file.read_exact_at_position(&mut data, footer_offset, true) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read footer from segment file: {} at offset: {} (0x{:08x})",
+                                    segment_number, footer_offset, footer_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
+                    keramics_core::debug_trace_data_and_structure!(
+                        "UdifFileFooter",
+                        footer_offset,
+                        &data,
+                        512,
+                        UdifFileFooter::debug_read_data(&data)
+                    );
+                    let mut file_footer: UdifFileFooter = UdifFileFooter::new();
+
+                    match file_footer.read_data(&data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read segment file: {} unencrypted footer",
+                                    segment_number
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if file_footer.segment_number != segment_number {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported segment file: {} - segment number value out of bounds",
+                            segment_number
+                        )));
+                    }
+                    if &file_footer.segment_set_identifier != &self.segment_set_identifier {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported segment file: {} - segment set identifier mismatch",
+                            segment_number
+                        )));
+                    }
+                    if file_footer.plist_size != 0 || file_footer.resource_fork_size != 0 {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported segment file: {} - XML plist and/or resource fork in use",
+                            segment_number
+                        )));
+                    }
+                    if file_footer.segment_offset != self.size {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported segment file: {} - segment offset value out of bounds",
+                            segment_number
+                        )));
+                    }
+                    if file_footer.number_of_sectors != self.number_of_sectors {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported segment file: {} - number of sectors value out of bounds",
+                            segment_number
+                        )));
+                    }
+                    segment_file.segment_offset = file_footer.segment_offset;
+
+                    self.size += file_footer.data_fork_size;
+
+                    let segment_range: UdifSegmentRange = UdifSegmentRange::new(
+                        file_footer.segment_offset,
+                        segment_number,
+                        file_footer.data_fork_size,
+                    );
+                    self.segment_ranges.push(segment_range);
+
+                    segment_file
+                        .credentials
+                        .retain(|credential| !self.credentials.contains(credential));
+                    self.credentials.append(&mut segment_file.credentials);
+                }
             }
             self.is_locked = false;
         }
@@ -843,7 +864,6 @@ mod tests {
 
     use crate::os_file_resolver::open_os_file_resolver;
     use crate::tests::get_test_data_path;
-    use crate::udif::credential::UdifCredentialType;
 
     fn get_segment_stream(file_name_string: &str) -> Result<UdifSegmentStream, ErrorTrace> {
         let mut segment_stream: UdifSegmentStream = UdifSegmentStream::new();
@@ -1037,12 +1057,9 @@ mod tests {
 
         assert_eq!(segment_stream.is_locked, true);
 
-        let mut credentials: Vec<UdifCredential> = Vec::new();
-        credentials.push(UdifCredential::new(
-            UdifCredentialType::Passphrase,
-            b"KeRaMiCs",
-        ));
-        segment_stream.unlock(&credentials)?;
+        let credentials: Vec<UdifCredential> =
+            vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        segment_stream.unlock(512, &credentials)?;
 
         assert_eq!(segment_stream.is_locked, false);
 

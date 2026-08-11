@@ -16,7 +16,7 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_be;
 
 use super::constants::*;
-use super::credential::{UdifCredential, UdifCredentialType};
+use super::credential::UdifCredential;
 use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifKeyDerivationContext};
 use super::encryption_type::UdifEncryptionType;
 
@@ -238,92 +238,90 @@ impl UdifEncryptedFileFooter {
 
     /// Unlocks the key.
     pub fn unlock(&mut self, credential: &UdifCredential) -> Result<bool, ErrorTrace> {
-        if credential.credential_type != UdifCredentialType::Passphrase {
-            return Ok(false);
-        }
-        let mut key_derivation_context: UdifKeyDerivationContext =
-            match UdifEncryption::get_key_derivation_context(
-                self.key_derivation_method,
-                &self.salt,
-                self.number_of_iterations as usize,
-            ) {
-                Ok(Some(context)) => context,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported key deriviation method: {}",
-                        self.key_derivation_method
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve key derivation context for method: {}",
-                            self.key_derivation_method
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-        let mut key: Vec<u8> = vec![0; self.kek_encryption_type.key_size];
+        match credential {
+            UdifCredential::Passphrase(passphrase) => {
+                let mut key_derivation_context: UdifKeyDerivationContext =
+                    match UdifEncryption::get_key_derivation_context(
+                        self.key_derivation_method,
+                        &self.salt,
+                        self.number_of_iterations as usize,
+                    ) {
+                        Ok(Some(context)) => context,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported key deriviation method: {}",
+                                self.key_derivation_method
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve key derivation context for method: {}",
+                                    self.key_derivation_method
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                let mut key: Vec<u8> = vec![0; self.kek_encryption_type.key_size];
 
-        match key_derivation_context.derive_key(&credential.data, &mut key) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to derive key from passphrase"
-                );
-                return Err(error);
-            }
-        }
-        match key_derivation_context.derive_key(&credential.data, &mut key) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to derive key from passphrase"
-                );
-                return Err(error);
-            }
-        }
-        let encryption_context: UdifEncryptionContext =
-            match UdifEncryption::get_encryption_context(&self.kek_encryption_type, &key) {
-                Ok(Some(context)) => context,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported encryption type: {}",
-                        self.kek_encryption_type
-                    )));
+                match key_derivation_context.derive_key(passphrase, &mut key) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to derive key from passphrase"
+                        );
+                        return Err(error);
+                    }
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve encryption context for type: {}",
-                            self.kek_encryption_type
-                        )
-                    );
-                    return Err(error);
+                let encryption_context: UdifEncryptionContext =
+                    match UdifEncryption::get_encryption_context(&self.kek_encryption_type, &key) {
+                        Ok(Some(context)) => context,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported encryption type: {}",
+                                self.kek_encryption_type
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve encryption context for type: {}",
+                                    self.kek_encryption_type
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                match self.unwrap_key(&encryption_context, &self.wrapped_block_key_data) {
+                    Ok(Some(key_data)) => self.block_key_data = key_data,
+                    Ok(None) => return Ok(false),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to unwrap block key data"
+                        );
+                        return Err(error);
+                    }
                 }
-            };
-        match self.unwrap_key(&encryption_context, &self.wrapped_block_key_data) {
-            Ok(Some(key_data)) => self.block_key_data = key_data,
-            Ok(None) => return Ok(false),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to unwrap block key data");
-                return Err(error);
+                match self.unwrap_key(&encryption_context, &self.wrapped_hmac_key_data) {
+                    Ok(Some(key_data)) => self.hmac_key_data = key_data,
+                    Ok(None) => return Ok(false),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to unwrap HMAC key data"
+                        );
+                        return Err(error);
+                    }
+                }
+                Ok(true)
             }
+            _ => Ok(false),
         }
-        match self.unwrap_key(&encryption_context, &self.wrapped_hmac_key_data) {
-            Ok(Some(key_data)) => self.hmac_key_data = key_data,
-            Ok(None) => return Ok(false),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to unwrap HMAC key data");
-                return Err(error);
-            }
-        }
-        Ok(true)
     }
 
     /// Unwraps a key.

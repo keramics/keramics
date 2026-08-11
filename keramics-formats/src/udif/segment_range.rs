@@ -19,20 +19,16 @@ pub struct UdifSegmentRange {
     /// Segment number.
     pub segment_number: u32,
 
-    /// Data offset.
-    pub data_offset: u64,
-
     /// Size.
     pub size: u64,
 }
 
 impl UdifSegmentRange {
     /// Creates a new segment range.
-    pub fn new(segment_offset: u64, segment_number: u32, data_offset: u64, size: u64) -> Self {
+    pub fn new(segment_offset: u64, segment_number: u32, size: u64) -> Self {
         Self {
             segment_offset,
             segment_number,
-            data_offset,
             size,
         }
     }

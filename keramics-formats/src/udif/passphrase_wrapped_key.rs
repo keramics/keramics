@@ -16,7 +16,7 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
-use super::credential::{UdifCredential, UdifCredentialType};
+use super::credential::UdifCredential;
 use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifKeyDerivationContext};
 use super::encryption_type::UdifEncryptionType;
 
@@ -137,128 +137,130 @@ impl UdifPassphraseWrappedKey {
 
     /// Unlocks the key.
     pub fn unlock(&mut self, credential: &UdifCredential) -> Result<bool, ErrorTrace> {
-        if credential.credential_type != UdifCredentialType::Passphrase {
-            return Ok(false);
-        }
-        let mut key_derivation_context: UdifKeyDerivationContext =
-            match UdifEncryption::get_key_derivation_context(
-                self.key_derivation_method,
-                &self.salt,
-                self.number_of_iterations as usize,
-            ) {
-                Ok(Some(context)) => context,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported key deriviation method: {}",
-                        self.key_derivation_method
-                    )));
+        match credential {
+            UdifCredential::Passphrase(passphrase) => {
+                let mut key_derivation_context: UdifKeyDerivationContext =
+                    match UdifEncryption::get_key_derivation_context(
+                        self.key_derivation_method,
+                        &self.salt,
+                        self.number_of_iterations as usize,
+                    ) {
+                        Ok(Some(context)) => context,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported key deriviation method: {}",
+                                self.key_derivation_method
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve key derivation context for method: {}",
+                                    self.key_derivation_method
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                let mut key: Vec<u8> = vec![0; self.encryption_type.key_size];
+
+                match key_derivation_context.derive_key(passphrase, &mut key) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to derive key from passphrase"
+                        );
+                        return Err(error);
+                    }
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve key derivation context for method: {}",
-                            self.key_derivation_method
-                        )
-                    );
-                    return Err(error);
+                let mut initialization_vector: Vec<u8> = self.initialization_vector.to_vec();
+
+                match UdifEncryption::add_padding(2, 16, &mut initialization_vector) {
+                    Ok(data) => data,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to add padding to initialization vector"
+                        );
+                        return Err(error);
+                    }
+                };
+                let encryption_context: UdifEncryptionContext =
+                    match UdifEncryption::get_encryption_context(&self.encryption_type, &key) {
+                        Ok(Some(context)) => context,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported encryption type: {}",
+                                self.encryption_type
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve encryption context for type: {}",
+                                    self.encryption_type
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
+
+                match encryption_context.decrypt_cbc(
+                    &mut initialization_vector,
+                    &self.wrapped_key_data,
+                    &mut padded_key_data,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to decrypt passphrase encrypted key data"
+                        );
+                        return Err(error);
+                    }
                 }
-            };
-        let mut key: Vec<u8> = vec![0; self.encryption_type.key_size];
-
-        match key_derivation_context.derive_key(&credential.data, &mut key) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to derive key from passphrase"
+                keramics_core::debug_trace_data!(
+                    "UdifPaddedKeyData",
+                    0,
+                    &padded_key_data,
+                    padded_key_data.len(),
                 );
-                return Err(error);
-            }
-        }
-        let mut initialization_vector: Vec<u8> = self.initialization_vector.to_vec();
+                let key_data: &[u8] = match UdifEncryption::remove_padding(
+                    self.padding_type,
+                    self.initialization_vector_size,
+                    &padded_key_data,
+                ) {
+                    Ok(data) => data,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to remove padding from key data"
+                        );
+                        return Err(error);
+                    }
+                };
+                let key_data_size: usize = key_data.len();
 
-        match UdifEncryption::add_padding(2, 16, &mut initialization_vector) {
-            Ok(data) => data,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to add padding to initialization vector"
-                );
-                return Err(error);
-            }
-        };
-        let encryption_context: UdifEncryptionContext =
-            match UdifEncryption::get_encryption_context(&self.encryption_type, &key) {
-                Ok(Some(context)) => context,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported encryption type: {}",
-                        self.encryption_type
-                    )));
+                if key_data_size < 5 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid key data size value out of bounds"
+                    ));
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve encryption context for type: {}",
-                            self.encryption_type
-                        )
-                    );
-                    return Err(error);
+                let signature_offset: usize = key_data_size - 5;
+
+                if &key_data[signature_offset..key_data_size] == UDIF_WRAPPED_KEY_SIGNATURE {
+                    self.key_data = key_data[0..signature_offset].to_vec();
+
+                    Ok(true)
+                } else {
+                    Ok(false)
                 }
-            };
-        let mut padded_key_data: Vec<u8> = vec![0; self.wrapped_key_data.len()];
-
-        match encryption_context.decrypt_cbc(
-            &mut initialization_vector,
-            &self.wrapped_key_data,
-            &mut padded_key_data,
-        ) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to decrypt passphrase encrypted key data"
-                );
-                return Err(error);
             }
-        }
-        keramics_core::debug_trace_data!(
-            "UdifPaddedKeyData",
-            0,
-            &padded_key_data,
-            padded_key_data.len(),
-        );
-        let key_data: &[u8] = match UdifEncryption::remove_padding(
-            self.padding_type,
-            self.initialization_vector_size,
-            &padded_key_data,
-        ) {
-            Ok(data) => data,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to remove padding from key data"
-                );
-                return Err(error);
-            }
-        };
-        let key_data_size: usize = key_data.len();
-
-        if key_data_size < 5 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid key data size value out of bounds"
-            ));
-        }
-        let signature_offset: usize = key_data_size - 5;
-
-        if &key_data[signature_offset..key_data_size] == UDIF_WRAPPED_KEY_SIGNATURE {
-            self.key_data = key_data[0..signature_offset].to_vec();
-
-            Ok(true)
-        } else {
-            Ok(false)
+            _ => Ok(false),
         }
     }
 }

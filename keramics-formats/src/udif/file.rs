@@ -23,7 +23,7 @@ use crate::plist::{PlistObject, XmlPlist};
 use super::block_table::UdifBlockTable;
 use super::block_table_reader::UdifBlockTableReader;
 use super::constants::*;
-use super::credential::{UdifCredential, UdifCredentialType};
+use super::credential::UdifCredential;
 use super::encrypted_file_footer::UdifEncryptedFileFooter;
 use super::encrypted_file_header::UdifEncryptedFileHeader;
 use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifHmacContext};
@@ -292,6 +292,8 @@ impl UdifFile {
                 return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
+        let mut file_offset: u64 = segment_offset;
+
         if !read_metadata {
             if segment_offset < self.segment_offset
                 || segment_offset >= self.segment_offset + self.data_fork_size
@@ -300,9 +302,8 @@ impl UdifFile {
                     "Invalid segment offset value out of bounds"
                 ));
             }
+            file_offset -= self.segment_offset;
         }
-        let mut file_offset: u64 = segment_offset - self.segment_offset;
-
         if self.encryption_type.mode == 0 {
             keramics_core::data_stream_read_exact_at_position!(
                 data_stream,
@@ -513,12 +514,6 @@ impl UdifFile {
         &mut self,
         block_table_reader: &mut UdifBlockTableReader,
     ) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         // Note that 16777216 is an arbitrary chosen limit.
         if self.plist_size > 16777216 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
@@ -662,34 +657,30 @@ impl UdifFile {
                             }
                         }
                         for credential in credentials.iter() {
-                            if credential.credential_type == UdifCredentialType::Passphrase {
-                                match file_footer.unlock(credential) {
-                                    Ok(result) => {
-                                        if result {
-                                            let block_key_size: usize =
-                                                self.encryption_type.key_size;
-                                            block_key = file_footer.block_key_data
-                                                [0..block_key_size]
-                                                .to_vec();
+                            match file_footer.unlock(credential) {
+                                Ok(result) => {
+                                    if result {
+                                        let block_key_size: usize = self.encryption_type.key_size;
+                                        block_key =
+                                            file_footer.block_key_data[0..block_key_size].to_vec();
 
-                                            let hmac_key_size: usize = self.hmac_key_size;
-                                            hmac_key = file_footer.hmac_key_data[0..hmac_key_size]
-                                                .to_vec();
+                                        let hmac_key_size: usize = self.hmac_key_size;
+                                        hmac_key =
+                                            file_footer.hmac_key_data[0..hmac_key_size].to_vec();
 
-                                            keys_unlocked = true;
+                                        keys_unlocked = true;
 
-                                            self.credentials.push(credential.clone());
+                                        self.credentials.push(credential.clone());
 
-                                            break;
-                                        }
+                                        break;
                                     }
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to unlock file footer"
-                                        );
-                                        return Err(error);
-                                    }
+                                }
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to unlock file footer"
+                                    );
+                                    return Err(error);
                                 }
                             }
                         }
@@ -715,36 +706,32 @@ impl UdifFile {
                             }
                         }
                         for credential in credentials.iter() {
-                            if credential.credential_type == UdifCredentialType::Passphrase {
-                                match wrapped_key.unlock(credential) {
-                                    Ok(result) => {
-                                        if result {
-                                            let block_key_size: usize =
-                                                self.encryption_type.key_size;
-                                            block_key =
-                                                wrapped_key.key_data[0..block_key_size].to_vec();
+                            match wrapped_key.unlock(credential) {
+                                Ok(result) => {
+                                    if result {
+                                        let block_key_size: usize = self.encryption_type.key_size;
+                                        block_key =
+                                            wrapped_key.key_data[0..block_key_size].to_vec();
 
-                                            let hmac_key_size: usize = self.hmac_key_size;
-                                            let data_end_offset: usize =
-                                                block_key_size + hmac_key_size;
-                                            hmac_key = wrapped_key.key_data
-                                                [block_key_size..data_end_offset]
-                                                .to_vec();
+                                        let hmac_key_size: usize = self.hmac_key_size;
+                                        let data_end_offset: usize = block_key_size + hmac_key_size;
+                                        hmac_key = wrapped_key.key_data
+                                            [block_key_size..data_end_offset]
+                                            .to_vec();
 
-                                            keys_unlocked = true;
+                                        keys_unlocked = true;
 
-                                            self.credentials.push(credential.clone());
+                                        self.credentials.push(credential.clone());
 
-                                            break;
-                                        }
+                                        break;
                                     }
-                                    Err(mut error) => {
-                                        keramics_core::error_trace_add_frame!(
-                                            error,
-                                            "Unable to unlock passphrase wrapped key"
-                                        );
-                                        return Err(error);
-                                    }
+                                }
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to unlock passphrase wrapped key"
+                                    );
+                                    return Err(error);
                                 }
                             }
                         }
@@ -916,8 +903,7 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
-        let segment_range: UdifSegmentRange =
-            UdifSegmentRange::new(0, 1, file.data_fork_offset, file.data_fork_size);
+        let segment_range: UdifSegmentRange = UdifSegmentRange::new(0, 1, file.data_fork_size);
         let mut block_table_reader: UdifBlockTableReader =
             UdifBlockTableReader::new(512, file.data_fork_size);
         file.read_resource_fork(&mut block_table_reader)?;
@@ -936,8 +922,7 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
-        let segment_range: UdifSegmentRange =
-            UdifSegmentRange::new(0, 1, file.data_fork_offset, file.data_fork_size);
+        let segment_range: UdifSegmentRange = UdifSegmentRange::new(0, 1, file.data_fork_size);
         let mut block_table_reader: UdifBlockTableReader =
             UdifBlockTableReader::new(512, file.data_fork_size);
         file.read_xml_plist(&mut block_table_reader)?;
@@ -958,11 +943,8 @@ mod tests {
 
         assert_eq!(file.is_locked, true);
 
-        let mut credentials: Vec<UdifCredential> = Vec::new();
-        credentials.push(UdifCredential::new(
-            UdifCredentialType::Passphrase,
-            b"KeRaMiCs",
-        ));
+        let credentials: Vec<UdifCredential> =
+            vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
         file.unlock(&credentials)?;
 
         assert_eq!(file.is_locked, false);

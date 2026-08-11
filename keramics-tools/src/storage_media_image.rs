@@ -22,13 +22,14 @@ use keramics_formats::qcow::{QcowImage, QcowImageLayer};
 use keramics_formats::sparsebundle::SparseBundleImage;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_formats::splitraw::SplitRawImage;
-use keramics_formats::udif::{UdifCredential, UdifCredentialType, UdifImage};
+use keramics_formats::udif::{UdifCredential, UdifImage};
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
 use keramics_formats::{
     FileResolverReference, FormatIdentifier, FormatScanner, PathComponent, open_os_file_resolver,
 };
+use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 /// Storage media image.
 pub enum StorageMediaImage {
@@ -145,7 +146,7 @@ impl StorageMediaImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(path: &PathBuf, passwords: &Vec<String>) -> Result<StorageMediaImage, ErrorTrace> {
+    pub fn open(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
         if path.is_dir() && path.extension() == Some("sparsebundle".as_ref()) {
             match Self::open_sparsebundle_image(path) {
                 Ok(storage_media_image) => return Ok(storage_media_image),
@@ -169,7 +170,7 @@ impl StorageMediaImage {
                 FormatIdentifier::Pdi => Self::open_pdi_image(path),
                 FormatIdentifier::Qcow => Self::open_qcow_image(path),
                 FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
-                FormatIdentifier::Udif => Self::open_udif_image(path, passwords),
+                FormatIdentifier::Udif => Self::open_udif_image(path),
                 FormatIdentifier::Vhd => Self::open_vhd_image(path),
                 FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
                 FormatIdentifier::Vmdk => Self::open_vmdk_image(path),
@@ -450,10 +451,7 @@ impl StorageMediaImage {
     }
 
     /// Opens an UDIF image.
-    fn open_udif_image(
-        path: &PathBuf,
-        passwords: &Vec<String>,
-    ) -> Result<StorageMediaImage, ErrorTrace> {
+    fn open_udif_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
             Ok(result) => result,
             Err(mut error) => {
@@ -493,15 +491,18 @@ impl StorageMediaImage {
             }
         }
         if udif_image.is_locked() {
-            let mut credentials: Vec<UdifCredential> = Vec::new();
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
 
-            for password in passwords.iter() {
-                credentials.push(UdifCredential::new(
-                    UdifCredentialType::Passphrase,
-                    password.as_bytes(),
-                ));
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
             }
-            match udif_image.unlock(&credentials) {
+            match udif_image.unlock(&udif_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to unlock image");

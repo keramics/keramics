@@ -372,7 +372,9 @@ impl UdifImage {
     /// Unlocks a locked (encrypted) volume.
     pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
         match self.segment_stream.write() {
-            Ok(mut segment_stream) => match segment_stream.unlock(credentials) {
+            Ok(mut segment_stream) => match segment_stream
+                .unlock(self.bytes_per_sector, credentials)
+            {
                 Ok(true) => {
                     self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                     self.number_of_segments = segment_stream.number_of_segments;
