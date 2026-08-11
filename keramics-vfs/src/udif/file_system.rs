@@ -103,14 +103,7 @@ impl UdifFileSystem {
                         if udif_image.is_locked() {
                             return Err(keramics_core::error_trace_new!("UDIF image is locked"));
                         }
-                        match udif_image.get_media_size() {
-                            Some(media_size) => media_size,
-                            None => {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Unable to determine media size"
-                                ));
-                            }
-                        }
+                        udif_image.get_media_size()
                     }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
@@ -213,17 +206,17 @@ impl UdifFileSystem {
         }
         if image.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut udif_credentials: Vec<CdsaEncrCredential> = Vec::new();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
                 match vfs_credential {
                     VfsCredential::Passphrase(passphrase) => {
-                        udif_credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                     }
                     _ => {}
                 }
             }
-            match image.unlock(&udif_credentials) {
+            match image.unlock(&credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Failed to unlock UDIF image");

@@ -122,13 +122,14 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/pdi/hfsplus.hdd/DiskDescriptor.xml");
         let pdi_image: PdiImage = PdiInfo::open_image(&path_buf)?;
         let test_struct: PdiImageInfo = PdiInfo::get_image_information(&pdi_image);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Parallels Disk Image (PDI) information:\n",
             "    Media information:\n",
@@ -136,7 +137,7 @@ mod tests {
             "        Bytes per sector\t\t\t: 512 bytes\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

@@ -1,14 +1,12 @@
 # Mac OS sparse image (.sparseimage) format
 
-The Mac OS sparse image (.sparseimage) format is one of the disk image formats
-supported natively by Mac OS.
+The Mac OS sparse image (.sparseimage) format is one of the disk image formats supported natively
+by Mac OS.
 
 ## Overview
 
-A sparse disk image consists of:
-
-* header data
-* bands data
+Sparse images can be encrypted. An encrypted sparse image uses a
+[Encrypted Encoding container](cdsaencr.md).
 
 ### Characteristics
 
@@ -19,6 +17,38 @@ A sparse disk image consists of:
 | Character strings | N/A |
 
 The number of bytes per sector is 512.
+
+### Image formats
+
+Known types of sparse image files are:
+
+* Sparse image file
+* Encrypted sparse image file
+
+#### Sparse image file
+
+A sparse image file consists of:
+
+* header data
+* bands data
+
+#### Encrypted Encoding version 1 encrypted sparse image file
+
+An Encrypted Encoding version 1 encryped sparse image file consists of:
+
+* Data fork, containing encrypted sparse image data
+* [Encrypted Encoding container footer](cdsaencr.md#encypted_container_footer) at the end of the
+  file
+
+#### Encrypted image format version 2 encrypted sparse image file
+
+An Encrypted Encoding version 2 encryped sparse image file consists of:
+
+* [Encrypted Encoding container header](cdsaencr.md#encypted_container_header) at the start of the
+  file
+* Key protectors
+* Unknown (empty values), probably reserved for the key protectors
+* Data fork, containing encrypted sparse image data
 
 ## Header data
 
@@ -69,6 +99,5 @@ The offset of band data can be calculated as following:
 band_data_offset = 4096 + (array_index * sectors_per_band * 512)
 ```
 
-For example if the first array entry contains a band number of 4, then the
-band data is located at offset 4096 and the corresponding media offset is:
-`3 * sectors_per_band * 512`.
+For example if the first array entry contains a band number of 4, then the band data is located at
+offset 4096 and the corresponding media offset is: `3 * sectors_per_band * 512`.

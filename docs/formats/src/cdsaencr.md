@@ -52,7 +52,7 @@ The encrypted container footer is 1276 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 16 | | Identifier (UUID), used in Mac OS keychain as account identifier |
+| 0 | 16 | | Container identifier (UUID), used in Mac OS keychain as account identifier |
 | 16 | 4 | | Block size, in number of bytes |
 | 20 | 4 | | Key protector [encryption method](#algorithm_identifiers) |
 | 24 | 4 | | Key protector [padding type](#padding_types) |
@@ -138,7 +138,7 @@ The encrypted container header is of variable size and consists of:
 | 24 | 4 | | Block key size, in number of bits |
 | 28 | 4 | | [HMAC method](#algorithm_identifiers) |
 | 32 | 4 | | HMAC key size, in number of bits |
-| 36 | 16 | | Identifier (UUID), used in Mac OS keychain as account identifier |
+| 36 | 16 | | Container identifier (UUID), used in Mac OS keychain as account identifier |
 | 52 | 4 | | Block size, in number of bytes |
 | 56 | 8 | | Data fork size, in number of bytes |
 | 64 | 8 | | Data fork offset, where the offset is relative from the start of the container |

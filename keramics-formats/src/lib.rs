@@ -16,7 +16,7 @@ mod block_tree_node;
 mod enums;
 mod fake_file_resolver;
 mod file_resolver;
-mod lru_cache;
+pub mod lru_cache;
 mod macros;
 mod os_file_resolver;
 mod path;

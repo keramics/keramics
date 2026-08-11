@@ -18,6 +18,7 @@ use std::fmt;
 pub enum FormatIdentifier {
     Apfs,
     Apm,
+    CdsaEncr,
     Ewf,
     Ext,
     Fat,
@@ -41,7 +42,8 @@ impl FormatIdentifier {
     /// Determines if the format identifier represents a storage media image format.
     pub fn is_storage_media_image_format(&self) -> bool {
         match self {
-            FormatIdentifier::Ewf
+            FormatIdentifier::CdsaEncr
+            | FormatIdentifier::Ewf
             | FormatIdentifier::Pdi
             | FormatIdentifier::Qcow
             | FormatIdentifier::SparseBundle
@@ -62,6 +64,7 @@ impl fmt::Display for FormatIdentifier {
         let string: &str = match self {
             FormatIdentifier::Apfs => "apfs",
             FormatIdentifier::Apm => "apm",
+            FormatIdentifier::CdsaEncr => "cdsaencr",
             FormatIdentifier::Ewf => "ewf",
             FormatIdentifier::Ext => "ext",
             FormatIdentifier::Fat => "fat",
@@ -97,6 +100,10 @@ mod tests {
         let format_identifier: FormatIdentifier = FormatIdentifier::Apm;
         let string: String = format_identifier.to_string();
         assert_eq!(string, "apm");
+
+        let format_identifier: FormatIdentifier = FormatIdentifier::CdsaEncr;
+        let string: String = format_identifier.to_string();
+        assert_eq!(string, "cdsaencr");
 
         let format_identifier: FormatIdentifier = FormatIdentifier::Ewf;
         let string: String = format_identifier.to_string();

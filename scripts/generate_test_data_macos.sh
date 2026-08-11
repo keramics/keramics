@@ -206,6 +206,14 @@ create_file_entries "/Volumes/hfsplus_test"
 
 detach_image ${IMAGE_FILE}.sparseimage
 
+BASE_IMAGE_FILE=${IMAGE_FILE}
+
+IMAGE_FILE="test_data/sparseimage/hfsplus_aes128"
+
+echo -n KeRaMiCs | hdiutil convert test_data/udif/hfsplus_zlib.dmg -encryption AES-128 -format UDSP -stdinpass -o hfsplus_aes128 ${IMAGE_FILE}
+
+# echo -n KeRaMiCs | hdiutil convert test_data/udif/hfsplus_zlib.dmg -encryption AES-128 -format UDSP -stdinpass -o hfsplus_aes128 -tgtimagekey encrypted-encoding-version=1 ${IMAGE_FILE}
+
 # Create a sparse bundle with a HFS+ file system
 IMAGE_FILE="test_data/sparsebundle/hfsplus"
 IMAGE_SIZE="4M"

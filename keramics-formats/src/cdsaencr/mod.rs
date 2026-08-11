@@ -12,6 +12,7 @@
  */
 
 pub mod constants;
+mod container;
 mod container_footer;
 mod container_header;
 mod credential;
@@ -23,6 +24,7 @@ mod key_protector_descriptor;
 mod passphrase_wrapped_key;
 mod public_key_wrapped_key;
 
+pub use container::CdsaEncrContainer;
 pub use container_footer::CdsaEncrContainerFooter;
 pub use container_header::CdsaEncrContainerHeader;
 pub use credential::CdsaEncrCredential;

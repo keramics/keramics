@@ -39,7 +39,7 @@ pub struct LruCache<K: Hash + Eq, V> {
     usage: VecDeque<K>,
 }
 
-impl<K: Hash + Eq + Copy, V> LruCache<K, V> {
+impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
     /// Creates a new cache.
     pub fn new(number_of_entries: usize) -> Self {
         Self {
@@ -77,7 +77,7 @@ impl<K: Hash + Eq + Copy, V> LruCache<K, V> {
             self.values.remove(&lru_key);
         }
         let entry: LruCacheEntry<V> = LruCacheEntry::new(value);
-        self.values.insert(key, entry);
+        self.values.insert(key.clone(), entry);
         self.usage.push_back(key);
     }
 }

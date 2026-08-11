@@ -13,6 +13,7 @@
 
 mod apfs;
 mod apm;
+mod cdsaencr;
 mod constants;
 mod ewf;
 mod ext;
@@ -33,6 +34,7 @@ mod vmdk;
 
 pub use apfs::ApfsInfo;
 pub use apm::ApmInfo;
+pub use cdsaencr::CdsaEncrInfo;
 pub use ewf::EwfInfo;
 pub use ext::ExtInfo;
 pub use fat::FatInfo;
@@ -48,3 +50,24 @@ pub use udif::UdifInfo;
 pub use vhd::VhdInfo;
 pub use vhdx::VhdxInfo;
 pub use vmdk::VmdkInfo;
+
+#[cfg(test)]
+mod tests {
+    pub fn assert_lines_eq(text: &str, expected_text: &str) {
+        let mut lines = text.lines();
+        let mut expected_lines = expected_text.lines();
+
+        for (line_index, (line, expected_line)) in
+            lines.by_ref().zip(expected_lines.by_ref()).enumerate()
+        {
+            assert_eq!(
+                line,
+                expected_line,
+                "line: {} does not match",
+                line_index + 1
+            );
+        }
+        assert_eq!(lines.next(), None, "additional lines");
+        assert_eq!(expected_lines.next(), None, "missing lines");
+    }
+}

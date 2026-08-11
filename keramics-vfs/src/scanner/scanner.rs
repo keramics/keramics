@@ -12,10 +12,12 @@
  */
 
 use std::collections::HashSet;
+use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use keramics_formats::apm::ApmVolumeSystem;
+use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::fat::FatFileSystem;
 use keramics_formats::gpt::GptVolumeSystem;
@@ -32,6 +34,8 @@ use keramics_formats::vmdk::VmdkImage;
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 
 use crate::apm::ApmFileSystem;
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
 use crate::enums::{VfsFileType, VfsType};
 use crate::ewf::EwfFileSystem;
 use crate::file_entry::VfsFileEntry;
@@ -90,6 +94,7 @@ impl VfsScanner {
 
     /// Builds the scanner.
     pub fn build(&mut self) -> Result<(), ErrorTrace> {
+        self.storage_media_image_scanner.add_cdsaencr_signatures();
         self.storage_media_image_scanner.add_ewf_signatures();
         self.storage_media_image_scanner.add_pdi_signatures();
         self.storage_media_image_scanner.add_qcow_signatures();
@@ -292,20 +297,22 @@ impl VfsScanner {
         file_system: &VfsFileSystemReference,
         vfs_location: &VfsLocation,
     ) -> Result<Option<VfsType>, ErrorTrace> {
-        let data_stream: DataStreamReference =
-            match file_system.get_data_stream_by_location(vfs_location) {
-                Ok(Some(data_stream)) => data_stream,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing data stream: {}",
-                        vfs_location
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
-                    return Err(error);
-                }
-            };
+        let data_stream: DataStreamReference = match self
+            .resolver
+            .get_data_stream_by_location_and_name(vfs_location, None)
+        {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing data stream: {}",
+                    vfs_location
+                )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve data stream");
+                return Err(error);
+            }
+        };
         match vfs_location.get_type() {
             VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
                 self.scan_for_file_system_format(&data_stream)
@@ -414,33 +421,35 @@ impl VfsScanner {
         &self,
         data_stream: &DataStreamReference,
     ) -> Result<Option<VfsType>, ErrorTrace> {
-        let scan_results: HashSet<FormatIdentifier> =
+        let format_identifier: FormatIdentifier =
             match self.file_system_scanner.scan_data_stream(data_stream) {
-                Ok(scan_results) => scan_results,
+                Ok(mut scan_results) => {
+                    if scan_results.len() > 1 {
+                        return Err(keramics_core::error_trace_new!(
+                            "Found multiple file system format signatures"
+                        ));
+                    }
+                    match scan_results.drain().next() {
+                        Some(format_identifier) => format_identifier,
+                        None => return Ok(None),
+                    }
+                }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to scan data stream for known file system format signatures"
+                        "Unable to scan data stream for file system format signatures"
                     );
                     return Err(error);
                 }
             };
-        if scan_results.len() > 1 {
-            return Err(keramics_core::error_trace_new!(
-                "Found multiple known file system format signatures"
-            ));
-        }
-        match scan_results.iter().next() {
-            Some(format_identifier) => match format_identifier {
-                FormatIdentifier::Ext => Ok(Some(VfsType::Ext)),
-                FormatIdentifier::Fat => Ok(Some(VfsType::Fat)),
-                FormatIdentifier::Hfs => Ok(Some(VfsType::Hfs)),
-                FormatIdentifier::Ntfs => Ok(Some(VfsType::Ntfs)),
-                _ => Err(keramics_core::error_trace_new!(
-                    "Found unsupported file system format signature"
-                )),
-            },
-            None => Ok(None),
+        match &format_identifier {
+            FormatIdentifier::Ext => Ok(Some(VfsType::Ext)),
+            FormatIdentifier::Fat => Ok(Some(VfsType::Fat)),
+            FormatIdentifier::Hfs => Ok(Some(VfsType::Hfs)),
+            FormatIdentifier::Ntfs => Ok(Some(VfsType::Ntfs)),
+            _ => Err(keramics_core::error_trace_new!(
+                "Found unsupported file system format signature"
+            )),
         }
     }
 
@@ -449,40 +458,107 @@ impl VfsScanner {
         &self,
         data_stream: &DataStreamReference,
     ) -> Result<Option<VfsType>, ErrorTrace> {
-        let scan_results: HashSet<FormatIdentifier> = match self
+        let mut format_identifier: FormatIdentifier = match self
             .storage_media_image_scanner
             .scan_data_stream(data_stream)
         {
-            Ok(scan_results) => scan_results,
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Found multiple storage media image format signatures"
+                    ));
+                }
+                match scan_results.drain().next() {
+                    Some(format_identifier) => format_identifier,
+                    None => return Ok(None),
+                }
+            }
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to scan data stream for known storage media image format signatures"
+                    "Unable to scan data stream for storage media image format signatures"
                 );
                 return Err(error);
             }
         };
-        if scan_results.len() > 1 {
-            return Err(keramics_core::error_trace_new!(
-                "Found multiple known storage media image format signatures"
-            ));
+        if format_identifier == FormatIdentifier::CdsaEncr {
+            let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
+
+            match cdsaencr_container.read_data_stream(data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open Mac OS Encrypted Encoding container"
+                    );
+                    return Err(error);
+                }
+            }
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match cdsaencr_container.unlock(&credentials) {
+                Ok(false) => {}
+                Ok(true) => {
+                    let container_data_stream: DataStreamReference =
+                        Arc::new(RwLock::new(cdsaencr_container));
+
+                    format_identifier = match self
+                        .storage_media_image_scanner
+                        .scan_data_stream(&container_data_stream)
+                    {
+                        Ok(scan_results) => {
+                            if scan_results.len() > 1 {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Found multiple storage media image format signatures in encrypted container"
+                                ));
+                            }
+                            match scan_results.iter().next() {
+                                Some(format_identifier) => format_identifier.clone(),
+                                // If no format was found treat the contents of the encrypted
+                                // container as an encrypted uncompressed UDIF image.
+                                None => FormatIdentifier::Udif,
+                            }
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan encrypted container data stream for storage media image format signatures"
+                            );
+                            return Err(error);
+                        }
+                    };
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock Mac OS Encrypted Encoding container"
+                    );
+                    return Err(error);
+                }
+            }
         }
-        match scan_results.iter().next() {
-            Some(format_identifier) => match format_identifier {
-                FormatIdentifier::Ewf => Ok(Some(VfsType::Ewf)),
-                FormatIdentifier::Pdi => Ok(Some(VfsType::Pdi)),
-                FormatIdentifier::Qcow => Ok(Some(VfsType::Qcow)),
-                FormatIdentifier::SparseBundle => Ok(Some(VfsType::SparseBundle)),
-                FormatIdentifier::SparseImage => Ok(Some(VfsType::SparseImage)),
-                FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
-                FormatIdentifier::Vhd => Ok(Some(VfsType::Vhd)),
-                FormatIdentifier::Vhdx => Ok(Some(VfsType::Vhdx)),
-                FormatIdentifier::Vmdk => Ok(Some(VfsType::Vmdk)),
-                _ => Err(keramics_core::error_trace_new!(
-                    "Found unsupported storage media image format signature"
-                )),
-            },
-            None => Ok(None),
+        match &format_identifier {
+            FormatIdentifier::Ewf => Ok(Some(VfsType::Ewf)),
+            FormatIdentifier::Pdi => Ok(Some(VfsType::Pdi)),
+            FormatIdentifier::Qcow => Ok(Some(VfsType::Qcow)),
+            FormatIdentifier::SparseBundle => Ok(Some(VfsType::SparseBundle)),
+            FormatIdentifier::SparseImage => Ok(Some(VfsType::SparseImage)),
+            FormatIdentifier::Udif => Ok(Some(VfsType::Udif)),
+            FormatIdentifier::Vhd => Ok(Some(VfsType::Vhd)),
+            FormatIdentifier::Vhdx => Ok(Some(VfsType::Vhdx)),
+            FormatIdentifier::Vmdk => Ok(Some(VfsType::Vmdk)),
+            _ => Err(keramics_core::error_trace_new!(
+                "Found unsupported storage media image format signature"
+            )),
         }
     }
 
@@ -958,98 +1034,100 @@ impl VfsScanner {
         &self,
         data_stream: &DataStreamReference,
     ) -> Result<Option<VfsType>, ErrorTrace> {
-        let scan_results: HashSet<FormatIdentifier> = match self
+        let format_identifier: Option<FormatIdentifier> = match self
             .phase1_volume_system_scanner
             .scan_data_stream(data_stream)
         {
-            Ok(scan_results) => scan_results,
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Found multiple non-overlapping volume system format signatures"
+                    ));
+                }
+                scan_results.drain().next()
+            }
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to scan data stream for known volume system format signatures"
+                    "Unable to scan data stream for non-overlapping volume system format signatures"
                 );
                 return Err(error);
             }
         };
-        if scan_results.len() > 1 {
-            return Err(keramics_core::error_trace_new!(
-                "Found multiple known non-overlapping volume system format signatures"
-            ));
-        }
-        match scan_results.iter().next() {
-            Some(format_identifier) => match format_identifier {
-                FormatIdentifier::Apm => Ok(Some(VfsType::Apm)),
-                FormatIdentifier::Gpt => Ok(Some(VfsType::Gpt)),
-                _ => Err(keramics_core::error_trace_new!(
-                    "Found unsupported non-overlapping volume system format signature"
-                )),
-            },
+        match &format_identifier {
+            Some(FormatIdentifier::Apm) => Ok(Some(VfsType::Apm)),
+            Some(FormatIdentifier::Gpt) => Ok(Some(VfsType::Gpt)),
             None => {
-                let scan_results: HashSet<FormatIdentifier> = match self
+                let format_identifier: Option<FormatIdentifier> = match self
                     .phase2_volume_system_scanner
                     .scan_data_stream(data_stream)
                 {
-                    Ok(scan_results) => scan_results,
+                    Ok(mut scan_results) => {
+                        if scan_results.len() > 1 {
+                            return Err(keramics_core::error_trace_new!(
+                                "Found multiple exclusion volume system format signatures"
+                            ));
+                        }
+                        scan_results.drain().next()
+                    }
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
-                            "Unable to scan data stream for known volume system format signatures"
+                            "Unable to scan data stream for exclusion volume system format signatures"
                         );
                         return Err(error);
                     }
                 };
-                if scan_results.len() > 1 {
-                    return Err(keramics_core::error_trace_new!(
-                        "Found multiple exclusion volume system format signatures"
-                    ));
-                }
-                match scan_results.iter().next() {
-                    Some(format_identifier) => match format_identifier {
-                        FormatIdentifier::Fat => Ok(None),
-                        FormatIdentifier::Ntfs => Ok(None),
-                        _ => Err(keramics_core::error_trace_new!(
-                            "Found unsupported exclusion volume system format signature"
-                        )),
-                    },
+                match &format_identifier {
+                    Some(FormatIdentifier::Fat) => Ok(None),
+                    Some(FormatIdentifier::Ntfs) => Ok(None),
                     None => {
-                        let scan_results: HashSet<FormatIdentifier> = match self
+                        let format_identifier: FormatIdentifier = match self
                             .phase3_volume_system_scanner
                             .scan_data_stream(data_stream)
                         {
-                            Ok(scan_results) => scan_results,
+                            Ok(mut scan_results) => {
+                                if scan_results.len() > 1 {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Found multiple overlapping volume system format signatures"
+                                    ));
+                                }
+                                match scan_results.drain().next() {
+                                    Some(format_identifier) => format_identifier,
+                                    None => return Ok(None),
+                                }
+                            }
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
                                     error,
-                                    "Unable to scan data stream for known volume system format signatures"
+                                    "Unable to scan data stream for overlapping volume system format signatures"
                                 );
                                 return Err(error);
                             }
                         };
-                        if scan_results.len() > 1 {
-                            return Err(keramics_core::error_trace_new!(
-                                "Found multiple overlapping volume system format signatures"
-                            ));
-                        }
-                        match scan_results.iter().next() {
-                            Some(format_identifier) => match format_identifier {
-                                FormatIdentifier::Mbr => {
-                                    // FAT does not have unique signatures.
-                                    let mut fat_file_system: FatFileSystem = FatFileSystem::new();
+                        match &format_identifier {
+                            FormatIdentifier::Mbr => {
+                                // FAT does not have unique signatures.
+                                let mut fat_file_system: FatFileSystem = FatFileSystem::new();
 
-                                    match fat_file_system.read_data_stream(data_stream) {
-                                        Ok(_) => Ok(Some(VfsType::Fat)),
-                                        Err(_) => Ok(Some(VfsType::Mbr)),
-                                    }
+                                match fat_file_system.read_data_stream(data_stream) {
+                                    Ok(_) => Ok(Some(VfsType::Fat)),
+                                    Err(_) => Ok(Some(VfsType::Mbr)),
                                 }
-                                _ => Err(keramics_core::error_trace_new!(
-                                    "Found unsupported overlapping volume system format signature"
-                                )),
-                            },
-                            None => Ok(None),
+                            }
+                            _ => Err(keramics_core::error_trace_new!(
+                                "Found unsupported overlapping volume system format signature"
+                            )),
                         }
                     }
+                    _ => Err(keramics_core::error_trace_new!(
+                        "Found unsupported exclusion volume system format signature"
+                    )),
                 }
             }
+            _ => Err(keramics_core::error_trace_new!(
+                "Found unsupported non-overlapping volume system format signature"
+            )),
         }
     }
 

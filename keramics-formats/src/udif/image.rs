@@ -104,12 +104,8 @@ impl UdifImage {
     }
 
     /// Retrieves the media size.
-    pub fn get_media_size(&self) -> Option<u64> {
-        if self.is_locked {
-            None
-        } else {
-            Some(self.media_size)
-        }
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
     }
 
     /// Retrieves the number of segments.
@@ -146,37 +142,39 @@ impl UdifImage {
                     }
                 }
                 self.bytes_per_sector = 512;
-                self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
-                self.number_of_segments = segment_stream.number_of_segments;
-                let mut block_table_reader: UdifBlockTableReader =
-                    match segment_stream.read_metadata(self.bytes_per_sector) {
+
+                if segment_stream.is_locked {
+                    self.encryption_type = Some(segment_stream.encryption_type.clone());
+                    self.is_locked = true;
+                } else {
+                    self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
+                    self.number_of_segments = segment_stream.number_of_segments;
+                    let mut block_table_reader: UdifBlockTableReader = match segment_stream
+                        .read_metadata(self.bytes_per_sector)
+                    {
                         Ok(block_table_reader) => block_table_reader,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(error, "Unable to read metadata");
                             return Err(error);
                         }
                     };
-                self.has_block_ranges = block_table_reader.has_block_ranges();
+                    self.has_block_ranges = block_table_reader.has_block_ranges();
 
-                if self.has_block_ranges {
-                    self.block_tree = match block_table_reader.get_block_tree() {
-                        Ok(block_tree) => block_tree,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to determine block tree"
-                            );
-                            return Err(error);
-                        }
-                    };
-                }
-                self.media_size = block_table_reader.get_media_size();
-                self.compression_method = block_table_reader.get_compression_method();
-                self.is_locked = segment_stream.is_locked;
+                    if self.has_block_ranges {
+                        self.block_tree = match block_table_reader.get_block_tree() {
+                            Ok(block_tree) => block_tree,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to determine block tree"
+                                );
+                                return Err(error);
+                            }
+                        };
+                    }
+                    self.media_size = block_table_reader.get_media_size();
+                    self.compression_method = block_table_reader.get_compression_method();
 
-                if self.is_locked {
-                    self.encryption_type = Some(segment_stream.encryption_type.clone());
-                } else {
                     if self.media_size
                         > (segment_stream.number_of_sectors * (self.bytes_per_sector as u64))
                     {
@@ -520,13 +518,13 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_image() -> Result<UdifImage, ErrorTrace> {
+    fn get_image(file_name: &str) -> Result<UdifImage, ErrorTrace> {
         let mut image: UdifImage = UdifImage::new();
 
         let path_string: String = get_test_data_path("udif");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
-        let file_name: PathComponent = PathComponent::from("hfsplus_zlib_segments.dmg");
+        let file_name: PathComponent = PathComponent::from(file_name);
         image.open(&file_resolver, &file_name)?;
 
         Ok(image)
@@ -534,7 +532,7 @@ mod tests {
 
     #[test]
     fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
-        let image: UdifImage = get_image()?;
+        let image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let bytes_per_sector: u16 = image.get_bytes_per_sector();
         assert_eq!(bytes_per_sector, 512);
@@ -544,7 +542,7 @@ mod tests {
 
     #[test]
     fn test_get_compression_method() -> Result<(), ErrorTrace> {
-        let image: UdifImage = get_image()?;
+        let image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let compression_method: &UdifCompressionMethod = image.get_compression_method();
         assert_eq!(compression_method, &UdifCompressionMethod::Zlib);
@@ -552,20 +550,43 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_encryption_type
+    #[test]
+    fn test_get_encryption_type() -> Result<(), ErrorTrace> {
+        let image: UdifImage = get_image("hfsplus_aes256.dmg")?;
+
+        let encryption_type: &CdsaEncrEncryptionType = image.get_encryption_type().unwrap();
+        assert_eq!(encryption_type.method, 0x80000001);
+        assert_eq!(encryption_type.mode, 5);
+        assert_eq!(encryption_type.key_size, 32);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_media_size() -> Result<(), ErrorTrace> {
-        let image: UdifImage = get_image()?;
+        let image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
-        let media_size: Option<u64> = image.get_media_size();
-        assert_eq!(media_size, Some(1964032));
+        let media_size: u64 = image.get_media_size();
+        assert_eq!(media_size, 1964032);
 
         Ok(())
     }
 
     // TODO: add tests for get_number_of_segments
-    // TODO: add tests for get_segment_set_identifier
+
+    #[test]
+    fn test_get_segment_set_identifier() -> Result<(), ErrorTrace> {
+        let image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
+
+        let segment_set_identifier: &Uuid = image.get_segment_set_identifier();
+        assert_eq!(
+            segment_set_identifier.to_string(),
+            "cd0a02d0-648c-49ec-b7e8-1c5d1e6d6281"
+        );
+        Ok(())
+    }
+
+    // TODO: add tests for is_locked
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
@@ -586,7 +607,7 @@ mod tests {
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         image.seek(SeekFrom::Start(1024))?;
 
@@ -598,7 +619,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let size: u64 = image.get_size()?;
         assert_eq!(size, 1964032);
@@ -608,7 +629,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let offset: u64 = image.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -618,7 +639,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let offset: u64 = image.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, image.media_size - 512);
@@ -628,7 +649,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let offset = image.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -641,7 +662,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let result: Result<u64, ErrorTrace> = image.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -651,7 +672,7 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
 
         let offset: u64 = image.seek(SeekFrom::End(512))?;
         assert_eq!(offset, image.media_size + 512);
@@ -661,7 +682,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
         image.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -714,7 +735,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
-        let mut image: UdifImage = get_image()?;
+        let mut image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
         image.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];

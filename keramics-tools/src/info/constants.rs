@@ -11,6 +11,8 @@
  * under the License.
  */
 
+pub const NOT_SET_VALUE: &'static str = "N/A (not set)";
+
 pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
     ("00000000-0000-0000-0000-000000000000", "Unused entry"),
     (

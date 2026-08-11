@@ -15,8 +15,11 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparseimage::SparseImageFile;
 
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
 use crate::location::VfsLocation;
 use crate::types::VfsFileSystemReference;
 
@@ -71,7 +74,7 @@ impl SparseImageFileSystem {
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
         match self.file.read() {
-            Ok(sparseimage_file) => Ok(sparseimage_file.bytes_per_sector as u32),
+            Ok(sparseimage_file) => Ok(sparseimage_file.get_bytes_per_sector() as u32),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain read lock on sparseimage file",
@@ -98,7 +101,14 @@ impl SparseImageFileSystem {
                     return Ok(None);
                 }
                 let media_size: u64 = match self.file.read() {
-                    Ok(sparseimage_file) => sparseimage_file.media_size,
+                    Ok(sparseimage_file) => {
+                        if sparseimage_file.is_locked() {
+                            return Err(keramics_core::error_trace_new!(
+                                "sparseimage file is locked"
+                            ));
+                        }
+                        sparseimage_file.get_media_size()
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on sparseimage file",
@@ -191,6 +201,29 @@ impl SparseImageFileSystem {
                     "Unable to read sparseimage file from data stream"
                 );
                 return Err(error);
+            }
+        }
+        if file.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match file.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Failed to unlock sparseimage file"
+                    );
+                    return Err(error);
+                }
             }
         }
         Ok(())

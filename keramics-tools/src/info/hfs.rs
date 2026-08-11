@@ -473,6 +473,8 @@ mod tests {
     use keramics_datetime::HfsTime;
     use keramics_types::Utf16String;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
@@ -483,7 +485,6 @@ mod tests {
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
         let test_struct: HfsFileEntryInfo = HfsInfo::get_file_entry_information(&hfs_file_entry);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "    Identifier\t\t\t\t\t: 20\n",
             "    Name\t\t\t\t\t: testfile1\n",
@@ -499,7 +500,7 @@ mod tests {
             "    File mode\t\t\t\t\t: -rw-r--r-- (0o100644)\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

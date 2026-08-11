@@ -176,6 +176,8 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/gpt/gpt.raw");
@@ -185,7 +187,6 @@ mod tests {
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
         let test_struct: GptPartitionInfo = GptInfo::get_partition_information(&gpt_partition);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Partition: 1\n",
             "    Identifier\t\t\t\t\t: 0b119671-75ff-4e2a-a31a-0bc83f857fdd\n",
@@ -194,7 +195,7 @@ mod tests {
             "    Size\t\t\t\t\t: 1.0 MiB (1048576 bytes)\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }
