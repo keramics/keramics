@@ -170,6 +170,7 @@ impl UdifImage {
                             return Err(error);
                         }
                     };
+                    segment_stream.has_block_ranges = self.has_block_ranges;
                 }
                 self.media_size = block_table_reader.get_media_size();
                 self.compression_method = block_table_reader.get_compression_method();
@@ -401,6 +402,7 @@ impl UdifImage {
                                 return Err(error);
                             }
                         };
+                        segment_stream.has_block_ranges = self.has_block_ranges;
                     }
                     self.media_size = block_table_reader.get_media_size();
                     self.compression_method = block_table_reader.get_compression_method();
