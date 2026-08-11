@@ -19,7 +19,7 @@ pub enum UdifCredentialType {
 }
 
 /// Universal Disk Image Format (UDIF) credential.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct UdifCredential {
     /// Credential type.
     pub(super) credential_type: UdifCredentialType,

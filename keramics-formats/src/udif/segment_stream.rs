@@ -151,21 +151,24 @@ impl UdifSegmentStream {
                 return Err(error);
             }
         }
-        match segment_file.unlock(&self.credentials) {
-            Ok(true) => {}
-            Ok(false) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unable to unlock segment file: {}",
-                    segment_file_name
-                )));
+        if segment_file.is_locked {
+            match segment_file.unlock(&self.credentials) {
+                Ok(true) => {}
+                Ok(false) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to unlock segment file: {}",
+                        segment_file_name
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Failed to unlock segment file: {}", segment_file_name)
+                    );
+                    return Err(error);
+                }
             }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Failed to unlock segment file: {}", segment_file_name)
-                );
-                return Err(error);
-            }
+            segment_file.credentials.clear();
         }
         Ok(segment_file)
     }
@@ -623,6 +626,10 @@ impl UdifSegmentStream {
                 file_footer.data_fork_size,
             );
             self.segment_ranges.push(segment_range);
+
+            segment_file
+                .credentials
+                .retain(|credential| !self.credentials.contains(credential));
             self.credentials.append(&mut segment_file.credentials);
 
             self.segment_set_identifier = file_footer.segment_set_identifier.clone();
@@ -755,6 +762,10 @@ impl UdifSegmentStream {
                     file_footer.data_fork_size,
                 );
                 self.segment_ranges.push(segment_range);
+
+                segment_file
+                    .credentials
+                    .retain(|credential| !self.credentials.contains(credential));
                 self.credentials.append(&mut segment_file.credentials);
             }
             self.is_locked = false;
