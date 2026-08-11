@@ -469,7 +469,7 @@ impl UdifImage {
                 ));
             }
         }
-        Ok(result)
+        Ok(!self.is_locked)
     }
 }
 
