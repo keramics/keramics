@@ -11,9 +11,9 @@
  * under the License.
  */
 
-/// Universal Disk Image Format (UDIF) credential.
-#[derive(Clone, Debug, PartialEq)]
-pub enum UdifCredential {
+/// Virtual File System (VFS) credential.
+#[derive(Clone)]
+pub enum VfsCredential {
     None,
     Passphrase(Vec<u8>),
 }

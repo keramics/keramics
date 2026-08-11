@@ -11,21 +11,28 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Uuid, bytes_to_u32_be};
 
+use crate::lru_cache::LruCache;
 use crate::plist::{PlistObject, XmlPlist};
 
 use super::block_table::UdifBlockTable;
 use super::block_table_reader::UdifBlockTableReader;
 use super::constants::*;
+use super::credential::UdifCredential;
 use super::encrypted_file_footer::UdifEncryptedFileFooter;
 use super::encrypted_file_header::UdifEncryptedFileHeader;
+use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifHmacContext};
+use super::encryption_type::UdifEncryptionType;
 use super::enums::UdifKeyProtectorType;
 use super::file_footer::UdifFileFooter;
 use super::key_protector::UdifKeyProtector;
+use super::passphrase_wrapped_key::UdifPassphraseWrappedKey;
+use super::public_key_wrapped_key::UdifPublicKeyWrappedKey;
 use super::resource_fork_header::UdifResourceForkHeader;
 use super::resource_map::UdifResourceMap;
 use super::resource_map_item::UdifResourceMapItem;
@@ -77,14 +84,8 @@ pub struct UdifFile {
     /// Value to indicate the (encrypted) file is locked.
     pub(super) is_locked: bool,
 
-    /// Encryption method.
-    pub(super) encryption_method: u32,
-
-    /// Encryption mode.
-    pub(super) encryption_mode: u32,
-
-    /// Key size.
-    pub(super) key_size: usize,
+    /// Encryption type.
+    pub(super) encryption_type: UdifEncryptionType,
 
     /// Initialization vector size.
     pub(super) initialization_vector_size: usize,
@@ -97,6 +98,18 @@ pub struct UdifFile {
 
     /// Key key_protectors.
     pub(super) key_protectors: Vec<UdifKeyProtector>,
+
+    /// Credentials.
+    pub(super) credentials: Vec<UdifCredential>,
+
+    /// Encryption context.
+    encryption_context: UdifEncryptionContext,
+
+    /// HMAC context.
+    hmac_context: UdifHmacContext,
+
+    /// Decrypted block cache.
+    block_cache: LruCache<u64, Vec<u8>>,
 }
 
 impl UdifFile {
@@ -118,13 +131,15 @@ impl UdifFile {
             plist_size: 0,
             block_size: 0,
             is_locked: false,
-            encryption_method: 0,
-            encryption_mode: 0,
-            key_size: 0,
+            encryption_type: UdifEncryptionType::new(),
             initialization_vector_size: 0,
             hmac_method: 0,
             hmac_key_size: 0,
             key_protectors: Vec::new(),
+            credentials: Vec::new(),
+            encryption_context: UdifEncryptionContext::None,
+            hmac_context: UdifHmacContext::None,
+            block_cache: LruCache::new(64),
         }
     }
 
@@ -173,9 +188,7 @@ impl UdifFile {
             self.data_fork_size = encrypted_file_header.data_fork_size;
             self.block_size = encrypted_file_header.block_size;
             self.is_locked = true;
-            self.encryption_method = encrypted_file_header.encryption_method;
-            self.encryption_mode = encrypted_file_header.encryption_mode;
-            self.key_size = (encrypted_file_header.key_size / 8) as usize;
+            self.encryption_type = encrypted_file_header.encryption_type;
             self.initialization_vector_size =
                 encrypted_file_header.initialization_vector_size as usize;
             self.hmac_method = encrypted_file_header.hmac_method;
@@ -221,13 +234,11 @@ impl UdifFile {
                 self.data_fork_size = encrypted_file_footer.data_fork_size as u64;
                 self.block_size = encrypted_file_footer.block_size;
                 self.is_locked = true;
-                self.encryption_method = encrypted_file_footer.encryption_method;
-                self.encryption_mode = encrypted_file_footer.encryption_mode;
-                self.key_size = (encrypted_file_footer.key_size / 8) as usize;
+                self.encryption_type = encrypted_file_footer.encryption_type;
                 self.initialization_vector_size =
                     encrypted_file_footer.initialization_vector_size as usize;
-                // self.hmac_method = encrypted_file_footer.hmac_method;
-                // self.hmac_key_size = (encrypted_file_footer.hmac_key_size / 8) as usize;
+                self.hmac_method = encrypted_file_footer.hmac_method;
+                self.hmac_key_size = (encrypted_file_footer.hmac_key_size / 8) as usize;
 
                 let key_protector: UdifKeyProtector = UdifKeyProtector::new(
                     UdifKeyProtectorType::PassphraseWrappedKey,
@@ -269,21 +280,145 @@ impl UdifFile {
     pub(super) fn read_exact_at_position(
         &mut self,
         data: &mut [u8],
-        position: SeekFrom,
-    ) -> Result<u64, ErrorTrace> {
-        match self.data_stream.as_ref() {
-            Some(data_stream) => {
-                let offset: u64 =
-                    keramics_core::data_stream_read_exact_at_position!(data_stream, data, position);
-
-                Ok(offset)
+        segment_offset: u64,
+        read_metadata: bool,
+    ) -> Result<usize, ErrorTrace> {
+        if self.is_locked {
+            return Err(keramics_core::error_trace_new!("File is locked"));
+        }
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
-            None => Err(keramics_core::error_trace_new!("Missing data stream")),
+        };
+        let mut file_offset: u64 = segment_offset;
+
+        if !read_metadata {
+            if segment_offset < self.segment_offset
+                || segment_offset >= self.segment_offset + self.data_fork_size
+            {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid segment offset value out of bounds"
+                ));
+            }
+            file_offset -= self.segment_offset;
+        }
+        if self.encryption_type.mode == 0 {
+            keramics_core::data_stream_read_exact_at_position!(
+                data_stream,
+                data,
+                SeekFrom::Start(file_offset)
+            );
+            Ok(data.len())
+        } else {
+            let read_size: usize = data.len();
+            let mut data_offset: usize = 0;
+
+            let mut block_number: u64 = file_offset / (self.block_size as u64);
+            let mut block_offset: u64 = block_number * (self.block_size as u64);
+
+            if block_number > u32::MAX as u64 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid block number value out of bounds"
+                ));
+            }
+            while data_offset < read_size {
+                if !read_metadata && file_offset >= self.data_fork_size {
+                    break;
+                }
+                let range_relative_offset: u64 = file_offset - block_offset;
+                let range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
+
+                let range_read_size: usize =
+                    min(read_size - data_offset, range_remainder_size as usize);
+
+                if range_read_size == 0 {
+                    break;
+                }
+                if !self.block_cache.contains(&block_number) {
+                    let block_data_offset: u64 = self.data_fork_offset + block_offset;
+
+                    let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
+
+                    keramics_core::data_stream_read_exact_at_position!(
+                        data_stream,
+                        &mut encrypted_data,
+                        SeekFrom::Start(block_data_offset)
+                    );
+                    let block_number_data: [u8; 4] = (block_number as u32).to_be_bytes();
+
+                    let mut initialization_vector: Vec<u8> = match self
+                        .hmac_context
+                        .calculate_hmac(&block_number_data)
+                    {
+                        Ok(data) => data,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to HMAC initialization vector of encrypted block: {}",
+                                    block_number
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                    let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
+
+                    match self.encryption_context.decrypt_cbc(
+                        &mut initialization_vector,
+                        &encrypted_data,
+                        &mut block_data,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to decrypt encrypted block: {}", block_number)
+                            );
+                            return Err(error);
+                        }
+                    }
+                    keramics_core::debug_trace_data!(
+                        "BlockData",
+                        block_data_offset,
+                        &block_data,
+                        self.block_size,
+                    );
+                    self.block_cache.insert(block_number, block_data);
+                }
+                let range_data: &[u8] = match self.block_cache.get(&block_number) {
+                    Some(data) => data,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unable to retrieve encrypted block: {} data from cache",
+                            block_number
+                        )));
+                    }
+                };
+                let data_end_offset: usize = data_offset + range_read_size;
+
+                let range_data_offset: usize = range_relative_offset as usize;
+                let range_data_end_offset: usize = range_data_offset + range_read_size;
+
+                data[data_offset..data_end_offset]
+                    .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
+
+                data_offset = data_end_offset;
+                if data_offset >= read_size {
+                    break;
+                }
+                file_offset += range_read_size as u64;
+                block_offset += self.block_size as u64;
+                block_number += 1;
+            }
+            Ok(data_offset)
         }
     }
 
-    /// Reads the metadata in the XML plist or resource fork.
-    pub(super) fn read_metadata(
+    /// Reads metadata from the resource fork.
+    pub(super) fn read_resource_fork(
         &mut self,
         block_table_reader: &mut UdifBlockTableReader,
     ) -> Result<(), ErrorTrace> {
@@ -293,181 +428,401 @@ impl UdifFile {
                 return Err(keramics_core::error_trace_new!("Missing data stream"));
             }
         };
-        if self.plist_size == 0 {
-            let mut resource_fork_header: UdifResourceForkHeader = UdifResourceForkHeader::new();
+        let mut resource_fork_header: UdifResourceForkHeader = UdifResourceForkHeader::new();
 
-            match resource_fork_header
-                .read_at_position(data_stream, SeekFrom::Start(self.resource_fork_offset))
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read resource fork header"
-                    );
-                    return Err(error);
-                }
+        match resource_fork_header
+            .read_at_position(data_stream, SeekFrom::Start(self.resource_fork_offset))
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read resource fork header");
+                return Err(error);
             }
-            let offset: u64 =
-                self.resource_fork_offset + (resource_fork_header.resource_map_offset as u64);
+        }
+        let offset: u64 =
+            self.resource_fork_offset + (resource_fork_header.resource_map_offset as u64);
 
-            let mut resource_map: UdifResourceMap = UdifResourceMap::new();
+        let mut resource_map: UdifResourceMap = UdifResourceMap::new();
 
-            match resource_map.read_at_position(
+        match resource_map.read_at_position(
+            data_stream,
+            resource_fork_header.resource_map_size,
+            SeekFrom::Start(offset),
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read resource map");
+                return Err(error);
+            }
+        }
+        let mut lookup_item: Option<&UdifResourceMapItem> = None;
+
+        for resource_map_item in resource_map.items.iter() {
+            if resource_map_item.name == "blkx" {
+                lookup_item = Some(resource_map_item);
+                break;
+            }
+        }
+        let blkx_item: &UdifResourceMapItem = match lookup_item {
+            Some(resource_map_item) => resource_map_item,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve blkx item from resource map"
+                ));
+            }
+        };
+        let mut data: [u8; 4] = [0; 4];
+
+        for blkx_value in blkx_item.values.iter() {
+            let offset: u64 = self.resource_fork_offset
+                + (resource_fork_header.resource_data_offset as u64)
+                + (blkx_value.data_offset as u64);
+
+            keramics_core::data_stream_read_exact_at_position!(
                 data_stream,
-                resource_fork_header.resource_map_size,
-                SeekFrom::Start(offset),
+                &mut data,
+                SeekFrom::Start(offset)
+            );
+            let block_table_data_size: u32 = bytes_to_u32_be!(data, 0);
+
+            let mut block_table = UdifBlockTable::new();
+
+            match block_table.read_at_position(
+                data_stream,
+                block_table_data_size,
+                SeekFrom::Start(offset + 4),
             ) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to read resource map");
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block table");
                     return Err(error);
                 }
             }
-            let mut lookup_item: Option<&UdifResourceMapItem> = None;
-
-            for resource_map_item in resource_map.items.iter() {
-                if resource_map_item.name == "blkx" {
-                    lookup_item = Some(resource_map_item);
-                    break;
-                }
-            }
-            let blkx_item: &UdifResourceMapItem = match lookup_item {
-                Some(resource_map_item) => resource_map_item,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unable to retrieve blkx item from resource map"
-                    ));
-                }
-            };
-            let mut data: [u8; 4] = [0; 4];
-
-            for blkx_value in blkx_item.values.iter() {
-                let offset: u64 = self.resource_fork_offset
-                    + (resource_fork_header.resource_data_offset as u64)
-                    + (blkx_value.data_offset as u64);
-
-                keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
-                    &mut data,
-                    SeekFrom::Start(offset)
-                );
-                let block_table_data_size: u32 = bytes_to_u32_be!(data, 0);
-
-                let mut block_table = UdifBlockTable::new();
-
-                match block_table.read_at_position(
-                    data_stream,
-                    block_table_data_size,
-                    SeekFrom::Start(offset + 4),
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read block table");
-                        return Err(error);
-                    }
-                }
-                match block_table_reader.process_block_table(&block_table) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to process block table"
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-        } else {
-            // Note that 16777216 is an arbitrary chosen limit.
-            if self.plist_size > 16777216 {
-                return Err(keramics_core::error_trace_new!("Unsupported data size"));
-            }
-            let mut data: Vec<u8> = vec![0; self.plist_size as usize];
-
-            keramics_core::data_stream_read_at_position!(
-                data_stream,
-                &mut data,
-                SeekFrom::Start(self.plist_offset)
-            );
-            keramics_core::debug_trace_data!(
-                "UdifFileXmlPlist",
-                self.plist_offset,
-                &data,
-                self.plist_size
-            );
-            let string: String = match String::from_utf8(data) {
-                Ok(string) => string,
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to convert plist data into UTF-8 string",
-                        error
-                    ));
-                }
-            };
-            let mut xml_plist: XmlPlist = XmlPlist::new();
-
-            match xml_plist.parse(string.as_str()) {
+            match block_table_reader.process_block_table(&block_table) {
                 Ok(_) => {}
-                Err(error) => {
-                    return Err(keramics_core::error_trace_new_with_error!(
-                        "Unable to parse plist",
-                        error
-                    ));
-                }
-            }
-            let resource_fork_object: &PlistObject =
-                match xml_plist.root_object.get_object_by_key("resource-fork") {
-                    Some(string) => string,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unable to retrieve resource-fork value from plist"
-                        ));
-                    }
-                };
-            let blkx_item: &[PlistObject] = match resource_fork_object.get_slice_by_key("blkx") {
-                Some(string) => string,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Unable to retrieve blkx item from plist"
-                    ));
-                }
-            };
-            for (value_index, blkx_value) in blkx_item.iter().enumerate() {
-                let data: &[u8] = match blkx_value.get_bytes_by_key("Data") {
-                    Some(data) => data,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unable to retrieve Data value from blkx value: {}",
-                            value_index
-                        )));
-                    }
-                };
-                // TODO: determine data offset relative to start of plist
-                keramics_core::debug_trace_data!("UdifBlockTable", 0, &data, data.len());
-
-                let mut block_table: UdifBlockTable = UdifBlockTable::new();
-
-                match block_table.read_data(&data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read block table");
-                        return Err(error);
-                    }
-                }
-                match block_table_reader.process_block_table(&block_table) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to process block table"
-                        );
-                        return Err(error);
-                    }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to process block table");
+                    return Err(error);
                 }
             }
         }
         Ok(())
+    }
+
+    /// Reads metadata from the XML plist.
+    pub(super) fn read_xml_plist(
+        &mut self,
+        block_table_reader: &mut UdifBlockTableReader,
+    ) -> Result<(), ErrorTrace> {
+        // Note that 16777216 is an arbitrary chosen limit.
+        if self.plist_size > 16777216 {
+            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+        }
+        let mut data: Vec<u8> = vec![0; self.plist_size as usize];
+
+        match self.read_exact_at_position(&mut data, self.plist_offset, true) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read plist data");
+                return Err(error);
+            }
+        }
+        keramics_core::debug_trace_data!(
+            "UdifFileXmlPlist",
+            self.plist_offset,
+            &data,
+            self.plist_size
+        );
+        let string: String = match String::from_utf8(data) {
+            Ok(string) => string,
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to convert plist data into UTF-8 string",
+                    error
+                ));
+            }
+        };
+        let mut xml_plist: XmlPlist = XmlPlist::new();
+
+        match xml_plist.parse(string.as_str()) {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to parse plist",
+                    error
+                ));
+            }
+        }
+        let resource_fork_object: &PlistObject =
+            match xml_plist.root_object.get_object_by_key("resource-fork") {
+                Some(string) => string,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Unable to retrieve resource-fork value from plist"
+                    ));
+                }
+            };
+        let blkx_item: &[PlistObject] = match resource_fork_object.get_slice_by_key("blkx") {
+            Some(string) => string,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve blkx item from plist"
+                ));
+            }
+        };
+        for (value_index, blkx_value) in blkx_item.iter().enumerate() {
+            let data: &[u8] = match blkx_value.get_bytes_by_key("Data") {
+                Some(data) => data,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to retrieve Data value from blkx value: {}",
+                        value_index
+                    )));
+                }
+            };
+            // TODO: determine data offset relative to start of plist
+            keramics_core::debug_trace_data!("UdifBlockTable", 0, &data, data.len());
+
+            let mut block_table: UdifBlockTable = UdifBlockTable::new();
+
+            match block_table.read_data(&data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read block table");
+                    return Err(error);
+                }
+            }
+            match block_table_reader.process_block_table(&block_table) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to process block table");
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Unlocks a locked (encrypted) file.
+    pub fn unlock(&mut self, credentials: &[UdifCredential]) -> Result<bool, ErrorTrace> {
+        if !self.is_locked {
+            return Ok(true);
+        }
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        let mut block_key: Vec<u8> = Vec::new();
+        let mut hmac_key: Vec<u8> = Vec::new();
+        let mut keys_unlocked: bool = false;
+
+        for (key_protector_index, key_protector) in self.key_protectors.iter().enumerate() {
+            // Note that 65536 is an arbitrary chosen limit.
+            if key_protector.size > 65536 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported key protector: {} size: {} value out of bounds",
+                    key_protector_index, key_protector.size
+                )));
+            }
+            let mut data: Vec<u8> = vec![0; key_protector.size as usize];
+
+            keramics_core::data_stream_read_exact_at_position!(
+                data_stream,
+                &mut data,
+                SeekFrom::Start(key_protector.offset)
+            );
+            match key_protector.protector_type {
+                UdifKeyProtectorType::PassphraseWrappedKey => {
+                    if self.format_version == 1 {
+                        keramics_core::debug_trace_data_and_structure!(
+                            "UdifEncryptedFileFooter",
+                            key_protector.offset,
+                            &data,
+                            key_protector.size,
+                            UdifEncryptedFileFooter::debug_read_data(&data)
+                        );
+                        let mut file_footer: UdifEncryptedFileFooter =
+                            UdifEncryptedFileFooter::new();
+
+                        match file_footer.read_data(&data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read file footer"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        for credential in credentials.iter() {
+                            match file_footer.unlock(credential) {
+                                Ok(result) => {
+                                    if result {
+                                        let block_key_size: usize = self.encryption_type.key_size;
+                                        block_key =
+                                            file_footer.block_key_data[0..block_key_size].to_vec();
+
+                                        let hmac_key_size: usize = self.hmac_key_size;
+                                        hmac_key =
+                                            file_footer.hmac_key_data[0..hmac_key_size].to_vec();
+
+                                        keys_unlocked = true;
+
+                                        self.credentials.push(credential.clone());
+
+                                        break;
+                                    }
+                                }
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to unlock file footer"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                        }
+                    } else if self.format_version == 2 {
+                        keramics_core::debug_trace_data_and_structure!(
+                            "UdifPasspraseWrappedKey",
+                            key_protector.offset,
+                            &data,
+                            key_protector.size,
+                            UdifPassphraseWrappedKey::debug_read_data(&data)
+                        );
+                        let mut wrapped_key: UdifPassphraseWrappedKey =
+                            UdifPassphraseWrappedKey::new();
+
+                        match wrapped_key.read_data(&data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read passphrase wrapped key"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        for credential in credentials.iter() {
+                            match wrapped_key.unlock(credential) {
+                                Ok(result) => {
+                                    if result {
+                                        let block_key_size: usize = self.encryption_type.key_size;
+                                        block_key =
+                                            wrapped_key.key_data[0..block_key_size].to_vec();
+
+                                        let hmac_key_size: usize = self.hmac_key_size;
+                                        let data_end_offset: usize = block_key_size + hmac_key_size;
+                                        hmac_key = wrapped_key.key_data
+                                            [block_key_size..data_end_offset]
+                                            .to_vec();
+
+                                        keys_unlocked = true;
+
+                                        self.credentials.push(credential.clone());
+
+                                        break;
+                                    }
+                                }
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to unlock passphrase wrapped key"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                        }
+                    }
+                    if keys_unlocked {
+                        break;
+                    }
+                }
+                UdifKeyProtectorType::PublicKeyWrappedKey => {
+                    if self.format_version == 2 {
+                        keramics_core::debug_trace_data_and_structure!(
+                            "UdifPublicKeyrappedKey",
+                            key_protector.offset,
+                            &data,
+                            key_protector.size,
+                            UdifPublicKeyWrappedKey::debug_read_data(&data)
+                        );
+                        let mut wrapped_key: UdifPublicKeyWrappedKey =
+                            UdifPublicKeyWrappedKey::new();
+
+                        match wrapped_key.read_data(&data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read public key wrapped key"
+                                );
+                                return Err(error);
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    if self.format_version == 2 {
+                        keramics_core::debug_trace_data!(
+                            "UdifEncryptedKeyProtector",
+                            key_protector.offset,
+                            &data,
+                            key_protector.size,
+                        );
+                    }
+                }
+            }
+        }
+        if keys_unlocked {
+            keramics_core::debug_trace_data!("UdifBlockKey", 0, &block_key, block_key.len());
+            keramics_core::debug_trace_data!("UdifBlockHmacKey", 0, &hmac_key, hmac_key.len());
+
+            self.encryption_context =
+                match UdifEncryption::get_encryption_context(&self.encryption_type, &block_key) {
+                    Ok(Some(context)) => context,
+                    Ok(None) => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported encryption type: {}",
+                            self.encryption_type
+                        )));
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve encryption type: {}",
+                                self.encryption_type
+                            )
+                        );
+                        return Err(error);
+                    }
+                };
+            self.hmac_context = match UdifEncryption::get_hmac_context(self.hmac_method, &hmac_key)
+            {
+                Ok(Some(context)) => context,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported HMAC method: {}",
+                        self.hmac_method
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve HMAC context for method: {}",
+                            self.hmac_method
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+            self.is_locked = false;
+        }
+        Ok(!self.is_locked)
     }
 }
 
@@ -540,7 +895,26 @@ mod tests {
     }
 
     #[test]
-    fn test_read_metadata() -> Result<(), ErrorTrace> {
+    fn test_read_resource_fork() -> Result<(), ErrorTrace> {
+        let mut file: UdifFile = UdifFile::new();
+
+        let path_string: String = get_test_data_path("udif/hfsplus_rsrc.dmg");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file.read_data_stream(&data_stream)?;
+
+        let segment_range: UdifSegmentRange = UdifSegmentRange::new(0, 1, file.data_fork_size);
+        let mut block_table_reader: UdifBlockTableReader =
+            UdifBlockTableReader::new(512, file.data_fork_size);
+        file.read_resource_fork(&mut block_table_reader)?;
+
+        assert!(block_table_reader.has_block_ranges());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_read_xml_plist() -> Result<(), ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
 
         let path_string: String = get_test_data_path("udif/hfsplus_zlib.dmg");
@@ -548,13 +922,32 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
-        let segment_range: UdifSegmentRange =
-            UdifSegmentRange::new(0, 1, file.data_fork_offset, file.data_fork_size);
+        let segment_range: UdifSegmentRange = UdifSegmentRange::new(0, 1, file.data_fork_size);
         let mut block_table_reader: UdifBlockTableReader =
             UdifBlockTableReader::new(512, file.data_fork_size);
-        file.read_metadata(&mut block_table_reader)?;
+        file.read_xml_plist(&mut block_table_reader)?;
 
         assert!(block_table_reader.has_block_ranges());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_unlock() -> Result<(), ErrorTrace> {
+        let mut file: UdifFile = UdifFile::new();
+
+        let path_string: String = get_test_data_path("udif/hfsplus_aes256.dmg");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        file.read_data_stream(&data_stream)?;
+
+        assert_eq!(file.is_locked, true);
+
+        let credentials: Vec<UdifCredential> =
+            vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        file.unlock(&credentials)?;
+
+        assert_eq!(file.is_locked, false);
 
         Ok(())
     }

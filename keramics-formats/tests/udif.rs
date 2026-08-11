@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, ErrorTrace};
-use keramics_formats::udif::{UdifCredential, UdifCredentialType, UdifImage};
+use keramics_formats::udif::{UdifCredential, UdifImage};
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
@@ -88,6 +88,36 @@ fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
 }
 
 #[test]
+fn read_media_aes128_encrypted_and_zlib_compressed() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif");
+    let mut image: UdifImage = open_image(&path_buf, "hfsplus_zlib_aes128.dmg")?;
+    let credentials: Vec<UdifCredential> = vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    image.unlock(&credentials)?;
+
+    let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
+    let media_size: u64 = image.get_media_size().unwrap();
+    assert_eq!(media_offset, media_size);
+    assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
+
+    Ok(())
+}
+
+#[test]
+fn read_media_aes256_encrypted() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/udif");
+    let mut image: UdifImage = open_image(&path_buf, "hfsplus_aes256.dmg")?;
+    let credentials: Vec<UdifCredential> = vec![UdifCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    image.unlock(&credentials)?;
+
+    let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
+    let media_size: u64 = image.get_media_size().unwrap();
+    assert_eq!(media_offset, media_size);
+    assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
+
+    Ok(())
+}
+
+#[test]
 fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_bzip2.dmg")?;
@@ -143,25 +173,6 @@ fn read_media_with_segments() -> Result<(), ErrorTrace> {
 fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
     let path_buf: PathBuf = PathBuf::from("../test_data/udif");
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_zlib.dmg")?;
-
-    let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
-    assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
-
-    Ok(())
-}
-
-#[test]
-fn read_media_encrypted_and_zlib_compressed() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/udif");
-    let mut image: UdifImage = open_image(&path_buf, "hfsplus_zlib_aes128.dmg")?;
-    let mut credentials: Vec<UdifCredential> = Vec::new();
-    credentials.push(UdifCredential::new(
-        UdifCredentialType::Passphrase,
-        b"KeRaMiCs",
-    ));
-    image.unlock(&credentials)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
     let media_size: u64 = image.get_media_size().unwrap();

@@ -12,6 +12,8 @@
  */
 
 mod context;
+mod credential;
+mod credential_store;
 mod data_fork;
 mod data_forks;
 mod enums;
@@ -48,6 +50,8 @@ mod resolver;
 mod scanner;
 
 pub use context::VfsContext;
+pub use credential::VfsCredential;
+pub use credential_store::VfsCredentialStore;
 pub use data_fork::VfsDataFork;
 pub use enums::*;
 pub use extended_attribute::VfsExtendedAttribute;

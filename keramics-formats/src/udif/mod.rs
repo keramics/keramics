@@ -21,6 +21,7 @@ mod credential;
 mod encrypted_file_footer;
 mod encrypted_file_header;
 mod encryption;
+mod encryption_type;
 mod enums;
 mod file;
 mod file_footer;
@@ -39,7 +40,8 @@ mod resource_map_value;
 mod segment_range;
 mod segment_stream;
 
-pub use credential::{UdifCredential, UdifCredentialType};
+pub use credential::UdifCredential;
+pub use encryption_type::UdifEncryptionType;
 pub use enums::UdifCompressionMethod;
 pub use file::UdifFile;
 pub use image::UdifImage;

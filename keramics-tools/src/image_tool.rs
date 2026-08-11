@@ -27,9 +27,9 @@ use keramics_formats::ntfs::NtfsAttribute;
 use keramics_hashes::{DigestHashContext, Md5Context, Sha1Context};
 use keramics_types::Ucs2String;
 use keramics_vfs::{
-    VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder, VfsLocation,
-    VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions, VfsScanner,
-    VfsType, new_os_vfs_location,
+    VfsCredentialStore, VfsDataFork, VfsFileEntry, VfsFileSystemReference, VfsFileType, VfsFinder,
+    VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions,
+    VfsScanner, VfsType, new_os_vfs_location,
 };
 
 mod bodyfile;
@@ -886,6 +886,20 @@ fn main() -> ExitCode {
     }
     .make_current();
 
+    let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+
+    for password in arguments.password.iter() {
+        match vfs_credential_store.add_passphrase(password.as_bytes()) {
+            Ok(_) => {}
+            Err(error) => {
+                println!(
+                    "Unable to add passphrase to credential store with error:\n{}",
+                    error
+                );
+                return ExitCode::FAILURE;
+            }
+        }
+    }
     let mut image_tool: ImageTool = ImageTool::new(arguments.stop_on_error);
 
     match arguments.command {
@@ -901,9 +915,8 @@ fn main() -> ExitCode {
             }
         }
         Some(Commands::Hash) => {
-            // TODO: bundle all credentials into 1 credential store argument.
             let storage_media_image: StorageMediaImage =
-                match StorageMediaImage::open(&arguments.source, &arguments.password) {
+                match StorageMediaImage::open(&arguments.source) {
                     Ok(storage_media_image) => storage_media_image,
                     Err(error) => {
                         println!(

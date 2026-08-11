@@ -17,6 +17,8 @@ use keramics_encryption::{
     Pkcs7Context,
 };
 
+use super::encryption_type::UdifEncryptionType;
+
 /// Universal Disk Image Format (UDIF) encryption context.
 pub enum UdifEncryptionContext {
     Aes(AesContext),
@@ -133,12 +135,11 @@ impl UdifEncryption {
 
     /// Retrieve an encryption context.
     pub fn get_encryption_context(
-        encryption_method: u32,
-        encryption_mode: u32,
+        encryption_type: &UdifEncryptionType,
         key: &[u8],
     ) -> Result<Option<UdifEncryptionContext>, ErrorTrace> {
-        match encryption_method {
-            0x00000011 => match encryption_mode {
+        match encryption_type.method {
+            0x00000011 => match encryption_type.mode {
                 5 | 6 => {
                     let mut context: Des3Context = Des3Context::new();
 
@@ -156,7 +157,7 @@ impl UdifEncryption {
                 }
                 _ => Ok(None),
             },
-            0x80000001 => match encryption_mode {
+            0x80000001 => match encryption_type.mode {
                 5 | 6 => {
                     let mut context: AesContext = AesContext::new();
 

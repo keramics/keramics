@@ -14,9 +14,11 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::ErrorTrace;
-use keramics_formats::udif::UdifImage;
+use keramics_formats::udif::{UdifCredential, UdifImage};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
 
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
 use crate::types::VfsFileSystemReference;
@@ -206,6 +208,26 @@ impl UdifFileSystem {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open UDIF image");
                 return Err(error);
+            }
+        }
+        if image.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match image.unlock(&udif_credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Failed to unlock UDIF image");
+                    return Err(error);
+                }
             }
         }
         Ok(())

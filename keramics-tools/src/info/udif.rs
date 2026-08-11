@@ -16,9 +16,11 @@ use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
 use keramics_formats::udif::{
-    UdifCompressionMethod, UdifCredential, UdifCredentialType, UdifImage,
+    UdifCompressionMethod, UdifCredential, UdifEncryptionType, UdifImage,
 };
 use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_types::Uuid;
+use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 use crate::formatters::ByteSize;
 
@@ -27,11 +29,17 @@ struct UdifImageInfo {
     /// Value to indicate the (encrypted) image is locked.
     pub is_locked: bool,
 
+    /// Segment set identifier.
+    pub segment_set_identifier: Uuid,
+
+    /// Number of segments.
+    pub number_of_segments: u32,
+
     /// Compression method.
     pub compression_method: UdifCompressionMethod,
 
-    /// Encryption method.
-    pub encryption_method: u32,
+    /// Encryption type.
+    pub encryption_type: Option<UdifEncryptionType>,
 
     /// Media size.
     pub media_size: Option<u64>,
@@ -54,8 +62,10 @@ impl UdifImageInfo {
     fn new() -> Self {
         Self {
             is_locked: false,
+            segment_set_identifier: Uuid::new(),
+            number_of_segments: 0,
             compression_method: UdifCompressionMethod::None,
-            encryption_method: 0,
+            encryption_type: None,
             media_size: None,
             bytes_per_sector: 0,
         }
@@ -72,26 +82,46 @@ impl UdifImageInfo {
 impl fmt::Display for UdifImageInfo {
     /// Formats file information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        let locked_value_string: String = String::from("N/A locked");
+        let locked_value_string: &str = "N/A (locked)";
+        let not_set_value_string: &str = "N/A (not set)";
+        let mut value_string: String;
 
         writeln!(formatter, "Universal Disk Image Format (UDIF) information:")?;
 
+        let segment_set_identifier_string: &str = if self.is_locked {
+            locked_value_string
+        } else if self.segment_set_identifier.is_nil() {
+            not_set_value_string
+        } else {
+            value_string = format!("{}", self.segment_set_identifier);
+            value_string.as_str()
+        };
+        writeln!(
+            formatter,
+            "    Segment set identifier\t\t\t: {}",
+            segment_set_identifier_string
+        )?;
+        writeln!(
+            formatter,
+            "    Number of segments\t\t\t\t: {}",
+            self.number_of_segments
+        )?;
         // TODO: print (segment) set identifier
-        if self.encryption_method != 0 {
+        if let Some(encryption_type) = &self.encryption_type {
             writeln!(formatter, "    Encryption information:")?;
             writeln!(
                 formatter,
-                "        Encryption method\t\t\t: 0x{:08x}",
-                self.encryption_method
+                "        Encryption method\t\t\t: {}",
+                encryption_type
             )?;
             // TODO: print human readable encryption method
-            // TODO: print password protectors
+            // TODO: print key protectors
             // TODO: print identifier
         }
         writeln!(formatter, "    Compression information:")?;
 
         let compression_method_string: &str = if self.is_locked {
-            locked_value_string.as_str()
+            locked_value_string
         } else {
             self.get_compression_method_string()
         };
@@ -103,18 +133,17 @@ impl fmt::Display for UdifImageInfo {
         writeln!(formatter, "    Media information:")?;
         // TODO: print identifier
 
-        let byte_value_string: String;
         let media_size_string: &str = match self.media_size {
             Some(media_size) => {
                 let byte_size: ByteSize = ByteSize::new(media_size, 1024);
-                byte_value_string = format!("{}", byte_size);
-                byte_value_string.as_str()
+                value_string = format!("{}", byte_size);
+                value_string.as_str()
             }
             None => {
                 if self.is_locked {
-                    locked_value_string.as_str()
+                    locked_value_string
                 } else {
-                    "N/A"
+                    not_set_value_string
                 }
             }
         };
@@ -142,8 +171,10 @@ impl UdifInfo {
         let mut image_information: UdifImageInfo = UdifImageInfo::new();
 
         image_information.is_locked = udif_image.is_locked();
+        image_information.segment_set_identifier = udif_image.get_segment_set_identifier().clone();
+        image_information.number_of_segments = udif_image.get_number_of_segments();
         image_information.compression_method = udif_image.get_compression_method().clone();
-        image_information.encryption_method = udif_image.get_encryption_method();
+        image_information.encryption_type = udif_image.get_encryption_type().cloned();
         image_information.media_size = udif_image.get_media_size();
         image_information.bytes_per_sector = udif_image.get_bytes_per_sector();
 
@@ -186,7 +217,7 @@ impl UdifInfo {
     }
 
     /// Prints information about an image or file.
-    pub fn print(path_buf: &PathBuf, passwords: &Vec<String>) -> Result<(), ErrorTrace> {
+    pub fn print(path_buf: &PathBuf) -> Result<(), ErrorTrace> {
         // TODO: fallback to file if image open fails
 
         let mut udif_image: UdifImage = match Self::open_image(path_buf) {
@@ -197,15 +228,18 @@ impl UdifInfo {
             }
         };
         if udif_image.is_locked() {
-            let mut credentials: Vec<UdifCredential> = Vec::new();
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut udif_credentials: Vec<UdifCredential> = Vec::new();
 
-            for password in passwords.iter() {
-                credentials.push(UdifCredential::new(
-                    UdifCredentialType::Passphrase,
-                    password.as_bytes(),
-                ));
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        udif_credentials.push(UdifCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
             }
-            match udif_image.unlock(&credentials) {
+            match udif_image.unlock(&udif_credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to unlock image");
@@ -234,6 +268,8 @@ mod tests {
         let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Universal Disk Image Format (UDIF) information:\n",
+            "    Segment set identifier\t\t\t: N/A (not set)\n",
+            "    Number of segments\t\t\t\t: 1\n",
             "    Compression information:\n",
             "        Compression method\t\t\t: zlib\n",
             "    Media information:\n",
@@ -252,8 +288,14 @@ mod tests {
         let udif_image: UdifImage = UdifInfo::open_image(&path_buf)?;
         let test_struct: UdifImageInfo = UdifInfo::get_image_information(&udif_image);
 
+        assert_eq!(test_struct.is_locked, false);
+        assert_eq!(
+            test_struct.segment_set_identifier.to_string(),
+            "00000000-0000-0000-0000-000000000000"
+        );
+        assert_eq!(test_struct.number_of_segments, 1);
         assert_eq!(test_struct.compression_method, UdifCompressionMethod::Zlib);
-        assert_eq!(test_struct.encryption_method, 0);
+        assert_eq!(test_struct.encryption_type, None);
         assert_eq!(test_struct.media_size, Some(1964032));
         assert_eq!(test_struct.bytes_per_sector, 512);
 

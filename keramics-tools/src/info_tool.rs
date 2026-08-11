@@ -23,6 +23,7 @@ use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
+use keramics_vfs::VfsCredentialStore;
 
 mod enums;
 mod formatters;
@@ -158,13 +159,9 @@ impl InfoTool {
     }
 
     /// Retrieves a data stream.
-    pub fn get_data_stream(
-        &self,
-        path: &PathBuf,
-        passwords: &Vec<String>,
-    ) -> Result<DataStreamReference, ErrorTrace> {
+    pub fn get_data_stream(&self, path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
         let data_stream: DataStreamReference = if self.image_mode {
-            match StorageMediaImage::open(path, passwords) {
+            match StorageMediaImage::open(path) {
                 Ok(storage_media_image) => storage_media_image.get_data_stream(),
                 Err(error) => {
                     return Err(keramics_core::error_trace_new_with_error!(
@@ -339,17 +336,29 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let info_tool: InfoTool = InfoTool::new(&arguments.encoding, arguments.image, arguments.offset);
+    let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
-    // TODO: bundle all credentials into 1 credential store argument.
-    let data_stream: DataStreamReference =
-        match info_tool.get_data_stream(&arguments.source, &arguments.password) {
-            Ok(data_stream) => data_stream,
+    for password in arguments.password.iter() {
+        match vfs_credential_store.add_passphrase(password.as_bytes()) {
+            Ok(_) => {}
             Err(error) => {
-                println!("Unable to open data stream with error:\n{}", error);
+                println!(
+                    "Unable to add passphrase to credential store with error:\n{}",
+                    error
+                );
                 return ExitCode::FAILURE;
             }
-        };
+        }
+    }
+    let info_tool: InfoTool = InfoTool::new(&arguments.encoding, arguments.image, arguments.offset);
+
+    let data_stream: DataStreamReference = match info_tool.get_data_stream(&arguments.source) {
+        Ok(data_stream) => data_stream,
+        Err(error) => {
+            println!("Unable to open data stream with error:\n{}", error);
+            return ExitCode::FAILURE;
+        }
+    };
     let format_identifier: FormatIdentifier = if !arguments.image
         && arguments.source.is_dir()
         && arguments.source.extension() == Some("sparsebundle".as_ref())
@@ -449,7 +458,7 @@ fn main() -> ExitCode {
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
             // TODO: bundle all credentials into 1 credential store argument.
-            FormatIdentifier::Udif => UdifInfo::print(&arguments.source, &arguments.password),
+            FormatIdentifier::Udif => UdifInfo::print(&arguments.source),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             // TODO: add support for VHDX image.
