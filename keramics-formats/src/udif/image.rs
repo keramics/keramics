@@ -27,6 +27,7 @@ use crate::path_component::PathComponent;
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table_reader::UdifBlockTableReader;
 use super::credential::UdifCredential;
+use super::encryption_type::UdifEncryptionType;
 use super::enums::UdifCompressionMethod;
 use super::file::UdifFile;
 use super::segment_stream::UdifSegmentStream;
@@ -37,7 +38,10 @@ pub struct UdifImage {
     segment_stream: Arc<RwLock<UdifSegmentStream>>,
 
     /// Segment file set identifier.
-    set_identifier: Uuid,
+    segment_set_identifier: Uuid,
+
+    /// Number of segments.
+    number_of_segments: u32,
 
     /// Bytes per sector.
     bytes_per_sector: u16,
@@ -57,8 +61,8 @@ pub struct UdifImage {
     /// Value to indicate the (encrypted) image is locked.
     is_locked: bool,
 
-    /// Encryption method.
-    encryption_method: u32,
+    /// Encryption type.
+    encryption_type: Option<UdifEncryptionType>,
 
     /// The current offset.
     current_offset: u64,
@@ -72,14 +76,15 @@ impl UdifImage {
     pub fn new() -> Self {
         Self {
             segment_stream: Arc::new(RwLock::new(UdifSegmentStream::new())),
-            set_identifier: Uuid::new(),
+            segment_set_identifier: Uuid::new(),
+            number_of_segments: 0,
             bytes_per_sector: 0,
             has_block_ranges: false,
             block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
             block_cache: LruCache::new(64),
             compression_method: UdifCompressionMethod::None,
             is_locked: false,
-            encryption_method: 0,
+            encryption_type: None,
             current_offset: 0,
             media_size: 0,
         }
@@ -95,9 +100,9 @@ impl UdifImage {
         &self.compression_method
     }
 
-    /// Retrieves the encryption method.
-    pub fn get_encryption_method(&self) -> u32 {
-        self.encryption_method
+    /// Retrieves the encryption type.
+    pub fn get_encryption_type(&self) -> Option<&UdifEncryptionType> {
+        self.encryption_type.as_ref()
     }
 
     /// Retrieves the media size.
@@ -109,9 +114,14 @@ impl UdifImage {
         }
     }
 
-    /// Retrieves the (segment) set identifier.
-    pub fn get_set_identifier(&self) -> &Uuid {
-        &self.set_identifier
+    /// Retrieves the number of segments.
+    pub fn get_number_of_segments(&self) -> u32 {
+        self.number_of_segments
+    }
+
+    /// Retrieves the segment set identifier.
+    pub fn get_segment_set_identifier(&self) -> &Uuid {
+        &self.segment_set_identifier
     }
 
     /// Determines if the (encrypted) image is locked.
@@ -138,7 +148,8 @@ impl UdifImage {
                     }
                 }
                 self.bytes_per_sector = 512;
-                self.set_identifier = segment_stream.set_identifier.clone();
+                self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
+                self.number_of_segments = segment_stream.number_of_segments;
 
                 let mut block_table_reader: UdifBlockTableReader =
                     match segment_stream.read_metadata(self.bytes_per_sector) {
@@ -165,9 +176,10 @@ impl UdifImage {
                 self.media_size = block_table_reader.get_media_size();
                 self.compression_method = block_table_reader.get_compression_method();
                 self.is_locked = segment_stream.is_locked;
-                self.encryption_method = segment_stream.encryption_method;
 
-                if !self.is_locked {
+                if self.is_locked {
+                    self.encryption_type = Some(segment_stream.encryption_type.clone());
+                } else {
                     if self.media_size
                         > (segment_stream.number_of_sectors * (self.bytes_per_sector as u64))
                     {
@@ -412,7 +424,8 @@ impl UdifImage {
             let mut block_table_reader: UdifBlockTableReader =
                 UdifBlockTableReader::new(self.bytes_per_sector, segment_file.data_fork_size);
 
-            self.set_identifier = segment_file.segment_set_identifier.clone();
+            self.segment_set_identifier = segment_file.segment_set_identifier.clone();
+            self.number_of_segments = segment_file.number_of_segments;
 
             if segment_file.plist_size == 0 && segment_file.resource_fork_size == 0 {
                 block_table_reader.media_offset =
@@ -582,6 +595,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for get_encryption_type
+
     #[test]
     fn test_get_media_size() -> Result<(), ErrorTrace> {
         let image: UdifImage = get_image()?;
@@ -591,6 +606,9 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for get_number_of_segments
+    // TODO: add tests for get_segment_set_identifier
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {

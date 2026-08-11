@@ -24,7 +24,9 @@ use crate::path_component::PathComponent;
 
 use super::block_table_reader::UdifBlockTableReader;
 use super::credential::{UdifCredential, UdifCredentialType};
+use super::encrypted_file_footer::UdifEncryptedFileFooter;
 use super::encryption::{UdifEncryption, UdifEncryptionContext, UdifHmacContext};
+use super::encryption_type::UdifEncryptionType;
 use super::enums::UdifKeyProtectorType;
 use super::file::UdifFile;
 use super::key_protector::UdifKeyProtector;
@@ -38,7 +40,10 @@ pub struct UdifSegmentStream {
     file_resolver: FileResolverReference,
 
     /// Segment file set identifier.
-    pub set_identifier: Uuid,
+    pub segment_set_identifier: Uuid,
+
+    /// Number of segments.
+    pub number_of_segments: u32,
 
     /// Name.
     name: String,
@@ -61,8 +66,8 @@ pub struct UdifSegmentStream {
     /// Value to indicate the (encrypted) image is locked.
     pub is_locked: bool,
 
-    /// Encryption method.
-    pub encryption_method: u32,
+    /// Encryption type.
+    pub encryption_type: UdifEncryptionType,
 
     /// Key key_protectors.
     key_protectors: Vec<UdifKeyProtector>,
@@ -85,7 +90,8 @@ impl UdifSegmentStream {
     pub(super) fn new() -> Self {
         Self {
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
-            set_identifier: Uuid::new(),
+            segment_set_identifier: Uuid::new(),
+            number_of_segments: 0,
             name: String::new(),
             segment_ranges: Vec::new(),
             segment_file_cache: LruCache::new(16),
@@ -93,7 +99,7 @@ impl UdifSegmentStream {
             block_size: 0,
             block_cache: LruCache::new(64),
             is_locked: false,
-            encryption_method: 0,
+            encryption_type: UdifEncryptionType::new(),
             key_protectors: Vec::new(),
             encryption_context: UdifEncryptionContext::None,
             hmac_context: UdifHmacContext::None,
@@ -222,13 +228,13 @@ impl UdifSegmentStream {
             }
         }
         self.number_of_sectors = segment_file.number_of_sectors;
+        self.number_of_segments = segment_file.number_of_segments;
 
         let segment_number: u32 = segment_file.segment_number;
-        let number_of_segments: u32 = segment_file.number_of_segments;
 
-        if (number_of_segments == 0 && segment_number != 0)
-            || (number_of_segments != 0 && segment_number != 1)
-        {
+        if self.number_of_segments == 0 && segment_number == 0 {
+            self.number_of_segments = 1
+        } else if self.number_of_segments != 0 && segment_number != 1 {
             return Err(keramics_core::error_trace_new!(
                 "Unsupported segment file: 1 - segment number value out of bounds"
             ));
@@ -253,16 +259,16 @@ impl UdifSegmentStream {
         );
         self.segment_ranges.push(segment_range);
 
-        self.set_identifier = segment_file.segment_set_identifier.clone();
+        self.segment_set_identifier = segment_file.segment_set_identifier.clone();
         self.block_size = segment_file.block_size;
         self.is_locked = segment_file.is_locked;
-        self.encryption_method = segment_file.encryption_method;
+        self.encryption_type = segment_file.encryption_type.clone();
         self.key_protectors = segment_file.key_protectors;
         segment_file.key_protectors = Vec::new();
 
         self.segment_file_cache.insert(1, segment_file);
 
-        for segment_number in 2..=number_of_segments {
+        for segment_number in 2..=self.number_of_segments {
             let segment_file_name: String = Self::get_segment_file_name(&self.name, segment_number);
             let path_components: [PathComponent; 1] = [PathComponent::from(&segment_file_name)];
 
@@ -301,7 +307,7 @@ impl UdifSegmentStream {
                     segment_number
                 )));
             }
-            if &segment_file.segment_set_identifier != &self.set_identifier {
+            if &segment_file.segment_set_identifier != &self.segment_set_identifier {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported segment file: {} - segment set identifier mismatch",
                     segment_number
@@ -695,37 +701,88 @@ impl UdifSegmentStream {
                     )));
                 }
             };
-        if first_segment_file.format_version == 1 {
-            // TODO: read values from encrypted footer
-            todo!();
-        } else if first_segment_file.format_version == 2 {
-            for key_protector in self.key_protectors.iter() {
-                // Note that 65536 is an arbitrary chosen limit.
-                if key_protector.size > 65536 {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported key protector size: {} value out of bounds",
-                        key_protector.size
-                    )));
-                }
-                let mut data: Vec<u8> = vec![0; key_protector.size as usize];
+        for key_protector in self.key_protectors.iter() {
+            // Note that 65536 is an arbitrary chosen limit.
+            if key_protector.size > 65536 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported key protector size: {} value out of bounds",
+                    key_protector.size
+                )));
+            }
+            let mut data: Vec<u8> = vec![0; key_protector.size as usize];
 
-                match first_segment_file
-                    .read_exact_at_position(&mut data, SeekFrom::Start(key_protector.offset))
-                {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to read from segment file: {} at offset: {} (0x{:08x})",
-                                segment_number, key_protector.offset, key_protector.offset
-                            )
-                        );
-                        return Err(error);
-                    }
+            match first_segment_file
+                .read_exact_at_position(&mut data, SeekFrom::Start(key_protector.offset))
+            {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read from segment file: {} at offset: {} (0x{:08x})",
+                            segment_number, key_protector.offset, key_protector.offset
+                        )
+                    );
+                    return Err(error);
                 }
-                match key_protector.protector_type {
-                    UdifKeyProtectorType::PassphraseWrappedKey => {
+            }
+            match key_protector.protector_type {
+                UdifKeyProtectorType::PassphraseWrappedKey => {
+                    let mut block_key: Vec<u8> = Vec::new();
+                    let mut hmac_key: Vec<u8> = Vec::new();
+
+                    if first_segment_file.format_version == 1 {
+                        keramics_core::debug_trace_data_and_structure!(
+                            "UdifEncryptedFileFooter",
+                            key_protector.offset,
+                            &data,
+                            key_protector.size,
+                            UdifEncryptedFileFooter::debug_read_data(&data)
+                        );
+                        let mut file_footer: UdifEncryptedFileFooter =
+                            UdifEncryptedFileFooter::new();
+
+                        match file_footer.read_data(&data) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to read file footer"
+                                );
+                                return Err(error);
+                            }
+                        }
+                        for credential in credentials.iter() {
+                            if credential.credential_type == UdifCredentialType::Passphrase {
+                                match file_footer.unlock(credential) {
+                                    Ok(result) => {
+                                        if result {
+                                            let block_key_size: usize =
+                                                first_segment_file.encryption_type.key_size;
+                                            block_key = file_footer.block_key_data
+                                                [0..block_key_size]
+                                                .to_vec();
+
+                                            let hmac_key_size: usize =
+                                                first_segment_file.hmac_key_size;
+                                            hmac_key = file_footer.hmac_key_data[0..hmac_key_size]
+                                                .to_vec();
+
+                                            self.is_locked = false;
+                                            break;
+                                        }
+                                    }
+                                    Err(mut error) => {
+                                        keramics_core::error_trace_add_frame!(
+                                            error,
+                                            "Unable to unlock file footer"
+                                        );
+                                        return Err(error);
+                                    }
+                                }
+                            }
+                        }
+                    } else if first_segment_file.format_version == 2 {
                         keramics_core::debug_trace_data_and_structure!(
                             "UdifPasspraseWrappedKey",
                             key_protector.offset,
@@ -748,8 +805,26 @@ impl UdifSegmentStream {
                         }
                         for credential in credentials.iter() {
                             if credential.credential_type == UdifCredentialType::Passphrase {
-                                let result: bool = match wrapped_key.unlock(credential) {
-                                    Ok(result) => result,
+                                match wrapped_key.unlock(credential) {
+                                    Ok(result) => {
+                                        if result {
+                                            let block_key_size: usize =
+                                                first_segment_file.encryption_type.key_size;
+                                            block_key =
+                                                wrapped_key.key_data[0..block_key_size].to_vec();
+
+                                            let hmac_key_size: usize =
+                                                first_segment_file.hmac_key_size;
+                                            let data_end_offset: usize =
+                                                block_key_size + hmac_key_size;
+                                            hmac_key = wrapped_key.key_data
+                                                [block_key_size..data_end_offset]
+                                                .to_vec();
+
+                                            self.is_locked = false;
+                                            break;
+                                        }
+                                    }
                                     Err(mut error) => {
                                         keramics_core::error_trace_add_frame!(
                                             error,
@@ -757,83 +832,71 @@ impl UdifSegmentStream {
                                         );
                                         return Err(error);
                                     }
-                                };
-                                if result {
-                                    self.is_locked = false;
                                 }
                             }
                         }
-                        if !self.is_locked {
-                            let master_key_size: usize = first_segment_file.key_size;
-                            let master_key: &[u8] = &wrapped_key.data[0..master_key_size];
-
-                            let hmac_key_size: usize = first_segment_file.hmac_key_size;
-                            let data_end_offset: usize = master_key_size + hmac_key_size;
-                            let hmac_key: &[u8] =
-                                &wrapped_key.data[master_key_size..data_end_offset];
-
-                            keramics_core::debug_trace_data!(
-                                "UdifMasterKey",
-                                0,
-                                &master_key,
-                                master_key.len(),
-                            );
-                            keramics_core::debug_trace_data!(
-                                "UdifHmacKey",
-                                0,
-                                &hmac_key,
-                                hmac_key.len(),
-                            );
-                            self.encryption_context = match UdifEncryption::get_encryption_context(
-                                first_segment_file.encryption_method,
-                                first_segment_file.encryption_mode,
-                                &master_key,
-                            ) {
-                                Ok(Some(context)) => context,
-                                Ok(None) => {
-                                    return Err(keramics_core::error_trace_new!(format!(
-                                        "Unsupported encryption method: 0x{:08x} with mode: {}",
-                                        first_segment_file.encryption_method,
-                                        first_segment_file.encryption_mode
-                                    )));
-                                }
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to retrieve encryption context for method: {} with mode: {}",
-                                            first_segment_file.encryption_method,
-                                            first_segment_file.encryption_mode,
-                                        )
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                            self.hmac_context = match UdifEncryption::get_hmac_context(
-                                first_segment_file.hmac_method,
-                                &hmac_key,
-                            ) {
-                                Ok(Some(context)) => context,
-                                Ok(None) => {
-                                    return Err(keramics_core::error_trace_new!(format!(
-                                        "Unsupported HMAC method: 0x{:08x}",
-                                        first_segment_file.hmac_method
-                                    )));
-                                }
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to retrieve HMAC context for method: {}",
-                                            first_segment_file.hmac_method
-                                        )
-                                    );
-                                    return Err(error);
-                                }
-                            };
-                        }
                     }
-                    UdifKeyProtectorType::PublicKeyWrappedKey => {
+                    if !self.is_locked {
+                        keramics_core::debug_trace_data!(
+                            "UdifBlockKey",
+                            0,
+                            &block_key,
+                            block_key.len(),
+                        );
+                        keramics_core::debug_trace_data!(
+                            "UdifBlockHmacKey",
+                            0,
+                            &hmac_key,
+                            hmac_key.len(),
+                        );
+                        self.encryption_context = match UdifEncryption::get_encryption_context(
+                            &first_segment_file.encryption_type,
+                            &block_key,
+                        ) {
+                            Ok(Some(context)) => context,
+                            Ok(None) => {
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Unsupported encryption type: {}",
+                                    first_segment_file.encryption_type
+                                )));
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve encryption type: {}",
+                                        first_segment_file.encryption_type
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        };
+                        self.hmac_context = match UdifEncryption::get_hmac_context(
+                            first_segment_file.hmac_method,
+                            &hmac_key,
+                        ) {
+                            Ok(Some(context)) => context,
+                            Ok(None) => {
+                                return Err(keramics_core::error_trace_new!(format!(
+                                    "Unsupported HMAC method: {}",
+                                    first_segment_file.hmac_method
+                                )));
+                            }
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve HMAC context for method: {}",
+                                        first_segment_file.hmac_method
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        };
+                    }
+                }
+                UdifKeyProtectorType::PublicKeyWrappedKey => {
+                    if first_segment_file.format_version == 2 {
                         keramics_core::debug_trace_data_and_structure!(
                             "UdifPublicKeyrappedKey",
                             key_protector.offset,
@@ -855,7 +918,9 @@ impl UdifSegmentStream {
                             }
                         }
                     }
-                    _ => {
+                }
+                _ => {
+                    if first_segment_file.format_version == 2 {
                         keramics_core::debug_trace_data!(
                             "UdifEncryptedKeyProtector",
                             key_protector.offset,
@@ -892,7 +957,7 @@ impl DataStream for UdifSegmentStream {
         if (read_size as u64) > remaining_size {
             read_size = remaining_size as usize;
         }
-        let read_count: usize = if self.encryption_method == 0 {
+        let read_count: usize = if self.encryption_type.mode == 0 {
             match self.read_data_from_segments(&mut buf[..read_size]) {
                 Ok(read_count) => read_count,
                 Err(mut error) => {

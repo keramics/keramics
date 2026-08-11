@@ -31,7 +31,7 @@ Known UDIF image types are:
 | ULFO | LZFSE compressed UDIF |
 | ULMO | LZMA compressed UDIF |
 
-An UDIF image can also be encrypted.
+UDIF images can be encrypted, where each encrypted segment file has its own key protectors.
 
 ### Terminology
 
@@ -62,12 +62,22 @@ A compressed UDIF segment file consist of:
 
 #### Encrypted image format version 1
 
+Encrypted image format version 1 supports the following key protectors:
+
+* Passphrase
+
 A version 1 encrypted segment file consist of:
 
 * Data fork, containing encyrypted UDIF data
 * [Encrypted file footer](#encypted_file_footer) at the end of the file
 
 #### Encrypted image format version 2
+
+Encrypted image format version 2 supports the following key protectors:
+
+* Passphrase
+* Public key
+* Unknown (keybag)
 
 A version 2 encrypted segment file consist of:
 
@@ -446,25 +456,25 @@ The encrypted file footer is 1276 bytes in size and consists of:
 | 32 | 4 | | Key protector key size, in number of bits |
 | 36 | 4 | | Key protector initialization vector size |
 | 40 | 4 | | [Key derivation method](#algorithm_identifiers) |
-| 44 | 4 | | Key derivation number of iterations |
-| 48 | 4 | | Unknown |
+| 44 | 4 | | Unknown |
+| 48 | 4 | | Key derivation number of iterations |
 | 52 | 4 | | Key derivation salt size, in number of bytes |
 | 56 | 32 | | Key derivation salt |
 | 88 | 4 | | Block initialization vector size |
 | 92 | 4 | | Block [encryption mode](#encryption_modes) |
-| 96 | 4 | | Data (or block) [encryption method](#algorithm_identifiers) |
+| 96 | 4 | | Block [encryption method](#algorithm_identifiers) |
 | 100 | 4 | | Block key size, in number of bits |
-| 104 | 32 | | Block initialization vector |
-| 136 | 4 | | Wrapped AES key size |
-| 140 | 256 | | Wrapped AES key |
+| 104 | 32 | | Unknown (Wrapped block (or master) data encryption key (DEK) initialization vector?) |
+| 136 | 4 | | Wrapped block (or master) data encryption key (DEK) size |
+| 140 | 256 | | Wrapped block (or master) data encryption key (DEK) |
 | 396 | 4 | | [HMAC method](#algorithm_identifiers) |
-| 400 | 4 | | Unknown (HMAC number of bits?) |
-| 404 | 32 | | HMAC initialization vector |
-| 436 | 4 | | Wrapped HMAC key size |
-| 440 | 256 | | Wrapped HMAC key |
+| 400 | 4 | | HMAC key size, in number of bits |
+| 404 | 32 | | Unknown (Wrapped block HMAC initialization vector?) |
+| 436 | 4 | | Wrapped block HMAC key size |
+| 440 | 256 | | Wrapped block HMAC key |
 | 696 | 4 | | Integrity [encryption method](#algorithm_identifiers) |
-| 700 | 4 | | Unknown (Integrity number of bits?) |
-| 704 | 32 | | Integrity initialization vector |
+| 700 | 4 | | Integrity key size, in number of bits |
+| 704 | 32 | | Unknown (Wrapped integrity key initialization vector?) |
 | 736 | 4 | | Wrapped integrity key size |
 | 740 | 256 | | Wrapped integrity key |
 | 996 | 4 | | Unknown (data size) |
@@ -473,6 +483,39 @@ The encrypted file footer is 1276 bytes in size and consists of:
 | 1260 | 4 | | Data fork size, in number of bytes |
 | 1264 | 4 | 1 | Encrypted file format version |
 | 1268 | 8 | "cdsaencr" | Signature |
+
+Key data can be obtained from the wrapped key data using the following approach (presumably based
+on RFC 3537):
+
+* Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
+  determine the key encryption key (KEK) based on a passphrase.
+* Pad the initialization vector [0x4a, 0xdd, 0xa2, 0x2c, 0x79, 0xe8, 0x21, 0x05] with 0-byte values
+  if necessesary, e.g. if initialization vector is 8 bytes but the encryption method (AES) requires
+  an initialization vector of 16 bytes.
+* Decrypt the wrapped key data using the encryption method and mode, e.g. DES3-CBC, with the number
+  of bits of the KEK (defined by encryption key size) and the initialization vector if applicable.
+* Remove the padding, specified by the padding type.
+* Reverse the resulting intermediate key data.
+
+The intermediate key data is of variable size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 8 | | Initialization vector |
+| 8 | ... | | Wrapped key data |
+
+* Pad the initialization vector of the intermediate key data with 0-byte values if necessesary.
+* Decrypt the wrapped key data (of the intermediate key data) using the encryption method and mode,
+  e.g. DES3-CBC, with the number of bits of the KEK (defined by encryption key size) and the
+  initialization vector (of the intermediate key data) if applicable.
+* Remove the padding, specified by the padding type.
+
+The decypted key data is of variable size and consists of:
+
+| Offset | Size | Value | Description |
+| --- | --- | --- | --- |
+| 0 | 4 | 0 | Signature |
+| 4 | ... | | Key data |
 
 ### Encrypted file header {#encypted_file_header}
 
@@ -484,10 +527,10 @@ The encrypted file header is of variable size and consists of:
 | 8 | 4 | 2 | Encrypted file format version |
 | 12 | 4 | | Block initialization vector size, in number of bytes |
 | 16 | 4 | | Block [encryption mode](#encryption_modes) |
-| 20 | 4 | | Data (or block) [encryption method](#algorithm_identifiers) |
+| 20 | 4 | | Block [encryption method](#algorithm_identifiers) |
 | 24 | 4 | | Block key size, in number of bits |
-| 28 | 4 | | Initialization vector [HMAC method](#algorithm_identifiers) |
-| 32 | 4 | | Initialization vector HMAC key size, in number of bits |
+| 28 | 4 | | [HMAC method](#algorithm_identifiers) |
+| 32 | 4 | | HMAC key size, in number of bits |
 | 36 | 16 | | Identifier (UUID), used in Mac OS keychain as account identifier |
 | 52 | 4 | | Block size, in number of bytes |
 | 56 | 8 | | Data fork size, in number of bytes |
@@ -529,26 +572,26 @@ The passphrase wrapped key is 616 bytes in size and consists of:
 | 88 | 4 | | [Encryption method](#algorithm_identifiers) |
 | 92 | 4 | | [Padding type](#padding_types) |
 | 96 | 4 | | [Encryption mode](#encryption_modes) |
-| 100 | 4 | | Encrypted data size |
-| 104 | 64 | | Encrypted data |
+| 100 | 4 | | Wrapped key data size |
+| 104 | 64 | | Wrapped key data |
 | 168 | 448 | | Unknown (empty values) |
 
-The encrypted data can be decrypted using the following approach:
+Key data can be obtained from the wrapped key data using the following approach:
 
 * Use the specified key derivation method, e.g. PDBKDF2, with salt and number of iterations to
   determine the key encryption key (KEK) based on a passphrase.
 * Pad the initialization vector with 0-byte values if necessesary, e.g. if initialization vector
   is 8 bytes but the encryption method (AES) requires an initialization vector of 16 bytes.
-* Decrypt the encrypted data using the encryption method and mode, e.g. AES-CBC, with the number
+* Decrypt the wrapped key data using the encryption method and mode, e.g. DES3-CBC, with the number
   of bits of the KEK (defined by encryption key size) and the initialization vector if applicable.
 * Remove the padding, specified by the padding type.
 
-The decypted data is of variable size and consists of:
+The decypted key data is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | ... | | Master data encryption key (DEK) |
-| ... | ... | | HMAC key |
+| 0 | ... | | Block (or master) data encryption key (DEK) |
+| ... | ... | | Block HMAC key |
 | ... | 5 | "CKIE\x00" | Signature |
 
 #### Public key wrapped key {#public_key_wrapped_key}
@@ -750,6 +793,17 @@ TODO: complete section
 | 40 | CSSM_ALGMODE_PKCS1_EMSA_V15 | |
 | 41 | CSSM_ALGMODE_ISO_9796 | |
 | 42 | CSSM_ALGMODE_X9_31 | |
+
+### Encrypted block data
+
+The encrypted block data can be decrypted using the following approach:
+
+* Calculate the specified block HMAC, e.g. HMAC-SHA-1, with the block HMAC key and the block number
+  stored as a 32-bit big-endian value. This HMAC is used as the initialization vector for
+  decryption.
+* Decrypt the encrypted data using the block encryption method and mode, e.g. AES-CBC, with the
+  number of bits of the block DEK (defined by the block encryption key size) and the initialization
+  vector if applicable.
 
 ## Format edge cases and corruption scenarios
 

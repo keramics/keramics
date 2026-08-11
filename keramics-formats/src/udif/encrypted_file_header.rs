@@ -16,6 +16,7 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
+use super::encryption_type::UdifEncryptionType;
 use super::key_protector_descriptor::UdifKeyProtectorDescriptor;
 
 #[derive(LayoutMap)]
@@ -28,8 +29,8 @@ use super::key_protector_descriptor::UdifKeyProtectorDescriptor;
         field(name = "block_encryption_mode", data_type = "u32"),
         field(name = "block_encryption_method", data_type = "u32", format = "hex"),
         field(name = "block_key_size", data_type = "u32"),
-        field(name = "initialization_vector_hmac_method", data_type = "u32"),
-        field(name = "initialization_vector_hmac_key_size", data_type = "u32"),
+        field(name = "hmac_method", data_type = "u32"),
+        field(name = "hmac_key_size", data_type = "u32"),
         field(name = "identifier", data_type = "Uuid"),
         field(name = "block_size", data_type = "u32"),
         field(name = "data_fork_size", data_type = "u64"),
@@ -50,14 +51,8 @@ pub struct UdifEncryptedFileHeader {
     /// Initialization vector size.
     pub initialization_vector_size: u32,
 
-    /// Encryption mode.
-    pub encryption_mode: u32,
-
-    /// Encryption method.
-    pub encryption_method: u32,
-
-    /// Key size.
-    pub key_size: u32,
+    /// Encryption type.
+    pub encryption_type: UdifEncryptionType,
 
     /// HMAC method.
     pub hmac_method: u32,
@@ -82,9 +77,7 @@ impl UdifEncryptedFileHeader {
             format_version: 0,
             block_size: 0,
             initialization_vector_size: 0,
-            encryption_mode: 0,
-            encryption_method: 0,
-            key_size: 0,
+            encryption_type: UdifEncryptionType::new(),
             hmac_method: 0,
             hmac_key_size: 0,
             data_fork_size: 0,
@@ -112,9 +105,9 @@ impl UdifEncryptedFileHeader {
             )));
         }
         self.initialization_vector_size = bytes_to_u32_be!(data, 12);
-        self.encryption_mode = bytes_to_u32_be!(data, 16);
-        self.encryption_method = bytes_to_u32_be!(data, 20);
-        self.key_size = bytes_to_u32_be!(data, 24);
+        self.encryption_type.mode = bytes_to_u32_be!(data, 16);
+        self.encryption_type.method = bytes_to_u32_be!(data, 20);
+        self.encryption_type.key_size = (bytes_to_u32_be!(data, 24) / 8) as usize;
         self.hmac_method = bytes_to_u32_be!(data, 28);
         self.hmac_key_size = bytes_to_u32_be!(data, 32);
 
@@ -216,9 +209,9 @@ mod tests {
 
         assert_eq!(test_struct.format_version, 2);
         assert_eq!(test_struct.initialization_vector_size, 16);
-        assert_eq!(test_struct.encryption_mode, 5);
-        assert_eq!(test_struct.encryption_method, 0x80000001);
-        assert_eq!(test_struct.key_size, 128);
+        assert_eq!(test_struct.encryption_type.mode, 5);
+        assert_eq!(test_struct.encryption_type.method, 0x80000001);
+        assert_eq!(test_struct.encryption_type.key_size, 16);
         assert_eq!(test_struct.hmac_method, 91);
         assert_eq!(test_struct.hmac_key_size, 160);
         assert_eq!(test_struct.block_size, 4096);
@@ -268,9 +261,9 @@ mod tests {
 
         assert_eq!(test_struct.format_version, 2);
         assert_eq!(test_struct.initialization_vector_size, 16);
-        assert_eq!(test_struct.encryption_mode, 5);
-        assert_eq!(test_struct.encryption_method, 0x80000001);
-        assert_eq!(test_struct.key_size, 128);
+        assert_eq!(test_struct.encryption_type.mode, 5);
+        assert_eq!(test_struct.encryption_type.method, 0x80000001);
+        assert_eq!(test_struct.encryption_type.key_size, 16);
         assert_eq!(test_struct.hmac_method, 0x0000005b);
         assert_eq!(test_struct.hmac_key_size, 160);
         assert_eq!(test_struct.block_size, 4096);

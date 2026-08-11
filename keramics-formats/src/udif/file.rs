@@ -23,6 +23,7 @@ use super::block_table_reader::UdifBlockTableReader;
 use super::constants::*;
 use super::encrypted_file_footer::UdifEncryptedFileFooter;
 use super::encrypted_file_header::UdifEncryptedFileHeader;
+use super::encryption_type::UdifEncryptionType;
 use super::enums::UdifKeyProtectorType;
 use super::file_footer::UdifFileFooter;
 use super::key_protector::UdifKeyProtector;
@@ -77,14 +78,8 @@ pub struct UdifFile {
     /// Value to indicate the (encrypted) file is locked.
     pub(super) is_locked: bool,
 
-    /// Encryption method.
-    pub(super) encryption_method: u32,
-
-    /// Encryption mode.
-    pub(super) encryption_mode: u32,
-
-    /// Key size.
-    pub(super) key_size: usize,
+    /// Encryption type.
+    pub(super) encryption_type: UdifEncryptionType,
 
     /// Initialization vector size.
     pub(super) initialization_vector_size: usize,
@@ -118,9 +113,7 @@ impl UdifFile {
             plist_size: 0,
             block_size: 0,
             is_locked: false,
-            encryption_method: 0,
-            encryption_mode: 0,
-            key_size: 0,
+            encryption_type: UdifEncryptionType::new(),
             initialization_vector_size: 0,
             hmac_method: 0,
             hmac_key_size: 0,
@@ -173,9 +166,7 @@ impl UdifFile {
             self.data_fork_size = encrypted_file_header.data_fork_size;
             self.block_size = encrypted_file_header.block_size;
             self.is_locked = true;
-            self.encryption_method = encrypted_file_header.encryption_method;
-            self.encryption_mode = encrypted_file_header.encryption_mode;
-            self.key_size = (encrypted_file_header.key_size / 8) as usize;
+            self.encryption_type = encrypted_file_header.encryption_type;
             self.initialization_vector_size =
                 encrypted_file_header.initialization_vector_size as usize;
             self.hmac_method = encrypted_file_header.hmac_method;
@@ -221,13 +212,11 @@ impl UdifFile {
                 self.data_fork_size = encrypted_file_footer.data_fork_size as u64;
                 self.block_size = encrypted_file_footer.block_size;
                 self.is_locked = true;
-                self.encryption_method = encrypted_file_footer.encryption_method;
-                self.encryption_mode = encrypted_file_footer.encryption_mode;
-                self.key_size = (encrypted_file_footer.key_size / 8) as usize;
+                self.encryption_type = encrypted_file_footer.encryption_type;
                 self.initialization_vector_size =
                     encrypted_file_footer.initialization_vector_size as usize;
-                // self.hmac_method = encrypted_file_footer.hmac_method;
-                // self.hmac_key_size = (encrypted_file_footer.hmac_key_size / 8) as usize;
+                self.hmac_method = encrypted_file_footer.hmac_method;
+                self.hmac_key_size = (encrypted_file_footer.hmac_key_size / 8) as usize;
 
                 let key_protector: UdifKeyProtector = UdifKeyProtector::new(
                     UdifKeyProtectorType::PassphraseWrappedKey,
