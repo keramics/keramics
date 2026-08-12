@@ -235,7 +235,7 @@ BASE_IMAGE_FILE="${IMAGE_FILE}.sparsebundle"
 
 IMAGE_FILE="test_data/sparsebundle/hfsplus_aes128"
 
-rm -f ${IMAGE_FILE}.sparsebundle
+rm -rf ${IMAGE_FILE}.sparsebundle
 
 echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDSB -stdinpass -o ${IMAGE_FILE}
 
