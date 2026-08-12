@@ -206,7 +206,7 @@ create_file_entries "/Volumes/hfsplus_test"
 
 detach_image ${IMAGE_FILE}.sparseimage
 
-BASE_IMAGE_FILE=${IMAGE_FILE}
+BASE_IMAGE_FILE="${IMAGE_FILE}.sparseimage"
 
 IMAGE_FILE="test_data/sparseimage/hfsplus_aes128"
 
@@ -249,42 +249,42 @@ detach_image ${IMAGE_FILE}.dmg
 # Create compressed UDIF images
 mkdir -p test_data/udif
 
-BASE_IMAGE_FILE=${IMAGE_FILE}
+BASE_IMAGE_FILE="${IMAGE_FILE}.dmg"
 
 # Create an ADC compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_adc"
 
 rm -f ${IMAGE_FILE}.dmg
 
-hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDCO -o ${IMAGE_FILE}
+hdiutil convert ${BASE_IMAGE_FILE} -format UDCO -o ${IMAGE_FILE}
 
 # Create a bzip2 compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_bzip2"
 
 rm -f ${IMAGE_FILE}.dmg
 
-hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDBZ -o ${IMAGE_FILE}
+hdiutil convert ${BASE_IMAGE_FILE} -format UDBZ -o ${IMAGE_FILE}
 
 # Create a lzfse compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_lzfse"
 
 rm -f ${IMAGE_FILE}.dmg
 
-hdiutil convert ${BASE_IMAGE_FILE}.dmg -format ULFO -o ${IMAGE_FILE}
+hdiutil convert ${BASE_IMAGE_FILE} -format ULFO -o ${IMAGE_FILE}
 
 # Create a lzma compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_lzma"
 
 rm -f ${IMAGE_FILE}.dmg
 
-hdiutil convert ${BASE_IMAGE_FILE}.dmg -format ULMO -o ${IMAGE_FILE}
+hdiutil convert ${BASE_IMAGE_FILE} -format ULMO -o ${IMAGE_FILE}
 
 # Create a zlib compressed UDIF image.
 IMAGE_FILE="test_data/udif/hfsplus_zlib"
 
 rm -f ${IMAGE_FILE}.dmg
 
-hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDZO -o ${IMAGE_FILE}
+hdiutil convert ${BASE_IMAGE_FILE} -format UDZO -o ${IMAGE_FILE}
 
 # Create a zlib compressed UDIF image with a resource fork.
 # Note this works with older versions of hdiutil that support flatten/unflatten.
@@ -293,7 +293,7 @@ hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDZO -o ${IMAGE_FILE}
 #
 # rm -f ${IMAGE_FILE}.dmg
 #
-# hdiutil convert ${BASE_IMAGE_FILE}.dmg -format UDZO -o ${IMAGE_FILE}
+# hdiutil convert ${BASE_IMAGE_FILE} -format UDZO -o ${IMAGE_FILE}
 #
 # hdiutil unflatten test.dmg
 # hdiutil flatten -noxml test.dmg
@@ -303,9 +303,9 @@ IMAGE_FILE="test_data/udif/hfsplus_zlib_aes128"
 
 rm -f ${IMAGE_FILE}.dmg
 
-echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE}.dmg -encryption AES-128 -format UDZO -stdinpass -o ${IMAGE_FILE}
+echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDZO -stdinpass -o ${IMAGE_FILE}
 
-# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE}.dmg -encryption AES-128 -format UDZO -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
+# echo -n KeRaMiCs | hdiutil convert ${BASE_IMAGE_FILE} -encryption AES-128 -format UDZO -stdinpass -tgtimagekey encrypted-encoding-version=1 -o ${IMAGE_FILE}
 
 # Create an uncompressed segmented UDIF image.
 #
