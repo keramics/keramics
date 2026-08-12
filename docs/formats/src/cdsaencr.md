@@ -343,63 +343,63 @@ TODO: complete section
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 0 | CSSM_PADDING_NONE | No padding |
-| 1 | CSSM_PADDING_CUSTOM | |
+| 1 | CSSM_PADDING_CUSTOM | Unknown |
 | 2 | CSSM_PADDING_ZERO | Pad with 0 |
 | 3 | CSSM_PADDING_ONE | Pad with 1 |
-| 4 | CSSM_PADDING_ALTERNATE | |
-| 5 | CSSM_PADDING_FF | |
+| 4 | CSSM_PADDING_ALTERNATE | Unknown |
+| 5 | CSSM_PADDING_FF | Unknown (Pad with 0xff?) |
 | 6 | CSSM_PADDING_PKCS5 | Pad using Public-Key Cryptography Standard (PKCS) 5 (RFC 2898) |
 | 7 | CSSM_PADDING_PKCS7 | Pad using Public-Key Cryptography Standard (PKCS) 7 (RFC 2315) |
-| 8 | CSSM_PADDING_CIPHERSTEALING | |
-| 9 | CSSM_PADDING_RANDOM | |
+| 8 | CSSM_PADDING_CIPHERSTEALING | Unknown |
+| 9 | CSSM_PADDING_RANDOM | Unknown |
 | 10 | CSSM_PADDING_PKCS1 | Pad using Public-Key Cryptography Standard (PKCS) 1 |
 
 ### Encryption modes {#encryption_modes}
 
 | Value | Identifier | Description |
 | --- | --- | --- |
-| 0 | CSSM_ALGMODE_NONE | |
-| 1 | CSSM_ALGMODE_CUSTOM | |
-| 2 | CSSM_ALGMODE_ECB | Electronic CodeBook (ECB) mode |
-| 3 | CSSM_ALGMODE_ECBPad | |
+| 0 | CSSM_ALGMODE_NONE | Unknown (Null algorithm mode) |
+| 1 | CSSM_ALGMODE_CUSTOM | Unknown (Custom mode) |
+| 2 | CSSM_ALGMODE_ECB | Electronic CodeBook (ECB) mode, without padding |
+| 3 | CSSM_ALGMODE_ECBPad | Electronic CodeBook (ECB) mode with padding |
 | 4 | CSSM_ALGMODE_CBC | Cipher Block Chaining (CBC) mode, without padding |
 | 5 | CSSM_ALGMODE_CBC_IV8 | Cipher Block Chaining (CBC) mode with 8 byte initialization vector, without padding |
 | 6 | CSSM_ALGMODE_CBCPadIV8 | Cipher Block Chaining (CBC) mode with 8 byte initialization vector, with padding |
-| 7 | CSSM_ALGMODE_CFB | |
-| 8 | CSSM_ALGMODE_CFB_IV8 | |
-| 9 | CSSM_ALGMODE_CFBPadIV8 | |
-| 10 | CSSM_ALGMODE_OFB | |
-| 11 | CSSM_ALGMODE_OFB_IV8 | |
-| 12 | CSSM_ALGMODE_OFBPadIV8 | |
-| 13 | CSSM_ALGMODE_COUNTER | |
-| 14 | CSSM_ALGMODE_BC | |
-| 15 | CSSM_ALGMODE_PCBC | |
-| 16 | CSSM_ALGMODE_CBCC | |
-| 17 | CSSM_ALGMODE_OFBNLF | |
-| 18 | CSSM_ALGMODE_PBC | |
-| 19 | CSSM_ALGMODE_PFB | |
-| 20 | CSSM_ALGMODE_CBCPD | |
-| 21 | CSSM_ALGMODE_PUBLIC_KEY | |
-| 22 | CSSM_ALGMODE_PRIVATE_KEY | |
-| 23 | CSSM_ALGMODE_SHUFFLE | |
-| 24 | CSSM_ALGMODE_ECB64 | |
-| 25 | CSSM_ALGMODE_CBC64 | |
-| 26 | CSSM_ALGMODE_OFB64 | |
-| 28 | CSSM_ALGMODE_CFB32 | |
-| 29 | CSSM_ALGMODE_CFB16 | |
-| 30 | CSSM_ALGMODE_CFB8 | |
-| 31 | CSSM_ALGMODE_WRAP | |
-| 32 | CSSM_ALGMODE_PRIVATE_WRAP | |
-| 33 | CSSM_ALGMODE_RELAYX | |
-| 34 | CSSM_ALGMODE_ECB128 | |
-| 35 | CSSM_ALGMODE_ECB96 | |
-| 36 | CSSM_ALGMODE_CBC128 | |
-| 37 | CSSM_ALGMODE_OAEP_HASH | |
-| 38 | CSSM_ALGMODE_PKCS1_EME_V15 | |
-| 39 | CSSM_ALGMODE_PKCS1_EME_OAEP | |
-| 40 | CSSM_ALGMODE_PKCS1_EMSA_V15 | |
-| 41 | CSSM_ALGMODE_ISO_9796 | |
-| 42 | CSSM_ALGMODE_X9_31 | |
+| 7 | CSSM_ALGMODE_CFB | Cipher feedback (CFB) mode |
+| 8 | CSSM_ALGMODE_CFB_IV8 | Cipher feedback (CFB) mode with 8 byte initialization vector |
+| 9 | CSSM_ALGMODE_CFBPadIV8 | Cipher feedback (CFB) mode with 8 byte initialization vector, with padding |
+| 10 | CSSM_ALGMODE_OFB | Output FeedBack (OFB) mode |
+| 11 | CSSM_ALGMODE_OFB_IV8 | Output FeedBack (OFB) mode mode with 8 byte initialization vector |
+| 12 | CSSM_ALGMODE_OFBPadIV8 | Output FeedBack (OFB) mode with 8 byte initialization vector, with padding |
+| 13 | CSSM_ALGMODE_COUNTER | Counter mode |
+| 14 | CSSM_ALGMODE_BC | Block Chaining mode |
+| 15 | CSSM_ALGMODE_PCBC | Propagating Cipher Block Chaining (CBC) mode |
+| 16 | CSSM_ALGMODE_CBCC | Cipher Block Chaining (CBC) with checksum mode |
+| 17 | CSSM_ALGMODE_OFBNLF | Output FeedBack (OFB) with non-linear function mode |
+| 18 | CSSM_ALGMODE_PBC | Plaintext Block Chaining (PBC) mode |
+| 19 | CSSM_ALGMODE_PFB | Plaintext FeedBack (PFB) mode |
+| 20 | CSSM_ALGMODE_CBCPD | Cipher Block Chaining (CBC) if Plaintext Difference mode |
+| 21 | CSSM_ALGMODE_PUBLIC_KEY | Public key mode |
+| 22 | CSSM_ALGMODE_PRIVATE_KEY | Private key mode |
+| 23 | CSSM_ALGMODE_SHUFFLE | Fortezza shuffle mode |
+| 24 | CSSM_ALGMODE_ECB64 | 64 byte Electronic CodeBook (ECB) mode |
+| 25 | CSSM_ALGMODE_CBC64 | 64 byte Cipher Block Chaining (CBC) mode |
+| 26 | CSSM_ALGMODE_OFB64 | 64 byte Output FeedBack (OFB) mode |
+| 28 | CSSM_ALGMODE_CFB32 | 32 byte Cipher feedback (CFB) mode |
+| 29 | CSSM_ALGMODE_CFB16 | 16 byte Cipher feedback (CFB) mode |
+| 30 | CSSM_ALGMODE_CFB8 | 8 byte Cipher feedback (CFB) mode |
+| 31 | CSSM_ALGMODE_WRAP | Unknown |
+| 32 | CSSM_ALGMODE_PRIVATE_WRAP | Unknown |
+| 33 | CSSM_ALGMODE_RELAYX | Unknown |
+| 34 | CSSM_ALGMODE_ECB128 | 128 byte Electronic CodeBook (ECB) mode |
+| 35 | CSSM_ALGMODE_ECB96 | 96 byte Electronic CodeBook (ECB) mode |
+| 36 | CSSM_ALGMODE_CBC128 | 128 byte Cipher Block Chaining (CBC) mode |
+| 37 | CSSM_ALGMODE_OAEP_HASH | Unknown (Algorithm mode for SET key wrapping?) |
+| 38 | CSSM_ALGMODE_PKCS1_EME_V15 | Public-Key Cryptography Standard (PKCS) 1 version 1.5 |
+| 39 | CSSM_ALGMODE_PKCS1_EME_OAEP | Public-Key Cryptography Standard (PKCS) 1 version 2.0 |
+| 40 | CSSM_ALGMODE_PKCS1_EMSA_V15 | Unknown |
+| 41 | CSSM_ALGMODE_ISO_9796 | Unknown |
+| 42 | CSSM_ALGMODE_X9_31 | Unknown |
 
 ### Encrypted block data
 

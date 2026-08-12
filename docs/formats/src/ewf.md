@@ -731,8 +731,7 @@ Line 9 consists of 2 values, namely the values are "0 0".
 
 Line 10 contains the values defined by line 8.
 
-> Note the default values of some of these values has changed around linen 6.19
-> or earlier.
+> Note the default values of some of these values has changed around linen 6.19 or earlier.
 
 ##### Subjects category {#subjects_category2}
 
@@ -757,8 +756,7 @@ Line 15 consists of 2 values, namely the values are "0 0".
 
 Line 16 contains the values defined by line 14.
 
-> Note the default values of some of these values has changed around linen 6.19
-> or earlier.
+> Note the default values of some of these values has changed around linen 6.19 or earlier.
 
 #### FTK Imager (EWF-E01)
 
@@ -820,16 +818,16 @@ EnCase 5 to 7 (EWF-L01) format, with the following aspects:
 | t | Notes | Free form string. EnCase limits this string to 3000 - 1 characters |
 | u | Systemdate and time | Contains a [date and time header value](#date_time_header_value) |
 
-> Note the restrictions were tested with EnCase 7.02.01, older versions could
-> have a restriction of 40 characters instead of 3000 characters.
+> Note the restrictions were tested with EnCase 7.02.01, older versions could have a restriction of
+> 40 characters instead of 3000 characters.
 
 ##### Date and time header value {#date_time_header_value}
 
-In EnCase a date and time contains a string of individual values separated by a
-space, e.g. "2002 3 4 10 19 59", which represents March 4, 2002 10:19:59.
+In EnCase a date and time contains a string of individual values separated by a space, e.g.
+"2002 3 4 10 19 59", which represents March 4, 2002 10:19:59.
 
-In linen a date and time contains a string with a POSIX 32-bit epoch timestamp,
-e.g. "1142163845" which represents the date: March 12 2006, 11:44:05
+In linen a date and time contains a string with a POSIX 32-bit epoch timestamp, e.g. "1142163845"
+which represents the date: March 12 2006, 11:44:05
 
 ##### Extents header value {#extents_header_value}
 
@@ -842,8 +840,7 @@ entries that consist of: S <1> <2> <3>
 
 ##### Compression header value {#compression_header_value}
 
-A compression header value consist of a single character that represent the
-compression level.
+A compression header value consist of a single character that represent the compression level.
 
 | Character value | Meaning |
 | --- | --- |
@@ -900,9 +897,9 @@ The volume section data is 94 bytes in size and consists of:
 | 90 | 4 | | Checksum, which contains an Adler-32 of all the previous data within the volume section data |
 
 The number of chunks is a 32-bit value this means it maximum of addressable chunks would be:
-4294967295 (= 2^32 - 1). For a chunk size of 32768 x 4294967295 = about 127 TiB. The maximum
-segment file amount is 2^16 - 1 = 65535. This allows for an equal number of storage if a segment
-file is filled to its maximum number of chunks.
+`4294967295 (= 2^32 - 1)`. For a chunk size of `32768 x 4294967295`, which is about 127 TiB. The
+maximum segment file amount is `2^16 - 1 = 65535`. This allows for an equal number of storage if a
+segment file is filled to its maximum number of chunks.
 
 However Keramics is restricted at 14295 segment files, due to the extension naming schema of the
 segment files.
@@ -947,9 +944,8 @@ The volume section data is 1052 bytes in size and consists of:
 
 TODO: a value that could be in the volume is the RAID stripe size
 
-> Note that EnCase requires for media that contains no partition table that the
-> is physical media flag is not set and vice versa. Other tools like FTK check
-> the actual storage media data.
+> Note that EnCase requires for media that contains no partition table that the is physical media
+> flag is not set and vice versa. Other tools like FTK check the actual storage media data.
 
 #### EnCase 5 to 7 (EWF-L01)
 
@@ -975,9 +971,8 @@ The EWF-L01 format uses the EnCase 5 (EWF-E01) volume section specification. How
 | | | |
 | 0x10 | | Physical Memory (RAM) or process memory |
 
-> Note that FTK imager versions, before version 2.9, set the storage media to
-> fixed (0x01). The exact version of FTK imager where this behavior changed is
-> unknown.
+> Note that FTK imager versions, before version 2.9, set the storage media to fixed (0x01). The
+> exact version of FTK imager where this behavior changed is unknown.
 
 #### Media flags {#media_flags}
 
@@ -1339,7 +1334,7 @@ offset.
 In EnCase 6.7.1 the sectors section can be larger than 2048Mb. The table entries offsets are 31 bit
 values in EnCase6 the offset in a table entry value will actually use *the full 32 bit* if the
 2048Mb has been exceeded. This behavior is no longer present in EnCase 6.8 so it is assumed to be a
-bug. Libewf currently assumes that the if the 31 bit value overflows the following chunks are
+bug. Keramics currently assumes that the if the 31 bit value overflows the following chunks are
 uncompressed. This allows EnCase 6.7.1 faulty EWF files to be converted.
 
 ##### Table footer
@@ -1367,8 +1362,8 @@ section are:
 
 #### FTK Imager and EnCase 2 to 7 and linen 5 to 7 (EWF-E01)
 
-The table2 section contains a mirror copy of the table section. Probably
-intended for recovery purposes.
+The table2 section contains a mirror copy of the table section. Probably intended for recovery
+purposes.
 
 #### EnCase 5 to 7 (EWF-L01)
 
@@ -1420,8 +1415,8 @@ The additional ltypes section data is 6 bytes in size and consists of:
 
 ### Ltree section
 
-The ltree section is identifier in the section data type field as "ltree". Some
-aspects of this section are:
+The ltree section is identifier in the section data type field as "ltree". Some aspects of this
+section are:
 
 * Found in EWF-L01 in of EnCase 5 to 7
 * Found in the last segment file after ltypes section and before data section.
@@ -1444,12 +1439,11 @@ The ltree header is 48 bytes in size and consists of:
 
 #### Ltree data
 
-The ltree data string consists of an UTF-16 little-endian encoded string without
-byte order mark. The ltree data is not strict UTF-16 since it allows for unpaired
-surrogates, such as "U+d800" and "U+dc00".
+The ltree data string consists of an UTF-16 little-endian encoded string without byte order mark.
+The ltree data is not strict UTF-16 since it allows for unpaired surrogates, such as "U+d800" and
+"U+dc00".
 
-Other observed characteristics where the names in the ltree deviate from
-the original source:
+Other observed characteristics where the names in the ltree deviate from the original source:
 
 * \[U+0001-U+0008] were converted to U+00ba
 * \[U+0009, U+000a] were stripped
@@ -1457,8 +1451,7 @@ the original source:
 * U+000d was converted to U+0002
 * U+00ba remained the same
 
-Note that this behavior could be related to EnCase as well and might not be
-specific for EWF-L01.
+Note that this behavior could be related to EnCase as well and might not be specific for EWF-L01.
 
 The ltree data string contains the following information:
 
@@ -1511,8 +1504,8 @@ The 2nd line consists of the following 2 values:
 | 1 | | The number of permission groups in the category |
 | 2 | 1 | Unknown |
 
-The 3rd line of the category contains tab (0x09) separated type indicators. For
-more information see the sections below.
+The 3rd line of the category contains tab (0x09) separated type indicators. For more information
+see the sections below.
 
 The remaining lines in the category consist of:
 
@@ -1638,8 +1631,8 @@ The 2nd line consists of 2 values.
 | 1 | | The number of sources in the category |
 | 2 | 1 | Unknown |
 
-The 3rd line of the category contains tab (0x09) separated type indicators. For
-more information see the sections below.
+The 3rd line of the category contains tab (0x09) separated type indicators. For more information
+see the sections below.
 
 The remaining lines in the category consist of:
 
@@ -1693,15 +1686,14 @@ The 1st line of the source entry consists of the following 2 values:
 | 20 | ma | MAC address, which contains a string without separator characters (introduced in EnCase 7.9) |
 | 21 | dt | Drive type, which contains a single character (introduced in EnCase 7.9) |
 
-The acquisition date and time is in the form of: "1142163845", which is a POSIX
-epoch timestamp and represents the date: March 12 2006, 11:44:05.
+The acquisition date and time is in the form of: "1142163845", which is a POSIX epoch timestamp and
+represents the date: March 12 2006, 11:44:05.
 
-If the "ha" value contains "00000000000000000000000000000000" this means the
-MD5 hash is not set. The same applies for the "sha" value when it contains
-"0000000000000000000000000000000000000000" the SHA1 has is not set.
+If the "ha" value contains "00000000000000000000000000000000" this means the MD5 hash is not set.
+The same applies for the "sha" value when it contains "0000000000000000000000000000000000000000"
+the SHA1 has is not set.
 
-If the "ma" value contains "000000000000" this means the MAC address is not
-set.
+If the "ma" value contains "000000000000" this means the MAC address is not set.
 
 ##### Drive type
 
@@ -1724,8 +1716,8 @@ The 2nd line consists of 2 values.
 | 1 | | The number of subjects in the category |
 | 2 | 1 | Unknown |
 
-The 3rd line of the category contains tab (0x09) separated type indicators. For
-more information see the sections below.
+The 3rd line of the category contains tab (0x09) separated type indicators. For more information
+see the sections below.
 
 The remaining lines in the category consist of:
 
@@ -1777,8 +1769,8 @@ The 2nd line consists of 2 values.
 | 1 | | The number of file entries in the category or 1 if unknown |
 | 2 | 1 | Unknown |
 
-The 3rd line of the category contains tab (0x09) separated type indicators. For
-more information see the sections below.
+The 3rd line of the category contains tab (0x09) separated type indicators. For more information
+see the sections below.
 
 The remaining lines in the category consist of:
 
@@ -1837,18 +1829,16 @@ The 1st line of the file entry consists of the following 2 values:
 | 23 | pm | Permissions group index, which contains an integer that corresponds to an identifier in the [Permissions category](#permissions_category3) or -1 if not set.  The value is 0 by default |
 | 24 | lpt | Unknown (introduced in EnCase 6.19) |
 
-The creation, access and last written date and time are in the form of:
-"1142163845", which is a POSIX epoch timestamp and represents the date: March
-12 2006, 11:44:05.
+The creation, access and last written date and time are in the form of: "1142163845", which is a
+POSIX epoch timestamp and represents the date: March 12 2006, 11:44:05.
 
-The "ha" value (Hash) consist of a MD5 hash string when file entries are
-hashed. If the "ha" value contains "00000000000000000000000000000000" this
-means the MD5 hash is not set.
+The "ha" value (Hash) consist of a MD5 hash string when file entries are hashed. If the "ha" value
+contains "00000000000000000000000000000000" this means the MD5 hash is not set.
 
 ###### Ltree file entries
 
-The ltree entries of files and directories consist of entries starting with: 0
-followed by the number of sub file entries.
+The ltree entries of files and directories consist of entries starting with: 0 followed by the
+number of sub file entries.
 
 The entries of files and directories:
 
@@ -1896,9 +1886,9 @@ The entries of files and directories:
 | 32 | ea | [Extended attributes](#extended_attributes) (Introduced in EnCase 7.9) |
 | 33 | lpt | Unknown |
 
-If the "ha" value contains "00000000000000000000000000000000" this means the
-MD5 hash is not set. The same applies for the "sha" value when it contains
-"0000000000000000000000000000000000000000" the SHA1 has is not set.
+If the "ha" value contains "00000000000000000000000000000000" this means the MD5 hash is not set.
+The same applies for the "sha" value when it contains "0000000000000000000000000000000000000000"
+the SHA1 has is not set.
 
 ###### File entry name {#file_entry_name}
 
@@ -1908,8 +1898,8 @@ A file entry name ("n" value):
 * uses the "MIDDLE DOT" Unicode character (U+00b7) as a (NTFS) alternative data stream (ADS) name
   seperator
 
-> Note that a regular "MIDDLE DOT" Unicode character will be encoded in the
-> same way so no real way to reliably tell the difference.
+> Note that a regular "MIDDLE DOT" Unicode character will be encoded in the same way so no real way
+> to reliably tell the difference.
 
 An empty name has been observed to be represented as "NoName".
 
@@ -1934,8 +1924,8 @@ TODO: add some text
 
 ###### Ltree file entries
 
-The ltree entries of files and directories consist of entries starting with: 26
-followed by the number of sub file entries.
+The ltree entries of files and directories consist of entries starting with: 26 followed by the
+number of sub file entries.
 
 The entries of files and directories:
 
@@ -1976,14 +1966,12 @@ If the sparse data flag is set:
 * the data size should be 1 and data should consist of a single byte value.
 * the data size should be equal to the file size and data should be the same.
 
-If the duplicate data offset value is not set the single byte value in the data
-should be used to reconstruct the file data. E.g. if the file size is 4096 and
-the data contains the byte value 0x00 the resulting file should consists of
-4096 x 0x00 byte values.
+If the duplicate data offset value is not set the single byte value in the data should be used to
+reconstruct the file data. E.g. if the file size is 4096 and the data contains the byte value 0x00
+the resulting file should consists of 4096 0-byte values.
 
-If the duplicate data offset value is set the single byte in the data is
-ignored and the duplicate data offset refers to the location where the data
-stored.
+If the duplicate data offset value is set the single byte in the data is ignored and the duplicate
+data offset refers to the location where the data stored.
 
 ##### Binary extents value {#binary_extents}
 
@@ -2038,8 +2026,8 @@ An extended attributes is of variable size and consists of:
 
 TODO: complete section
 
-> Note that branch nodes are presuably used to group attributes, however these
-> are not used consistently and are not shown by EnCase 7.
+> Note that branch nodes are presuably used to group attributes, however these are not used
+> consistently and are not shown by EnCase 7.
 
 ### Map section
 
@@ -2055,8 +2043,8 @@ The map consists of:
 
 #### Map string
 
-The map string consists of an UTF-16 little-endian encoded string without the
-UTF-16 endian byte order mark.
+The map string consists of an UTF-16 little-endian encoded string without the UTF-16 endian byte
+order mark.
 
 The map string contains the following information:
 
@@ -2125,10 +2113,9 @@ A session entry is 32 byte in size and consists of:
 
 EnCase stores audio tracks as 0 byte data with a sector size of 2048.
 
-> Note that for a CD the first session sector is stored as 16, although the
-> actual session starts at sector 0. Could this value be overloaded to indicate
-> the size of the reserved space between the start of the session and the ISO
-> 9660 volume descriptor.
+> Note that for a CD the first session sector is stored as 16, although the actual session starts
+> at sector 0. Could this value be overloaded to indicate the size of the reserved space between
+> the start of the session and the ISO 9660 volume descriptor.
 
 #### Session flags
 
@@ -2146,8 +2133,8 @@ The session footer is 4 byte in size and consists of:
 
 ### Error2 section
 
-The error2 section is identifier in the section data type field as "error2".
-Some aspects of this section are:
+The error2 section is identifier in the section data type field as "error2". Some aspects of this
+section are:
 
 * Not defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * It is not found in SMART (EWF-S01).
@@ -2156,8 +2143,8 @@ Some aspects of this section are:
 
 TODO: check FTK Imager, EnCase 1 and 2 for presence of the error2 section.
 
-It contains the sectors that have read errors. The sector where a read error
-occurred are filled with zero's during acquiry by EnCase.
+It contains the sectors that have read errors. The sector where a read error occurred are filled
+with zero's during acquiry by EnCase.
 
 The error2 section data consists of:
 
@@ -2194,8 +2181,8 @@ The error2 footer is 4 byte in size and consists of:
 
 ### Digest section
 
-The digest section is identified in the section data type field as "digest".
-Some aspects of this section are:
+The digest section is identified in the section data type field as "digest". Some aspects of this
+section are:
 
 * It is found in EnCase 6 to 7 files, as of EnCase 6.12 and linen 6.12 (EWF-E01).
 
@@ -2212,8 +2199,8 @@ The digest section data is 80 byte in size and consists of:
 
 ### Hash section
 
-The hash section is identified in the section data type field as "hash". Some
-aspects of this section are:
+The hash section is identified in the section data type field as "hash". Some aspects of this
+section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * It is found in SMART (EWF-S01) and FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01) files.
@@ -2253,8 +2240,8 @@ Test with EnCase 4 show that:
 
 ### Done section
 
-The done section is identified in the section data type field as "done". Some
-aspects of this section are:
+The done section is identified in the section data type field as "done". Some aspects of this
+section are:
 
 * Defined in [ASR Data - E01 Compression Format](http://www.asrdata.com/whitepaper-html).
 * It is found in SMART (EWF-S01), FTK Imager, EnCase 1 to 7 and linen 5 to 7 (EWF-E01) and EnCase 5
@@ -2270,34 +2257,31 @@ It resides after the table or table2 section.
 
 #### FTK Imager, EnCase and linen (EWF-E01)
 
-It resides after the data section in a single segment file or for multiple
-segment files after the table2 section.
+It resides after the data section in a single segment file or for multiple segment files after the
+table2 section.
 
-In the EnCase (EWF-E01) format the size in the section header is 0 instead of
-76 (the size of the section header).
+In the EnCase (EWF-E01) format the size in the section header is 0 instead of 76 (the size of the
+section header).
 
 > Note that FTK imager versions before 2.9 sets the section size to 76. At the
 > moment it is unknown in which version this behavior was changed.
 
 #### Incomplete section
 
-The incomplete section is identified in the section data type field as
-"incomplete".
+The incomplete section is identified in the section data type field as "incomplete".
 
-This section is seen rarely. It was seen in an EnCase 6.13 (EWF-E01) file as
-the last last section within the last segment file. The incomplete section was
-preceded by a hash and digest section, although later in the set of EWF files
-another hash and digest section were defined.
+This section is seen rarely. It was seen in an EnCase 6.13 (EWF-E01) file as the last last section
+within the last segment file. The incomplete section was preceded by a hash and digest section,
+although later in the set of EWF files another hash and digest section were defined.
 
-It is currently assumed that the incomplete section indicates an incomplete
-image created using remote imaging. The incomplete section contains data but
-currently there is no indication what purpose the data has.
+It is currently assumed that the incomplete section indicates an incomplete image created using
+remote imaging. The incomplete section contains data but currently there is no indication what
+purpose the data has.
 
 ## EWF-X
 
-EWF-X (extended) is an experimental format to enhance the EWF format. EWF-X is
-based on the EWF-E01 format. EWF-X does not limit the table entries to 16375.
-EWF-X is not the same as version 2 of EWF.
+EWF-X (extended) is an experimental format to enhance the EWF format. EWF-X is based on the EWF-E01
+format. EWF-X does not limit the table entries to 16375. EWF-X is not the same as version 2 of EWF.
 
 TODO: add note about the table entry limit.
 
@@ -2310,8 +2294,8 @@ Additional sections provided in the EWF-X format are:
 
 #### Xheader
 
-The xheader section contains [zlib compressed data](zlib.md) containing XML
-data containing the header values.
+The xheader section contains [zlib compressed data](zlib.md) containing XML data containing the
+header values.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -2330,8 +2314,8 @@ data containing the header values.
 
 #### Xhash
 
-The xhash section contains [zlib compressed data](zlib.md) containing XML data
-containing the hash values.
+The xhash section contains [zlib compressed data](zlib.md) containing XML data containing the hash
+values.
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -2347,8 +2331,7 @@ EWF-X uses a random based version of the GUID
 
 ## Format edge cases and corruption scenarios
 
-This chapter contains several corruption scenarios that have been encountered
-"in the wild".
+This chapter contains several corruption scenarios that have been encountered "in the wild".
 
 ### Corrupt uncompressed chunk
 
@@ -2363,10 +2346,10 @@ TODO: add description
 Seen in combination with some firmware versions of Tableau TD3 forensic imager.
 
 In this corruption scenarion the copy of uncompressed data size value of the
-[DEFLATE uncompressed block data](zlib.md) is set to 0 instead of the 1s
-complement of the uncompressed data size.
+[DEFLATE uncompressed block data](zlib.md) is set to 0 instead of the 1s complement of the
+uncompressed data size.
 
-Libewf currently does not handle this corruption scenario.
+Keramics currently does not handle this corruption scenario.
 
 ### Corrupt section header
 
@@ -2413,46 +2396,41 @@ TODO: add description
 
 ### Dual image: section size versus offset
 
-The section headers define both the next section offset and the size of the
-section. If an implementation reads only one of the two to determine the next
-section, a dual EWF image can be crafted that consists of two separate images
-including hashes.
+The section headers define both the next section offset and the size of the section. If an
+implementation reads only one of the two to determine the next section, a dual EWF image can be
+crafted that consists of two separate images including hashes.
 
 Keramics will mark such an image as corrupted.
 
 ### Table entries offset overflow
 
-In EnCase 6.7.1 the sectors section can be larger than 2048 MiB. The table
-entries offsets are 31 bit values in EnCase6 the offset in a table entry value
-will actually use the full 32 bit if the 2048 MiB has been exceeded. This
-behavior is no longer present in EnCase 6.8 so it is assumed to be a bug.
+In EnCase 6.7.1 the sectors section can be larger than 2048 MiB. The table entries offsets are 31
+bit values in EnCase6 the offset in a table entry value will actually use the full 32 bit if the
+2048 MiB has been exceeded. This behavior is no longer present in EnCase 6.8 so it is assumed to be
+a bug.
 
-Libewf currently assumes that the if the 31 bit value overflows the following
-chunks are uncompressed. This allows EnCase 6.7.1 faulty EWF files to be
-converted by Keramics.
+Keramics currently assumes that the if the 31 bit value overflows the following chunks are
+uncompressed. This allows EnCase 6.7.1 faulty EWF files to be converted by Keramics.
 
 ### Multiple incomplete segment file set identifiers
 
-Although rare it can occur that a set of EWF image files changes its segment
-file set identifier. This was seen in an image created by EnCase 6.13,
-presumably using remote imaging. The image contained 3 different segment file
-set identifiers. The first changes after an incomplete section. The second one
-changed without any clear indication. The corresponding data section also
-changed in some extent e.g. compression method and media flags, the is physical
-flag being dropped. The change was consistent across multiple segment files. It
-is unlikely that deliberate manipulation is involved. EnCase considers the
-image as invalid.
+Although rare it can occur that a set of EWF image files changes its segment file set identifier.
+This was seen in an image created by EnCase 6.13, presumably using remote imaging. The image
+contained 3 different segment file set identifiers. The first changes after an incomplete section.
+The second one changed without any clear indication. The corresponding data section also changed in
+some extent e.g. compression method and media flags, the is physical flag being dropped. The change
+was consistent across multiple segment files. It is unlikely that deliberate manipulation is
+involved. EnCase considers the image as invalid.
 
-Although with some tweaking of the individual segment file sets could be read.
-In this case the data read from the segment file sets was heavily corrupted.
-For now Keramics does not support reading multiple segment files sets from a
-single image, but this might change in the future.
+Although with some tweaking of the individual segment file sets could be read. In this case the
+data read from the segment file sets was heavily corrupted. For now Keramics does not support
+reading multiple segment files sets from a single image, but this might change in the future.
 
 ## AD encryption
 
-As of version 2.8 FTK Imager supports "AD encryption". Although the output file
-uses the EWF extensions the file actually is a AES-256 encrypted container. The
-EWF can be encrypted using a pass-phrase or a certificate.
+As of version 2.8 FTK Imager supports "AD encryption". Although the output file uses the EWF
+extensions the file actually is a AES-256 encrypted container. The EWF can be encrypted using a
+passphrase or a certificate.
 
 TODO: link to format definition
 

@@ -82,9 +82,6 @@ impl EwfTable {
             )));
         }
         for entry_index in 0..table_header.number_of_entries {
-            keramics_core::debug_trace_structure!(EwfTableEntry::debug_read_data(
-                &data[data_offset..]
-            ));
             let mut table_entry: EwfTableEntry = EwfTableEntry::new();
 
             match table_entry.read_data(&data[data_offset..]) {

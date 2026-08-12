@@ -110,6 +110,12 @@ impl FormatScanner {
             0,
             EWF_FILE_HEADER_SIGNATURE,
         ));
+        self.signature_scanner.add_signature(Signature::new(
+            "ewf2",
+            PatternType::BoundToStart,
+            0,
+            EWF_L01_FILE_HEADER_SIGNATURE,
+        ));
     }
 
     /// Adds Extended File System (ext) signatures.
@@ -389,7 +395,7 @@ impl FormatScanner {
                 "apfs1" => FormatIdentifier::Apfs,
                 "apm1" | "apm2" => FormatIdentifier::Apm,
                 "cdsaencr1" | "cdsaencr2" => FormatIdentifier::CdsaEncr,
-                "ewf1" => FormatIdentifier::Ewf,
+                "ewf1" | "ewf2" => FormatIdentifier::Ewf,
                 "ext1" => FormatIdentifier::Ext,
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
                 "gpt1" | "gpt2" | "gpt3" | "gpt4" => FormatIdentifier::Gpt,

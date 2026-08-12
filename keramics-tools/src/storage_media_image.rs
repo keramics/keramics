@@ -166,6 +166,9 @@ impl StorageMediaImage {
         };
         match Self::scan_for_storage_image_formats(&data_stream) {
             Ok(Some(format_identifier)) => match format_identifier {
+                FormatIdentifier::CdsaEncr => Err(keramics_core::error_trace_new!(
+                    "Store media image is encrypted and requires a credential to be unlocked",
+                )),
                 FormatIdentifier::Ewf => Self::open_ewf_image(path),
                 FormatIdentifier::Pdi => Self::open_pdi_image(path),
                 FormatIdentifier::Qcow => Self::open_qcow_image(path),
@@ -800,7 +803,12 @@ impl StorageMediaImage {
                                     "Unsupported multiple format signatures in Mac OS Encrypted Encoding container"
                                 ));
                             }
-                            scan_results.drain().next()
+                            match scan_results.drain().next() {
+                                Some(format_identifier) => Some(format_identifier),
+                                // If no format was found treat the contents of the encrypted
+                                // container as an encrypted uncompressed UDIF image.
+                                None => Some(FormatIdentifier::Udif),
+                            }
                         }
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(

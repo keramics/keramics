@@ -514,14 +514,14 @@ impl VfsScanner {
                         .storage_media_image_scanner
                         .scan_data_stream(&container_data_stream)
                     {
-                        Ok(scan_results) => {
+                        Ok(mut scan_results) => {
                             if scan_results.len() > 1 {
                                 return Err(keramics_core::error_trace_new!(
                                     "Found multiple storage media image format signatures in encrypted container"
                                 ));
                             }
-                            match scan_results.iter().next() {
-                                Some(format_identifier) => format_identifier.clone(),
+                            match scan_results.drain().next() {
+                                Some(format_identifier) => format_identifier,
                                 // If no format was found treat the contents of the encrypted
                                 // container as an encrypted uncompressed UDIF image.
                                 None => FormatIdentifier::Udif,
