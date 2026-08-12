@@ -34,6 +34,7 @@ use super::hash::EwfHash;
 use super::header::EwfHeader;
 use super::header_value::EwfHeaderValue;
 use super::header2::EwfHeader2;
+use super::ltree_header::EwfLtreeHeader;
 use super::section_header::EwfSectionHeader;
 use super::table::EwfTable;
 use super::table_entry::EwfTableEntry;
@@ -47,8 +48,8 @@ pub struct EwfImage {
     /// File resolver.
     file_resolver: FileResolverReference,
 
-    /// Segment file set identifier.
-    pub set_identifier: Uuid,
+    /// Segment (file) set identifier.
+    segment_set_identifier: Uuid,
 
     /// Name.
     name: String,
@@ -66,10 +67,10 @@ pub struct EwfImage {
     pub sectors_per_chunk: u32,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u32,
+    bytes_per_sector: u32,
 
     /// Number of sectors.
-    pub number_of_sectors: u32,
+    number_of_sectors: u32,
 
     /// Chunk size.
     chunk_size: u32,
@@ -108,7 +109,7 @@ impl EwfImage {
         Self {
             mediator: Mediator::current(),
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
-            set_identifier: Uuid::new(),
+            segment_set_identifier: Uuid::new(),
             name: String::new(),
             naming_schema: EwfNamingSchema::E01UpperCase,
             segment_file_cache: LruCache::new(16),
@@ -129,9 +130,19 @@ impl EwfImage {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u32 {
+        self.bytes_per_sector
+    }
+
     /// Retrieves a header value.
     pub fn get_header_value(&self, value_type: &EwfHeaderValueType) -> Option<&EwfHeaderValue> {
         self.header_values.get(value_type)
+    }
+
+    /// Retrieves the number of sectors.
+    pub fn get_number_of_sectors(&self) -> u32 {
+        self.number_of_sectors
     }
 
     /// Determines the segment file extension for a given segment number.
@@ -148,8 +159,10 @@ impl EwfImage {
 
         let first_character: u32 = match naming_schema {
             EwfNamingSchema::E01UpperCase => 0x45, // 'E'
+            EwfNamingSchema::L01UpperCase => 0x4c, // 'L'
             EwfNamingSchema::S01UpperCase => 0x53, // 'S'
             EwfNamingSchema::E01LowerCase => 0x65, // 'e'
+            EwfNamingSchema::L01LowerCase => 0x6c, // 'l'
             EwfNamingSchema::S01LowerCase => 0x73, // 's'
         };
         if segment_number < 100 {
@@ -158,8 +171,12 @@ impl EwfImage {
             extension[0] = first_character;
         } else {
             let base_character: u32 = match naming_schema {
-                EwfNamingSchema::E01UpperCase | EwfNamingSchema::S01UpperCase => 0x41, // 'A'
-                EwfNamingSchema::E01LowerCase | EwfNamingSchema::S01LowerCase => 0x61, // 'a'
+                EwfNamingSchema::E01UpperCase
+                | EwfNamingSchema::L01UpperCase
+                | EwfNamingSchema::S01UpperCase => 0x41, // 'A'
+                EwfNamingSchema::E01LowerCase
+                | EwfNamingSchema::L01LowerCase
+                | EwfNamingSchema::S01LowerCase => 0x61, // 'a'
             };
             let mut extension_segment_number: u32 = (segment_number as u32) - 100;
 
@@ -172,8 +189,12 @@ impl EwfImage {
             extension[0] = first_character + extension_segment_number;
         }
         let last_character: u32 = match naming_schema {
-            EwfNamingSchema::E01UpperCase | EwfNamingSchema::S01UpperCase => 0x5a, // 'Z'
-            EwfNamingSchema::E01LowerCase | EwfNamingSchema::S01LowerCase => 0x7a, // 'z'
+            EwfNamingSchema::E01UpperCase
+            | EwfNamingSchema::L01UpperCase
+            | EwfNamingSchema::S01UpperCase => 0x5a, // 'Z'
+            EwfNamingSchema::E01LowerCase
+            | EwfNamingSchema::L01LowerCase
+            | EwfNamingSchema::S01LowerCase => 0x7a, // 'z'
         };
         if extension[0] > last_character {
             return Err(keramics_core::error_trace_new!(format!(
@@ -241,8 +262,10 @@ impl EwfImage {
         };
         match extension.as_str() {
             "E01" => Ok(EwfNamingSchema::E01UpperCase),
+            "L01" => Ok(EwfNamingSchema::L01UpperCase),
             "S01" => Ok(EwfNamingSchema::S01UpperCase),
             "e01" => Ok(EwfNamingSchema::E01LowerCase),
+            "l01" => Ok(EwfNamingSchema::L01LowerCase),
             "s01" => Ok(EwfNamingSchema::S01LowerCase),
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -251,6 +274,11 @@ impl EwfImage {
                 )));
             }
         }
+    }
+
+    /// Retrieves the segment set identifier.
+    pub fn get_segment_set_identifier(&self) -> &Uuid {
+        &self.segment_set_identifier
     }
 
     /// Opens a storage media image.
@@ -499,11 +527,11 @@ impl EwfImage {
                             return Err(error);
                         }
                     }
-                    if self.set_identifier != volume.set_identifier {
+                    if self.segment_set_identifier != volume.segment_set_identifier {
                         return Err(keramics_core::error_trace_new!(format!(
-                            "Mismatch between set identifier in volume section: {} and data section: {}",
-                            self.set_identifier.to_string(),
-                            volume.set_identifier.to_string(),
+                            "Mismatch between segment set identifier in volume section: {} and data section: {}",
+                            self.segment_set_identifier.to_string(),
+                            volume.segment_set_identifier.to_string(),
                         )));
                     }
                 }
@@ -622,7 +650,27 @@ impl EwfImage {
                         }
                     }
                 }
-                // TODO: ltree
+                EWF_SECTION_TYPE_LTREE => {
+                    let mut ltree_header: EwfLtreeHeader = EwfLtreeHeader::new();
+
+                    match ltree_header
+                        .read_at_position(&data_stream, SeekFrom::Start(file_offset + 76))
+                    {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read ltree header section"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if self.number_of_chunks == 0 {
+                        // Correct the media size information for EWF-L01.
+                        self.media_size = ltree_header.data_size;
+                        self.number_of_sectors = 0;
+                    }
+                }
                 // TODO: ltypes
                 EWF_SECTION_TYPE_NEXT => {
                     *last_segment_file = false;
@@ -912,8 +960,7 @@ impl EwfImage {
             }
             safe_block_media_offset += self.chunk_size as u64;
 
-            // handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset
-            // overflow)
+            // handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset overflow)
             if !chunk_data_offset_overflow
                 && chunk_data_offset + chunk_data_size > (i32::MAX as u32)
             {
@@ -1043,7 +1090,7 @@ impl EwfImage {
                 self.bytes_per_sector = volume.bytes_per_sector;
                 self.number_of_sectors = volume.number_of_sectors;
                 self.error_granularity = volume.error_granularity;
-                self.set_identifier = volume.set_identifier;
+                self.segment_set_identifier = volume.segment_set_identifier;
             }
             _ => {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -1056,8 +1103,11 @@ impl EwfImage {
         self.chunk_size = self.sectors_per_chunk * self.bytes_per_sector;
         self.media_size = (self.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
-        let block_tree_data_size: u64 = (self.number_of_chunks as u64) * (self.chunk_size as u64);
-
+        let block_tree_data_size: u64 = if self.number_of_chunks == 0 {
+            self.media_size.next_multiple_of(self.chunk_size as u64)
+        } else {
+            (self.number_of_chunks as u64) * (self.chunk_size as u64)
+        };
         self.block_tree = BlockTree::<EwfBlockRange>::new(
             block_tree_data_size,
             self.sectors_per_chunk as u64,
@@ -1152,7 +1202,27 @@ mod tests {
         Ok(image)
     }
 
+    #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let image: EwfImage = get_image()?;
+
+        let bytes_per_sector: u32 = image.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
     // TODO: add tests for get_header_value
+
+    #[test]
+    fn test_get_number_of_sectors() -> Result<(), ErrorTrace> {
+        let image: EwfImage = get_image()?;
+
+        let number_of_sectors: u32 = image.get_number_of_sectors();
+        assert_eq!(number_of_sectors, 8192);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_segment_file_extension() -> Result<(), ErrorTrace> {
@@ -1192,12 +1262,20 @@ mod tests {
         assert!(result.is_err());
 
         let extension: String =
+            EwfImage::get_segment_file_extension(1, &EwfNamingSchema::L01UpperCase)?;
+        assert_eq!(extension, "L01");
+
+        let extension: String =
             EwfImage::get_segment_file_extension(1, &EwfNamingSchema::S01UpperCase)?;
         assert_eq!(extension, "S01");
 
         let extension: String =
             EwfImage::get_segment_file_extension(1, &EwfNamingSchema::E01LowerCase)?;
         assert_eq!(extension, "e01");
+
+        let extension: String =
+            EwfImage::get_segment_file_extension(1, &EwfNamingSchema::L01LowerCase)?;
+        assert_eq!(extension, "l01");
 
         let extension: String =
             EwfImage::get_segment_file_extension(1, &EwfNamingSchema::S01LowerCase)?;
@@ -1245,6 +1323,18 @@ mod tests {
             EwfImage::get_segment_file_naming_schema(&file_name);
         assert!(result.is_err());
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_segment_set_identifier() -> Result<(), ErrorTrace> {
+        let image: EwfImage = get_image()?;
+
+        let segment_set_identifier: &Uuid = image.get_segment_set_identifier();
+        assert_eq!(
+            segment_set_identifier.to_string(),
+            "00000000-0000-0000-0000-000000000000"
+        );
         Ok(())
     }
 

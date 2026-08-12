@@ -26,6 +26,7 @@ mod header;
 mod header2;
 mod header_value;
 mod image;
+mod ltree_header;
 mod object_storage;
 mod section_header;
 mod table;

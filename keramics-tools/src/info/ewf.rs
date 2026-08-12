@@ -24,8 +24,8 @@ use crate::formatters::ByteSize;
 
 /// Information about an Expert Witness Compression Format (EWF) image.
 struct EwfImageInfo {
-    /// Segment file set identifier.
-    pub set_identifier: Uuid,
+    /// Segment (file) set identifier.
+    pub segment_set_identifier: Uuid,
 
     /// Sectors per chunk.
     pub sectors_per_chunk: u32,
@@ -66,7 +66,7 @@ impl EwfImageInfo {
     /// Create new image information.
     pub fn new() -> Self {
         Self {
-            set_identifier: Uuid::new(),
+            segment_set_identifier: Uuid::new(),
             sectors_per_chunk: 0,
             error_granularity: 0,
             media_type: EwfMediaType::Unknown,
@@ -96,11 +96,11 @@ impl fmt::Display for EwfImageInfo {
         )?;
 
         // TODO: print file format
-        if !self.set_identifier.is_nil() {
+        if !self.segment_set_identifier.is_nil() {
             writeln!(
                 formatter,
-                "    Set identifier\t\t\t\t: {}",
-                self.set_identifier
+                "    Segment set identifier\t\t\t: {}",
+                self.segment_set_identifier
             )?;
         }
         writeln!(
@@ -135,16 +135,18 @@ impl fmt::Display for EwfImageInfo {
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
         writeln!(formatter, "        Media size\t\t\t\t: {}", byte_size)?;
 
-        writeln!(
-            formatter,
-            "        Number of sectors\t\t\t: {}",
-            self.number_of_sectors
-        )?;
-        writeln!(
-            formatter,
-            "        Bytes per sector\t\t\t: {}",
-            self.bytes_per_sector
-        )?;
+        if self.media_type != EwfMediaType::LogicalEvidence {
+            writeln!(
+                formatter,
+                "        Number of sectors\t\t\t: {}",
+                self.number_of_sectors
+            )?;
+            writeln!(
+                formatter,
+                "        Bytes per sector\t\t\t: {}",
+                self.bytes_per_sector
+            )?;
+        }
         if self.md5_hash != [0; 16] {
             let hash_string: String = format_as_string(&self.md5_hash);
             writeln!(formatter, "        MD5\t\t\t\t\t: {}", hash_string)?;
@@ -183,13 +185,13 @@ impl EwfInfo {
     fn get_image_information(ewf_image: &EwfImage) -> EwfImageInfo {
         let mut image_information: EwfImageInfo = EwfImageInfo::new();
 
-        image_information.set_identifier = ewf_image.set_identifier.clone();
+        image_information.segment_set_identifier = ewf_image.get_segment_set_identifier().clone();
         image_information.sectors_per_chunk = ewf_image.sectors_per_chunk;
         image_information.error_granularity = ewf_image.error_granularity;
         image_information.media_type = ewf_image.media_type.clone();
         image_information.media_size = ewf_image.media_size;
-        image_information.number_of_sectors = ewf_image.number_of_sectors;
-        image_information.bytes_per_sector = ewf_image.bytes_per_sector;
+        image_information.number_of_sectors = ewf_image.get_number_of_sectors();
+        image_information.bytes_per_sector = ewf_image.get_bytes_per_sector();
         image_information
             .md5_hash
             .copy_from_slice(&ewf_image.md5_hash);
@@ -223,6 +225,11 @@ impl EwfInfo {
                 }
                 if header_value_type == EwfHeaderValueType::PasswordHash
                     && header_value_string == "0"
+                {
+                    continue;
+                } else if (header_value_type == EwfHeaderValueType::AcquisitionDate
+                    || header_value_type == EwfHeaderValueType::SystemDate)
+                    && header_value_string == "1970-01-01T00:00:00"
                 {
                     continue;
                 }

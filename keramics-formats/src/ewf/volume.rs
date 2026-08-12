@@ -38,7 +38,7 @@ use keramics_types::{Uuid, bytes_to_u32_le};
         field(name = "unknown4", data_type = "[u8; 3]", format = "hex"),
         field(name = "error_granularity", data_type = "u32"),
         field(name = "unknown5", data_type = "[u8; 4]", format = "hex"),
-        field(name = "set_identifier", data_type = "Uuid"),
+        field(name = "segment_set_identifier", data_type = "Uuid"),
         field(name = "unknown6", data_type = "[u8; 963]", format = "hex"),
         field(name = "signature", data_type = "[u8; 5]"),
         field(name = "checksum", data_type = "u32", format = "hex"),
@@ -71,8 +71,8 @@ pub struct EwfE01Volume {
     /// Error granularity.
     pub error_granularity: u32,
 
-    /// Set identifier.
-    pub set_identifier: Uuid,
+    /// Segment set identifier.
+    pub segment_set_identifier: Uuid,
 }
 
 impl EwfE01Volume {
@@ -87,7 +87,7 @@ impl EwfE01Volume {
             media_flags: 0,
             compression_level: 0,
             error_granularity: 0,
-            set_identifier: Uuid::new(),
+            segment_set_identifier: Uuid::new(),
         }
     }
 
@@ -116,7 +116,7 @@ impl EwfE01Volume {
         self.media_flags = data[36];
         self.compression_level = data[52];
         self.error_granularity = bytes_to_u32_le!(data, 56);
-        self.set_identifier = Uuid::from_le_bytes(&data[64..80]);
+        self.segment_set_identifier = Uuid::from_le_bytes(&data[64..80]);
 
         Ok(())
     }
@@ -307,7 +307,7 @@ mod tests {
         assert_eq!(test_struct.compression_level, 0);
         assert_eq!(test_struct.error_granularity, 64);
         assert_eq!(
-            test_struct.set_identifier.to_string(),
+            test_struct.segment_set_identifier.to_string(),
             "6a31e044-1031-c27e-b74f-d12b7680ad29"
         );
         Ok(())
@@ -349,7 +349,7 @@ mod tests {
         assert_eq!(test_struct.compression_level, 0);
         assert_eq!(test_struct.error_granularity, 64);
         assert_eq!(
-            test_struct.set_identifier.to_string(),
+            test_struct.segment_set_identifier.to_string(),
             "6a31e044-1031-c27e-b74f-d12b7680ad29"
         );
         Ok(())

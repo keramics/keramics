@@ -48,6 +48,8 @@ pub enum EwfMediaType {
 pub enum EwfNamingSchema {
     E01LowerCase,
     E01UpperCase,
+    L01LowerCase,
+    L01UpperCase,
     S01LowerCase,
     S01UpperCase,
 }

@@ -570,7 +570,15 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_number_of_segments
+    #[test]
+    fn test_get_number_of_segments() -> Result<(), ErrorTrace> {
+        let image: UdifImage = get_image("hfsplus_zlib_segments.dmg")?;
+
+        let number_of_segments: u32 = image.get_number_of_segments();
+        assert_eq!(number_of_segments, 2);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_segment_set_identifier() -> Result<(), ErrorTrace> {
@@ -584,7 +592,15 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for is_locked
+    #[test]
+    fn test_is_locked() -> Result<(), ErrorTrace> {
+        let image: UdifImage = get_image("hfsplus_aes256.dmg")?;
+
+        let is_locked: bool = image.is_locked();
+        assert_eq!(is_locked, true);
+
+        Ok(())
+    }
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {

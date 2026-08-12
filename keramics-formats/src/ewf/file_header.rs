@@ -45,7 +45,8 @@ impl EwfFileHeader {
         if data.len() < 13 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        if &data[0..8] != EWF_FILE_HEADER_SIGNATURE {
+        if &data[0..8] != EWF_FILE_HEADER_SIGNATURE && &data[0..8] != EWF_L01_FILE_HEADER_SIGNATURE
+        {
             return Err(keramics_core::error_trace_new!("Unsupported signature"));
         }
         if data[8] != 1 {

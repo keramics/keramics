@@ -72,7 +72,7 @@ impl EwfFileSystem {
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
         match self.image.read() {
-            Ok(ewf_image) => Ok(ewf_image.bytes_per_sector),
+            Ok(ewf_image) => Ok(ewf_image.get_bytes_per_sector()),
             Err(error) => Err(keramics_core::error_trace_new_with_error!(
                 "Unable to obtain read lock on EWF image",
                 error
