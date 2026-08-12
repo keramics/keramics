@@ -15,8 +15,10 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
+use keramics_formats::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
 use keramics_formats::sparsebundle::SparseBundleImage;
-use keramics_formats::{FileResolverReference, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
+use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 use crate::formatters::ByteSize;
 
@@ -24,6 +26,12 @@ use crate::formatters::ByteSize;
 struct SparseBundleImageInfo {
     /// Block size.
     pub block_size: u32,
+
+    /// Value to indicate the (encrypted) image is locked.
+    pub is_locked: bool,
+
+    /// Encryption type.
+    pub encryption_type: Option<CdsaEncrEncryptionType>,
 
     /// Media size.
     pub media_size: u64,
@@ -37,6 +45,8 @@ impl SparseBundleImageInfo {
     fn new() -> Self {
         Self {
             block_size: 0,
+            is_locked: false,
+            encryption_type: None,
             media_size: 0,
             bytes_per_sector: 0,
         }
@@ -51,6 +61,21 @@ impl fmt::Display for SparseBundleImageInfo {
         let byte_size: ByteSize = ByteSize::new(self.block_size as u64, 1024);
         writeln!(formatter, "    Band size\t\t\t\t\t: {}", byte_size)?;
 
+        if let Some(encryption_type) = &self.encryption_type {
+            writeln!(formatter, "    Encryption information:")?;
+            writeln!(
+                formatter,
+                "        Encryption method\t\t\t: {}",
+                encryption_type
+            )?;
+            // TODO: print human readable encryption method
+            // TODO: print key protectors
+            // TODO: print identifier
+
+            if self.is_locked {
+                writeln!(formatter, "        Is locked")?;
+            }
+        }
         writeln!(formatter, "    Media information:")?;
 
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
@@ -73,9 +98,11 @@ impl SparseBundleInfo {
     fn get_image_information(sparsebundle_image: &SparseBundleImage) -> SparseBundleImageInfo {
         let mut image_information: SparseBundleImageInfo = SparseBundleImageInfo::new();
 
-        image_information.block_size = sparsebundle_image.block_size;
-        image_information.media_size = sparsebundle_image.media_size;
-        image_information.bytes_per_sector = sparsebundle_image.bytes_per_sector;
+        image_information.block_size = sparsebundle_image.get_block_size();
+        image_information.is_locked = sparsebundle_image.is_locked();
+        image_information.encryption_type = sparsebundle_image.get_encryption_type().cloned();
+        image_information.media_size = sparsebundle_image.get_media_size();
+        image_information.bytes_per_sector = sparsebundle_image.get_bytes_per_sector();
 
         image_information
     }
@@ -91,11 +118,32 @@ impl SparseBundleInfo {
         };
         let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
 
-        match sparsebundle_image.open(&file_resolver) {
+        let file_name: PathComponent = PathComponent::from("Info.plist");
+        match sparsebundle_image.open(&file_resolver, &file_name) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open sparsebundle image");
+                keramics_core::error_trace_add_frame!(error, "Unable to open image");
                 return Err(error);
+            }
+        }
+        if sparsebundle_image.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match sparsebundle_image.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to unlock image");
+                    return Err(error);
+                }
             }
         }
         Ok(sparsebundle_image)
@@ -155,6 +203,8 @@ mod tests {
             SparseBundleInfo::get_image_information(&sparsebundle_image);
 
         assert_eq!(test_struct.block_size, 8388608);
+        assert_eq!(test_struct.is_locked, false);
+        assert_eq!(test_struct.encryption_type, None);
         assert_eq!(test_struct.media_size, 4194304);
         assert_eq!(test_struct.bytes_per_sector, 512);
 

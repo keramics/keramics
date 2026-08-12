@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::HashSet;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};

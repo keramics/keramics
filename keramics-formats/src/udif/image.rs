@@ -56,11 +56,11 @@ pub struct UdifImage {
     /// Compression method.
     compression_method: UdifCompressionMethod,
 
-    /// Value to indicate the (encrypted) image is locked.
-    is_locked: bool,
-
     /// Encryption type.
     encryption_type: Option<CdsaEncrEncryptionType>,
+
+    /// Value to indicate the (encrypted) image is locked.
+    is_locked: bool,
 
     /// The current offset.
     current_offset: u64,
@@ -81,8 +81,8 @@ impl UdifImage {
             block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
             block_cache: LruCache::new(64),
             compression_method: UdifCompressionMethod::None,
-            is_locked: false,
             encryption_type: None,
+            is_locked: false,
             current_offset: 0,
             media_size: 0,
         }
@@ -369,9 +369,7 @@ impl UdifImage {
     /// Unlocks a locked (encrypted) volume.
     pub fn unlock(&mut self, credentials: &[CdsaEncrCredential]) -> Result<bool, ErrorTrace> {
         match self.segment_stream.write() {
-            Ok(mut segment_stream) => match segment_stream
-                .unlock(self.bytes_per_sector, credentials)
-            {
+            Ok(mut segment_stream) => match segment_stream.unlock(credentials) {
                 Ok(true) => {
                     self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                     self.number_of_segments = segment_stream.number_of_segments;
@@ -604,6 +602,21 @@ mod tests {
     }
 
     // TODO: add tests for read_data_from_blocks
+
+    #[test]
+    fn test_unlock() -> Result<(), ErrorTrace> {
+        let mut image: UdifImage = get_image("hfsplus_zlib_aes128.dmg")?;
+
+        assert_eq!(image.is_locked, true);
+
+        let credentials: Vec<CdsaEncrCredential> =
+            vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        image.unlock(&credentials)?;
+
+        assert_eq!(image.is_locked, false);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {

@@ -379,7 +379,6 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     use crate::tests::get_test_data_path;
-    use crate::udif::segment_range::UdifSegmentRange;
 
     fn get_file(path_string: &str) -> Result<UdifFile, ErrorTrace> {
         let mut file: UdifFile = UdifFile::new();
@@ -447,7 +446,6 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
-        let segment_range: UdifSegmentRange = UdifSegmentRange::new(0, 1, file.data_fork_size);
         let mut block_table_reader: UdifBlockTableReader =
             UdifBlockTableReader::new(512, file.data_fork_size);
         file.read_resource_fork(&mut block_table_reader)?;
@@ -466,7 +464,6 @@ mod tests {
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
-        let segment_range: UdifSegmentRange = UdifSegmentRange::new(0, 1, file.data_fork_size);
         let mut block_table_reader: UdifBlockTableReader =
             UdifBlockTableReader::new(512, file.data_fork_size);
         file.read_xml_plist(&mut block_table_reader)?;

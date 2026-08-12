@@ -28,7 +28,7 @@ A version 2 encrypted container consist of:
 * [Encrypted container header](#encypted_container_header) at the start of the file
 * Key protectors
 * Unknown (empty values), probably reserved for the key protectors
-* Encrypted data
+* Encrypted data, typically at offset 122368
 
 Version 2 supports the following key protectors:
 

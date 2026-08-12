@@ -11,6 +11,7 @@
  * under the License.
  */
 
+// pub const LOCKED_VALUE: &'static str = "N/A (locked)";
 pub const NOT_SET_VALUE: &'static str = "N/A (not set)";
 
 pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
