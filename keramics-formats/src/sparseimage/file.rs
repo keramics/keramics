@@ -14,14 +14,13 @@
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
-use crate::cdsaencr::constants::*;
-use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
-
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
 use crate::block_tree::BlockTree;
+use crate::cdsaencr::constants::*;
+use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
 
 use super::block_range::SparseImageBlockRange;
 use super::file_header::SparseImageFileHeader;
@@ -37,14 +36,14 @@ pub struct SparseImageFile {
     /// Bytes per sector.
     bytes_per_sector: u16,
 
-    /// Block size.
-    block_size: u32,
-
-    /// Value to indicate the (encrypted) image is locked.
-    is_locked: bool,
+    /// Band size.
+    band_size: u32,
 
     /// Encryption type.
     encryption_type: Option<CdsaEncrEncryptionType>,
+
+    /// Value to indicate the (encrypted) image is locked.
+    is_locked: bool,
 
     /// The current offset.
     current_offset: u64,
@@ -60,9 +59,9 @@ impl SparseImageFile {
             data_stream: None,
             block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
             bytes_per_sector: 0,
-            block_size: 0,
-            is_locked: false,
+            band_size: 0,
             encryption_type: None,
+            is_locked: false,
             current_offset: 0,
             media_size: 0,
         }
@@ -70,7 +69,7 @@ impl SparseImageFile {
 
     /// Retrieves the block size.
     pub fn get_block_size(&self) -> u32 {
-        self.block_size
+        self.band_size
     }
 
     /// Retrieves the bytes per sector.
@@ -194,10 +193,10 @@ impl SparseImageFile {
             )));
         }
         self.bytes_per_sector = 512;
-        self.block_size = file_header.sectors_per_band * (self.bytes_per_sector as u32);
+        self.band_size = file_header.sectors_per_band * (self.bytes_per_sector as u32);
         self.media_size = (file_header.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
-        let block_tree_size: u64 = (number_of_bands as u64) * (self.block_size as u64);
+        let block_tree_size: u64 = (number_of_bands as u64) * (self.band_size as u64);
 
         self.block_tree = BlockTree::<SparseImageBlockRange>::new(
             block_tree_size,
@@ -227,13 +226,13 @@ impl SparseImageFile {
             if band_number == 0 {
                 continue;
             }
-            let block_media_offset: u64 = ((band_number - 1) as u64) * (self.block_size as u64);
-            let band_data_offset: u64 = 4096 + ((array_index as u64) * (self.block_size as u64));
+            let band_media_offset: u64 = ((band_number - 1) as u64) * (self.band_size as u64);
+            let band_data_offset: u64 = 4096 + ((array_index as u64) * (self.band_size as u64));
 
             let block_range: SparseImageBlockRange = SparseImageBlockRange::new(band_data_offset);
             match self.block_tree.insert_value(
-                block_media_offset,
-                self.block_size as u64,
+                band_media_offset,
+                self.band_size as u64,
                 block_range,
             ) {
                 Ok(_) => {}
@@ -261,10 +260,10 @@ impl SparseImageFile {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.current_offset;
-        let block_number: u64 = media_offset / (self.block_size as u64);
-        let block_offset: u64 = block_number * (self.block_size as u64);
-        let mut range_relative_offset: u64 = media_offset - block_offset;
-        let mut range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
+        let band_number: u64 = media_offset / (self.band_size as u64);
+        let band_offset: u64 = band_number * (self.band_size as u64);
+        let mut range_relative_offset: u64 = media_offset - band_offset;
+        let mut range_remainder_size: u64 = (self.band_size as u64) - range_relative_offset;
 
         while data_offset < read_size {
             if media_offset >= self.media_size {
@@ -315,7 +314,7 @@ impl SparseImageFile {
             media_offset += range_read_count as u64;
 
             range_relative_offset = 0;
-            range_remainder_size = self.block_size as u64;
+            range_remainder_size = self.band_size as u64;
         }
         Ok(data_offset)
     }
@@ -452,6 +451,26 @@ mod tests {
     }
 
     #[test]
+    fn test_get_block_size() -> Result<(), ErrorTrace> {
+        let file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
+
+        let block_size: u32 = file.get_block_size();
+        assert_eq!(block_size, 1048576);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
+
+        let bytes_per_sector: u16 = file.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_encryption_type() -> Result<(), ErrorTrace> {
         let file: SparseImageFile = get_file("sparseimage/hfsplus_aes128.sparseimage")?;
 
@@ -459,6 +478,16 @@ mod tests {
         assert_eq!(encryption_type.method, 0x80000001);
         assert_eq!(encryption_type.mode, 5);
         assert_eq!(encryption_type.key_size, 16);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
+
+        let media_size: u64 = file.get_media_size();
+        assert_eq!(media_size, 4194304);
 
         Ok(())
     }
@@ -483,7 +512,7 @@ mod tests {
         file.read_data_stream(&data_stream)?;
 
         assert_eq!(file.bytes_per_sector, 512);
-        assert_eq!(file.block_size, 1048576);
+        assert_eq!(file.band_size, 1048576);
         assert_eq!(file.media_size, 4194304);
 
         Ok(())
@@ -499,13 +528,28 @@ mod tests {
         file.read_header_block(&data_stream)?;
 
         assert_eq!(file.bytes_per_sector, 512);
-        assert_eq!(file.block_size, 1048576);
+        assert_eq!(file.band_size, 1048576);
         assert_eq!(file.media_size, 4194304);
 
         Ok(())
     }
 
     // TODO: add test for read_data_from_bands
+
+    #[test]
+    fn test_unlock() -> Result<(), ErrorTrace> {
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus_aes128.sparseimage")?;
+
+        assert_eq!(file.is_locked, true);
+
+        let credentials: Vec<CdsaEncrCredential> =
+            vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        file.unlock(&credentials)?;
+
+        assert_eq!(file.is_locked, false);
+
+        Ok(())
+    }
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {

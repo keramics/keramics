@@ -88,8 +88,8 @@ impl SparseImageInfo {
     fn get_file_information(sparseimage_file: &SparseImageFile) -> SparseImageFileInfo {
         let mut file_information: SparseImageFileInfo = SparseImageFileInfo::new();
 
-        file_information.encryption_type = sparseimage_file.get_encryption_type().cloned();
         file_information.block_size = sparseimage_file.get_block_size();
+        file_information.encryption_type = sparseimage_file.get_encryption_type().cloned();
         file_information.media_size = sparseimage_file.get_media_size();
         file_information.bytes_per_sector = sparseimage_file.get_bytes_per_sector();
 

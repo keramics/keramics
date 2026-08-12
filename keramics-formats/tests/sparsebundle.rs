@@ -15,8 +15,9 @@ use std::path::PathBuf;
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, ErrorTrace};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparsebundle::SparseBundleImage;
-use keramics_formats::{FileResolverReference, open_os_file_resolver};
+use keramics_formats::{FileResolverReference, PathComponent, open_os_file_resolver};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_media_from_image(image: &mut SparseBundleImage) -> Result<(u64, String), ErrorTrace> {
@@ -63,7 +64,8 @@ fn open_image(base_path: &PathBuf) -> Result<SparseBundleImage, ErrorTrace> {
     };
     let mut image: SparseBundleImage = SparseBundleImage::new();
 
-    match image.open(&file_resolver) {
+    let file_name: PathComponent = PathComponent::from("Info.plist");
+    match image.open(&file_resolver, &file_name) {
         Ok(_) => {}
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(error, "Unable to open sparsebundle image");
@@ -79,8 +81,23 @@ fn read_media() -> Result<(), ErrorTrace> {
     let mut image: SparseBundleImage = open_image(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    assert_eq!(media_offset, image.media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "7adf013daec71e509669a9315a6a173c");
+
+    Ok(())
+}
+
+#[test]
+fn read_media_encrypted() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus_aes128.sparsebundle");
+    let mut image: SparseBundleImage = open_image(&path_buf)?;
+    let credentials: Vec<CdsaEncrCredential> =
+        vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    image.unlock(&credentials)?;
+
+    let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
+    assert_eq!(media_offset, image.get_media_size());
+    assert_eq!(md5_hash.as_str(), "2d568b020506121467d1d97bcc024f68");
 
     Ok(())
 }

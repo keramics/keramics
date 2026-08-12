@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
@@ -364,11 +363,35 @@ impl StorageMediaImage {
         };
         let mut sparsebundle_image: SparseBundleImage = SparseBundleImage::new();
 
-        match sparsebundle_image.open(&file_resolver) {
+        let file_name: PathComponent = PathComponent::from("Info.plist");
+        match sparsebundle_image.open(&file_resolver, &file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open sparsebundle image");
                 return Err(error);
+            }
+        }
+        if sparsebundle_image.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match sparsebundle_image.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock sparsebundle image"
+                    );
+                    return Err(error);
+                }
             }
         }
         Ok(Self::SparseBundle {

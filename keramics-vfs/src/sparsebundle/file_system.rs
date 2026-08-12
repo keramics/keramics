@@ -14,9 +14,12 @@
 use std::sync::{Arc, RwLock};
 
 use keramics_core::ErrorTrace;
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparsebundle::SparseBundleImage;
-use keramics_formats::{FileResolverReference, Path};
+use keramics_formats::{FileResolverReference, Path, PathComponent};
 
+use crate::credential::VfsCredential;
+use crate::credential_store::VfsCredentialStore;
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
 use crate::types::VfsFileSystemReference;
@@ -72,7 +75,7 @@ impl SparseBundleFileSystem {
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
         match self.image.read() {
-            Ok(sparsebundle_image) => Ok(sparsebundle_image.bytes_per_sector as u32),
+            Ok(sparsebundle_image) => Ok(sparsebundle_image.get_bytes_per_sector() as u32),
             Err(error) => {
                 return Err(keramics_core::error_trace_new_with_error!(
                     "Unable to obtain read lock on sparsebundle image",
@@ -99,7 +102,14 @@ impl SparseBundleFileSystem {
                     return Ok(None);
                 }
                 let media_size: u64 = match self.image.read() {
-                    Ok(sparsebundle_image) => sparsebundle_image.media_size,
+                    Ok(sparsebundle_image) => {
+                        if sparsebundle_image.is_locked() {
+                            return Err(keramics_core::error_trace_new!(
+                                "sparsebundle image is locked"
+                            ));
+                        }
+                        sparsebundle_image.get_media_size()
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on sparsebundle image",
@@ -185,11 +195,35 @@ impl SparseBundleFileSystem {
                     return Err(error);
                 }
             };
-        match image.open(&file_resolver) {
+        let file_name: PathComponent = PathComponent::from("Info.plist");
+        match image.open(&file_resolver, &file_name) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open sparsebundle image");
                 return Err(error);
+            }
+        }
+        if image.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match image.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Failed to unlock sparsebundle image"
+                    );
+                    return Err(error);
+                }
             }
         }
         Ok(())

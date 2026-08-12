@@ -28,7 +28,7 @@ A version 2 encrypted container consist of:
 * [Encrypted container header](#encypted_container_header) at the start of the file
 * Key protectors
 * Unknown (empty values), probably reserved for the key protectors
-* Encrypted data
+* Encrypted data, typically at offset 122368
 
 Version 2 supports the following key protectors:
 
@@ -406,8 +406,8 @@ TODO: complete section
 The encrypted block data can be decrypted using the following approach:
 
 * Calculate the specified block HMAC, e.g. HMAC-SHA-1, with the block HMAC key and the block number
-  stored as a 32-bit big-endian value. This HMAC is used as the initialization vector for
-  decryption.
+  stored as a 32-bit big-endian value, where 0 represents the first block. This HMAC is used as the
+  initialization vector for decryption.
 * Decrypt the encrypted data using the block encryption method and mode, e.g. AES-CBC, with the
   number of bits of the block DEK (defined by the block encryption key size) and the initialization
   vector if applicable.

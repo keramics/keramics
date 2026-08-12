@@ -52,14 +52,14 @@ pub struct UdifSegmentStream {
     /// Number of sectors.
     pub number_of_sectors: u64,
 
-    /// Value to indicate the (encrypted) image is locked.
-    pub is_locked: bool,
-
     /// Encryption type.
     pub encryption_type: CdsaEncrEncryptionType,
 
     /// Credentials.
     credentials: Vec<CdsaEncrCredential>,
+
+    /// Value to indicate the (encrypted) image is locked.
+    pub is_locked: bool,
 
     /// The current offset.
     current_offset: u64,
@@ -79,9 +79,9 @@ impl UdifSegmentStream {
             segment_ranges: Vec::new(),
             segment_file_cache: LruCache::new(16),
             number_of_sectors: 0,
-            is_locked: false,
             encryption_type: CdsaEncrEncryptionType::new(),
             credentials: Vec::new(),
+            is_locked: false,
             current_offset: 0,
             size: 0,
         }
@@ -553,11 +553,7 @@ impl UdifSegmentStream {
     }
 
     /// Unlocks a locked (encrypted) segment stream.
-    pub fn unlock(
-        &mut self,
-        bytes_per_sector: u16,
-        credentials: &[CdsaEncrCredential],
-    ) -> Result<bool, ErrorTrace> {
+    pub fn unlock(&mut self, credentials: &[CdsaEncrCredential]) -> Result<bool, ErrorTrace> {
         if !self.is_locked {
             return Ok(true);
         }
@@ -900,13 +896,13 @@ mod tests {
 
     #[test]
     fn test_unlock() -> Result<(), ErrorTrace> {
-        let mut segment_stream: UdifSegmentStream = get_segment_stream("hfsplus_zlib_aes128.dmg")?;
+        let mut segment_stream: UdifSegmentStream = get_segment_stream("hfsplus_aes256.dmg")?;
 
         assert_eq!(segment_stream.is_locked, true);
 
         let credentials: Vec<CdsaEncrCredential> =
             vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
-        segment_stream.unlock(512, &credentials)?;
+        segment_stream.unlock(&credentials)?;
 
         assert_eq!(segment_stream.is_locked, false);
 

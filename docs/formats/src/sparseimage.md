@@ -3,6 +3,8 @@
 The Mac OS sparse image (.sparseimage) format is one of the disk image formats supported natively
 by Mac OS.
 
+Mac OS referers to the sparse image format as CSparseDiskImage.
+
 ## Overview
 
 Sparse images can be encrypted. An encrypted sparse image uses a

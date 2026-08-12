@@ -11,10 +11,13 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
+use crate::cdsaencr::constants::*;
+use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
@@ -27,19 +30,28 @@ pub struct SparseBundleImage {
     file_resolver: FileResolverReference,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
-    /// Block size.
-    pub block_size: u32,
+    /// Band size.
+    band_size: u32,
 
     /// Band file cache.
     band_file_cache: LruCache<u64, DataStreamReference>,
+
+    /// Encrypted container.
+    encrypted_container: Option<CdsaEncrContainer>,
+
+    /// Encrypted block size.
+    encrypted_block_size: usize,
+
+    /// Decrypted block cache.
+    block_cache: LruCache<u32, Vec<u8>>,
 
     /// The current offset.
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    media_size: u64,
 }
 
 impl SparseBundleImage {
@@ -48,19 +60,67 @@ impl SparseBundleImage {
         Self {
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             bytes_per_sector: 0,
-            block_size: 0,
+            band_size: 0,
             band_file_cache: LruCache::new(16),
+            encrypted_container: None,
+            encrypted_block_size: 0,
+            block_cache: LruCache::new(64),
             current_offset: 0,
             media_size: 0,
         }
     }
 
+    /// Retrieves the block size.
+    pub fn get_block_size(&self) -> u32 {
+        self.band_size
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the encryption type.
+    pub fn get_encryption_type(&self) -> Option<&CdsaEncrEncryptionType> {
+        match &self.encrypted_container {
+            Some(encrypted_container) => Some(encrypted_container.get_encryption_type()),
+            None => None,
+        }
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
+    }
+
+    /// Determines if the (encrypted) image is locked.
+    pub fn is_locked(&self) -> bool {
+        match &self.encrypted_container {
+            Some(encrypted_container) => encrypted_container.is_locked(),
+            None => false,
+        }
+    }
+
     /// Opens a storage media image.
-    pub fn open(&mut self, file_resolver: &FileResolverReference) -> Result<(), ErrorTrace> {
-        match self.read_info_plist(&file_resolver, "Info.plist") {
+    pub fn open(
+        &mut self,
+        file_resolver: &FileResolverReference,
+        file_name: &PathComponent,
+    ) -> Result<(), ErrorTrace> {
+        match self.read_info_plist_file(&file_resolver, file_name) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read Info.plist");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to read info.plist file: {}", file_name)
+                );
+                return Err(error);
+            }
+        }
+        match self.read_token_file(&file_resolver) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read token file");
                 return Err(error);
             }
         }
@@ -70,12 +130,12 @@ impl SparseBundleImage {
     }
 
     /// Reads an Info.plist or Info.bckup file.
-    fn read_info_plist(
+    fn read_info_plist_file(
         &mut self,
         file_resolver: &FileResolverReference,
-        file_name: &str,
+        file_name: &PathComponent,
     ) -> Result<(), ErrorTrace> {
-        let path_components: [PathComponent; 1] = [PathComponent::from(file_name)];
+        let path_components: [PathComponent; 1] = [file_name.clone()];
 
         let data_stream: DataStreamReference = match file_resolver.get_data_stream(&path_components)
         {
@@ -169,7 +229,7 @@ impl SparseBundleImage {
                         *integer
                     )));
                 }
-                self.block_size = *integer as u32;
+                self.band_size = *integer as u32;
             }
             None => {
                 return Err(keramics_core::error_trace_new!(
@@ -198,22 +258,81 @@ impl SparseBundleImage {
         Ok(())
     }
 
+    /// Reads a token file.
+    fn read_token_file(&mut self, file_resolver: &FileResolverReference) -> Result<(), ErrorTrace> {
+        let path_components: [PathComponent; 1] = [PathComponent::from("token")];
+
+        let data_stream: DataStreamReference = match file_resolver.get_data_stream(&path_components)
+        {
+            Ok(Some(data_stream)) => data_stream,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing data stream: token",
+                ));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file: token");
+                return Err(error);
+            }
+        };
+        let data_stream_size: u64 = keramics_core::data_stream_get_size!(data_stream);
+
+        if data_stream_size == 0 {
+            return Ok(());
+        }
+        let mut footer_signature: [u8; 8] = [0; 8];
+        let mut header_signature: [u8; 8] = [0; 8];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            &data_stream,
+            &mut header_signature,
+            SeekFrom::Start(0)
+        );
+        keramics_core::data_stream_read_exact_at_position!(
+            &data_stream,
+            &mut footer_signature,
+            SeekFrom::End(-8)
+        );
+        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        {
+            let mut encrypted_container: CdsaEncrContainer = CdsaEncrContainer::new();
+
+            match encrypted_container.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read encrypted container"
+                    );
+                    return Err(error);
+                }
+            }
+            self.encrypted_block_size = encrypted_container.get_block_size() as usize;
+            self.encrypted_container = Some(encrypted_container);
+        }
+        Ok(())
+    }
+
     /// Reads media data from the bands based on the block size.
     fn read_data_from_bands(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
+        if self.is_locked() {
+            return Err(keramics_core::error_trace_new!("Image is locked"));
+        }
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.current_offset;
-        let mut block_number: u64 = media_offset / (self.block_size as u64);
-        let block_offset: u64 = block_number * (self.block_size as u64);
-        let mut range_relative_offset: u64 = media_offset - block_offset;
-        let mut range_remainder_size: u64 = (self.block_size as u64) - range_relative_offset;
+        let mut band_number: u64 = media_offset / (self.band_size as u64);
+        let band_offset: u64 = band_number * (self.band_size as u64);
+        let mut range_relative_offset: u64 = media_offset - band_offset;
+        let mut range_remainder_size: u64 = (self.band_size as u64) - range_relative_offset;
 
         while data_offset < read_size {
             if media_offset >= self.media_size {
                 break;
             }
-            if !self.band_file_cache.contains(&block_number) {
-                let band_file_name: String = format!("{:x}", block_number);
+            if !self.band_file_cache.contains(&band_number) {
+                let band_file_name: String = format!("{:x}", band_number);
 
                 let path_components: [PathComponent; 2] = [
                     PathComponent::from("bands"),
@@ -236,40 +355,111 @@ impl SparseBundleImage {
                             return Err(error);
                         }
                     };
-                self.band_file_cache.insert(block_number, data_stream);
+                self.band_file_cache.insert(band_number, data_stream);
             }
-            let data_stream: &DataStreamReference = match self.band_file_cache.get(&block_number) {
+            let data_stream: &DataStreamReference = match self.band_file_cache.get(&band_number) {
                 Some(file) => file,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unable to retrieve band file: bands/{:x} from cache",
-                        block_number
+                        band_number
                     )));
                 }
             };
-            let mut range_read_size: usize = read_size - data_offset;
+            let range_read_size: usize =
+                min(read_size - data_offset, range_remainder_size as usize);
 
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
+            match &mut self.encrypted_container {
+                Some(encrypted_container) => {
+                    let range_data_end_offset: usize = data_offset + range_read_size;
+
+                    let mut block_number: u64 = media_offset / (self.encrypted_block_size as u64);
+                    let block_media_offset: u64 = block_number * (self.encrypted_block_size as u64);
+                    let mut block_data_offset: usize = (media_offset - block_media_offset) as usize;
+
+                    let mut block_offset: u64 = range_relative_offset - (block_data_offset as u64);
+                    let mut block_remainder_size: usize =
+                        self.encrypted_block_size - block_data_offset;
+
+                    while data_offset < range_data_end_offset {
+                        // TODO: cache decrypted block.
+                        let mut encrypted_data: Vec<u8> = vec![0; self.encrypted_block_size];
+
+                        keramics_core::data_stream_read_exact_at_position!(
+                            data_stream,
+                            &mut encrypted_data,
+                            SeekFrom::Start(block_offset)
+                        );
+                        let mut block_data: Vec<u8> = vec![0; self.encrypted_block_size];
+
+                        match encrypted_container.decrypt_block(
+                            block_number as u32,
+                            &encrypted_data,
+                            &mut block_data,
+                        ) {
+                            Ok(_) => {}
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!("Unable to decrypt block: {}", block_number)
+                                );
+                                return Err(error);
+                            }
+                        }
+                        let block_read_size: usize =
+                            min(read_size - data_offset, block_remainder_size);
+
+                        let data_end_offset: usize = data_offset + block_read_size;
+                        let block_data_end_offset: usize = block_data_offset + block_read_size;
+
+                        data[data_offset..data_end_offset]
+                            .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+
+                        data_offset = data_end_offset;
+                        media_offset += block_read_size as u64;
+                        block_number += 1;
+                        block_offset += self.encrypted_block_size as u64;
+                        block_data_offset = 0;
+                        block_remainder_size = self.encrypted_block_size;
+                    }
+                }
+                None => {
+                    let data_end_offset: usize = data_offset + range_read_size;
+
+                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                        data_stream,
+                        &mut data[data_offset..data_end_offset],
+                        SeekFrom::Start(range_relative_offset)
+                    );
+                    if read_count == 0 {
+                        break;
+                    }
+                    data_offset += read_count;
+                    media_offset += read_count as u64;
+                }
             }
-            let data_end_offset: usize = data_offset + range_read_size;
-
-            let read_count: usize = keramics_core::data_stream_read_at_position!(
-                data_stream,
-                &mut data[data_offset..data_end_offset],
-                SeekFrom::Start(range_relative_offset)
-            );
-            if read_count == 0 {
-                break;
-            }
-            data_offset += read_count;
-            media_offset += read_count as u64;
-
-            block_number += 1;
+            band_number += 1;
             range_relative_offset = 0;
-            range_remainder_size = self.block_size as u64;
+            range_remainder_size = self.band_size as u64;
         }
         Ok(data_offset)
+    }
+
+    /// Unlocks a locked (encrypted) image.
+    pub fn unlock(&mut self, credentials: &[CdsaEncrCredential]) -> Result<bool, ErrorTrace> {
+        match &mut self.encrypted_container {
+            Some(encrypted_container) => match encrypted_container.unlock(credentials) {
+                Ok(result) => Ok(result),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock encrypted container"
+                    );
+                    Err(error)
+                }
+            },
+            None => Ok(true),
+        }
     }
 }
 
@@ -346,15 +536,68 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_image() -> Result<SparseBundleImage, ErrorTrace> {
+    fn get_image(path_string: &str) -> Result<SparseBundleImage, ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
-        let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let test_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
-        image.open(&file_resolver)?;
+        let file_name: PathComponent = PathComponent::from("Info.plist");
+        image.open(&file_resolver, &file_name)?;
 
         Ok(image)
+    }
+
+    #[test]
+    fn test_get_block_size() -> Result<(), ErrorTrace> {
+        let image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
+
+        let block_size: u32 = image.get_block_size();
+        assert_eq!(block_size, 8388608);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
+
+        let bytes_per_sector: u16 = image.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_type() -> Result<(), ErrorTrace> {
+        let image: SparseBundleImage = get_image("sparsebundle/hfsplus_aes128.sparsebundle")?;
+
+        let encryption_type: &CdsaEncrEncryptionType = image.get_encryption_type().unwrap();
+        assert_eq!(encryption_type.method, 0x80000001);
+        assert_eq!(encryption_type.mode, 5);
+        assert_eq!(encryption_type.key_size, 16);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
+
+        let media_size: u64 = image.get_media_size();
+        assert_eq!(media_size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_locked() -> Result<(), ErrorTrace> {
+        let image: SparseBundleImage = get_image("sparsebundle/hfsplus_aes128.sparsebundle")?;
+
+        let is_locked: bool = image.is_locked();
+        assert_eq!(is_locked, true);
+
+        Ok(())
     }
 
     #[test]
@@ -364,24 +607,28 @@ mod tests {
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
-        image.open(&file_resolver)?;
+        let file_name: PathComponent = PathComponent::from("Info.plist");
+        image.open(&file_resolver, &file_name)?;
 
-        assert_eq!(image.block_size, 8388608);
+        assert_eq!(image.bytes_per_sector, 512);
+        assert_eq!(image.band_size, 8388608);
         assert_eq!(image.media_size, 4194304);
 
         Ok(())
     }
 
     #[test]
-    fn test_read_info_plist() -> Result<(), ErrorTrace> {
+    fn test_read_info_plist_file() -> Result<(), ErrorTrace> {
         let mut image: SparseBundleImage = SparseBundleImage::new();
 
         let path_string: String = get_test_data_path("sparsebundle/hfsplus.sparsebundle");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let file_resolver: FileResolverReference = open_os_file_resolver(&path_buf)?;
-        image.read_info_plist(&file_resolver, "Info.plist")?;
+        let file_name: PathComponent = PathComponent::from("Info.plist");
+        image.read_info_plist_file(&file_resolver, &file_name)?;
 
-        assert_eq!(image.block_size, 8388608);
+        assert_eq!(image.bytes_per_sector, 512);
+        assert_eq!(image.band_size, 8388608);
         assert_eq!(image.media_size, 4194304);
 
         Ok(())
@@ -390,8 +637,23 @@ mod tests {
     // TODO: add tests for read_data_from_bands
 
     #[test]
+    fn test_unlock() -> Result<(), ErrorTrace> {
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus_aes128.sparsebundle")?;
+
+        assert_eq!(image.is_locked(), true);
+
+        let credentials: Vec<CdsaEncrCredential> =
+            vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+        image.unlock(&credentials)?;
+
+        assert_eq!(image.is_locked(), false);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         image.seek(SeekFrom::Start(1024))?;
 
@@ -403,7 +665,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         let size: u64 = image.get_size()?;
         assert_eq!(size, 4194304);
@@ -413,7 +675,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         let offset: u64 = image.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -423,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         let offset: u64 = image.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, image.media_size - 512);
@@ -433,7 +695,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         let offset = image.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -446,7 +708,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         let result: Result<u64, ErrorTrace> = image.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -456,7 +718,7 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
 
         let offset: u64 = image.seek(SeekFrom::End(512))?;
         assert_eq!(offset, image.media_size + 512);
@@ -466,7 +728,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
         image.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -519,7 +781,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
-        let mut image: SparseBundleImage = get_image()?;
+        let mut image: SparseBundleImage = get_image("sparsebundle/hfsplus.sparsebundle")?;
         image.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];

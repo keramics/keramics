@@ -47,11 +47,11 @@ pub struct CdsaEncrContainer {
     /// Data fork size.
     data_fork_size: u64,
 
-    /// Block size.
-    block_size: u32,
-
     /// Encryption type.
     encryption_type: CdsaEncrEncryptionType,
+
+    /// Block size.
+    block_size: u32,
 
     /// Initialization vector size.
     initialization_vector_size: usize,
@@ -65,9 +65,6 @@ pub struct CdsaEncrContainer {
     /// Key key_protectors.
     key_protectors: Vec<CdsaEncrKeyProtector>,
 
-    /// Credentials.
-    credentials: Vec<CdsaEncrCredential>,
-
     /// Encryption context.
     encryption_context: CdsaEncrEncryptionContext,
 
@@ -75,7 +72,7 @@ pub struct CdsaEncrContainer {
     hmac_context: CdsaEncrHmacContext,
 
     /// Decrypted block cache.
-    block_cache: LruCache<u64, Vec<u8>>,
+    block_cache: LruCache<u32, Vec<u8>>,
 
     /// Value to indicate the container is locked.
     is_locked: bool,
@@ -96,13 +93,12 @@ impl CdsaEncrContainer {
             container_identifier: Uuid::new(),
             data_fork_offset: 0,
             data_fork_size: 0,
-            block_size: 0,
             encryption_type: CdsaEncrEncryptionType::new(),
+            block_size: 0,
             initialization_vector_size: 0,
             hmac_method: 0,
             hmac_key_size: 0,
             key_protectors: Vec::new(),
-            credentials: Vec::new(),
             encryption_context: CdsaEncrEncryptionContext::None,
             hmac_context: CdsaEncrHmacContext::None,
             block_cache: LruCache::new(64),
@@ -187,8 +183,8 @@ impl CdsaEncrContainer {
             self.container_identifier = encrypted_container_header.container_identifier;
             self.data_fork_offset = encrypted_container_header.data_fork_offset;
             self.data_fork_size = encrypted_container_header.data_fork_size;
-            self.block_size = encrypted_container_header.block_size;
             self.encryption_type = encrypted_container_header.encryption_type;
+            self.block_size = encrypted_container_header.block_size;
             self.initialization_vector_size =
                 encrypted_container_header.initialization_vector_size as usize;
             self.hmac_method = encrypted_container_header.hmac_method;
@@ -230,8 +226,8 @@ impl CdsaEncrContainer {
             self.container_identifier = encrypted_container_footer.container_identifier;
             self.data_fork_offset = encrypted_container_footer.data_fork_offset as u64;
             self.data_fork_size = encrypted_container_footer.data_fork_size as u64;
-            self.block_size = encrypted_container_footer.block_size;
             self.encryption_type = encrypted_container_footer.encryption_type;
+            self.block_size = encrypted_container_footer.block_size;
             self.initialization_vector_size =
                 encrypted_container_footer.initialization_vector_size as usize;
             self.hmac_method = encrypted_container_footer.hmac_method;
@@ -250,17 +246,85 @@ impl CdsaEncrContainer {
         Ok(())
     }
 
+    /// Decrypts a block.
+    pub(crate) fn decrypt_block(
+        &mut self,
+        block_number: u32,
+        encrypted_data: &[u8],
+        data: &mut [u8],
+    ) -> Result<(), ErrorTrace> {
+        let block_number_data: [u8; 4] = (block_number as u32).to_be_bytes();
+
+        let mut initialization_vector: Vec<u8> =
+            match self.hmac_context.calculate_hmac(&block_number_data) {
+                Ok(data) => data,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to HMAC initialization vector for decrypting block: {}",
+                            block_number
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        match self
+            .encryption_context
+            .decrypt_cbc(&mut initialization_vector, encrypted_data, data)
+        {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to decrypt block: {}", block_number)
+                );
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    /// Reads and decrypts a block.
+    fn read_block(
+        &mut self,
+        block_number: u32,
+        block_data_offset: u64,
+    ) -> Result<Vec<u8>, ErrorTrace> {
+        let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
+
+        match self.data_stream.as_ref() {
+            Some(data_stream) => {
+                keramics_core::data_stream_read_exact_at_position!(
+                    data_stream,
+                    &mut encrypted_data,
+                    SeekFrom::Start(block_data_offset)
+                );
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        }
+        let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
+
+        match self.decrypt_block(block_number as u32, &encrypted_data, &mut block_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to decrypt block: {}", block_number)
+                );
+                return Err(error);
+            }
+        }
+        Ok(block_data)
+    }
+
     /// Reads container data based on the encrypted blocks.
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         if self.is_locked {
             return Err(keramics_core::error_trace_new!("Container is locked"));
         }
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
         let mut container_offset: u64 = self.current_offset;
@@ -268,11 +332,6 @@ impl CdsaEncrContainer {
         let mut block_number: u64 = container_offset / (self.block_size as u64);
         let mut block_offset: u64 = block_number * (self.block_size as u64);
 
-        if block_number > u32::MAX as u64 {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid block number value out of bounds"
-            ));
-        }
         while data_offset < read_size {
             if container_offset >= self.size {
                 break;
@@ -286,67 +345,37 @@ impl CdsaEncrContainer {
             if range_read_size == 0 {
                 break;
             }
-            if !self.block_cache.contains(&block_number) {
+            if block_number > u32::MAX as u64 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid block number value out of bounds"
+                ));
+            }
+            if !self.block_cache.contains(&(block_number as u32)) {
                 let block_data_offset: u64 = self.data_fork_offset + block_offset;
 
-                let mut encrypted_data: Vec<u8> = vec![0; self.block_size as usize];
-
-                keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
-                    &mut encrypted_data,
-                    SeekFrom::Start(block_data_offset)
-                );
-                let block_number_data: [u8; 4] = (block_number as u32).to_be_bytes();
-
-                let mut initialization_vector: Vec<u8> =
-                    match self.hmac_context.calculate_hmac(&block_number_data) {
+                let block_data: Vec<u8> =
+                    match self.read_block(block_number as u32, block_data_offset) {
                         Ok(data) => data,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                format!(
-                                    "Unable to HMAC initialization vector of encrypted block: {}",
-                                    block_number
-                                )
+                                format!("Unable to read block: {}", block_number)
                             );
                             return Err(error);
                         }
                     };
-                let mut block_data: Vec<u8> = vec![0; self.block_size as usize];
-
-                match self.encryption_context.decrypt_cbc(
-                    &mut initialization_vector,
-                    &encrypted_data,
-                    &mut block_data,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to decrypt encrypted block: {}", block_number)
-                        );
-                        return Err(error);
-                    }
-                }
-                keramics_core::debug_trace_data!(
-                    "BlockData",
-                    block_data_offset,
-                    &block_data,
-                    self.block_size,
-                );
-                self.block_cache.insert(block_number, block_data);
+                self.block_cache.insert(block_number as u32, block_data);
             }
-            let range_data: &[u8] = match self.block_cache.get(&block_number) {
+            let range_data: &[u8] = match self.block_cache.get(&(block_number as u32)) {
                 Some(data) => data,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve encrypted block: {} data from cache",
+                        "Unable to retrieve block: {} from cache",
                         block_number
                     )));
                 }
             };
             let data_end_offset: usize = data_offset + range_read_size;
-
             let range_data_offset: usize = range_relative_offset as usize;
             let range_data_end_offset: usize = range_data_offset + range_read_size;
 
@@ -354,9 +383,7 @@ impl CdsaEncrContainer {
                 .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
 
             data_offset = data_end_offset;
-            if data_offset >= read_size {
-                break;
-            }
+
             container_offset += range_read_size as u64;
             block_offset += self.block_size as u64;
             block_number += 1;
@@ -432,8 +459,6 @@ impl CdsaEncrContainer {
 
                                         keys_unlocked = true;
 
-                                        self.credentials.push(credential.clone());
-
                                         break;
                                     }
                                 }
@@ -482,8 +507,6 @@ impl CdsaEncrContainer {
                                             .to_vec();
 
                                         keys_unlocked = true;
-
-                                        self.credentials.push(credential.clone());
 
                                         break;
                                     }
