@@ -417,6 +417,8 @@ mod tests {
     use keramics_datetime::{FatDate, FatTimeDate, FatTimeDate10Ms};
     use keramics_types::Ucs2String;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_file_entry_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/fat/fat12.raw");
@@ -427,7 +429,6 @@ mod tests {
         let fat_file_entry: FatFileEntry = fat_file_system.get_file_entry_by_path(&path)?.unwrap();
         let test_struct: FatFileEntryInfo = FatInfo::get_file_entry_information(&fat_file_entry);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "    Identifier\t\t\t\t\t: 0x00006260\n",
             "    Name\t\t\t\t\t: testfile1\n",
@@ -439,7 +440,7 @@ mod tests {
             "        0x0020: Should be archived (FILE_ATTRIBUTE_ARCHIVE)\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

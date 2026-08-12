@@ -99,14 +99,7 @@ impl UdifFileEntry {
                         if udif_image.is_locked() {
                             return Err(keramics_core::error_trace_new!("UDIF image is locked"));
                         }
-                        match udif_image.get_media_size() {
-                            Some(media_size) => media_size,
-                            None => {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Unable to determine media size"
-                                ));
-                            }
-                        }
+                        udif_image.get_media_size()
                     }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
@@ -174,7 +167,7 @@ mod tests {
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
         let udif_image: UdifImage = get_image()?;
-        let media_size: u64 = udif_image.get_media_size().unwrap();
+        let media_size: u64 = udif_image.get_media_size();
 
         let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
@@ -197,7 +190,7 @@ mod tests {
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let udif_image: UdifImage = get_image()?;
-        let media_size: u64 = udif_image.get_media_size().unwrap();
+        let media_size: u64 = udif_image.get_media_size();
 
         let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
@@ -220,7 +213,7 @@ mod tests {
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let udif_image: UdifImage = get_image()?;
-        let media_size: u64 = udif_image.get_media_size().unwrap();
+        let media_size: u64 = udif_image.get_media_size();
 
         let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 
@@ -262,7 +255,7 @@ mod tests {
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let udif_image: UdifImage = get_image()?;
-        let media_size: u64 = udif_image.get_media_size().unwrap();
+        let media_size: u64 = udif_image.get_media_size();
 
         let test_image: Arc<RwLock<UdifImage>> = Arc::new(RwLock::new(udif_image));
 

@@ -95,7 +95,14 @@ impl SparseImageFileEntry {
                     )));
                 }
                 let media_size: u64 = match file.read() {
-                    Ok(sparseimage_file) => sparseimage_file.media_size,
+                    Ok(sparseimage_file) => {
+                        if sparseimage_file.is_locked() {
+                            return Err(keramics_core::error_trace_new!(
+                                "sparseimage file is locked"
+                            ));
+                        }
+                        sparseimage_file.get_media_size()
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on sparseimage file",
@@ -152,7 +159,6 @@ mod tests {
         let file_entry = SparseImageFileEntry::Root {
             file: test_file.clone(),
         };
-
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
@@ -162,14 +168,13 @@ mod tests {
     #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
         let sparseimage_file: SparseImageFile = get_file()?;
-        let media_size: u64 = sparseimage_file.media_size;
+        let media_size: u64 = sparseimage_file.get_media_size();
 
         let test_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(sparseimage_file));
 
         let file_entry = SparseImageFileEntry::Root {
             file: test_file.clone(),
         };
-
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
@@ -177,7 +182,6 @@ mod tests {
             file: test_file.clone(),
             size: media_size,
         };
-
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("sparseimage1"));
 
@@ -187,14 +191,13 @@ mod tests {
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
         let sparseimage_file: SparseImageFile = get_file()?;
-        let media_size: u64 = sparseimage_file.media_size;
+        let media_size: u64 = sparseimage_file.get_media_size();
 
         let test_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(sparseimage_file));
 
         let file_entry = SparseImageFileEntry::Root {
             file: test_file.clone(),
         };
-
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
@@ -202,7 +205,6 @@ mod tests {
             file: test_file.clone(),
             size: media_size,
         };
-
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 4194304);
 
@@ -212,14 +214,13 @@ mod tests {
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
         let sparseimage_file: SparseImageFile = get_file()?;
-        let media_size: u64 = sparseimage_file.media_size;
+        let media_size: u64 = sparseimage_file.get_media_size();
 
         let test_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(sparseimage_file));
 
         let file_entry = SparseImageFileEntry::Root {
             file: test_file.clone(),
         };
-
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 1);
 
@@ -227,7 +228,6 @@ mod tests {
             file: test_file.clone(),
             size: media_size,
         };
-
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
@@ -243,7 +243,6 @@ mod tests {
         let file_entry = SparseImageFileEntry::Root {
             file: test_file.clone(),
         };
-
         let sub_file_entry: SparseImageFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
         let name: PathComponent = sub_file_entry.get_name();
@@ -259,21 +258,19 @@ mod tests {
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
         let sparseimage_file: SparseImageFile = get_file()?;
-        let media_size: u64 = sparseimage_file.media_size;
+        let media_size: u64 = sparseimage_file.get_media_size();
 
         let test_file: Arc<RwLock<SparseImageFile>> = Arc::new(RwLock::new(sparseimage_file));
 
         let file_entry = SparseImageFileEntry::Root {
             file: test_file.clone(),
         };
-
         assert_eq!(file_entry.is_root_file_entry(), true);
 
         let file_entry = SparseImageFileEntry::Layer {
             file: test_file.clone(),
             size: media_size,
         };
-
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

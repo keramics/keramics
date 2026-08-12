@@ -12,6 +12,10 @@
  */
 
 use std::io::SeekFrom;
+use std::sync::{Arc, RwLock};
+
+use crate::cdsaencr::constants::*;
+use crate::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential, CdsaEncrEncryptionType};
 
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
@@ -31,16 +35,22 @@ pub struct SparseImageFile {
     block_tree: BlockTree<SparseImageBlockRange>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
     /// Block size.
-    pub block_size: u32,
+    block_size: u32,
+
+    /// Value to indicate the (encrypted) image is locked.
+    is_locked: bool,
+
+    /// Encryption type.
+    encryption_type: Option<CdsaEncrEncryptionType>,
 
     /// The current offset.
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    media_size: u64,
 }
 
 impl SparseImageFile {
@@ -51,9 +61,36 @@ impl SparseImageFile {
             block_tree: BlockTree::<SparseImageBlockRange>::new(0, 0, 0),
             bytes_per_sector: 0,
             block_size: 0,
+            is_locked: false,
+            encryption_type: None,
             current_offset: 0,
             media_size: 0,
         }
+    }
+
+    /// Retrieves the block size.
+    pub fn get_block_size(&self) -> u32 {
+        self.block_size
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the encryption type.
+    pub fn get_encryption_type(&self) -> Option<&CdsaEncrEncryptionType> {
+        self.encryption_type.as_ref()
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
+    }
+
+    /// Determines if the (encrypted) image is locked.
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
     }
 
     /// Reads a file from a data stream.
@@ -61,11 +98,44 @@ impl SparseImageFile {
         &mut self,
         data_stream: &DataStreamReference,
     ) -> Result<(), ErrorTrace> {
-        match self.read_header_block(data_stream) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read header block");
-                return Err(error);
+        let mut footer_signature: [u8; 8] = [0; 8];
+        let mut header_signature: [u8; 8] = [0; 8];
+
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut header_signature,
+            SeekFrom::Start(0)
+        );
+        keramics_core::data_stream_read_exact_at_position!(
+            data_stream,
+            &mut footer_signature,
+            SeekFrom::End(-8)
+        );
+        if &header_signature == CDSAENCR_CONTAINER_HEADER_SIGNATURE
+            || &footer_signature == CDSAENCR_CONTAINER_FOOTER_SIGNATURE
+        {
+            let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
+
+            match cdsaencr_container.read_data_stream(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open encrypted container",
+                    );
+                    return Err(error);
+                }
+            }
+            self.encryption_type = Some(cdsaencr_container.get_encryption_type().clone());
+            self.is_locked = true;
+        }
+        if !self.is_locked {
+            match self.read_header_block(data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read header block");
+                    return Err(error);
+                }
             }
         }
         self.data_stream = Some(data_stream.clone());
@@ -249,6 +319,52 @@ impl SparseImageFile {
         }
         Ok(data_offset)
     }
+
+    /// Unlocks a locked (encrypted) file.
+    pub fn unlock(&mut self, credentials: &[CdsaEncrCredential]) -> Result<bool, ErrorTrace> {
+        if !self.is_locked {
+            return Ok(true);
+        }
+        let data_stream: &DataStreamReference = match &self.data_stream {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
+
+        match cdsaencr_container.read_data_stream(data_stream) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open encrypted container",);
+                return Err(error);
+            }
+        }
+        let result: bool = match cdsaencr_container.unlock(credentials) {
+            Ok(result) => result,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Failed to unlock encrypted container",
+                );
+                return Err(error);
+            }
+        };
+        if result {
+            let data_stream: DataStreamReference = Arc::new(RwLock::new(cdsaencr_container));
+
+            match self.read_header_block(&data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read header block");
+                    return Err(error);
+                }
+            }
+            self.data_stream = Some(data_stream);
+            self.is_locked = false;
+        }
+        Ok(!self.is_locked)
+    }
 }
 
 impl DataStream for SparseImageFile {
@@ -324,15 +440,37 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_file() -> Result<SparseImageFile, ErrorTrace> {
+    fn get_file(path_string: &str) -> Result<SparseImageFile, ErrorTrace> {
         let mut file: SparseImageFile = SparseImageFile::new();
 
-        let path_string: String = get_test_data_path("sparseimage/hfsplus.sparseimage");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let test_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
         file.read_data_stream(&data_stream)?;
 
         Ok(file)
+    }
+
+    #[test]
+    fn test_get_encryption_type() -> Result<(), ErrorTrace> {
+        let file: SparseImageFile = get_file("sparseimage/hfsplus_aes128.sparseimage")?;
+
+        let encryption_type: &CdsaEncrEncryptionType = file.get_encryption_type().unwrap();
+        assert_eq!(encryption_type.method, 0x80000001);
+        assert_eq!(encryption_type.mode, 5);
+        assert_eq!(encryption_type.key_size, 16);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_locked() -> Result<(), ErrorTrace> {
+        let file: SparseImageFile = get_file("sparseimage/hfsplus_aes128.sparseimage")?;
+
+        let is_locked: bool = file.is_locked();
+        assert_eq!(is_locked, true);
+
+        Ok(())
     }
 
     #[test]
@@ -371,7 +509,7 @@ mod tests {
 
     #[test]
     fn test_get_offset() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         file.seek(SeekFrom::Start(1024))?;
 
@@ -383,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         let size: u64 = file.get_size()?;
         assert_eq!(size, 4194304);
@@ -393,7 +531,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         let offset: u64 = file.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -403,7 +541,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         let offset: u64 = file.seek(SeekFrom::End(-512))?;
         assert_eq!(offset, file.media_size - 512);
@@ -413,7 +551,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         let offset = file.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -426,7 +564,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         let result: Result<u64, ErrorTrace> = file.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -436,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
 
         let offset: u64 = file.seek(SeekFrom::End(512))?;
         assert_eq!(offset, file.media_size + 512);
@@ -446,7 +584,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
         file.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -499,7 +637,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_media_size() -> Result<(), ErrorTrace> {
-        let mut file: SparseImageFile = get_file()?;
+        let mut file: SparseImageFile = get_file("sparseimage/hfsplus.sparseimage")?;
         file.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];

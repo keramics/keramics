@@ -81,8 +81,7 @@ fn read_media_adc_compressed() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_adc.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "08c32fd5d0fc1c2274d1c2d34185312a");
 
     Ok(())
@@ -97,8 +96,7 @@ fn read_media_aes128_encrypted_and_zlib_compressed() -> Result<(), ErrorTrace> {
     image.unlock(&credentials)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())
@@ -113,8 +111,7 @@ fn read_media_aes256_encrypted() -> Result<(), ErrorTrace> {
     image.unlock(&credentials)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())
@@ -126,8 +123,7 @@ fn read_media_bzip2_compressed() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_bzip2.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "7ec785450bbc17de417be373fd5d2159");
 
     Ok(())
@@ -139,8 +135,7 @@ fn read_media_lzfse_compressed() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_lzfse.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "c2c160c788676641725fd1a4b8da733b");
 
     Ok(())
@@ -152,8 +147,7 @@ fn read_media_with_resource_fork() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_rsrc.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())
@@ -165,8 +159,7 @@ fn read_media_with_segments() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_segments.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())
@@ -178,8 +171,7 @@ fn read_media_zlib_compressed() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_zlib.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())
@@ -191,8 +183,7 @@ fn read_media_zlib_compressed_with_segments() -> Result<(), ErrorTrace> {
     let mut image: UdifImage = open_image(&path_buf, "hfsplus_zlib_segments.dmg")?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_image(&mut image)?;
-    let media_size: u64 = image.get_media_size().unwrap();
-    assert_eq!(media_offset, media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "399bfcc39637bde7e43eb86fcc8565ae");
 
     Ok(())

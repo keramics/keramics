@@ -1012,18 +1012,19 @@ mod tests {
     use keramics_core::open_os_data_stream;
     use keramics_datetime::{PosixTime32, PosixTime64Ns};
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_compatible_feature_status_flags_information_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ExtCompatibleFeatureFlagsInfo =
             ExtCompatibleFeatureFlagsInfo::new(0x00000038);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "        0x00000008: Has extended attributes (EXT2_FEATURE_COMPAT_EXT_ATTR)\n",
             "        0x00000010: Is resizable (EXT2_FEATURE_COMPAT_RESIZE_INO)\n",
             "        0x00000020: Has indexed directories (EXT2_FEATURE_COMPAT_DIR_INDEX)\n",
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }
@@ -1060,7 +1061,6 @@ mod tests {
         let test_struct: ExtFileEntryInfo =
             ExtInfo::get_file_entry_information(&mut ext_file_entry)?;
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "    Inode number\t\t\t\t: 14\n",
             "    Name\t\t\t\t\t: testfile1\n",
@@ -1075,7 +1075,7 @@ mod tests {
             "    File mode\t\t\t\t\t: -rw-r--r-- (0o100644)\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }
@@ -1085,11 +1085,10 @@ mod tests {
         let test_struct: ExtIncompatibleFeatureFlagsInfo =
             ExtIncompatibleFeatureFlagsInfo::new(0x00000002);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "        0x00000002: Directory entry has file type (EXT2_FEATURE_INCOMPAT_FILETYPE)\n",
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }
@@ -1099,12 +1098,11 @@ mod tests {
         let test_struct: ExtReadOnlyCompatibleFeatureFlagsInfo =
             ExtReadOnlyCompatibleFeatureFlagsInfo::new(0x00000003);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "        0x00000001: Has sparse superblocks and group descriptor tables (EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER)\n",
             "        0x00000002: Contains large files (EXT2_FEATURE_RO_COMPAT_LARGE_FILE)\n",
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

@@ -4,6 +4,8 @@ The Universal Disk Image Format (UDIF) (.dmg) is one of the disk image formats s
 by Mac OS. UDIF supersedes the New Disk Image Format (NDIF) format and was introduced in Max OS
 X 10.0 (Cheetah).
 
+Mac OS referers to the UDIF image format as CUDIFEncoding.
+
 ## Overview
 
 An UDIF image can consists of one or more segment files, where:
@@ -31,7 +33,9 @@ Known UDIF image types are:
 | ULFO | LZFSE compressed UDIF |
 | ULMO | LZMA compressed UDIF |
 
-UDIF images can be encrypted, where each encrypted segment file has its own key protectors.
+UDIF images can be encrypted. An encrypted UDIF image consists of one of more UDIF segment files,
+where each segment file uses a [Encrypted Encoding container](cdsaencr.md) with its own key
+protectors.
 
 ### Terminology
 
@@ -40,11 +44,15 @@ UDIF images can be encrypted, where each encrypted segment file has its own key 
 | Flattened image | The disk image is a self-contained, a resource fork is stored within the image |
 | Unflattened image | The disk image uses the file system to store a resource fork |
 
-### UDIF image format
+### Image formats
 
-Mac OS referers to the UDIF image format as CUDIFEncoding.
+Known types of UDIF segment files are:
 
-#### Uncompressed image format
+* Uncompressed segment file
+* Compressed segment file
+* Encrypted segment file
+
+#### Uncompressed segment file format
 
 An uncompressed UDIF segment file consist of:
 
@@ -54,18 +62,13 @@ An uncompressed UDIF segment file consist of:
 > Note that an uncompressed UDIF image without file footer is equivalent to a RAW storage media
 > image (CRawDiskImage).
 
-#### Compressed image format
+#### Compressed segment file format
 
 A compressed UDIF segment file consist of:
 
 * Data fork, containing the image data
 * Optional resource fork or XML plist
 * [File footer](#file_footer) at the end of the file
-
-### Encrypted UDIF image
-
-An encrypted UDIF image consists of one of more UDIF segment files, where each segmentfile is
-encrypted using a [Encrypted Encoding container](cdsaencr.md).
 
 #### Encrypted Encoding version 1 encrypted UDIF segment file
 
@@ -77,7 +80,7 @@ An Encrypted Encoding version 1 encryped UDIF segment file consists of:
 
 > Note that the encrypted UDIF data can contain an uncompressed UDIF image without file footer.
 
-#### Encrypted image format version 2 encrypted UDIF segment file
+#### Encrypted Encoding version 2 encrypted UDIF segment file
 
 An Encrypted Encoding version 2 encryped UDIF segment file consists of:
 

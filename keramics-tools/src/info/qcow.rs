@@ -173,6 +173,8 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_file_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/qcow/ext2.qcow2");
@@ -180,7 +182,6 @@ mod tests {
         let qcow_file: QcowFile = QcowInfo::open_file(&data_stream)?;
         let test_struct: QcowFileInfo = QcowInfo::get_file_information(&qcow_file);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "QEMU Copy-On-Write (QCOW) information:\n",
             "    Format version\t\t\t\t: 3\n",
@@ -190,7 +191,7 @@ mod tests {
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

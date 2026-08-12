@@ -11,10 +11,8 @@
  * under the License.
  */
 
-use std::collections::HashMap;
-use std::sync::Weak;
-
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::lru_cache::LruCache;
 use keramics_formats::{Path, PathComponent};
 
 use super::enums::VfsType;
@@ -25,8 +23,8 @@ use super::types::VfsFileSystemReference;
 
 /// Virtual File System (VFS) context.
 pub struct VfsContext {
-    /// File systems.
-    file_systems: HashMap<VfsLocation, Weak<VfsFileSystem>>,
+    /// File systems cache.
+    file_systems_cache: LruCache<VfsLocation, VfsFileSystemReference>,
 
     /// Operating system (OS) file system path.
     os_vfs_location: VfsLocation,
@@ -36,7 +34,7 @@ impl VfsContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            file_systems: HashMap::new(),
+            file_systems_cache: LruCache::new(8),
             os_vfs_location: new_os_vfs_location("/"),
         }
     }
@@ -102,52 +100,42 @@ impl VfsContext {
         };
         let parent_vfs_location: Option<&VfsLocation> = vfs_location.get_parent();
 
-        let lookup_key: &VfsLocation = match parent_vfs_location {
-            Some(parent_vfs_location) => parent_vfs_location,
-            None => &self.os_vfs_location,
+        let lookup_key: VfsLocation = match parent_vfs_location {
+            Some(parent_vfs_location) => parent_vfs_location.clone(),
+            None => self.os_vfs_location.clone(),
         };
-        let cached_file_system: Option<VfsFileSystemReference> =
-            match self.file_systems.get(lookup_key) {
-                Some(file_system) => file_system.upgrade(),
-                None => None,
-            };
-        match cached_file_system {
-            Some(file_system) => Ok(file_system),
-            None => {
-                let parent_file_system: Option<VfsFileSystemReference> = match parent_vfs_location {
-                    Some(parent_vfs_location) => match self.open_file_system(parent_vfs_location) {
-                        Ok(file_system) => Some(file_system),
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to open parent file system"
-                            );
-                            return Err(error);
-                        }
-                    },
-                    None => None,
-                };
-                let file_system_path: VfsLocation = match parent_vfs_location {
-                    Some(parent_vfs_location) => parent_vfs_location.clone(),
-                    None => self.os_vfs_location.clone(),
-                };
-                let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
-
-                match file_system.open(parent_file_system.as_ref(), &file_system_path) {
-                    Ok(()) => {}
+        if !self.file_systems_cache.contains(&lookup_key) {
+            let parent_file_system: Option<VfsFileSystemReference> = match parent_vfs_location {
+                Some(parent_vfs_location) => match self.open_file_system(parent_vfs_location) {
+                    Ok(file_system) => Some(file_system),
                     Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open parent file system"
+                        );
                         return Err(error);
                     }
-                }
-                let cached_file_system: VfsFileSystemReference =
-                    VfsFileSystemReference::new(file_system);
+                },
+                None => None,
+            };
+            let mut file_system: VfsFileSystem = VfsFileSystem::new(&vfs_type);
 
-                self.file_systems.insert(
-                    file_system_path,
-                    VfsFileSystemReference::downgrade(&cached_file_system),
-                );
-                Ok(cached_file_system)
+            match file_system.open(parent_file_system.as_ref(), &lookup_key) {
+                Ok(()) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                    return Err(error);
+                }
+            }
+            self.file_systems_cache
+                .insert(lookup_key.clone(), VfsFileSystemReference::new(file_system));
+        }
+        match self.file_systems_cache.get(&lookup_key) {
+            Some(file_system) => Ok(file_system.clone()),
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to retrieve cached file system"
+                ));
             }
         }
     }

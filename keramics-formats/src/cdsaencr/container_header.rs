@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_u32_be, bytes_to_u64_be};
+use keramics_types::{Uuid, bytes_to_u32_be, bytes_to_u64_be};
 
 use super::constants::*;
 use super::encryption_type::CdsaEncrEncryptionType;
@@ -31,7 +31,7 @@ use super::key_protector_descriptor::CdsaEncrKeyProtectorDescriptor;
         field(name = "block_key_size", data_type = "u32"),
         field(name = "hmac_method", data_type = "u32"),
         field(name = "hmac_key_size", data_type = "u32"),
-        field(name = "identifier", data_type = "Uuid"),
+        field(name = "container_identifier", data_type = "Uuid"),
         field(name = "block_size", data_type = "u32"),
         field(name = "data_fork_size", data_type = "u64"),
         field(name = "data_fork_offset", data_type = "u64"),
@@ -45,9 +45,6 @@ pub struct CdsaEncrContainerHeader {
     /// Format version.
     pub format_version: u32,
 
-    /// Block size.
-    pub block_size: u32,
-
     /// Initialization vector size.
     pub initialization_vector_size: u32,
 
@@ -59,6 +56,12 @@ pub struct CdsaEncrContainerHeader {
 
     /// Initialization vector encryption method.
     pub hmac_key_size: u32,
+
+    /// Container identifier.
+    pub container_identifier: Uuid,
+
+    /// Block size.
+    pub block_size: u32,
 
     /// Data fork size.
     pub data_fork_size: u64,
@@ -75,11 +78,12 @@ impl CdsaEncrContainerHeader {
     pub fn new() -> Self {
         Self {
             format_version: 0,
-            block_size: 0,
             initialization_vector_size: 0,
             encryption_type: CdsaEncrEncryptionType::new(),
             hmac_method: 0,
             hmac_key_size: 0,
+            container_identifier: Uuid::new(),
+            block_size: 0,
             data_fork_size: 0,
             data_fork_offset: 0,
             key_protector_descriptors: Vec::new(),
@@ -111,6 +115,7 @@ impl CdsaEncrContainerHeader {
         self.hmac_method = bytes_to_u32_be!(data, 28);
         self.hmac_key_size = bytes_to_u32_be!(data, 32);
 
+        self.container_identifier = Uuid::from_be_bytes(&data[36..52]);
         self.block_size = bytes_to_u32_be!(data, 52);
         self.data_fork_size = bytes_to_u64_be!(data, 56);
         self.data_fork_offset = bytes_to_u64_be!(data, 64);
@@ -214,6 +219,10 @@ mod tests {
         assert_eq!(test_struct.encryption_type.key_size, 16);
         assert_eq!(test_struct.hmac_method, 91);
         assert_eq!(test_struct.hmac_key_size, 160);
+        assert_eq!(
+            test_struct.container_identifier.to_string(),
+            "12d14a6e-fa1f-4a6b-ad03-3e720963b105"
+        );
         assert_eq!(test_struct.block_size, 4096);
         assert_eq!(test_struct.data_fork_size, 65536);
         assert_eq!(test_struct.data_fork_offset, 122880);
@@ -266,6 +275,10 @@ mod tests {
         assert_eq!(test_struct.encryption_type.key_size, 16);
         assert_eq!(test_struct.hmac_method, 0x0000005b);
         assert_eq!(test_struct.hmac_key_size, 160);
+        assert_eq!(
+            test_struct.container_identifier.to_string(),
+            "12d14a6e-fa1f-4a6b-ad03-3e720963b105"
+        );
         assert_eq!(test_struct.block_size, 4096);
         assert_eq!(test_struct.data_fork_size, 65536);
         assert_eq!(test_struct.data_fork_offset, 122880);

@@ -125,6 +125,8 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/sparsebundle/hfsplus.sparsebundle");
@@ -132,7 +134,6 @@ mod tests {
         let test_struct: SparseBundleImageInfo =
             SparseBundleInfo::get_image_information(&sparsebundle_image);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Sparse bundle (.sparsebundle) information:\n",
             "    Band size\t\t\t\t\t: 8.0 MiB (8388608 bytes)\n",
@@ -141,7 +142,7 @@ mod tests {
             "        Bytes per sector\t\t\t: 512 bytes\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

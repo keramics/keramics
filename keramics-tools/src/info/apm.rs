@@ -282,6 +282,8 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_partition_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/apm/apm.dmg");
@@ -291,7 +293,6 @@ mod tests {
         let apm_partition: ApmPartition = apm_volume_system.get_partition_by_index(0)?;
         let test_struct: ApmPartitionInfo = ApmInfo::get_partition_information(0, &apm_partition);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Partition: 1\n",
             "    Type identifier\t\t\t\t: Apple_HFS\n",
@@ -306,7 +307,7 @@ mod tests {
             "        0x40000000: Automatic mount at startup\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }
@@ -315,7 +316,6 @@ mod tests {
     fn test_partition_status_flags_fmt() -> Result<(), ErrorTrace> {
         let test_struct: ApmPartitionStatusFlagsInfo = ApmPartitionStatusFlagsInfo::new(0xc000077f);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "        0x00000001: Is valid\n",
             "        0x00000002: Is allocated\n",
@@ -330,7 +330,7 @@ mod tests {
             "        0x40000000: Automatic mount at startup\n",
             "        0x80000000: Is startup partition\n",
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

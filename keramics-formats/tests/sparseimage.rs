@@ -15,6 +15,7 @@ use std::path::PathBuf;
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::sparseimage::SparseImageFile;
 use keramics_hashes::{DigestHashContext, Md5Context};
 
@@ -136,8 +137,23 @@ fn read_media() -> Result<(), ErrorTrace> {
     let mut file: SparseImageFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "22c35335e6fafcbfc2ef21f1839f228d");
+
+    Ok(())
+}
+
+#[test]
+fn read_media_encrypted() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/sparseimage/hfsplus_aes128.sparseimage");
+    let mut file: SparseImageFile = open_file(&path_buf)?;
+    let credentials: Vec<CdsaEncrCredential> =
+        vec![CdsaEncrCredential::Passphrase(b"KeRaMiCs".to_vec())];
+    file.unlock(&credentials)?;
+
+    let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
+    assert_eq!(media_offset, file.get_media_size());
+    assert_eq!(md5_hash.as_str(), "52da5f232d3910a366379bf4c3f004aa");
 
     Ok(())
 }

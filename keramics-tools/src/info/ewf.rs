@@ -290,13 +290,14 @@ impl EwfInfo {
 mod tests {
     use super::*;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_image_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/ewf/ext2.E01");
         let ewf_image: EwfImage = EwfInfo::open_image(&path_buf)?;
         let test_struct: EwfImageInfo = EwfInfo::get_image_information(&ewf_image);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Expert Witness Compression Format (EWF) information:\n",
             "    Sectors per chunk\t\t\t\t: 64\n",
@@ -320,7 +321,7 @@ mod tests {
             "        Software version used\t\t\t: 20140817\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

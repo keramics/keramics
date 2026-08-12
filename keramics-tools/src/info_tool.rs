@@ -22,8 +22,9 @@ use clap_num::maybe_hex;
 use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_encodings::CharacterEncoding;
+use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
-use keramics_vfs::VfsCredentialStore;
+use keramics_vfs::{VfsCredential, VfsCredentialStore};
 
 mod enums;
 mod formatters;
@@ -33,8 +34,9 @@ mod storage_media_image;
 
 use crate::enums::EncodingType;
 use crate::info::{
-    ApfsInfo, ApmInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo, NtfsInfo, PdiInfo,
-    QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo, VmdkInfo,
+    ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo,
+    NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo,
+    VmdkInfo,
 };
 use crate::range_stream::RangeDataStream;
 use crate::storage_media_image::StorageMediaImage;
@@ -194,51 +196,11 @@ impl InfoTool {
         Ok(Arc::new(RwLock::new(range_data_stream)))
     }
 
-    /// Scans a data stream for format signatures.
-    fn scan_for_formats(
+    /// Checks the scan results.
+    fn check_scan_results(
         &self,
-        data_stream: &DataStreamReference,
+        scan_results: &HashSet<FormatIdentifier>,
     ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
-        let mut format_scanner: FormatScanner = FormatScanner::new();
-
-        if !self.image_mode {
-            format_scanner.add_ewf_signatures();
-            format_scanner.add_pdi_signatures();
-            format_scanner.add_qcow_signatures();
-            // TODO: add support for sparse bundle Info.plist.
-            format_scanner.add_sparseimage_signatures();
-            format_scanner.add_udif_signatures();
-            format_scanner.add_vhd_signatures();
-            format_scanner.add_vhdx_signatures();
-            format_scanner.add_vmdk_signatures();
-            // TODO: add support for individual VMDK sparse file.
-            // TODO: add support for individual VMDK sparse COWD file.
-        }
-        format_scanner.add_apfs_signatures();
-        format_scanner.add_apm_signatures();
-        format_scanner.add_ext_signatures();
-        format_scanner.add_fat_signatures();
-        format_scanner.add_hfs_signatures();
-        format_scanner.add_gpt_signatures();
-        format_scanner.add_ntfs_signatures();
-
-        match format_scanner.build() {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
-            }
-        }
-        let mut scan_results: HashSet<FormatIdentifier> =
-            match format_scanner.scan_data_stream(data_stream) {
-                Ok(scan_results) => scan_results,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve scan results");
-                    return Err(error);
-                }
-            };
         let mut result: Option<FormatIdentifier> = None;
 
         if scan_results.len() > 1 {
@@ -283,12 +245,127 @@ impl InfoTool {
             }
             if result.is_none() {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported multiple known format signatures {:?}",
+                    "Unsupported multiple format signatures {:?}",
                     scan_results
                 )));
             }
         } else {
             result = scan_results.iter().next().cloned();
+        }
+        Ok(result)
+    }
+
+    /// Scans a data stream for format signatures.
+    fn scan_for_formats(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
+        let mut format_scanner: FormatScanner = FormatScanner::new();
+
+        if !self.image_mode {
+            format_scanner.add_cdsaencr_signatures();
+            format_scanner.add_ewf_signatures();
+            format_scanner.add_pdi_signatures();
+            format_scanner.add_qcow_signatures();
+            // TODO: add support for sparse bundle Info.plist.
+            format_scanner.add_sparseimage_signatures();
+            format_scanner.add_udif_signatures();
+            format_scanner.add_vhd_signatures();
+            format_scanner.add_vhdx_signatures();
+            format_scanner.add_vmdk_signatures();
+            // TODO: add support for individual VMDK sparse file.
+            // TODO: add support for individual VMDK sparse COWD file.
+        }
+        format_scanner.add_apfs_signatures();
+        format_scanner.add_apm_signatures();
+        format_scanner.add_ext_signatures();
+        format_scanner.add_fat_signatures();
+        format_scanner.add_hfs_signatures();
+        format_scanner.add_gpt_signatures();
+        format_scanner.add_ntfs_signatures();
+
+        match format_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build format scanner",
+                    error
+                ));
+            }
+        }
+        let mut result: Option<FormatIdentifier> = match format_scanner
+            .scan_data_stream(data_stream)
+        {
+            Ok(scan_results) => match self.check_scan_results(&scan_results) {
+                Ok(result) => result,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to check scan results");
+                    return Err(error);
+                }
+            },
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve scan results");
+                return Err(error);
+            }
+        };
+        if result == Some(FormatIdentifier::CdsaEncr) {
+            let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
+
+            match cdsaencr_container.read_data_stream(data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open Mac OS Encrypted Encoding container"
+                    );
+                    return Err(error);
+                }
+            }
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match cdsaencr_container.unlock(&credentials) {
+                Ok(false) => {}
+                Ok(true) => {
+                    let container_data_stream: DataStreamReference =
+                        Arc::new(RwLock::new(cdsaencr_container));
+
+                    result = match format_scanner.scan_data_stream(&container_data_stream) {
+                        Ok(scan_results) => match self.check_scan_results(&scan_results) {
+                            Ok(result) => result,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to check scan results"
+                                );
+                                return Err(error);
+                            }
+                        },
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve scan results"
+                            );
+                            return Err(error);
+                        }
+                    };
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock Mac OS Encrypted Encoding container"
+                    );
+                    return Err(error);
+                }
+            }
         }
         if result.is_none() {
             let mut format_scanner: FormatScanner = FormatScanner::new();
@@ -303,22 +380,23 @@ impl InfoTool {
                     ));
                 }
             }
-            scan_results = match format_scanner.scan_data_stream(data_stream) {
-                Ok(scan_results) => scan_results,
+            result = match format_scanner.scan_data_stream(data_stream) {
+                Ok(scan_results) => {
+                    if scan_results.len() > 1 {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unsupported multiple format signatures"
+                        ));
+                    }
+                    scan_results.iter().next().cloned()
+                }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to scan data stream for known format signatures"
+                        "Unable to scan data stream for format signatures"
                     );
                     return Err(error);
                 }
-            };
-            if scan_results.len() > 1 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported multiple known format signatures"
-                ));
             }
-            result = scan_results.iter().next().cloned();
         }
         Ok(result)
     }
@@ -368,12 +446,12 @@ fn main() -> ExitCode {
         match info_tool.scan_for_formats(&data_stream) {
             Ok(Some(format_identifier)) => format_identifier,
             Ok(None) => {
-                println!("No known format signatures found");
+                println!("No format signatures found");
                 return ExitCode::FAILURE;
             }
             Err(error) => {
                 println!(
-                    "Unable to scan data stream for known format signatures with error:\n{}",
+                    "Unable to scan data stream for format signatures with error:\n{}",
                     error
                 );
                 return ExitCode::FAILURE;
@@ -441,6 +519,7 @@ fn main() -> ExitCode {
         None => match &format_identifier {
             FormatIdentifier::Apfs => ApfsInfo::print_container(&data_stream),
             FormatIdentifier::Apm => ApmInfo::print_volume_system(&data_stream),
+            FormatIdentifier::CdsaEncr => CdsaEncrInfo::print_container(&data_stream),
             // TODO: add support for individual EWF segment file.
             FormatIdentifier::Ewf => EwfInfo::print_image(&arguments.source),
             FormatIdentifier::Ext => {
@@ -458,7 +537,7 @@ fn main() -> ExitCode {
             FormatIdentifier::SparseBundle => SparseBundleInfo::print_image(&arguments.source),
             FormatIdentifier::SparseImage => SparseImageInfo::print_file(&data_stream),
             // TODO: bundle all credentials into 1 credential store argument.
-            FormatIdentifier::Udif => UdifInfo::print(&arguments.source),
+            FormatIdentifier::Udif => UdifInfo::print_image(&arguments.source),
             // TODO: add support for VHD image.
             FormatIdentifier::Vhd => VhdInfo::print_file(&data_stream),
             // TODO: add support for VHDX image.

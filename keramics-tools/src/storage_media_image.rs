@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::cdsaencr::CdsaEncrCredential;
+use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
@@ -153,7 +153,7 @@ impl StorageMediaImage {
                 Ok(storage_media_image) => return Ok(storage_media_image),
                 Err(_) => {
                     return Err(keramics_core::error_trace_new!(
-                        "No known storage media image formats found"
+                        "No storage media image formats found"
                     ));
                 }
             }
@@ -184,10 +184,10 @@ impl StorageMediaImage {
                 match Self::open_splitraw_image(path) {
                     Ok(storage_media_image) => Ok(storage_media_image),
                     Err(_) => {
-                        // TODO: scan for known volume and file system formats to detect raw
-                        // storage media image format.
+                        // TODO: scan for volume and file system formats to detect raw storage
+                        // media image format.
                         Err(keramics_core::error_trace_new!(
-                            "No known storage media image formats found"
+                            "No storage media image formats found"
                         ))
                     }
                 }
@@ -195,7 +195,7 @@ impl StorageMediaImage {
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to scan data stream for known storage media image format signatures"
+                    "Unable to scan data stream for storage media image format signatures"
                 );
                 Err(error)
             }
@@ -401,6 +401,29 @@ impl StorageMediaImage {
                 return Err(error);
             }
         }
+        if sparseimage_file.is_locked() {
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match sparseimage_file.unlock(&credentials) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock sparseimage file"
+                    );
+                    return Err(error);
+                }
+            }
+        }
         Ok(Self::SparseImage {
             sparseimage_file: Arc::new(RwLock::new(sparseimage_file)),
         })
@@ -493,20 +516,20 @@ impl StorageMediaImage {
         }
         if udif_image.is_locked() {
             let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut udif_credentials: Vec<CdsaEncrCredential> = Vec::new();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
 
             for vfs_credential in credential_store.iter() {
                 match vfs_credential {
                     VfsCredential::Passphrase(passphrase) => {
-                        udif_credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
                     }
                     _ => {}
                 }
             }
-            match udif_image.unlock(&udif_credentials) {
+            match udif_image.unlock(&credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to unlock image");
+                    keramics_core::error_trace_add_frame!(error, "Unable to unlock UDIF image");
                     return Err(error);
                 }
             }
@@ -677,6 +700,7 @@ impl StorageMediaImage {
         data_stream: &DataStreamReference,
     ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
         let mut format_scanner: FormatScanner = FormatScanner::new();
+        format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_pdi_signatures();
         format_scanner.add_qcow_signatures();
@@ -696,24 +720,83 @@ impl StorageMediaImage {
                 ));
             }
         }
-        let mut scan_results: HashSet<FormatIdentifier> =
+        let mut format_identifier: Option<FormatIdentifier> =
             match format_scanner.scan_data_stream(data_stream) {
-                Ok(scan_results) => scan_results,
+                Ok(mut scan_results) => {
+                    if scan_results.len() > 1 {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unsupported multiple format signatures"
+                        ));
+                    }
+                    scan_results.drain().next()
+                }
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to scan data stream for known format signatures"
+                        "Unable to scan data stream for format signatures"
                     );
                     return Err(error);
                 }
             };
-        if scan_results.len() > 1 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported multiple known format signatures"
-            ));
-        }
-        let result: Option<FormatIdentifier> = scan_results.drain().next();
+        if format_identifier == Some(FormatIdentifier::CdsaEncr) {
+            let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
 
-        Ok(result)
+            match cdsaencr_container.read_data_stream(data_stream) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to open Mac OS Encrypted Encoding container"
+                    );
+                    return Err(error);
+                }
+            }
+            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
+            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
+
+            for vfs_credential in credential_store.iter() {
+                match vfs_credential {
+                    VfsCredential::Passphrase(passphrase) => {
+                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
+                    }
+                    _ => {}
+                }
+            }
+            match cdsaencr_container.unlock(&credentials) {
+                Ok(false) => {}
+                Ok(true) => {
+                    let container_data_stream: DataStreamReference =
+                        Arc::new(RwLock::new(cdsaencr_container));
+
+                    format_identifier = match format_scanner
+                        .scan_data_stream(&container_data_stream)
+                    {
+                        Ok(mut scan_results) => {
+                            if scan_results.len() > 1 {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unsupported multiple format signatures in Mac OS Encrypted Encoding container"
+                                ));
+                            }
+                            scan_results.drain().next()
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan Mac OS Encrypted Encoding container for format signatures"
+                            );
+                            return Err(error);
+                        }
+                    };
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to unlock Mac OS Encrypted Encoding container"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(format_identifier)
     }
 }

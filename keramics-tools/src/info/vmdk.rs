@@ -265,6 +265,8 @@ mod tests {
 
     use std::path::PathBuf;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_image_layer_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/vmdk/ext2.vmdk");
@@ -279,7 +281,6 @@ mod tests {
             }
         };
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "VMware Virtual Disk (VMDK) information:\n",
             "    Disk type\t\t\t\t\t: Monolithic sparse\n",
@@ -291,7 +292,7 @@ mod tests {
             "        Bytes per sector\t\t\t: 512 bytes\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }

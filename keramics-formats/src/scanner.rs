@@ -84,6 +84,24 @@ impl FormatScanner {
         ));
     }
 
+    /// Adds Mac OS Encrypted Encoding container signatures.
+    pub fn add_cdsaencr_signatures(&mut self) {
+        // Mac OS Encrypted Encoding container version 1 footer.
+        self.signature_scanner.add_signature(Signature::new(
+            "cdsaencr1",
+            PatternType::BoundToEnd,
+            8,
+            CDSAENCR_CONTAINER_FOOTER_SIGNATURE,
+        ));
+        // Mac OS Encrypted Encoding container version 2 header.
+        self.signature_scanner.add_signature(Signature::new(
+            "cdsaencr2",
+            PatternType::BoundToStart,
+            0,
+            CDSAENCR_CONTAINER_HEADER_SIGNATURE,
+        ));
+    }
+
     /// Adds Expert Witness Compression Format (EWF) signatures.
     pub fn add_ewf_signatures(&mut self) {
         self.signature_scanner.add_signature(Signature::new(
@@ -257,23 +275,6 @@ impl FormatScanner {
             512,
             UDIF_FILE_FOOTER_SIGNATURE,
         ));
-        // TODO: make Mac OS Encrypted Encoding container a separate type and add a helper to
-        // determine the contents of the container.
-
-        // Mac OS Encrypted Encoding container version 1 footer.
-        self.signature_scanner.add_signature(Signature::new(
-            "udif2",
-            PatternType::BoundToEnd,
-            8,
-            CDSAENCR_CONTAINER_FOOTER_SIGNATURE,
-        ));
-        // Mac OS Encrypted Encoding container version 2 header.
-        self.signature_scanner.add_signature(Signature::new(
-            "udif3",
-            PatternType::BoundToStart,
-            0,
-            CDSAENCR_CONTAINER_HEADER_SIGNATURE,
-        ));
     }
 
     /// Adds Virtual Hard Disk (VHD) signatures.
@@ -387,6 +388,7 @@ impl FormatScanner {
             let format_identifier: FormatIdentifier = match signature.identifier.as_str() {
                 "apfs1" => FormatIdentifier::Apfs,
                 "apm1" | "apm2" => FormatIdentifier::Apm,
+                "cdsaencr1" | "cdsaencr2" => FormatIdentifier::CdsaEncr,
                 "ewf1" => FormatIdentifier::Ewf,
                 "ext1" => FormatIdentifier::Ext,
                 "fat1" | "fat2" | "fat3" => FormatIdentifier::Fat,
@@ -397,7 +399,7 @@ impl FormatScanner {
                 "pdi1" => FormatIdentifier::Pdi,
                 "qcow1" | "qcow2" | "qcow3" => FormatIdentifier::Qcow,
                 "sparseimage1" => FormatIdentifier::SparseImage,
-                "udif1" | "udif2" | "udif3" => FormatIdentifier::Udif,
+                "udif1" => FormatIdentifier::Udif,
                 "vhd1" => FormatIdentifier::Vhd,
                 "vhdx1" => FormatIdentifier::Vhdx,
                 "vmdk1" | "vmdk2" => FormatIdentifier::Vmdk,
@@ -424,6 +426,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();
@@ -446,6 +449,7 @@ mod tests {
         let mut format_scanner: FormatScanner = FormatScanner::new();
         format_scanner.add_apfs_signatures();
         format_scanner.add_apm_signatures();
+        format_scanner.add_cdsaencr_signatures();
         format_scanner.add_ewf_signatures();
         format_scanner.add_ext_signatures();
         format_scanner.add_fat_signatures();

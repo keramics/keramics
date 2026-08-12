@@ -13,7 +13,7 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::bytes_to_u32_be;
+use keramics_types::{Uuid, bytes_to_u32_be};
 
 use super::constants::*;
 use super::credential::CdsaEncrCredential;
@@ -26,7 +26,7 @@ use super::encryption_type::CdsaEncrEncryptionType;
 #[layout_map(
     structure(
         byte_order = "big",
-        field(name = "identifier", data_type = "Uuid"),
+        field(name = "container_identifier", data_type = "Uuid"),
         field(name = "block_size", data_type = "u32"),
         field(name = "kek_encryption_method", data_type = "u32", format = "hex"),
         field(name = "kek_padding_type", data_type = "u32"),
@@ -82,6 +82,9 @@ use super::encryption_type::CdsaEncrEncryptionType;
 )]
 /// Mac OS Encrypted Encoding (cdsaencr) encrypted container footer.
 pub struct CdsaEncrContainerFooter {
+    /// Container identifier.
+    pub container_identifier: Uuid,
+
     /// Block size.
     pub block_size: u32,
 
@@ -141,6 +144,7 @@ impl CdsaEncrContainerFooter {
     /// Creates a new encrypted container footer.
     pub fn new() -> Self {
         Self {
+            container_identifier: Uuid::new(),
             block_size: 0,
             kek_encryption_type: CdsaEncrEncryptionType::new(),
             kek_padding_type: 0,
@@ -178,6 +182,7 @@ impl CdsaEncrContainerFooter {
                 self.format_version
             )));
         }
+        self.container_identifier = Uuid::from_be_bytes(&data[0..16]);
         self.block_size = bytes_to_u32_be!(data, 16);
         self.kek_encryption_type.method = bytes_to_u32_be!(data, 20);
         self.kek_padding_type = bytes_to_u32_be!(data, 24);
@@ -547,6 +552,10 @@ mod tests {
         let mut test_struct = CdsaEncrContainerFooter::new();
         test_struct.read_data(&test_data)?;
 
+        assert_eq!(
+            test_struct.container_identifier.to_string(),
+            "ac93aee0-d045-483a-940d-f033aa11b85d"
+        );
         assert_eq!(test_struct.block_size, 4096);
         assert_eq!(test_struct.kek_encryption_type.method, 0x00000011);
         assert_eq!(test_struct.kek_padding_type, 7);
@@ -608,6 +617,10 @@ mod tests {
         let mut test_struct = CdsaEncrContainerFooter::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
 
+        assert_eq!(
+            test_struct.container_identifier.to_string(),
+            "ac93aee0-d045-483a-940d-f033aa11b85d"
+        );
         assert_eq!(test_struct.block_size, 4096);
         assert_eq!(test_struct.kek_encryption_type.method, 0x00000011);
         assert_eq!(test_struct.kek_padding_type, 7);

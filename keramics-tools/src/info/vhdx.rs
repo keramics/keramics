@@ -171,6 +171,8 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
 
+    use crate::info::tests::assert_lines_eq;
+
     #[test]
     fn test_file_information_fmt() -> Result<(), ErrorTrace> {
         let path_buf: PathBuf = PathBuf::from("../test_data/vhdx/ext2.vhdx");
@@ -178,7 +180,6 @@ mod tests {
         let vhdx_file: VhdxFile = VhdxInfo::open_file(&data_stream)?;
         let test_struct: VhdxFileInfo = VhdxInfo::get_file_information(&vhdx_file);
 
-        let string: String = test_struct.to_string();
         let expected_string: &str = concat!(
             "Virtual Hard Disk (VHDX) information:\n",
             "    Format version\t\t\t\t: 2.1\n",
@@ -189,7 +190,7 @@ mod tests {
             "        Bytes per sector\t\t\t: 512 bytes\n",
             "\n"
         );
-        assert_eq!(string, expected_string);
+        assert_lines_eq(test_struct.to_string().as_str(), expected_string);
 
         Ok(())
     }
