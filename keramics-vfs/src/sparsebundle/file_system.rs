@@ -218,7 +218,10 @@ impl SparseBundleFileSystem {
             match image.unlock(&credentials) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Failed to unlock sparsebundle image");
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Failed to unlock sparsebundle image"
+                    );
                     return Err(error);
                 }
             }
