@@ -57,6 +57,7 @@ fuzz_target!(|data: &[u8]| {
 
     let file_resolver: SparseBundleFuzzFileResolver = SparseBundleFuzzFileResolver::new(&data);
     let file_resolver_reference: FileResolverReference = Arc::new(Box::new(file_resolver));
+    let file_name: PathComponent = PathComponent::from("Info.plist");
 
-    _ = sparsebundle_image.open(&file_resolver_reference);
+    _ = sparsebundle_image.open(&file_resolver_reference, &file_name);
 });
