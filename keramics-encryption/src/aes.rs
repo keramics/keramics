@@ -19,7 +19,8 @@ use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u32_le;
 
 use super::cbc::CbcContext;
-use super::traits::{CryptCbc, CryptContext};
+use super::traits::{CryptCbc, CryptContext, CryptEcb};
+use super::xts::XtsContext;
 
 /// Calculate the next GF(2^8) value using the generator polynomial 0x1b.
 const fn calculate_next_gf28_value(value: usize) -> usize {
@@ -549,53 +550,6 @@ impl AesContext {
         );
     }
 
-    /// Decrypts data using ECB (Electronic CodeBook) mode.
-    pub fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
-        if self.decryption_round_keys.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        let encrypted_data_size: usize = encrypted_data.len();
-
-        if encrypted_data_size < AES_BLOCK_SIZE {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data size value too small"
-            ));
-        }
-        if encrypted_data_size % AES_BLOCK_SIZE != 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid encrypted data size value not a multitude of block size: {}",
-                AES_BLOCK_SIZE
-            )));
-        }
-        if encrypted_data_size > data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data value too small"
-            ));
-        }
-        let mut block_values: [u32; 4] = [0; 4];
-        let mut cipher_values: [u32; 4] = [0; 4];
-        let mut data_offset: usize = 0;
-
-        for block_data in encrypted_data.chunks_exact(AES_BLOCK_SIZE) {
-            block_values[0] = bytes_to_u32_le!(block_data, 0);
-            block_values[1] = bytes_to_u32_le!(block_data, 4);
-            block_values[2] = bytes_to_u32_le!(block_data, 8);
-            block_values[3] = bytes_to_u32_le!(block_data, 12);
-
-            self.decrypt_block(&mut block_values, &mut cipher_values);
-
-            for block_value in block_values.iter() {
-                let data_end_offset: usize = data_offset + 4;
-                data[data_offset..data_end_offset].copy_from_slice(&block_value.to_le_bytes());
-
-                data_offset = data_end_offset;
-            }
-        }
-        Ok(())
-    }
-
     /// Encrypts a 16 byte block (4 32-bit values).
     #[inline(always)]
     fn encrypt_block(&self, block_values: &mut [u32], cipher_values: &mut [u32]) {
@@ -635,54 +589,6 @@ impl AesContext {
             block_values,
             cipher_values,
         );
-    }
-
-    /// Encrypts data using ECB (Electronic CodeBook) mode.
-    pub fn encrypt_ecb(&self, data: &[u8], encrypted_data: &mut [u8]) -> Result<(), ErrorTrace> {
-        if self.encryption_round_keys.is_empty() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid context - key was not set"
-            ));
-        }
-        let data_size: usize = data.len();
-
-        if data_size < AES_BLOCK_SIZE {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid data size value too small"
-            ));
-        }
-        if data_size % AES_BLOCK_SIZE != 0 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid data size value not a multitude of block size: {}",
-                AES_BLOCK_SIZE
-            )));
-        }
-        if data_size > encrypted_data.len() {
-            return Err(keramics_core::error_trace_new!(
-                "Invalid encrypted data value too small"
-            ));
-        }
-        let mut block_values: [u32; 4] = [0; 4];
-        let mut cipher_values: [u32; 4] = [0; 4];
-        let mut data_offset: usize = 0;
-
-        for block_data in data.chunks_exact(AES_BLOCK_SIZE) {
-            block_values[0] = bytes_to_u32_le!(block_data, 0);
-            block_values[1] = bytes_to_u32_le!(block_data, 4);
-            block_values[2] = bytes_to_u32_le!(block_data, 8);
-            block_values[3] = bytes_to_u32_le!(block_data, 12);
-
-            self.encrypt_block(&mut block_values, &mut cipher_values);
-
-            for block_value in block_values.iter() {
-                let data_end_offset: usize = data_offset + 4;
-                encrypted_data[data_offset..data_end_offset]
-                    .copy_from_slice(&block_value.to_le_bytes());
-
-                data_offset = data_end_offset;
-            }
-        }
-        Ok(())
     }
 
     /// Initializes the context for encryption with a 128 bits key.
@@ -1080,8 +986,108 @@ impl CryptCbc for AesContext {
     }
 }
 
+impl CryptEcb for AesContext {
+    /// Decrypts data using ECB (Electronic CodeBook) mode.
+    fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace> {
+        if self.decryption_round_keys.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        let encrypted_data_size: usize = encrypted_data.len();
+
+        if encrypted_data_size < AES_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data size value too small"
+            ));
+        }
+        if encrypted_data_size % AES_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid encrypted data size value not a multitude of block size: {}",
+                AES_BLOCK_SIZE
+            )));
+        }
+        if encrypted_data_size > data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data value too small"
+            ));
+        }
+        let mut block_values: [u32; 4] = [0; 4];
+        let mut cipher_values: [u32; 4] = [0; 4];
+        let mut data_offset: usize = 0;
+
+        for block_data in encrypted_data.chunks_exact(AES_BLOCK_SIZE) {
+            block_values[0] = bytes_to_u32_le!(block_data, 0);
+            block_values[1] = bytes_to_u32_le!(block_data, 4);
+            block_values[2] = bytes_to_u32_le!(block_data, 8);
+            block_values[3] = bytes_to_u32_le!(block_data, 12);
+
+            self.decrypt_block(&mut block_values, &mut cipher_values);
+
+            for block_value in block_values.iter() {
+                let data_end_offset: usize = data_offset + 4;
+                data[data_offset..data_end_offset].copy_from_slice(&block_value.to_le_bytes());
+
+                data_offset = data_end_offset;
+            }
+        }
+        Ok(())
+    }
+
+    /// Encrypts data using ECB (Electronic CodeBook) mode.
+    fn encrypt_ecb(&self, data: &[u8], encrypted_data: &mut [u8]) -> Result<(), ErrorTrace> {
+        if self.encryption_round_keys.is_empty() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid context - key was not set"
+            ));
+        }
+        let data_size: usize = data.len();
+
+        if data_size < AES_BLOCK_SIZE {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid data size value too small"
+            ));
+        }
+        if data_size % AES_BLOCK_SIZE != 0 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid data size value not a multitude of block size: {}",
+                AES_BLOCK_SIZE
+            )));
+        }
+        if data_size > encrypted_data.len() {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid encrypted data value too small"
+            ));
+        }
+        let mut block_values: [u32; 4] = [0; 4];
+        let mut cipher_values: [u32; 4] = [0; 4];
+        let mut data_offset: usize = 0;
+
+        for block_data in data.chunks_exact(AES_BLOCK_SIZE) {
+            block_values[0] = bytes_to_u32_le!(block_data, 0);
+            block_values[1] = bytes_to_u32_le!(block_data, 4);
+            block_values[2] = bytes_to_u32_le!(block_data, 8);
+            block_values[3] = bytes_to_u32_le!(block_data, 12);
+
+            self.encrypt_block(&mut block_values, &mut cipher_values);
+
+            for block_value in block_values.iter() {
+                let data_end_offset: usize = data_offset + 4;
+                encrypted_data[data_offset..data_end_offset]
+                    .copy_from_slice(&block_value.to_le_bytes());
+
+                data_offset = data_end_offset;
+            }
+        }
+        Ok(())
+    }
+}
+
 /// Context for AES-CBC
 pub type AesCbcContext = CbcContext<AesContext, 16>;
+
+/// Context for AES-XTS
+pub type AesXtsContext = XtsContext<AesContext, 16>;
 
 #[cfg(test)]
 mod tests {

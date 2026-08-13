@@ -831,7 +831,7 @@ mod tests {
     #[test]
     fn test_get_ntfs_volume_flags_strings() {
         let flags_strings: Vec<String> = NtfsInfo::get_ntfs_volume_flags_strings(0x0001);
-        assert_eq!(flags_strings, ["0x0001: Is dirty (VOLUME_IS_DIRTY)"],);
+        assert_eq!(flags_strings, ["0x0001: Is dirty (VOLUME_IS_DIRTY)"]);
     }
 
     // TODO: add tests for open_file_system

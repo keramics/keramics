@@ -19,6 +19,7 @@ use keramics_encodings::CharacterEncoding;
 use keramics_types::{Utf16CharacterMappings, bytes_to_u16_be, bytes_to_u32_be};
 
 use crate::path_component::PathComponent;
+use crate::types::IndexedHashMap;
 use crate::util::calculate_alignment_padding;
 
 use super::block_range::HfsBlockRange;
@@ -30,7 +31,6 @@ use super::catalog_folder_record::HfsCatalogFolderRecord;
 use super::catalog_key::HfsCatalogKey;
 use super::catalog_thread_record::HfsCatalogThreadRecord;
 use super::constants::*;
-use super::directory_entries::HfsDirectoryEntries;
 use super::directory_entry::HfsDirectoryEntry;
 use super::enums::{HfsBtreeNodeType, HfsFormat, HfsKeyComparisonMethod};
 use super::string::HfsString;
@@ -62,7 +62,7 @@ impl HfsCatalogFile {
         &self,
         data_stream: &DataStreamReference,
         parent_identifier: u32,
-        directory_entries: &mut HfsDirectoryEntries,
+        directory_entries: &mut IndexedHashMap<HfsString, HfsDirectoryEntry>,
     ) -> Result<(), ErrorTrace> {
         let mut read_node_numbers: HashSet<u32> = HashSet::new();
 
@@ -90,7 +90,7 @@ impl HfsCatalogFile {
         data_stream: &DataStreamReference,
         node_number: u32,
         parent_identifier: u32,
-        directory_entries: &mut HfsDirectoryEntries,
+        directory_entries: &mut IndexedHashMap<HfsString, HfsDirectoryEntry>,
         read_node_numbers: &mut HashSet<u32>,
     ) -> Result<(), ErrorTrace> {
         if read_node_numbers.contains(&node_number) {
@@ -194,7 +194,7 @@ impl HfsCatalogFile {
                         };
                         match self.read_directory_entry(&key, record_data) {
                             Ok(directory_entry) => {
-                                directory_entries.insert_entry(name, directory_entry);
+                                directory_entries.insert(name, directory_entry);
                             }
                             Err(mut error) => {
                                 keramics_core::error_trace_add_frame!(
@@ -554,10 +554,10 @@ impl HfsCatalogFile {
                     }
                     if result == Ordering::Equal {
                         if is_branch {
-                            record_index += 1;
-
                             last_key = key;
                             last_record_data = record_data;
+
+                            record_index += 1;
 
                             break;
                         } else {
@@ -1127,13 +1127,14 @@ mod tests {
         let data_stream: DataStreamReference = get_data_stream_hfsplus()?;
         let test_struct: HfsCatalogFile = get_catalog_file_hfsplus(&data_stream)?;
 
-        let mut directory_entries: HfsDirectoryEntries = HfsDirectoryEntries::new();
+        let mut directory_entries: IndexedHashMap<HfsString, HfsDirectoryEntry> =
+            IndexedHashMap::new();
         test_struct.get_directory_entries_by_identifier(
             &data_stream,
             19,
             &mut directory_entries,
         )?;
-        assert_eq!(directory_entries.get_number_of_entries(), 13);
+        assert_eq!(directory_entries.len(), 13);
 
         Ok(())
     }

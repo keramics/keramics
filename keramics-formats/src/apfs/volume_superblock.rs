@@ -12,9 +12,8 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_datetime::DateTime;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{ByteString, Uuid, bytes_to_u32_le, bytes_to_u64_le};
+use keramics_types::{ByteString, bytes_to_u32_le, bytes_to_u64_le};
 
 use super::change_information::ApfsChangeInformation;
 use super::constants::*;
@@ -75,7 +74,7 @@ use super::object_header::ApfsObjectHeader;
         field(name = "total_number_of_blocks_freed", data_type = "u64"),
         field(name = "volume_identifier", data_type = "Uuid", byte_order = "big"),
         field(name = "modification_time", data_type = "ApfsTime"),
-        field(name = "volume_flags", data_type = "u64"),
+        field(name = "volume_flags", data_type = "u64", format = "hex"),
         field(
             name = "creation_change_information",
             data_type = "Struct<ApfsChangeInformation; 48>"
@@ -128,8 +127,17 @@ pub struct ApfsVolumeSuperblock {
     /// Incompatible feature flags.
     pub incompatible_feature_flags: u64,
 
+    /// Object map block number.
+    pub object_map_block_number: u64,
+
+    /// File system root object identifier.
+    pub file_system_root_object_identifier: u64,
+
+    /// Volume flags.
+    pub volume_flags: u64,
+
     /// Volume identifier.
-    pub volume_identifier: Uuid,
+    pub volume_identifier: Vec<u8>,
 
     /// Volume label.
     pub volume_label: ByteString,
@@ -144,7 +152,10 @@ impl ApfsVolumeSuperblock {
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
-            volume_identifier: Uuid::new(),
+            object_map_block_number: 0,
+            file_system_root_object_identifier: 0,
+            volume_flags: 0,
+            volume_identifier: Vec::new(),
             volume_label: ByteString::new(),
         }
     }
@@ -190,7 +201,10 @@ impl ApfsVolumeSuperblock {
         self.feature_flags = bytes_to_u64_le!(data, 40);
         self.read_only_compatible_feature_flags = bytes_to_u64_le!(data, 48);
         self.incompatible_feature_flags = bytes_to_u64_le!(data, 56);
-        self.volume_identifier = Uuid::from_be_bytes(&data[240..256]);
+        self.object_map_block_number = bytes_to_u64_le!(data, 128);
+        self.file_system_root_object_identifier = bytes_to_u64_le!(data, 136);
+        self.volume_flags = bytes_to_u64_le!(data, 264);
+        self.volume_identifier = data[240..256].to_vec();
         self.volume_label.read_data(&data[704..960]);
 
         Ok(())
@@ -518,10 +532,10 @@ mod tests {
         assert_eq!(test_struct.feature_flags, 0x00000002);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
-        assert_eq!(
-            test_struct.volume_identifier.to_string(),
-            "b0a66853-26ca-4885-9c31-7644390cd3aa"
-        );
+        assert_eq!(test_struct.object_map_block_number, 137);
+        assert_eq!(test_struct.file_system_root_object_identifier, 1028);
+        assert_eq!(test_struct.volume_flags, 0x00000001);
+        assert_eq!(test_struct.volume_identifier, &test_data[240..256]);
         assert_eq!(test_struct.volume_label, ByteString::from("SingleVolume"));
 
         Ok(())
@@ -592,10 +606,10 @@ mod tests {
         assert_eq!(test_struct.feature_flags, 0x00000002);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
-        assert_eq!(
-            test_struct.volume_identifier.to_string(),
-            "b0a66853-26ca-4885-9c31-7644390cd3aa"
-        );
+        assert_eq!(test_struct.object_map_block_number, 137);
+        assert_eq!(test_struct.file_system_root_object_identifier, 1028);
+        assert_eq!(test_struct.volume_flags, 0x00000001);
+        assert_eq!(test_struct.volume_identifier, &test_data[240..256]);
         assert_eq!(test_struct.volume_label, ByteString::from("SingleVolume"));
 
         Ok(())

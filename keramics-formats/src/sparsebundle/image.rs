@@ -44,9 +44,6 @@ pub struct SparseBundleImage {
     /// Encrypted block size.
     encrypted_block_size: usize,
 
-    /// Decrypted block cache.
-    block_cache: LruCache<u32, Vec<u8>>,
-
     /// The current offset.
     current_offset: u64,
 
@@ -64,7 +61,6 @@ impl SparseBundleImage {
             band_file_cache: LruCache::new(16),
             encrypted_container: None,
             encrypted_block_size: 0,
-            block_cache: LruCache::new(64),
             current_offset: 0,
             media_size: 0,
         }

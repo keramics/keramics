@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_encryption::{AesContext, CryptCbc, CryptContext};
+use keramics_encryption::{AesContext, CryptCbc, CryptContext, CryptEcb};
 
 /// Test vector.
 struct TestVector {
@@ -9342,7 +9342,7 @@ const ECB_TEST_VECTORS: &'static [TestVector] = &[
 
 #[test]
 fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
-    for test_vector in CBC_TEST_VECTORS.iter() {
+    for (test_number, test_vector) in CBC_TEST_VECTORS.iter().enumerate() {
         let key_bit_size: usize = test_vector.key.len() * 8;
 
         let mut aes_context: AesContext = AesContext::new();
@@ -9355,9 +9355,11 @@ fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
             &mut data,
         )?;
         assert_eq!(
-            &data, &test_vector.plaintext,
-            "mismatch with {} bits test vector",
-            key_bit_size
+            &data,
+            &test_vector.plaintext,
+            "mismatch with {} bits test vector: {}",
+            key_bit_size,
+            test_number + 1
         );
     }
     Ok(())
@@ -9365,7 +9367,7 @@ fn test_decrypt_cbc() -> Result<(), ErrorTrace> {
 
 #[test]
 fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
-    for test_vector in CBC_TEST_VECTORS.iter() {
+    for (test_number, test_vector) in CBC_TEST_VECTORS.iter().enumerate() {
         let key_bit_size: usize = test_vector.key.len() * 8;
 
         let mut aes_context: AesContext = AesContext::new();
@@ -9378,9 +9380,11 @@ fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
             &mut encrypted_data,
         )?;
         assert_eq!(
-            &encrypted_data, &test_vector.ciphertext,
-            "mismatch with {} bits test vector",
-            key_bit_size
+            &encrypted_data,
+            &test_vector.ciphertext,
+            "mismatch with {} bits test vector: {}",
+            key_bit_size,
+            test_number + 1
         );
     }
     Ok(())
@@ -9388,7 +9392,7 @@ fn test_encrypt_cbc() -> Result<(), ErrorTrace> {
 
 #[test]
 fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
-    for test_vector in ECB_TEST_VECTORS.iter() {
+    for (test_number, test_vector) in ECB_TEST_VECTORS.iter().enumerate() {
         let key_bit_size: usize = test_vector.key.len() * 8;
 
         let mut aes_context: AesContext = AesContext::new();
@@ -9398,9 +9402,11 @@ fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
         aes_context.decrypt_ecb(&test_vector.ciphertext, &mut data)?;
 
         assert_eq!(
-            &data, &test_vector.plaintext,
-            "mismatch with {} bits test vector",
-            key_bit_size
+            &data,
+            &test_vector.plaintext,
+            "mismatch with {} bits test vector: {}",
+            key_bit_size,
+            test_number + 1
         );
     }
     Ok(())
@@ -9408,7 +9414,7 @@ fn test_decrypt_ecb() -> Result<(), ErrorTrace> {
 
 #[test]
 fn test_encrypt_ecb() -> Result<(), ErrorTrace> {
-    for test_vector in ECB_TEST_VECTORS.iter() {
+    for (test_number, test_vector) in ECB_TEST_VECTORS.iter().enumerate() {
         let key_bit_size: usize = test_vector.key.len() * 8;
 
         let mut aes_context: AesContext = AesContext::new();
@@ -9418,9 +9424,11 @@ fn test_encrypt_ecb() -> Result<(), ErrorTrace> {
         aes_context.encrypt_ecb(&test_vector.plaintext, &mut encrypted_data)?;
 
         assert_eq!(
-            &encrypted_data, &test_vector.ciphertext,
-            "mismatch with {} bits test vector",
-            key_bit_size
+            &encrypted_data,
+            &test_vector.ciphertext,
+            "mismatch with {} bits test vector: {}",
+            key_bit_size,
+            test_number + 1
         );
     }
     Ok(())

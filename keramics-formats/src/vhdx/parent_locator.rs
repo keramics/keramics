@@ -23,7 +23,7 @@ use super::parent_locator_header::VhdxParentLocatorHeader;
 /// Virtual Hard Disk version 2 (VHDX) parent locator.
 pub struct VhdxParentLocator {
     /// Entries.
-    pub entries: HashMap<String, Ucs2String>,
+    entries: HashMap<String, Ucs2String>,
 }
 
 impl VhdxParentLocator {
@@ -32,6 +32,11 @@ impl VhdxParentLocator {
         Self {
             entries: HashMap::new(),
         }
+    }
+
+    /// Retrieves a specific entry.
+    pub fn get_entry(&self, identifier: &str) -> Option<&Ucs2String> {
+        self.entries.get(identifier)
     }
 
     /// Reads the parent locator from a buffer.

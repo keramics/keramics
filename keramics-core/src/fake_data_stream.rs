@@ -26,6 +26,9 @@ pub struct FakeDataStream {
     /// The data size.
     data_size: usize,
 
+    /// The data offset.
+    data_offset: u64,
+
     /// The current offset.
     current_offset: u64,
 
@@ -39,9 +42,16 @@ impl FakeDataStream {
         Self {
             data: data.to_vec(),
             data_size: data.len(),
+            data_offset: 0,
             current_offset: 0,
             size,
         }
+    }
+
+    /// Sets the data offset.
+    pub fn set_data_offset(&mut self, data_offset: u64) {
+        self.data_offset = data_offset;
+        self.size += data_offset;
     }
 }
 
@@ -69,11 +79,15 @@ impl DataStream for FakeDataStream {
         }
         let mut buf_offset: usize = 0;
 
+        let data_end_offset: u64 = self.data_offset + (self.data_size as u64);
+
         while buf_offset < read_size {
             let read_remainder_size: usize = read_size - buf_offset;
 
-            let read_count: usize = if self.current_offset < self.data_size as u64 {
-                let data_offset: usize = self.current_offset as usize;
+            let read_count: usize = if self.current_offset >= self.data_offset
+                && self.current_offset < data_end_offset
+            {
+                let data_offset: usize = (self.current_offset - self.data_offset) as usize;
 
                 let data_remainder_size: usize =
                     min(read_remainder_size, self.data_size - data_offset);
@@ -132,6 +146,14 @@ impl DataStream for FakeDataStream {
 pub fn open_fake_data_stream(data: &[u8]) -> DataStreamReference {
     let data_size: u64 = data.len() as u64;
     let fake_data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
+    Arc::new(RwLock::new(fake_data_stream))
+}
+
+/// Opens a new fake data stream with offset.
+pub fn open_fake_data_stream_with_offset(data: &[u8], data_offset: u64) -> DataStreamReference {
+    let data_size: u64 = data.len() as u64;
+    let mut fake_data_stream: FakeDataStream = FakeDataStream::new(data, data_size);
+    fake_data_stream.set_data_offset(data_offset);
     Arc::new(RwLock::new(fake_data_stream))
 }
 

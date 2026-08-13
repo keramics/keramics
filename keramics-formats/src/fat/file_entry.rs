@@ -17,6 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 
 use crate::path_component::PathComponent;
+use crate::traits::FileEntryIterator;
 
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::block_stream::FatBlockStream;
@@ -149,61 +150,6 @@ impl FatFileEntry {
         Ok(Some(Arc::new(RwLock::new(block_stream))))
     }
 
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
-            match self.read_sub_directory_entries() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read sub directory entries"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        Ok(self.sub_directory_entries.get_number_of_entries())
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
-        &mut self,
-        sub_file_entry_index: usize,
-    ) -> Result<FatFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read() {
-            match self.read_sub_directory_entries() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read sub directory entries"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        match self
-            .sub_directory_entries
-            .get_entry_by_index(sub_file_entry_index)
-        {
-            Some(directory_entry) => Ok(FatFileEntry::new(
-                &self.data_stream,
-                &self.block_allocation_table,
-                directory_entry.identifier,
-                Some(directory_entry.clone()),
-                FatDirectoryEntries::new(
-                    &self.sub_directory_entries.format,
-                    &self.sub_directory_entries.case_folding_mappings,
-                ),
-            )),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Unable to retrieve sub file entry: {}",
-                sub_file_entry_index
-            ))),
-        }
-    }
-
     /// Retrieves a sub file entries iterator.
     pub fn sub_file_entries(&mut self) -> FatFileEntriesIterator<'_> {
         FatFileEntriesIterator::new(self)
@@ -290,6 +236,63 @@ impl FatFileEntry {
             }
         }
         Ok(())
+    }
+}
+
+impl FileEntryIterator for FatFileEntry {
+    /// Retrieves the number of sub file entries.
+    fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.read_sub_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read sub directory entries"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(self.sub_directory_entries.get_number_of_entries())
+    }
+
+    /// Retrieves a specific sub file entry.
+    fn get_sub_file_entry_by_index(
+        &mut self,
+        sub_file_entry_index: usize,
+    ) -> Result<FatFileEntry, ErrorTrace> {
+        if self.is_directory() && !self.sub_directory_entries.is_read() {
+            match self.read_sub_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read sub directory entries"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        match self
+            .sub_directory_entries
+            .get_entry_by_index(sub_file_entry_index)
+        {
+            Some(directory_entry) => Ok(FatFileEntry::new(
+                &self.data_stream,
+                &self.block_allocation_table,
+                directory_entry.identifier,
+                Some(directory_entry.clone()),
+                FatDirectoryEntries::new(
+                    &self.sub_directory_entries.format,
+                    &self.sub_directory_entries.case_folding_mappings,
+                ),
+            )),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve sub file entry: {}",
+                sub_file_entry_index
+            ))),
+        }
     }
 }
 
@@ -455,7 +458,7 @@ mod tests {
         let mut fat_file_entry: FatFileEntry =
             fat_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        let sub_file_entry: FatFileEntry = fat_file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: FatFileEntry = fat_file_entry.get_sub_file_entry_by_index(2)?;
 
         let name: Option<FatString> = sub_file_entry.get_name();
         assert_eq!(
@@ -464,7 +467,6 @@ mod tests {
                 "My long, very long file name, so very long"
             ))
         );
-
         Ok(())
     }
 

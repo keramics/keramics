@@ -66,12 +66,6 @@ impl VmdkSectorTable {
         }
     }
 
-    /// Creates a new sector table.
-    pub fn set_range(&mut self, offset: u64, number_of_entries: u32) {
-        self.offset = offset;
-        self.number_of_entries = number_of_entries;
-    }
-
     /// Reads a sector table entry.
     pub fn read_entry(
         &self,
@@ -92,13 +86,6 @@ impl VmdkSectorTable {
             &mut data,
             SeekFrom::Start(entry_offset)
         );
-        keramics_core::debug_trace_data_and_structure!(
-            format!("VmdkSectorTableEntry: {}", entry_index),
-            entry_offset,
-            &data,
-            data.len(),
-            VmdkSectorTableEntry::debug_read_data(&data)
-        );
         let mut entry: VmdkSectorTableEntry = VmdkSectorTableEntry::new();
 
         match entry.read_data(&data) {
@@ -109,6 +96,12 @@ impl VmdkSectorTable {
             }
         }
         Ok(entry)
+    }
+
+    /// Creates a new sector table.
+    pub fn set_range(&mut self, offset: u64, number_of_entries: u32) {
+        self.offset = offset;
+        self.number_of_entries = number_of_entries;
     }
 }
 

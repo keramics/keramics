@@ -21,7 +21,7 @@ use keramics_formats::fat::{FatFileEntry, FatString};
 use keramics_formats::hfs::constants::*;
 use keramics_formats::hfs::{HfsFileEntry, HfsString};
 use keramics_formats::ntfs::NtfsFileEntry;
-use keramics_formats::{Path, PathComponent};
+use keramics_formats::{FileEntryIterator, Path, PathComponent};
 use keramics_types::Ucs2String;
 
 use super::apm::ApmFileEntry;
@@ -957,71 +957,46 @@ impl VfsFileEntry {
         VfsExtendedAttributesIterator::new(self)
     }
 
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        let result: Result<usize, ErrorTrace> = match self {
-            VfsFileEntry::Apm(apm_file_entry) => {
-                Ok(apm_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Ewf(ewf_file_entry) => {
-                Ok(ewf_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Fake(fake_file_entry) => {
-                Ok(fake_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Gpt(gpt_file_entry) => {
-                Ok(gpt_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Mbr(mbr_file_entry) => {
-                Ok(mbr_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_sub_file_entries(),
-            VfsFileEntry::Pdi(pdi_file_entry) => {
-                Ok(pdi_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Qcow(qcow_file_entry) => {
-                Ok(qcow_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
-                Ok(sparsebundle_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::SparseImage(sparseimage_file_entry) => {
-                Ok(sparseimage_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::SplitRaw(splitraw_file_entry) => {
-                Ok(splitraw_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Udif(udif_file_entry) => {
-                Ok(udif_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Vhd(vhd_file_entry) => {
-                Ok(vhd_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Vhdx(vhdx_file_entry) => {
-                Ok(vhdx_file_entry.get_number_of_sub_file_entries())
-            }
-            VfsFileEntry::Vmdk(vmdk_file_entry) => {
-                Ok(vmdk_file_entry.get_number_of_sub_file_entries())
-            }
-        };
-        match result {
-            Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to retrieve number of sub file entries"
-                );
-                Err(error)
-            }
-        }
+    // TODO: add get sub_file_entry_by_name
+
+    /// Retrieves a sub file entries iterator.
+    pub fn sub_file_entries(&mut self) -> VfsFileEntriesIterator<'_> {
+        VfsFileEntriesIterator::new(self)
     }
 
+    /// Determines if the file entry is the root directory.
+    pub fn is_root_directory(&self) -> bool {
+        match self {
+            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
+            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
+            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.is_root_file_entry(),
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
+            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.is_root_file_entry(),
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.is_root_directory(),
+            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.is_root_file_entry(),
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
+            VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.is_root_file_entry(),
+            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.is_root_file_entry(),
+            VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
+                sparsebundle_file_entry.is_root_file_entry()
+            }
+            VfsFileEntry::SparseImage(sparseimage_file_entry) => {
+                sparseimage_file_entry.is_root_file_entry()
+            }
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.is_root_file_entry(),
+            VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.is_root_file_entry(),
+            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.is_root_file_entry(),
+            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.is_root_file_entry(),
+            VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.is_root_file_entry(),
+        }
+    }
+}
+
+impl FileEntryIterator for VfsFileEntry {
     /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
+    fn get_sub_file_entry_by_index(
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<VfsFileEntry, ErrorTrace> {
@@ -1099,39 +1074,66 @@ impl VfsFileEntry {
         }
     }
 
-    // TODO: add get sub_file_entry_by_name
-
-    /// Retrieves a sub file entries iterator.
-    pub fn sub_file_entries(&mut self) -> VfsFileEntriesIterator<'_> {
-        VfsFileEntriesIterator::new(self)
-    }
-
-    /// Determines if the file entry is the root directory.
-    pub fn is_root_directory(&self) -> bool {
-        match self {
-            VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
-            VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
-            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
-            VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.is_root_file_entry(),
-            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.is_root_directory(),
-            VfsFileEntry::Gpt(gpt_file_entry) => gpt_file_entry.is_root_file_entry(),
-            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.is_root_directory(),
-            VfsFileEntry::Mbr(mbr_file_entry) => mbr_file_entry.is_root_file_entry(),
-            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.is_root_directory(),
-            VfsFileEntry::Os(os_file_entry) => os_file_entry.is_root_file_entry(),
-            VfsFileEntry::Pdi(pdi_file_entry) => pdi_file_entry.is_root_file_entry(),
-            VfsFileEntry::Qcow(qcow_file_entry) => qcow_file_entry.is_root_file_entry(),
+    /// Retrieves the number of sub file entries.
+    fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+        let result: Result<usize, ErrorTrace> = match self {
+            VfsFileEntry::Apm(apm_file_entry) => {
+                Ok(apm_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Ewf(ewf_file_entry) => {
+                Ok(ewf_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Fake(fake_file_entry) => {
+                Ok(fake_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Gpt(gpt_file_entry) => {
+                Ok(gpt_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Mbr(mbr_file_entry) => {
+                Ok(mbr_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Ntfs(ntfs_file_entry) => ntfs_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::Pdi(pdi_file_entry) => {
+                Ok(pdi_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Qcow(qcow_file_entry) => {
+                Ok(qcow_file_entry.get_number_of_sub_file_entries())
+            }
             VfsFileEntry::SparseBundle(sparsebundle_file_entry) => {
-                sparsebundle_file_entry.is_root_file_entry()
+                Ok(sparsebundle_file_entry.get_number_of_sub_file_entries())
             }
             VfsFileEntry::SparseImage(sparseimage_file_entry) => {
-                sparseimage_file_entry.is_root_file_entry()
+                Ok(sparseimage_file_entry.get_number_of_sub_file_entries())
             }
-            VfsFileEntry::SplitRaw(splitraw_file_entry) => splitraw_file_entry.is_root_file_entry(),
-            VfsFileEntry::Udif(udif_file_entry) => udif_file_entry.is_root_file_entry(),
-            VfsFileEntry::Vhd(vhd_file_entry) => vhd_file_entry.is_root_file_entry(),
-            VfsFileEntry::Vhdx(vhdx_file_entry) => vhdx_file_entry.is_root_file_entry(),
-            VfsFileEntry::Vmdk(vmdk_file_entry) => vmdk_file_entry.is_root_file_entry(),
+            VfsFileEntry::SplitRaw(splitraw_file_entry) => {
+                Ok(splitraw_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Udif(udif_file_entry) => {
+                Ok(udif_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Vhd(vhd_file_entry) => {
+                Ok(vhd_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Vhdx(vhdx_file_entry) => {
+                Ok(vhdx_file_entry.get_number_of_sub_file_entries())
+            }
+            VfsFileEntry::Vmdk(vmdk_file_entry) => {
+                Ok(vmdk_file_entry.get_number_of_sub_file_entries())
+            }
+        };
+        match result {
+            Ok(number_of_sub_file_entries) => Ok(number_of_sub_file_entries),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve number of sub file entries"
+                );
+                Err(error)
+            }
         }
     }
 }
@@ -2114,7 +2116,7 @@ mod tests {
                 115, 101, 99, 117, 114, 105, 116, 121, 46, 115, 101, 108, 105, 110, 117, 120,
             ],
         });
-        assert_eq!(extended_attribute.get_name(), expected_name,);
+        assert_eq!(extended_attribute.get_name(), expected_name);
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(99);
@@ -2697,7 +2699,7 @@ mod tests {
     fn test_test_get_sub_file_entry_by_index_with_fat() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_fat_file_entry("/testdir1")?;
 
-        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(2)?;
 
         let name: Option<PathComponent> = sub_file_entry.get_name();
         assert_eq!(
@@ -2706,7 +2708,6 @@ mod tests {
                 "My long, very long file name, so very long"
             )))
         );
-
         let result: Result<VfsFileEntry, ErrorTrace> =
             vfs_file_entry.get_sub_file_entry_by_index(99);
         assert!(result.is_err());
@@ -3352,7 +3353,7 @@ mod tests {
         let expected_name: PathComponent = PathComponent::Utf16String(Utf16String {
             elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
         });
-        assert_eq!(extended_attribute.get_name(), expected_name,);
+        assert_eq!(extended_attribute.get_name(), expected_name);
 
         let result: Result<VfsExtendedAttribute, ErrorTrace> =
             vfs_file_entry.get_extended_attribute_by_index(99);

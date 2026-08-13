@@ -24,7 +24,7 @@ use super::region_table_header::VhdxRegionTableHeader;
 /// Virtual Hard Disk version 2 (VHDX) region table.
 pub struct VhdxRegionTable {
     /// Entries.
-    pub entries: HashMap<Uuid, VhdxRegionTableEntry>,
+    entries: HashMap<Uuid, VhdxRegionTableEntry>,
 }
 
 impl VhdxRegionTable {
@@ -33,6 +33,11 @@ impl VhdxRegionTable {
         Self {
             entries: HashMap::new(),
         }
+    }
+
+    /// Retrieves a specific entry.
+    pub fn get_entry(&self, identifier: &Uuid) -> Option<&VhdxRegionTableEntry> {
+        self.entries.get(identifier)
     }
 
     /// Reads the region table from a buffer.

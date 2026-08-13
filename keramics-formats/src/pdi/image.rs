@@ -389,7 +389,7 @@ impl PdiImage {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                format!("Unable to open image file: {}", descriptor_image.file,)
+                                format!("Unable to open image file: {}", descriptor_image.file)
                             );
                             return Err(error);
                         }

@@ -20,12 +20,12 @@ use keramics_types::Uuid;
 use super::checkpoint_map::ApfsCheckpointMap;
 use super::checkpoint_map_entry::ApfsCheckpointMapEntry;
 use super::container_superblock::ApfsContainerSuperblock;
+use super::key_bag::ApfsKeyBag;
 use super::object_header::ApfsObjectHeader;
 use super::object_map::ApfsObjectMap;
 use super::object_map_tree::ApfsObjectMapTree;
 use super::object_map_value::ApfsObjectMapValue;
 use super::volume::ApfsVolume;
-use super::volume_superblock::ApfsVolumeSuperblock;
 use super::volumes::ApfsVolumesIterator;
 
 /// Apple File System (APFS) container.
@@ -35,6 +35,9 @@ pub struct ApfsContainer {
 
     /// Identifier.
     identifier: Uuid,
+
+    /// Bytes per sector.
+    bytes_per_sector: u16,
 
     /// Block size.
     block_size: u32,
@@ -55,7 +58,10 @@ pub struct ApfsContainer {
     volume_object_identifiers: Vec<u64>,
 
     /// Object map B-tree.
-    object_map_tree: Arc<ApfsObjectMapTree>,
+    object_map_tree: ApfsObjectMapTree,
+
+    /// Key bag.
+    key_bag: Option<Arc<ApfsKeyBag>>,
 }
 
 impl ApfsContainer {
@@ -64,19 +70,26 @@ impl ApfsContainer {
         Self {
             data_stream: None,
             identifier: Uuid::new(),
+            bytes_per_sector: 0,
             block_size: 0,
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
             transaction_identifier: 0,
             volume_object_identifiers: Vec::new(),
-            object_map_tree: Arc::new(ApfsObjectMapTree::new()),
+            object_map_tree: ApfsObjectMapTree::new(),
+            key_bag: None,
         }
     }
 
     /// Retrieves the block size.
     pub fn get_block_size(&self) -> u32 {
         self.block_size
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
     }
 
     /// Retrieves the feature flags.
@@ -97,6 +110,14 @@ impl ApfsContainer {
     /// Retrieves the read-only compatible feature flags.
     pub fn get_read_only_compatible_feature_flags(&self) -> u64 {
         self.read_only_compatible_feature_flags
+    }
+
+    /// Determines if the container is locked.
+    pub fn is_locked(&self) -> bool {
+        match &self.key_bag {
+            Some(key_bag) => key_bag.is_locked,
+            None => false,
+        }
     }
 
     /// Retrieves the number of volumes.
@@ -121,50 +142,34 @@ impl ApfsContainer {
                 )));
             }
         };
-        let object_map_value: ApfsObjectMapValue =
-            match self.object_map_tree.get_value_by_object_identifier(
-                &data_stream,
-                object_identifier,
-                self.transaction_identifier,
-            ) {
-                Ok(Some(object_map_value)) => object_map_value,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing object map value of volume object: {}",
-                        object_identifier
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve object map value of volume object: {}",
-                            object_identifier
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-        let offset: u64 = object_map_value.physical_address * (self.block_size as u64);
-
-        let mut superblock: ApfsVolumeSuperblock = ApfsVolumeSuperblock::new();
-
-        match superblock.read_at_position(&data_stream, SeekFrom::Start(offset)) {
-            Ok(_) => {}
+        let object_map_value: ApfsObjectMapValue = match self
+            .object_map_tree
+            .get_value_by_identifier(&data_stream, object_identifier, self.transaction_identifier)
+        {
+            Ok(Some(object_map_value)) => object_map_value,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing object map value of volume object: {}",
+                    object_identifier
+                )));
+            }
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to read volume superblock at offset: {} (0x{:08x}))",
-                        offset, offset
+                        "Unable to retrieve object map value of volume object: {}",
+                        object_identifier
                     )
                 );
                 return Err(error);
             }
-        }
-        let mut volume: ApfsVolume = ApfsVolume::new(superblock);
-
-        match volume.open(data_stream) {
+        };
+        let mut volume: ApfsVolume = ApfsVolume::new(
+            self.bytes_per_sector,
+            self.block_size,
+            self.key_bag.as_ref(),
+        );
+        match volume.open(data_stream, object_map_value.physical_address) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -223,7 +228,8 @@ impl ApfsContainer {
                 return Err(error);
             }
         }
-        self.identifier = superblock.container_identifier;
+        self.identifier = Uuid::from_be_bytes(&superblock.container_identifier);
+        self.bytes_per_sector = 512;
         self.block_size = superblock.block_size;
         self.feature_flags = superblock.feature_flags;
         self.read_only_compatible_feature_flags = superblock.read_only_compatible_feature_flags;
@@ -231,6 +237,39 @@ impl ApfsContainer {
         self.transaction_identifier = superblock.object_header.transaction_identifier;
         self.volume_object_identifiers = superblock.volume_object_identifiers;
 
+        if superblock.key_bag.block_number > 0 && superblock.key_bag.number_of_blocks > 0 {
+            let key_bag_offset: u64 = superblock.key_bag.block_number * (self.block_size as u64);
+            let key_bag_size: u64 = superblock.key_bag.number_of_blocks * (self.block_size as u64);
+
+            let mut key_bag: ApfsKeyBag = ApfsKeyBag::new(
+                self.bytes_per_sector,
+                &superblock.container_identifier,
+                &superblock.container_identifier,
+            );
+            match key_bag.read_at_position(
+                &data_stream,
+                key_bag_size,
+                SeekFrom::Start(key_bag_offset),
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read key bag at offset: {} (0x{:08x}))",
+                            key_bag_offset, key_bag_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            if key_bag.object_header.object_type != 0x6b657973 {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported container key bag object type"
+                ));
+            }
+            self.key_bag = Some(Arc::new(key_bag));
+        }
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
@@ -358,29 +397,15 @@ impl ApfsContainer {
                 return Err(error);
             }
         }
-        match Arc::get_mut(&mut self.object_map_tree) {
-            Some(object_map_tree) => {
-                match object_map_tree
-                    .initialize(superblock.block_size, object_map.btree_block_number)
-                {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to initialize object map tree"
-                        );
-                        return Err(error);
-                    }
-                }
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Unable to obtain mutable reference to object map tree"
-                ));
-            }
+        if object_map.btree_block_number == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid object map - missing B-tree block number"
+            ));
         }
+        self.object_map_tree
+            .initialize(superblock.block_size, object_map.btree_block_number);
+
         // TODO: determine snapshots based on objects map.
-        // TODO: read optional key bag.
 
         Ok(())
     }

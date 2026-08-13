@@ -40,7 +40,6 @@ mod catalog_thread_record;
 mod catalog_thread_record_extended;
 mod catalog_thread_record_standard;
 pub mod constants;
-mod directory_entries;
 mod directory_entry;
 mod enums;
 mod extended_attribute;

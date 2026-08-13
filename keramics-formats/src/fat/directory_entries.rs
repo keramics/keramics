@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 use std::io::SeekFrom;
 use std::sync::Arc;
 
@@ -19,6 +19,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, Ucs2CharacterMappings, Ucs2String};
 
 use crate::path_component::PathComponent;
+use crate::types::IndexedHashMap;
 
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::constants::*;
@@ -39,7 +40,7 @@ pub struct FatDirectoryEntries {
     pub case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
     /// Entries.
-    pub entries: BTreeMap<Ucs2String, FatDirectoryEntry>,
+    pub entries: IndexedHashMap<Ucs2String, FatDirectoryEntry>,
 
     /// Volume label.
     pub volume_label: Option<ByteString>,
@@ -54,7 +55,7 @@ impl FatDirectoryEntries {
         Self {
             format: format.clone(),
             case_folding_mappings: case_folding_mappings.clone(),
-            entries: BTreeMap::new(),
+            entries: IndexedHashMap::new(),
             volume_label: None,
             is_read: false,
         }
@@ -62,10 +63,7 @@ impl FatDirectoryEntries {
 
     /// Retrieves a specific directory entry.
     pub fn get_entry_by_index(&self, entry_index: usize) -> Option<&FatDirectoryEntry> {
-        match self.entries.iter().nth(entry_index) {
-            Some((_, entry)) => Some(entry),
-            None => None,
-        }
+        self.entries.get_value_by_index(entry_index)
     }
 
     /// Retrieves a specific directory entry by name.
@@ -84,10 +82,7 @@ impl FatDirectoryEntries {
                     return Err(error);
                 }
             };
-        match self.entries.get_key_value(&lookup_name) {
-            Some((_, entry)) => Ok(Some(entry)),
-            None => Ok(None),
-        }
+        Ok(self.entries.get_value_by_key(&lookup_name))
     }
 
     /// Retrieves the number of entries.

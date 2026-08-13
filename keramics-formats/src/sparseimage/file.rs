@@ -335,7 +335,7 @@ impl SparseImageFile {
         match cdsaencr_container.read_data_stream(data_stream) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open encrypted container",);
+                keramics_core::error_trace_add_frame!(error, "Unable to open encrypted container");
                 return Err(error);
             }
         }

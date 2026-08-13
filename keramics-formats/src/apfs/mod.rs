@@ -11,6 +11,7 @@
  * under the License.
  */
 
+mod attribute_record;
 mod block_range;
 mod btree_entry;
 mod btree_entry_fixed_size;
@@ -24,7 +25,22 @@ mod checkpoint_map_entry;
 pub mod constants;
 mod container;
 mod container_superblock;
+mod directory_entry;
+mod directory_record;
 mod encryption_state;
+mod extended_attribute;
+mod extended_attributes;
+mod file_entries;
+mod file_entry;
+mod file_system;
+mod file_system_key;
+mod file_system_key_with_name;
+mod file_system_key_with_name_and_hash;
+mod file_system_tree;
+mod inode;
+mod key_bag;
+mod key_bag_entry;
+mod key_bag_header;
 mod object_checksum;
 mod object_header;
 mod object_map;
@@ -36,4 +52,6 @@ mod volume_superblock;
 mod volumes;
 
 pub use container::ApfsContainer;
+pub use file_entry::ApfsFileEntry;
+pub use file_system::ApfsFileSystem;
 pub use volume::ApfsVolume;

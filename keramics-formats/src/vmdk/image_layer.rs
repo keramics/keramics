@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -220,11 +220,23 @@ impl VmdkImageLayer {
 
         let media_sector: u64 = media_offset / (self.bytes_per_sector as u64);
 
-        let mut extent_sector: u64 = 0;
-        let mut extent_index: usize = self.extents.partition_point(|extent| {
-            extent_sector += extent.number_of_sectors;
-            media_sector >= extent_sector
-        });
+        let mut extent_index: usize = match self.extents.binary_search_by(|extent| {
+            if media_sector >= extent.media_end_sector {
+                Ordering::Less
+            } else if media_sector < extent.media_start_sector {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(extent_index) => extent_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing extent for media offset: {} (0x{:08x})",
+                    media_offset, media_offset
+                )));
+            }
+        };
         let mut extent: &VmdkDescriptorExtent = match self.extents.get(extent_index) {
             Some(extent) => extent,
             None => {
@@ -234,13 +246,8 @@ impl VmdkImageLayer {
                 )));
             }
         };
-        extent_sector = self.extents[0..extent_index]
-            .iter()
-            .map(|extent| extent.number_of_sectors)
-            .sum::<u64>();
-
-        let mut extent_offset: u64 =
-            media_offset - (extent_sector * (self.bytes_per_sector as u64));
+        let extent_start_offset: u64 = extent.media_start_sector * (self.bytes_per_sector as u64);
+        let mut extent_offset: u64 = media_offset - extent_start_offset;
         let mut extent_size: u64 = extent.number_of_sectors * (self.bytes_per_sector as u64);
 
         while data_offset < read_size {
@@ -637,6 +644,8 @@ impl VmdkImageLayer {
                 "Invalid descriptor data - missing extent description section"
             )));
         }
+        let mut media_start_sector: u64 = 0;
+
         while let Some(line) = descriptor_storage.next_line() {
             let trimmed_line: &[u8] = VmdkDescriptorStorage::trim(line);
             last_line = VmdkDescriptorStorage::to_ascii_lowercase(trimmed_line);
@@ -647,13 +656,17 @@ impl VmdkImageLayer {
             if last_line.is_empty() || last_line[0] == b'#' {
                 continue;
             }
-            let extent: VmdkDescriptorExtent =
+            let mut extent: VmdkDescriptorExtent =
                 match VmdkDescriptorStorage::parse_extent(trimmed_line, &self.character_encoding) {
                     Some(extent) => extent,
                     None => {
                         return Err(keramics_core::error_trace_new!("Unsupported extent value"));
                     }
                 };
+            extent.media_start_sector = media_start_sector;
+            media_start_sector += extent.number_of_sectors;
+            extent.media_end_sector = media_start_sector;
+
             match &extent.extent_type {
                 VmdkDescriptorExtentType::Flat => match &self.disk_type {
                     VmdkDiskType::Device

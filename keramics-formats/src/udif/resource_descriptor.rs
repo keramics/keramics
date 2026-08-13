@@ -21,9 +21,8 @@ use keramics_types::{bytes_to_u16_be, bytes_to_u32_be};
         byte_order = "big",
         field(name = "resource_identifier", data_type = "u16", format = "hex"),
         field(name = "name_offset", data_type = "u16", format = "hex"),
-        field(name = "resource_flags", data_type = "u8", format = "hex"),
-        field(name = "data_offset_lower", data_type = "u16"),
-        field(name = "data_offset_upper", data_type = "u8"),
+        field(name = "data_offset", data_type = "BitField32<24>"),
+        field(name = "resource_flags", data_type = "BitField32<8>", format = "hex"),
         field(name = "unknown1", data_type = "u32", format = "hex"),
     ),
     methods("debug_read_data")

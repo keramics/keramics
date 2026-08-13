@@ -42,3 +42,12 @@ pub trait CryptCbc: CryptContext {
         encrypted_data: &mut [u8],
     ) -> Result<(), ErrorTrace>;
 }
+
+/// ECB (Electronic CodeBook) encryption and decryption context trait.
+pub trait CryptEcb: CryptContext {
+    /// Decrypts data using ECB (Electronic CodeBook) mode.
+    fn decrypt_ecb(&self, encrypted_data: &[u8], data: &mut [u8]) -> Result<(), ErrorTrace>;
+
+    /// Encrypts data using ECB (Electronic CodeBook) mode.
+    fn encrypt_ecb(&self, data: &[u8], encrypted_data: &mut [u8]) -> Result<(), ErrorTrace>;
+}

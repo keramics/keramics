@@ -75,7 +75,7 @@ use super::object_header::ApfsObjectHeader;
         field(name = "container_flags", data_type = "u64", format = "hex"),
         field(name = "efi_jumpstart_object_identifier", data_type = "u64"),
         field(name = "fusion_set_identifier", data_type = "Uuid", byte_order = "big"),
-        field(name = "key_bag_area", data_type = "Struct<ApfsBlockRange; 16>"),
+        field(name = "key_bag", data_type = "Struct<ApfsBlockRange; 16>"),
         field(name = "ephemeral_information", data_type = "[u64; 4]"),
         field(name = "unknown2", data_type = "u64"),
         field(name = "fusion_middle_tree_block_number", data_type = "u64"),
@@ -111,7 +111,7 @@ pub struct ApfsContainerSuperblock {
     pub incompatible_feature_flags: u64,
 
     /// Container identifier.
-    pub container_identifier: Uuid,
+    pub container_identifier: Vec<u8>,
 
     /// Checkpoint descriptor area.
     pub checkpoint_descriptor_area: ApfsBlockRange,
@@ -125,8 +125,8 @@ pub struct ApfsContainerSuperblock {
     /// Fusion set identifier.
     pub fusion_set_identifier: Uuid,
 
-    /// Key bag area.
-    pub key_bag_area: ApfsBlockRange,
+    /// Key bag.
+    pub key_bag: ApfsBlockRange,
 }
 
 impl ApfsContainerSuperblock {
@@ -139,12 +139,12 @@ impl ApfsContainerSuperblock {
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
-            container_identifier: Uuid::new(),
+            container_identifier: Vec::new(),
             checkpoint_descriptor_area: ApfsBlockRange::new(),
             object_map_block_number: 0,
             volume_object_identifiers: Vec::new(),
             fusion_set_identifier: Uuid::new(),
-            key_bag_area: ApfsBlockRange::new(),
+            key_bag: ApfsBlockRange::new(),
         }
     }
 
@@ -191,7 +191,7 @@ impl ApfsContainerSuperblock {
         self.feature_flags = bytes_to_u64_le!(data, 48);
         self.read_only_compatible_feature_flags = bytes_to_u64_le!(data, 56);
         self.incompatible_feature_flags = bytes_to_u64_le!(data, 64);
-        self.container_identifier = Uuid::from_be_bytes(&data[72..88]);
+        self.container_identifier = data[72..88].to_vec();
 
         self.checkpoint_descriptor_area.number_of_blocks = bytes_to_u32_le!(data, 104) as u64;
         self.checkpoint_descriptor_area.block_number = bytes_to_u64_le!(data, 112);
@@ -206,13 +206,10 @@ impl ApfsContainerSuperblock {
         }
         self.fusion_set_identifier = Uuid::from_be_bytes(&data[1280..1296]);
 
-        match self.key_bag_area.read_data(&data[1296..]) {
+        match self.key_bag.read_data(&data[1296..]) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to read key bag area block range"
-                );
+                keramics_core::error_trace_add_frame!(error, "Unable to read key bag block range");
                 return Err(error);
             }
         }
@@ -543,10 +540,7 @@ mod tests {
         assert_eq!(test_struct.feature_flags, 0x00000000);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
-        assert_eq!(
-            test_struct.container_identifier.to_string(),
-            "ff9765c4-2187-4167-a484-416859c64f86"
-        );
+        assert_eq!(test_struct.container_identifier, &test_data[72..88]);
         assert_eq!(test_struct.checkpoint_descriptor_area.number_of_blocks, 8);
         assert_eq!(test_struct.checkpoint_descriptor_area.block_number, 1);
         assert_eq!(test_struct.object_map_block_number, 148);
@@ -555,8 +549,8 @@ mod tests {
             test_struct.fusion_set_identifier.to_string(),
             "00000000-0000-0000-0000-000000000000"
         );
-        assert_eq!(test_struct.key_bag_area.number_of_blocks, 0);
-        assert_eq!(test_struct.key_bag_area.block_number, 0);
+        assert_eq!(test_struct.key_bag.number_of_blocks, 0);
+        assert_eq!(test_struct.key_bag.block_number, 0);
 
         Ok(())
     }
@@ -628,20 +622,17 @@ mod tests {
         assert_eq!(test_struct.feature_flags, 0x00000000);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
-        assert_eq!(
-            test_struct.container_identifier.to_string(),
-            "ff9765c4-2187-4167-a484-416859c64f86"
-        );
+        assert_eq!(test_struct.container_identifier, &test_data[72..88]);
         assert_eq!(test_struct.checkpoint_descriptor_area.number_of_blocks, 8);
         assert_eq!(test_struct.checkpoint_descriptor_area.block_number, 1);
         assert_eq!(test_struct.object_map_block_number, 148);
         assert_eq!(test_struct.volume_object_identifiers, vec![1026]);
-        assert_eq!(test_struct.key_bag_area.number_of_blocks, 0);
+        assert_eq!(test_struct.key_bag.number_of_blocks, 0);
         assert_eq!(
             test_struct.fusion_set_identifier.to_string(),
             "00000000-0000-0000-0000-000000000000"
         );
-        assert_eq!(test_struct.key_bag_area.block_number, 0);
+        assert_eq!(test_struct.key_bag.block_number, 0);
 
         Ok(())
     }

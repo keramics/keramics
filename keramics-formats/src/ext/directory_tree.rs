@@ -24,7 +24,7 @@ use super::directory_entry::ExtDirectoryEntry;
 /// Extended File System directory.
 pub struct ExtDirectoryTree {
     /// Character encoding.
-    encoding: CharacterEncoding,
+    character_encoding: CharacterEncoding,
 
     /// Block size.
     block_size: u32,
@@ -32,9 +32,9 @@ pub struct ExtDirectoryTree {
 
 impl ExtDirectoryTree {
     /// Creates a new directory tree.
-    pub fn new(encoding: &CharacterEncoding, block_size: u32) -> Self {
+    pub fn new(character_encoding: &CharacterEncoding, block_size: u32) -> Self {
         Self {
-            encoding: encoding.clone(),
+            character_encoding: character_encoding.clone(),
             block_size,
         }
     }
@@ -132,16 +132,17 @@ impl ExtDirectoryTree {
                     entry.size
                 )));
             }
-            let name: ByteString = match entry.read_name(&data[data_offset..], &self.encoding) {
-                Ok(name) => name,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read directory entry name"
-                    );
-                    return Err(error);
-                }
-            };
+            let name: ByteString =
+                match entry.read_name(&data[data_offset..], &self.character_encoding) {
+                    Ok(name) => name,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read directory entry name"
+                        );
+                        return Err(error);
+                    }
+                };
             data_offset += entry.size as usize;
 
             // TODO: print trailing data
@@ -154,7 +155,7 @@ impl ExtDirectoryTree {
             if name == "." || name == ".." {
                 continue;
             }
-            entries.insert_entry(name, entry);
+            entries.insert(name, entry);
         }
         Ok(())
     }
@@ -220,10 +221,10 @@ mod tests {
             number_of_blocks: 1,
             range_type: ExtBlockRangeType::InFile,
         }];
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
         test_struct.read_block_data(&data_stream, &block_ranges, &mut entries)?;
 
-        assert_eq!(entries.get_number_of_entries(), 10);
+        assert_eq!(entries.len(), 10);
 
         Ok(())
     }
@@ -239,10 +240,10 @@ mod tests {
         ];
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
         test_struct.read_inline_data(&test_data, &mut entries)?;
 
-        assert_eq!(entries.get_number_of_entries(), 1);
+        assert_eq!(entries.len(), 1);
 
         Ok(())
     }
@@ -253,10 +254,10 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
         test_struct.read_node_data(&test_data, 0, 256, &mut entries)?;
 
-        assert_eq!(entries.get_number_of_entries(), 10);
+        assert_eq!(entries.len(), 10);
 
         Ok(())
     }
@@ -268,10 +269,10 @@ mod tests {
 
         let mut test_struct = ExtDirectoryTree::new(&CharacterEncoding::Utf8, 256);
 
-        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new(&CharacterEncoding::Utf8);
+        let mut entries: ExtDirectoryEntries = ExtDirectoryEntries::new();
         test_struct.read_node_at_position(&data_stream, SeekFrom::Start(0), &mut entries)?;
 
-        assert_eq!(entries.get_number_of_entries(), 10);
+        assert_eq!(entries.len(), 10);
 
         Ok(())
     }

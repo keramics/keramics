@@ -11,7 +11,6 @@
  * under the License.
  */
 
-use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
@@ -20,6 +19,8 @@ use keramics_types::ByteString;
 
 use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader};
 use crate::path_component::PathComponent;
+use crate::traits::FileEntryIterator;
+use crate::types::IndexedHashMap;
 
 use super::attribute_record::HfsAttributeRecord;
 use super::attributes_file::HfsAttributesFile;
@@ -27,7 +28,6 @@ use super::block_ranges::HfsBlockRanges;
 use super::block_stream::HfsBlockStream;
 use super::catalog_file::HfsCatalogFile;
 use super::constants::*;
-use super::directory_entries::HfsDirectoryEntries;
 use super::directory_entry::HfsDirectoryEntry;
 use super::enums::HfsForkType;
 use super::extended_attribute::HfsExtendedAttribute;
@@ -71,13 +71,16 @@ pub struct HfsFileEntry {
     compressed_data_header: Option<DecmpfsHeader>,
 
     /// Sub directory entries.
-    sub_directory_entries: HfsDirectoryEntries,
+    sub_directory_entries: IndexedHashMap<HfsString, HfsDirectoryEntry>,
+
+    /// Value to indicate the sub directory entries were read.
+    read_sub_directory_entries: bool,
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
 
     /// Attributes.
-    attributes: BTreeMap<HfsString, HfsAttributeRecord>,
+    attributes: IndexedHashMap<HfsString, HfsAttributeRecord>,
 }
 
 impl HfsFileEntry {
@@ -102,9 +105,10 @@ impl HfsFileEntry {
             directory_entry,
             indirect_node: None,
             compressed_data_header: None,
-            sub_directory_entries: HfsDirectoryEntries::new(),
+            sub_directory_entries: IndexedHashMap::new(),
+            read_sub_directory_entries: false,
             symbolic_link_target: None,
-            attributes: BTreeMap::new(),
+            attributes: IndexedHashMap::new(),
         }
     }
 
@@ -320,7 +324,7 @@ impl HfsFileEntry {
                     _ => {
                         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-                        match self.attributes.get(&lookup_name) {
+                        match self.attributes.get_value_by_key(&lookup_name) {
                             Some(attribute_record) => match attribute_record {
                                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                                     let data_stream: FakeDataStream = FakeDataStream::new(
@@ -431,11 +435,6 @@ impl HfsFileEntry {
         }
     }
 
-    /// Retrieves the number of extended attributes.
-    pub fn get_number_of_extended_attributes(&self) -> Result<usize, ErrorTrace> {
-        Ok(self.attributes.len())
-    }
-
     /// Retrieves the data stream of an extended attribute.
     fn get_extended_attribute_data_stream(
         &self,
@@ -443,6 +442,7 @@ impl HfsFileEntry {
     ) -> Result<DataStreamReference, ErrorTrace> {
         match attribute_record {
             HfsAttributeRecord::Extents(extents_attribute_record) => {
+                // TODO: implement
                 todo!();
             }
             HfsAttributeRecord::ForkData(fork_data_attribute_record) => {
@@ -467,12 +467,20 @@ impl HfsFileEntry {
         }
     }
 
+    /// Retrieves the number of extended attributes.
+    pub fn get_number_of_extended_attributes(&self) -> Result<usize, ErrorTrace> {
+        Ok(self.attributes.len())
+    }
+
     /// Retrieves a specific extended attribute.
     pub fn get_extended_attribute_by_index(
         &self,
         extended_attribute_index: usize,
     ) -> Result<HfsExtendedAttribute, ErrorTrace> {
-        match self.attributes.iter().nth(extended_attribute_index) {
+        match self
+            .attributes
+            .get_key_value_by_index(extended_attribute_index)
+        {
             Some((name, attribute_record)) => {
                 let data_stream: DataStreamReference =
                     match self.get_extended_attribute_data_stream(attribute_record) {
@@ -509,7 +517,7 @@ impl HfsFileEntry {
                 return Err(error);
             }
         };
-        match self.attributes.get_key_value(&lookup_name) {
+        match self.attributes.get_key_value_by_key(&lookup_name) {
             Some((name, attributes_entry)) => {
                 let data_stream: DataStreamReference =
                     match self.get_extended_attribute_data_stream(attributes_entry) {
@@ -531,83 +539,6 @@ impl HfsFileEntry {
     /// Retrieves an extended attributes iterator.
     pub fn extended_attributes(&mut self) -> HfsExtendedAttributesIterator<'_> {
         HfsExtendedAttributesIterator::new(self)
-    }
-
-    /// Retrieves the number of sub file entries.
-    pub fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read {
-            match self.read_sub_directory_entries() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read sub directory entries"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        Ok(self.sub_directory_entries.get_number_of_entries())
-    }
-
-    /// Retrieves a specific sub file entry.
-    pub fn get_sub_file_entry_by_index(
-        &mut self,
-        sub_file_entry_index: usize,
-    ) -> Result<HfsFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.sub_directory_entries.is_read {
-            match self.read_sub_directory_entries() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read sub directory entries"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        match self
-            .sub_directory_entries
-            .get_entry_by_index(sub_file_entry_index)
-        {
-            Some((name, directory_entry)) => {
-                let mut sub_directory_entry: HfsDirectoryEntry = directory_entry.clone();
-                sub_directory_entry.name = Some(name.clone());
-
-                let mut file_entry: HfsFileEntry = HfsFileEntry::new(
-                    &self.data_stream,
-                    self.block_size,
-                    self.data_area_block_number,
-                    &self.catalog_file,
-                    &self.extents_overflow_file,
-                    &self.attributes_file,
-                    sub_directory_entry,
-                );
-                match file_entry.read_indirect_node() {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read indirect node"
-                        );
-                        return Err(error);
-                    }
-                }
-                match file_entry.read_attributes() {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
-                        return Err(error);
-                    }
-                }
-                Ok(file_entry)
-            }
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Missing directory entry: {}",
-                sub_file_entry_index
-            ))),
-        }
     }
 
     /// Retrieves a specific sub file entry.
@@ -720,7 +651,7 @@ impl HfsFileEntry {
         }
         let lookup_name: HfsString = HfsString::from("com.apple.decmpfs");
 
-        match self.attributes.get(&lookup_name) {
+        match self.attributes.get_value_by_key(&lookup_name) {
             Some(attribute_record) => match attribute_record {
                 HfsAttributeRecord::InlineData(attribute_inline_data_record) => {
                     let mut compressed_data_header: DecmpfsHeader = DecmpfsHeader::new();
@@ -737,7 +668,7 @@ impl HfsFileEntry {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to read compressed data header"
+                                "Unable to read decmpfs header"
                             );
                             return Err(error);
                         }
@@ -804,9 +735,88 @@ impl HfsFileEntry {
                 return Err(error);
             }
         }
-        self.sub_directory_entries.is_read = true;
+        self.read_sub_directory_entries = true;
 
         Ok(())
+    }
+}
+
+impl FileEntryIterator for HfsFileEntry {
+    /// Retrieves the number of sub file entries.
+    fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
+        if self.is_directory() && !self.read_sub_directory_entries {
+            match self.read_sub_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read sub directory entries"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(self.sub_directory_entries.len())
+    }
+
+    /// Retrieves a specific sub file entry.
+    fn get_sub_file_entry_by_index(
+        &mut self,
+        sub_file_entry_index: usize,
+    ) -> Result<HfsFileEntry, ErrorTrace> {
+        if self.is_directory() && !self.read_sub_directory_entries {
+            match self.read_sub_directory_entries() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read sub directory entries"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        match self
+            .sub_directory_entries
+            .get_key_value_by_index(sub_file_entry_index)
+        {
+            Some((name, directory_entry)) => {
+                let mut sub_directory_entry: HfsDirectoryEntry = directory_entry.clone();
+                sub_directory_entry.name = Some(name.clone());
+
+                let mut file_entry: HfsFileEntry = HfsFileEntry::new(
+                    &self.data_stream,
+                    self.block_size,
+                    self.data_area_block_number,
+                    &self.catalog_file,
+                    &self.extents_overflow_file,
+                    &self.attributes_file,
+                    sub_directory_entry,
+                );
+                match file_entry.read_indirect_node() {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read indirect node"
+                        );
+                        return Err(error);
+                    }
+                }
+                match file_entry.read_attributes() {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                        return Err(error);
+                    }
+                }
+                Ok(file_entry)
+            }
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing directory entry: {}",
+                sub_file_entry_index
+            ))),
+        }
     }
 }
 
@@ -846,15 +856,26 @@ mod tests {
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
-            hfs_file_entry.get_change_time(),
+            hfs_file_entry.get_access_time(),
             Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868686545
+                timestamp: 3868686544
             }))
         );
         Ok(())
     }
 
-    // TODO: add tests for get_backup_time
+    #[test]
+    fn test_get_backup_time() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_backup_time(), &DateTime::NotSet,);
+
+        Ok(())
+    }
+
     // TODO: add tests for get_block_stream
 
     #[test]
@@ -881,10 +902,10 @@ mod tests {
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
-            hfs_file_entry.get_change_time(),
-            Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868686545
-            }))
+            hfs_file_entry.get_creation_time(),
+            &DateTime::HfsTime(HfsTime {
+                timestamp: 3868686544
+            })
         );
         Ok(())
     }
@@ -924,10 +945,10 @@ mod tests {
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
         assert_eq!(
-            hfs_file_entry.get_change_time(),
-            Some(&DateTime::HfsTime(HfsTime {
-                timestamp: 3868686545
-            }))
+            hfs_file_entry.get_modification_time(),
+            &DateTime::HfsTime(HfsTime {
+                timestamp: 3868686544
+            })
         );
         Ok(())
     }

@@ -15,8 +15,11 @@ use super::enums::PdiExtentType;
 
 /// Parallels Disk Image (PDI) image extent.
 pub(super) struct PdiImageExtent {
-    /// Offset.
-    pub offset: u64,
+    /// Start offset.
+    pub start_offset: u64,
+
+    /// End offset.
+    pub end_offset: u64,
 
     /// Size.
     pub size: u64,
@@ -32,7 +35,8 @@ impl PdiImageExtent {
     /// Creates a new image extent.
     pub fn new(offset: u64, size: u64, file_name: &str, extent_type: PdiExtentType) -> Self {
         Self {
-            offset,
+            start_offset: offset,
+            end_offset: offset + size,
             size,
             file_name: file_name.to_string(),
             extent_type,

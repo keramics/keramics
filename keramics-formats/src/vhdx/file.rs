@@ -205,23 +205,21 @@ impl VhdxFile {
         }
         // TODO: compare primary region table with secondary
 
-        let metadata_region: &VhdxRegionTableEntry = match primary_region_table
-            .entries
-            .get(&VHDX_METADATA_REGION_IDENTIFIER)
-        {
-            Some(region_table_entry) => {
-                if region_table_entry.data_size < 65536 {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported metadata region size: {}",
-                        region_table_entry.data_size
-                    )));
+        let metadata_region: &VhdxRegionTableEntry =
+            match primary_region_table.get_entry(&VHDX_METADATA_REGION_IDENTIFIER) {
+                Some(region_table_entry) => {
+                    if region_table_entry.data_size < 65536 {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Unsupported metadata region size: {}",
+                            region_table_entry.data_size
+                        )));
+                    }
+                    region_table_entry
                 }
-                region_table_entry
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing metadata region"));
-            }
-        };
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing metadata region"));
+                }
+            };
         match self.read_metadata_values(data_stream, metadata_region) {
             Ok(_) => {}
             Err(mut error) => {
@@ -229,17 +227,15 @@ impl VhdxFile {
                 return Err(error);
             }
         }
-        let block_allocation_table_region: &VhdxRegionTableEntry = match primary_region_table
-            .entries
-            .get(&VHDX_BLOCK_ALLOCATION_TABLE_REGION_IDENTIFIER)
-        {
-            Some(region_table_entry) => region_table_entry,
-            None => {
-                return Err(keramics_core::error_trace_new!(
-                    "Missing block allocation table region"
-                ));
-            }
-        };
+        let block_allocation_table_region: &VhdxRegionTableEntry =
+            match primary_region_table.get_entry(&VHDX_BLOCK_ALLOCATION_TABLE_REGION_IDENTIFIER) {
+                Some(region_table_entry) => region_table_entry,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Missing block allocation table region"
+                    ));
+                }
+            };
         self.entries_per_chunk =
             ((1 << 23) * (self.bytes_per_sector as u64)) / (self.block_size as u64);
         self.sector_bitmap_size = 1048576 / (self.entries_per_chunk as u32);
@@ -288,10 +284,7 @@ impl VhdxFile {
         if self.mediator.debug_output {
             self.mediator.debug_print("VhdxMetadataValues {\n");
         }
-        match metadata_table
-            .entries
-            .get(&VHDX_FILE_PARAMETERS_METADATA_IDENTIFIER)
-        {
+        match metadata_table.get_entry(&VHDX_FILE_PARAMETERS_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 8 {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -340,10 +333,7 @@ impl VhdxFile {
                 ));
             }
         };
-        match metadata_table
-            .entries
-            .get(&VHDX_VIRTUAL_DISK_SIZE_METADATA_IDENTIFIER)
-        {
+        match metadata_table.get_entry(&VHDX_VIRTUAL_DISK_SIZE_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 8 {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -373,10 +363,7 @@ impl VhdxFile {
                 ));
             }
         };
-        match metadata_table
-            .entries
-            .get(&VHDX_LOGICAL_SECTOR_SIZE_METADATA_IDENTIFIER)
-        {
+        match metadata_table.get_entry(&VHDX_LOGICAL_SECTOR_SIZE_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 4 {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -415,10 +402,7 @@ impl VhdxFile {
                 ));
             }
         };
-        match metadata_table
-            .entries
-            .get(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER)
-        {
+        match metadata_table.get_entry(&VHDX_PHYSICAL_SECTOR_SIZE_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 4 {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -452,10 +436,7 @@ impl VhdxFile {
             }
             None => {}
         };
-        match metadata_table
-            .entries
-            .get(&VHDX_VIRTUAL_DISK_IDENTIFIER_METADATA_IDENTIFIER)
-        {
+        match metadata_table.get_entry(&VHDX_VIRTUAL_DISK_IDENTIFIER_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 if metadata_table_entry.item_size != 16 {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -490,10 +471,7 @@ impl VhdxFile {
         if self.mediator.debug_output {
             self.mediator.debug_print("}\n\n");
         }
-        match metadata_table
-            .entries
-            .get(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER)
-        {
+        match metadata_table.get_entry(&VHDX_PARENT_LOCATOR_METADATA_IDENTIFIER) {
             Some(metadata_table_entry) => {
                 let mut parent_locator: VhdxParentLocator = VhdxParentLocator::new();
                 let metadata_item_offset: u64 =
@@ -513,7 +491,7 @@ impl VhdxFile {
                         return Err(error);
                     }
                 }
-                match parent_locator.entries.get("parent_linkage") {
+                match parent_locator.get_entry("parent_linkage") {
                     Some(ucs2_string) => {
                         // TODO: improve handling of invalid string.
                         let uuid_string: String = ucs2_string.to_string();
@@ -532,14 +510,14 @@ impl VhdxFile {
                     }
                     None => {}
                 };
-                match parent_locator.entries.get("absolute_win32_path") {
+                match parent_locator.get_entry("absolute_win32_path") {
                     Some(ucs2_string) => {
                         self.parent_name = Some(ucs2_string.clone());
                     }
                     None => {}
                 };
                 if self.parent_name.is_none() {
-                    match parent_locator.entries.get("volume_path") {
+                    match parent_locator.get_entry("volume_path") {
                         Some(ucs2_string) => {
                             self.parent_name = Some(ucs2_string.clone());
                         }
@@ -547,7 +525,7 @@ impl VhdxFile {
                     };
                 }
                 if self.parent_name.is_none() {
-                    match parent_locator.entries.get("relative_path") {
+                    match parent_locator.get_entry("relative_path") {
                         Some(ucs2_string) => {
                             self.parent_name = Some(ucs2_string.clone());
                         }

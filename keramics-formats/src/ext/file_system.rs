@@ -23,7 +23,6 @@ use keramics_types::ByteString;
 use crate::path::Path;
 
 use super::constants::*;
-use super::directory_entries::ExtDirectoryEntries;
 use super::features::ExtFeatures;
 use super::file_entry::ExtFileEntry;
 use super::group_descriptor::ExtGroupDescriptor;
@@ -181,7 +180,7 @@ impl ExtFileSystem {
             inode_number,
             inode,
             None,
-            ExtDirectoryEntries::new(&self.character_encoding),
+            &self.character_encoding,
         ))
     }
 

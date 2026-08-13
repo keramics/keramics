@@ -12,7 +12,7 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_formats::Path;
+use keramics_formats::{FileEntryIterator, Path};
 
 use crate::file_entry::VfsFileEntry;
 use crate::file_system::VfsFileSystem;
