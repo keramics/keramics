@@ -45,10 +45,12 @@ impl VfsScanNode {
 
     /// Determines if the scan node contains a file system format.
     pub fn is_file_system(&self) -> bool {
-        // Note that below a catch all match is not used to ensure a compiler
-        // error is raised when a new VFS type is added.
+        // Note that below no catch all match is used to ensure a compiler error is raised when a
+        // new VFS type is added.
         match self.location.get_type() {
-            VfsType::Apm
+            VfsType::Apfs | VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => true,
+            VfsType::ApfsContainer
+            | VfsType::Apm
             | VfsType::Ewf
             | VfsType::Fake
             | VfsType::Gpt
@@ -63,7 +65,6 @@ impl VfsScanNode {
             | VfsType::Vhd
             | VfsType::Vhdx
             | VfsType::Vmdk => false,
-            VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => true,
         }
     }
 }

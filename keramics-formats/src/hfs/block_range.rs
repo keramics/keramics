@@ -12,7 +12,7 @@
  */
 
 /// Hierarchical File System (HFS) block range.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct HfsBlockRange {
     /// Logical block number.
     pub logical_block_number: u32,

@@ -16,8 +16,11 @@ use std::io::SeekFrom;
 
 use keramics_compression::{LzfseContext, LzvnContext};
 use keramics_core::formatters::debug_format_array;
-use keramics_core::{DataStream, DataStreamReference, DebugTrace, ErrorTrace};
+use keramics_core::{DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::{bytes_to_u32_be, bytes_to_u32_le};
+
+use crate::block_stream::BlockStream;
+use crate::traits::BlockReader;
 
 use super::constants::*;
 use super::enums::DecmpfsCompressionMethod;
@@ -28,18 +31,18 @@ use super::zlib_header::DecmpfsZlibHeader;
 use crate::lru_cache::LruCache;
 
 /// Apple File System Compression (decmpfs) data stream.
-pub struct DecmpfsDataStream {
+pub type DecmpfsDataStream = BlockStream<DecmpfsBlockReader>;
+
+/// Apple File System Compression (decmpfs) block reader.
+pub struct DecmpfsBlockReader {
     /// The data stream.
-    data_stream: Option<DataStreamReference>,
+    data_stream: DataStreamReference,
 
     /// Compression method.
     compression_method: DecmpfsCompressionMethod,
 
     /// The compressed size.
     compressed_size: u64,
-
-    /// The current offset.
-    current_offset: u64,
 
     /// The size.
     size: u64,
@@ -54,11 +57,14 @@ pub struct DecmpfsDataStream {
     uncompressed_data_marker: Option<u8>,
 }
 
-impl DecmpfsDataStream {
+impl DecmpfsBlockReader {
     const BLOCK_SIZE: usize = 65536;
 
     /// Creates a new compressed stream.
-    pub(crate) fn new(compression_method: DecmpfsCompressionMethod) -> Self {
+    pub(crate) fn new(
+        data_stream: &DataStreamReference,
+        compression_method: DecmpfsCompressionMethod,
+    ) -> Self {
         let uncompressed_data_marker: Option<u8> = match compression_method {
             DecmpfsCompressionMethod::Lzfse | DecmpfsCompressionMethod::Zlib => Some(0xff),
             DecmpfsCompressionMethod::Lzvn => Some(0x06),
@@ -66,10 +72,9 @@ impl DecmpfsDataStream {
             _ => None,
         };
         Self {
-            data_stream: None,
+            data_stream: data_stream.clone(),
             compression_method,
             compressed_size: 0,
-            current_offset: 0,
             size: 0,
             block_offsets: Vec::new(),
             block_cache: LruCache::new(8),
@@ -78,12 +83,8 @@ impl DecmpfsDataStream {
     }
 
     /// Opens a block stream.
-    pub(crate) fn open(
-        &mut self,
-        data_stream: &DataStreamReference,
-        size: u64,
-    ) -> Result<(), ErrorTrace> {
-        self.compressed_size = match data_stream.write() {
+    pub(crate) fn open(&mut self, size: u64) -> Result<(), ErrorTrace> {
+        self.compressed_size = match self.data_stream.write() {
             Ok(mut data_stream) => match data_stream.get_size() {
                 Ok(size) => size,
                 Err(mut error) => {
@@ -98,110 +99,9 @@ impl DecmpfsDataStream {
                 ));
             }
         };
-        self.data_stream = Some(data_stream.clone());
         self.size = size;
 
         Ok(())
-    }
-
-    /// Reads media data based on the compressed blocks.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.size > 0 && self.block_offsets.is_empty() {
-            match self.read_compressed_block_offsets() {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to read compressed block offsets"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        let read_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut current_offset: u64 = self.current_offset;
-
-        while data_offset < data.len() {
-            if current_offset >= self.size {
-                break;
-            }
-            let block_index: u64 = current_offset / (Self::BLOCK_SIZE as u64);
-            let block_offset: u64 = self.block_offsets[block_index as usize] as u64;
-
-            let next_block_index: usize = (block_index as usize) + 1;
-            let next_block_offset: u64 = if next_block_index < self.block_offsets.len() {
-                self.block_offsets[next_block_index] as u64
-            } else {
-                self.compressed_size
-            };
-            let block_size: usize = (next_block_offset - block_offset) as usize;
-
-            let range_offset: u64 = block_index * (Self::BLOCK_SIZE as u64);
-            let range_size: u64 = min(Self::BLOCK_SIZE as u64, self.size - range_offset);
-            let block_relative_offset: u64 = current_offset - range_offset;
-            let block_remainder_size: u64 = range_size - block_relative_offset;
-
-            let block_read_size: usize =
-                min(read_size - data_offset, block_remainder_size as usize);
-            if block_read_size == 0 {
-                break;
-            }
-            let data_end_offset: usize = data_offset + block_read_size;
-
-            if self.compression_method == DecmpfsCompressionMethod::Unknown5 {
-                let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                    Some(data_stream) => data_stream,
-                    None => {
-                        return Err(keramics_core::error_trace_new!("Missing data stream"));
-                    }
-                };
-                let read_offset: u64 = block_offset + block_relative_offset;
-
-                keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
-                    &mut data[data_offset..data_end_offset],
-                    SeekFrom::Start(read_offset)
-                );
-            } else {
-                if !self.block_cache.contains(&block_offset) {
-                    let mut data: Vec<u8> = vec![0; Self::BLOCK_SIZE];
-
-                    match self.read_compressed_block(block_offset, block_size, &mut data) {
-                        Ok(size) => size,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable to read compressed block at offset: {} (0x{:08x})",
-                                    block_offset, block_offset
-                                )
-                            );
-                            return Err(error);
-                        }
-                    };
-                    self.block_cache.insert(block_offset, data);
-                }
-                let block_data: &[u8] = match self.block_cache.get(&block_offset) {
-                    Some(data) => data,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unable to retrieve data from cache"
-                        ));
-                    }
-                };
-                let block_data_offset: usize = block_relative_offset as usize;
-                let block_data_end_offset: usize = block_data_offset + block_read_size;
-
-                data[data_offset..data_end_offset]
-                    .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
-            }
-            data_offset += block_read_size;
-            current_offset += block_read_size as u64;
-        }
-        self.current_offset = current_offset;
-
-        Ok(data_offset)
     }
 
     /// Reads and decompresses a compressed block.
@@ -211,16 +111,10 @@ impl DecmpfsDataStream {
         block_size: usize,
         data: &mut [u8],
     ) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         let mut compressed_data = vec![0; block_size];
 
         keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
+            &self.data_stream,
             &mut compressed_data,
             SeekFrom::Start(block_offset)
         );
@@ -293,16 +187,10 @@ impl DecmpfsDataStream {
 
     /// Reads the compressed block offsets.
     fn read_compressed_block_offsets(&mut self) -> Result<(), ErrorTrace> {
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         let mut data: Vec<u8> = vec![0; 4];
 
         keramics_core::data_stream_read_exact_at_position!(
-            data_stream,
+            &self.data_stream,
             &mut data,
             SeekFrom::Start(0)
         );
@@ -329,7 +217,7 @@ impl DecmpfsDataStream {
                 let mut block_descriptor_data: Vec<u8> = vec![0; (first_block_offset - 4) as usize];
 
                 keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
+                    &self.data_stream,
                     &mut block_descriptor_data,
                     SeekFrom::Start(4)
                 );
@@ -394,7 +282,7 @@ impl DecmpfsDataStream {
                 }
                 let mut zlib_header: DecmpfsZlibHeader = DecmpfsZlibHeader::new();
 
-                match zlib_header.read_at_position(data_stream, SeekFrom::Start(0)) {
+                match zlib_header.read_at_position(&self.data_stream, SeekFrom::Start(0)) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read zlib header");
@@ -424,7 +312,7 @@ impl DecmpfsDataStream {
                     )));
                 }
                 keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
+                    &self.data_stream,
                     &mut data,
                     SeekFrom::Start(260)
                 );
@@ -438,7 +326,7 @@ impl DecmpfsDataStream {
                 let mut block_descriptor_data: Vec<u8> = vec![0; block_descriptor_data_size];
 
                 keramics_core::data_stream_read_exact_at_position!(
-                    data_stream,
+                    &self.data_stream,
                     &mut block_descriptor_data,
                     SeekFrom::Start(264)
                 );
@@ -498,7 +386,7 @@ impl DecmpfsDataStream {
                 let mut zlib_footer: DecmpfsZlibFooter = DecmpfsZlibFooter::new();
 
                 match zlib_footer.read_at_position(
-                    data_stream,
+                    &self.data_stream,
                     SeekFrom::Start(zlib_header.footer_offset as u64),
                 ) {
                     Ok(_) => {}
@@ -531,64 +419,102 @@ impl DecmpfsDataStream {
     }
 }
 
-impl DataStream for DecmpfsDataStream {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.current_offset)
+impl BlockReader for DecmpfsBlockReader {
+    /// Retrieves the size of the data.
+    fn get_size(&self) -> u64 {
+        self.size
     }
 
-    /// Retrieves the size of the data stream.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.size)
-    }
-
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.size {
-            return Ok(0);
-        }
-        let remaining_size: u64 = self.size - self.current_offset;
-        let mut read_size: usize = buf.len();
-
-        if (read_size as u64) > remaining_size {
-            read_size = remaining_size as usize;
-        }
-        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                return Err(error);
+    /// Reads media data based on the compressed blocks.
+    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
+        if self.size > 0 && self.block_offsets.is_empty() {
+            match self.read_compressed_block_offsets() {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read compressed block offsets"
+                    );
+                    return Err(error);
+                }
             }
-        };
-        self.current_offset += read_count as u64;
+        }
+        let read_size: usize = data.len();
+        let mut data_offset: usize = 0;
+        let mut current_offset: u64 = offset;
 
-        Ok(read_count)
-    }
+        while data_offset < data.len() {
+            if current_offset >= self.size {
+                break;
+            }
+            let block_index: u64 = current_offset / (Self::BLOCK_SIZE as u64);
+            let block_offset: u64 = self.block_offsets[block_index as usize] as u64;
 
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.current_offset = match pos {
-            SeekFrom::Current(relative_offset) => {
-                match self.current_offset.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
+            let next_block_index: usize = (block_index as usize) + 1;
+            let next_block_offset: u64 = if next_block_index < self.block_offsets.len() {
+                self.block_offsets[next_block_index] as u64
+            } else {
+                self.compressed_size
+            };
+            let block_size: usize = (next_block_offset - block_offset) as usize;
+
+            let range_offset: u64 = block_index * (Self::BLOCK_SIZE as u64);
+            let range_size: u64 = min(Self::BLOCK_SIZE as u64, self.size - range_offset);
+            let block_relative_offset: u64 = current_offset - range_offset;
+            let block_remainder_size: u64 = range_size - block_relative_offset;
+
+            let block_read_size: usize =
+                min(read_size - data_offset, block_remainder_size as usize);
+            if block_read_size == 0 {
+                break;
+            }
+            let data_end_offset: usize = data_offset + block_read_size;
+
+            if self.compression_method == DecmpfsCompressionMethod::Unknown5 {
+                let read_offset: u64 = block_offset + block_relative_offset;
+
+                keramics_core::data_stream_read_exact_at_position!(
+                    &self.data_stream,
+                    &mut data[data_offset..data_end_offset],
+                    SeekFrom::Start(read_offset)
+                );
+            } else {
+                if !self.block_cache.contains(&block_offset) {
+                    let mut data: Vec<u8> = vec![0; Self::BLOCK_SIZE];
+
+                    match self.read_compressed_block(block_offset, block_size, &mut data) {
+                        Ok(size) => size,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read compressed block at offset: {} (0x{:08x})",
+                                    block_offset, block_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                    self.block_cache.insert(block_offset, data);
+                }
+                let block_data: &[u8] = match self.block_cache.get(&block_offset) {
+                    Some(data) => data,
                     None => {
                         return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
+                            "Unable to retrieve data from cache"
                         ));
                     }
-                }
+                };
+                let block_data_offset: usize = block_relative_offset as usize;
+                let block_data_end_offset: usize = block_data_offset + block_read_size;
+
+                data[data_offset..data_end_offset]
+                    .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
             }
-            SeekFrom::End(relative_offset) => match self.size.checked_add_signed(relative_offset) {
-                Some(offset) => offset,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid offset value out of bounds"
-                    ));
-                }
-            },
-            SeekFrom::Start(offset) => offset,
-        };
-        Ok(self.current_offset)
+            data_offset += block_read_size;
+            current_offset += block_read_size as u64;
+        }
+        Ok(data_offset)
     }
 }
 
@@ -596,7 +522,7 @@ impl DataStream for DecmpfsDataStream {
 mod tests {
     use super::*;
 
-    use keramics_core::open_fake_data_stream;
+    use keramics_core::{DataStream, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -607,31 +533,17 @@ mod tests {
         ];
     }
 
-    fn get_decmpfs_stream() -> Result<DecmpfsDataStream, ErrorTrace> {
-        let test_data: Vec<u8> = get_test_data();
-        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
-
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
-        decmpfs_stream.open(&data_stream, 19)?;
-
-        Ok(decmpfs_stream)
-    }
-
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
-
-        decmpfs_stream.open(&data_stream, 16)?;
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(16)?;
 
         Ok(())
     }
-
-    // TODO: add tests for read_data_from_blocks
 
     #[test]
     fn test_read_compressed_block_with_lzfse() -> Result<(), ErrorTrace> {
@@ -642,14 +554,14 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzfse);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzfse);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+        block_reader.read_compressed_block(16, 20, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
@@ -661,14 +573,14 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzfse);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzfse);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 31, &mut data)?;
+        block_reader.read_compressed_block(16, 31, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
@@ -684,28 +596,28 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+        block_reader.read_compressed_block(16, 20, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Lzvn);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 29, &mut data)?;
+        block_reader.read_compressed_block(16, 29, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
@@ -721,14 +633,14 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Raw);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Raw);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+        block_reader.read_compressed_block(16, 20, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
@@ -739,15 +651,14 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Raw);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Raw);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        let result: Result<(), ErrorTrace> =
-            decmpfs_stream.read_compressed_block(16, 20, &mut data);
+        let result: Result<(), ErrorTrace> = block_reader.read_compressed_block(16, 20, &mut data);
         assert!(result.is_err());
 
         Ok(())
@@ -762,14 +673,14 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Zlib);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 20, &mut data)?;
+        block_reader.read_compressed_block(16, 20, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
@@ -781,14 +692,14 @@ mod tests {
         ];
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut decmpfs_stream: DecmpfsDataStream =
-            DecmpfsDataStream::new(DecmpfsCompressionMethod::Zlib);
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Zlib);
 
-        decmpfs_stream.open(&data_stream, 19)?;
-        decmpfs_stream.read_compressed_block_offsets()?;
+        block_reader.open(19)?;
+        block_reader.read_compressed_block_offsets()?;
 
         let mut data: Vec<u8> = vec![0; 32];
-        decmpfs_stream.read_compressed_block(16, 27, &mut data)?;
+        block_reader.read_compressed_block(16, 27, &mut data)?;
 
         assert_eq!(&data[0..19], b"My compressed file\n");
 
@@ -796,6 +707,19 @@ mod tests {
     }
 
     // TODO: add tests for test_read_compressed_block_offsets
+
+    // TODO: add tests for read_data_from_blocks
+
+    fn get_decmpfs_stream() -> Result<DecmpfsDataStream, ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut block_reader: DecmpfsBlockReader =
+            DecmpfsBlockReader::new(&data_stream, DecmpfsCompressionMethod::Lzvn);
+        block_reader.open(19)?;
+
+        Ok(DecmpfsDataStream::new(block_reader))
+    }
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {

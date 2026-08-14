@@ -13,6 +13,8 @@
 
 mod attribute_record;
 mod block_range;
+mod block_reader;
+mod block_stream;
 mod btree_entry;
 mod btree_entry_fixed_size;
 mod btree_entry_variable_size;
@@ -29,6 +31,7 @@ mod data_stream_descriptor;
 mod directory_entry;
 mod directory_record;
 mod encryption_state;
+mod enums;
 mod extended_attribute;
 mod extended_attributes;
 mod extended_fields;
@@ -44,6 +47,7 @@ mod file_system_key_with_extent;
 mod file_system_key_with_name;
 mod file_system_key_with_name_and_hash;
 mod file_system_tree;
+mod fork;
 mod inode;
 mod key_bag;
 mod key_bag_entry;
@@ -59,6 +63,9 @@ mod volume_superblock;
 mod volumes;
 
 pub use container::ApfsContainer;
+pub use enums::ApfsForkType;
+pub use extended_attribute::ApfsExtendedAttribute;
 pub use file_entry::ApfsFileEntry;
 pub use file_system::ApfsFileSystem;
+pub use fork::ApfsFork;
 pub use volume::ApfsVolume;

@@ -15,6 +15,7 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 
 use super::attribute_list_entry::NtfsAttributeListEntry;
+use super::block_reader::NtfsBlockReader;
 use super::block_stream::NtfsBlockStream;
 use super::constants::*;
 use super::mft_attribute::NtfsMftAttribute;
@@ -97,15 +98,18 @@ impl NtfsAttributeList {
                 }
             }
         } else {
-            let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
+            let mut block_reader: NtfsBlockReader =
+                NtfsBlockReader::new(data_stream, cluster_block_size);
 
-            match block_stream.open(data_stream, data_attribute) {
+            match block_reader.open(data_attribute) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                    keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
                     return Err(error);
                 }
             }
+            let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(block_reader);
+
             let mut cluster_block: Vec<u8> = vec![0; cluster_block_size as usize];
 
             loop {

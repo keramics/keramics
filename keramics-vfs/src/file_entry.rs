@@ -15,6 +15,8 @@ use std::sync::Arc;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
+use keramics_formats::apfs::ApfsFileEntry;
+use keramics_formats::apfs::constants::*;
 use keramics_formats::ext::ExtFileEntry;
 use keramics_formats::ext::constants::*;
 use keramics_formats::fat::{FatFileEntry, FatString};
@@ -24,10 +26,11 @@ use keramics_formats::ntfs::NtfsFileEntry;
 use keramics_formats::{FileEntryIterator, Path, PathComponent};
 use keramics_types::Ucs2String;
 
+use super::apfs::ApfsContainerFileEntry;
 use super::apm::ApmFileEntry;
 use super::data_fork::VfsDataFork;
 use super::data_forks::VfsDataForksIterator;
-use super::enums::VfsFileType;
+use super::enums::{VfsFileType, VfsType};
 use super::ewf::EwfFileEntry;
 use super::extended_attribute::VfsExtendedAttribute;
 use super::extended_attributes::VfsExtendedAttributesIterator;
@@ -48,6 +51,8 @@ use super::vmdk::VmdkFileEntry;
 
 /// Virtual File System (VFS) file entry.
 pub enum VfsFileEntry {
+    Apfs(ApfsFileEntry),
+    ApfsContainer(ApfsContainerFileEntry),
     Apm(ApmFileEntry),
     Ext(ExtFileEntry),
     Ewf(EwfFileEntry),
@@ -70,10 +75,38 @@ pub enum VfsFileEntry {
 }
 
 impl VfsFileEntry {
+    /// Retrieves the type.
+    pub(super) fn get_type(&self) -> VfsType {
+        match self {
+            VfsFileEntry::Apfs(_) => VfsType::Apfs,
+            VfsFileEntry::ApfsContainer(_) => VfsType::ApfsContainer,
+            VfsFileEntry::Apm(_) => VfsType::Apm,
+            VfsFileEntry::Ewf(_) => VfsType::Ewf,
+            VfsFileEntry::Ext(_) => VfsType::Ext,
+            VfsFileEntry::Fake(_) => VfsType::Fake,
+            VfsFileEntry::Fat(_) => VfsType::Fat,
+            VfsFileEntry::Gpt(_) => VfsType::Gpt,
+            VfsFileEntry::Hfs(_) => VfsType::Hfs,
+            VfsFileEntry::Mbr(_) => VfsType::Mbr,
+            VfsFileEntry::Ntfs(_) => VfsType::Ntfs,
+            VfsFileEntry::Os(_) => VfsType::Os,
+            VfsFileEntry::Pdi(_) => VfsType::Pdi,
+            VfsFileEntry::Qcow(_) => VfsType::Qcow,
+            VfsFileEntry::SparseBundle(_) => VfsType::SparseBundle,
+            VfsFileEntry::SparseImage(_) => VfsType::SparseImage,
+            VfsFileEntry::SplitRaw(_) => VfsType::SplitRaw,
+            VfsFileEntry::Udif(_) => VfsType::Udif,
+            VfsFileEntry::Vhd(_) => VfsType::Vhd,
+            VfsFileEntry::Vhdx(_) => VfsType::Vhdx,
+            VfsFileEntry::Vmdk(_) => VfsType::Vmdk,
+        }
+    }
+
     /// Retrieves the access time.
     pub fn get_access_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
@@ -86,6 +119,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_access_time()),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_access_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_access_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_access_time(),
@@ -98,7 +132,8 @@ impl VfsFileEntry {
     /// Retrieves the change time.
     pub fn get_change_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fat(_)
             | VfsFileEntry::Gpt(_)
@@ -112,6 +147,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_change_time()),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_change_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_change_time(),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_change_time(),
@@ -123,7 +159,8 @@ impl VfsFileEntry {
     /// Retrieves the creation time.
     pub fn get_creation_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
@@ -136,6 +173,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_creation_time()),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_creation_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_creation_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_creation_time(),
@@ -147,8 +185,12 @@ impl VfsFileEntry {
 
     /// Retrieves the device identifier.
     pub fn get_device_identifier(&self) -> Result<Option<u64>, ErrorTrace> {
+        // TODO: implement support for APFS
+        // TODO: implement support for HFS
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::Apfs(_)
+            | VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -183,7 +225,8 @@ impl VfsFileEntry {
     /// Retrieves the file mode.
     pub fn get_file_mode(&self) -> Option<u32> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -199,6 +242,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_file_mode() as u32),
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_file_mode() as u32),
             VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_file_mode() {
                 Some(file_mode) => Some(*file_mode as u32),
@@ -211,6 +255,23 @@ impl VfsFileEntry {
     /// Retrieves the file type.
     pub fn get_file_type(&self) -> VfsFileType {
         match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                let file_type: u16 = apfs_file_entry.get_file_mode() & 0xf000;
+                match file_type {
+                    APFS_FILE_MODE_TYPE_FIFO => VfsFileType::NamedPipe,
+                    APFS_FILE_MODE_TYPE_CHARACTER_DEVICE => VfsFileType::CharacterDevice,
+                    APFS_FILE_MODE_TYPE_DIRECTORY => VfsFileType::Directory,
+                    APFS_FILE_MODE_TYPE_BLOCK_DEVICE => VfsFileType::BlockDevice,
+                    APFS_FILE_MODE_TYPE_REGULAR_FILE => VfsFileType::File,
+                    APFS_FILE_MODE_TYPE_SYMBOLIC_LINK => VfsFileType::SymbolicLink,
+                    APFS_FILE_MODE_TYPE_SOCKET => VfsFileType::Socket,
+                    APFS_FILE_MODE_TYPE_WHITEOUT => VfsFileType::Whiteout,
+                    _ => VfsFileType::Unknown(file_type),
+                }
+            }
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                apfs_container_file_entry.get_file_type()
+            }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_file_type(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_file_type(),
             VfsFileEntry::Ext(ext_file_entry) => {
@@ -285,7 +346,8 @@ impl VfsFileEntry {
     /// Retrieves the modification time.
     pub fn get_modification_time(&self) -> Option<&DateTime> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Gpt(_)
             | VfsFileEntry::Mbr(_)
@@ -298,6 +360,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_modification_time()),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_modification_time(),
             VfsFileEntry::Fake(fake_file_entry) => fake_file_entry.get_modification_time(),
             VfsFileEntry::Fat(fat_file_entry) => fat_file_entry.get_modification_time(),
@@ -310,7 +373,8 @@ impl VfsFileEntry {
     /// Retrieves the group identifier.
     pub fn get_group_identifier(&self) -> Option<u32> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -326,16 +390,19 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_group_identifier()),
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_group_identifier()),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_group_identifier().cloned(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_group_identifier(),
         }
     }
 
+    /// TODO: refactor to use typed file entry identifier
     /// Retrieves the inode number.
     pub fn get_inode_number(&self) -> Option<u64> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -351,6 +418,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_identifier()),
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_inode_number() as u64),
             VfsFileEntry::Hfs(hfs_file_entry) => Some(hfs_file_entry.get_identifier() as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_inode_number(),
@@ -360,6 +428,13 @@ impl VfsFileEntry {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<PathComponent> {
         match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => match apfs_file_entry.get_name() {
+                Some(name) => Some(PathComponent::from(name)),
+                None => None,
+            },
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                Some(apfs_container_file_entry.get_name())
+            }
             VfsFileEntry::Apm(apm_file_entry) => Some(apm_file_entry.get_name()),
             VfsFileEntry::Ewf(ewf_file_entry) => Some(ewf_file_entry.get_name()),
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_name() {
@@ -412,7 +487,8 @@ impl VfsFileEntry {
     /// Retrieves the number of links.
     pub fn get_number_of_links(&self) -> Option<u64> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -428,6 +504,9 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                Some(apfs_file_entry.get_number_of_links() as u64)
+            }
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_number_of_links() as u64),
             VfsFileEntry::Hfs(hfs_file_entry) => Some(hfs_file_entry.get_number_of_links() as u64),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_number_of_links(),
@@ -437,7 +516,8 @@ impl VfsFileEntry {
     /// Retrieves the owner identifier.
     pub fn get_owner_identifier(&self) -> Option<u32> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -453,6 +533,7 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => None,
+            VfsFileEntry::Apfs(apfs_file_entry) => Some(apfs_file_entry.get_owner_identifier()),
             VfsFileEntry::Ext(ext_file_entry) => Some(ext_file_entry.get_owner_identifier()),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_owner_identifier().cloned(),
             VfsFileEntry::Os(os_file_entry) => os_file_entry.get_owner_identifier(),
@@ -462,6 +543,10 @@ impl VfsFileEntry {
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
         match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => apfs_file_entry.get_size(),
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                apfs_container_file_entry.get_size()
+            }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_size(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_size(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_size(),
@@ -489,7 +574,8 @@ impl VfsFileEntry {
     /// Retrieves the symbolic link target.
     pub fn get_symbolic_link_target(&mut self) -> Result<Option<Path>, ErrorTrace> {
         match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -504,6 +590,20 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => Ok(None),
+            VfsFileEntry::Apfs(apfs_file_entry) => match apfs_file_entry.get_symbolic_link_target()
+            {
+                Ok(result) => match result {
+                    Some(symbolic_link_target) => Ok(Some(Path::from(symbolic_link_target))),
+                    None => Ok(None),
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve APFS symbolic link target"
+                    );
+                    Err(error)
+                }
+            },
             VfsFileEntry::Ext(ext_file_entry) => match ext_file_entry.get_symbolic_link_target() {
                 Ok(result) => match result {
                     Some(symbolic_link_target) => Ok(Some(Path::from(symbolic_link_target))),
@@ -554,6 +654,19 @@ impl VfsFileEntry {
     /// Retrieves the number of data forks.
     pub fn get_number_of_data_forks(&self) -> Result<usize, ErrorTrace> {
         let result: usize = match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                let has_data_fork: bool = apfs_file_entry.has_data_fork();
+                let has_resource_fork: bool = apfs_file_entry.has_resource_fork();
+
+                if has_data_fork && has_resource_fork {
+                    2
+                } else if has_data_fork || has_resource_fork {
+                    1
+                } else {
+                    0
+                }
+            }
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => 0,
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry {
                 ApmFileEntry::Partition { .. } => 1,
                 ApmFileEntry::Root { .. } => 0,
@@ -664,6 +777,35 @@ impl VfsFileEntry {
         data_fork_index: usize,
     ) -> Result<VfsDataFork, ErrorTrace> {
         let result: Result<Option<VfsDataFork>, ErrorTrace> = match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                let has_data_fork: bool = apfs_file_entry.has_data_fork();
+                let resource_fork_index: usize = if has_data_fork { 1 } else { 0 };
+
+                if has_data_fork && data_fork_index == 0 {
+                    match apfs_file_entry.get_data_fork()? {
+                        Some(apfs_fork) => Ok(Some(VfsDataFork::Apfs(apfs_fork))),
+                        None => Ok(None),
+                    }
+                } else if apfs_file_entry.has_resource_fork()
+                    && data_fork_index == resource_fork_index
+                {
+                    match apfs_file_entry.get_resource_fork()? {
+                        Some(apfs_fork) => Ok(Some(VfsDataFork::Apfs(apfs_fork))),
+                        None => Ok(None),
+                    }
+                } else {
+                    Err(keramics_core::error_trace_new!(format!(
+                        "Invalid data fork index: {}",
+                        data_fork_index
+                    )))
+                }
+            }
+            VfsFileEntry::ApfsContainer(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid data fork index: {}",
+                    data_fork_index
+                )));
+            }
             VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Ext(_)
@@ -745,6 +887,10 @@ impl VfsFileEntry {
     /// Retrieves the default data stream.
     pub fn get_data_stream(&mut self) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => apfs_file_entry.get_data_stream(),
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                apfs_container_file_entry.get_data_stream()
+            }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.get_data_stream(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.get_data_stream(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_data_stream(),
@@ -784,7 +930,9 @@ impl VfsFileEntry {
         name: Option<&PathComponent>,
     ) -> Result<Option<DataStreamReference>, ErrorTrace> {
         let result: Result<Option<DataStreamReference>, ErrorTrace> = match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::Apfs(_)
+            | VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Ext(_)
             | VfsFileEntry::Fake(_)
@@ -819,7 +967,8 @@ impl VfsFileEntry {
     /// Retrieves the number of extended attributes.
     pub fn get_number_of_extended_attributes(&mut self) -> Result<usize, ErrorTrace> {
         let result: Result<usize, ErrorTrace> = match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -836,6 +985,9 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => Ok(0),
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                apfs_file_entry.get_number_of_extended_attributes()
+            }
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.get_number_of_extended_attributes(),
             VfsFileEntry::Hfs(hfs_file_entry) => hfs_file_entry.get_number_of_extended_attributes(),
         };
@@ -857,7 +1009,8 @@ impl VfsFileEntry {
         extended_attribute_index: usize,
     ) -> Result<VfsExtendedAttribute, ErrorTrace> {
         let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -874,6 +1027,9 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => Ok(None),
+            VfsFileEntry::Apfs(apfs_file_entry) => Ok(Some(VfsExtendedAttribute::Apfs(
+                apfs_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
+            ))),
             VfsFileEntry::Ext(ext_file_entry) => Ok(Some(VfsExtendedAttribute::Ext(
                 ext_file_entry.get_extended_attribute_by_index(extended_attribute_index)?,
             ))),
@@ -906,7 +1062,8 @@ impl VfsFileEntry {
         extended_attribute_name: &PathComponent,
     ) -> Result<Option<VfsExtendedAttribute>, ErrorTrace> {
         let result: Result<Option<VfsExtendedAttribute>, ErrorTrace> = match self {
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::ApfsContainer(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Fake(_)
             | VfsFileEntry::Fat(_)
@@ -923,6 +1080,14 @@ impl VfsFileEntry {
             | VfsFileEntry::Vhd(_)
             | VfsFileEntry::Vhdx(_)
             | VfsFileEntry::Vmdk(_) => Ok(None),
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                match apfs_file_entry.get_extended_attribute_by_name(extended_attribute_name)? {
+                    Some(apfs_extended_attribute) => {
+                        Ok(Some(VfsExtendedAttribute::Apfs(apfs_extended_attribute)))
+                    }
+                    None => Ok(None),
+                }
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 match ext_file_entry.get_extended_attribute_by_name(extended_attribute_name)? {
                     Some(ext_extended_attribute) => {
@@ -967,6 +1132,10 @@ impl VfsFileEntry {
     /// Determines if the file entry is the root directory.
     pub fn is_root_directory(&self) -> bool {
         match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => apfs_file_entry.is_root_directory(),
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                apfs_container_file_entry.is_root_file_entry()
+            }
             VfsFileEntry::Apm(apm_file_entry) => apm_file_entry.is_root_file_entry(),
             VfsFileEntry::Ewf(ewf_file_entry) => ewf_file_entry.is_root_file_entry(),
             VfsFileEntry::Ext(ext_file_entry) => ext_file_entry.is_root_directory(),
@@ -1001,6 +1170,14 @@ impl FileEntryIterator for VfsFileEntry {
         sub_file_entry_index: usize,
     ) -> Result<VfsFileEntry, ErrorTrace> {
         let result: Result<VfsFileEntry, ErrorTrace> = match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => Ok(VfsFileEntry::Apfs(
+                apfs_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+            )),
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                Ok(VfsFileEntry::ApfsContainer(
+                    apfs_container_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
+                ))
+            }
             VfsFileEntry::Apm(apm_file_entry) => Ok(VfsFileEntry::Apm(
                 apm_file_entry.get_sub_file_entry_by_index(sub_file_entry_index)?,
             )),
@@ -1077,6 +1254,10 @@ impl FileEntryIterator for VfsFileEntry {
     /// Retrieves the number of sub file entries.
     fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
         let result: Result<usize, ErrorTrace> = match self {
+            VfsFileEntry::Apfs(apfs_file_entry) => apfs_file_entry.get_number_of_sub_file_entries(),
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                Ok(apfs_container_file_entry.get_number_of_sub_file_entries())
+            }
             VfsFileEntry::Apm(apm_file_entry) => {
                 Ok(apm_file_entry.get_number_of_sub_file_entries())
             }
@@ -1147,9 +1328,10 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
     use keramics_datetime::{
-        FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, HfsTime, PosixTime32,
+        ApfsTime, FatDate, FatTimeDate, FatTimeDate10Ms, Filetime, HfsTime, PosixTime32,
     };
     use keramics_encodings::CharacterEncoding;
+    use keramics_formats::apfs::{ApfsContainer, ApfsFileSystem, ApfsVolume};
     use keramics_formats::ext::ExtFileSystem;
     use keramics_formats::fat::FatFileSystem;
     use keramics_formats::hfs::HfsFileSystem;
@@ -1165,6 +1347,726 @@ mod tests {
 
     fn get_parent_file_system() -> VfsFileSystemReference {
         VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os))
+    }
+
+    // Tests with APFS.
+
+    fn get_apfs_file_system() -> Result<ApfsFileSystem, ErrorTrace> {
+        let mut container: ApfsContainer = ApfsContainer::new();
+
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        container.read_data_stream(&data_stream)?;
+
+        let volume: ApfsVolume = container.get_volume_by_index(0)?;
+        volume.get_file_system()
+    }
+
+    fn get_apfs_file_entry(path_string: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let apfs_file_system: ApfsFileSystem = get_apfs_file_system()?;
+
+        let path: Path = Path::from(path_string);
+        match apfs_file_system.get_file_entry_by_path(&path)? {
+            Some(apfs_file_entry) => Ok(VfsFileEntry::Apfs(apfs_file_entry)),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765254251713
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765262832871
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765254516511
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, Some(0o100644));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, Some(99));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, Some(18));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(
+            result,
+            Some(&DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765254251713
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(PathComponent::from(ByteString::from("testfile1")))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, Some(2));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, Some(99));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 9);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/file_symboliclink1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+
+        assert_eq!(
+            link_target,
+            Some(Path {
+                components: vec![
+                    PathComponent::Root,
+                    PathComponent::ByteString(ByteString::from("Volumes")),
+                    PathComponent::ByteString(ByteString::from("apfs_test")),
+                    PathComponent::ByteString(ByteString::from("testdir1")),
+                    PathComponent::ByteString(ByteString::from("testfile1")),
+                ],
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_data_forks_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_some());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+
+        let extended_attribute: VfsExtendedAttribute =
+            vfs_file_entry.get_extended_attribute_by_index(0)?;
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(extended_attribute.get_name(), expected_name);
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+
+        let name: PathComponent = PathComponent::from("myxattr1");
+        let extended_attribute: VfsExtendedAttribute = vfs_file_entry
+            .get_extended_attribute_by_name(&name)?
+            .unwrap();
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(extended_attribute.get_name(), expected_name);
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 13);
+
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(7)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(
+            name,
+            Some(PathComponent::from(ByteString::from("large_xattr")))
+        );
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_apfs() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_file_entry("/testdir1")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(12).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    // Tests with APFS container.
+
+    fn get_apfs_container_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::ApfsContainer);
+
+        let parent_file_system: VfsFileSystemReference = get_parent_file_system();
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    fn get_apfs_container_file_entry(path: &str) -> Result<VfsFileEntry, ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_container_file_system()?;
+
+        let path: Path = Path::from(path);
+        match vfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_access_time_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_access_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_change_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_creation_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_device_identifier_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let device_identifier: Option<u64> = vfs_file_entry.get_device_identifier()?;
+        assert_eq!(device_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let file_mode: Option<u32> = vfs_file_entry.get_file_mode();
+        assert_eq!(file_mode, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_type_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let group_identifier: Option<u32> = vfs_file_entry.get_group_identifier();
+        assert_eq!(group_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_inode_number_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let inode_number: Option<u64> = vfs_file_entry.get_inode_number();
+        assert_eq!(inode_number, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_modification_time_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let result: Option<&DateTime> = vfs_file_entry.get_modification_time();
+        assert_eq!(result, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let name: Option<PathComponent> = vfs_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("apfs1")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let number_of_links: Option<u64> = vfs_file_entry.get_number_of_links();
+        assert_eq!(number_of_links, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let owner_identifier: Option<u32> = vfs_file_entry.get_owner_identifier();
+        assert_eq!(owner_identifier, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let size: u64 = vfs_file_entry.get_size();
+        assert_eq!(size, 77824);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_symbolic_link_target_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let link_target: Option<Path> = vfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(link_target, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_data_forks_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        let vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let number_of_data_forks: usize = vfs_file_entry.get_number_of_data_forks()?;
+        assert_eq!(number_of_data_forks, 0);
+
+        Ok(())
+    }
+
+    // TODO: add test for get_data_fork_by_index
+
+    #[test]
+    fn test_data_forks_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let mut data_forks_iterator: VfsDataForksIterator = vfs_file_entry.data_forks();
+
+        let result: Option<Result<VfsDataFork, ErrorTrace>> = data_forks_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let result: Option<DataStreamReference> = vfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_by_name_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let name: Option<PathComponent> = None;
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        let name: Option<PathComponent> = Some(PathComponent::from("bogus"));
+        let result: Option<DataStreamReference> =
+            vfs_file_entry.get_data_stream_by_name(name.as_ref())?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let number_of_extended_attributes: usize =
+            vfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_extended_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let result: Result<VfsExtendedAttribute, ErrorTrace> =
+            vfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let name: PathComponent = PathComponent::from("bogus");
+        let result: Option<VfsExtendedAttribute> =
+            vfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let mut extended_attributes_iterator: VfsExtendedAttributesIterator =
+            vfs_file_entry.extended_attributes();
+
+        let result: Option<Result<VfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 1);
+
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/apfs1")?;
+
+        let number_of_sub_file_entries: usize = vfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_test_get_sub_file_entry_by_index_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/")?;
+
+        let sub_file_entry: VfsFileEntry = vfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<PathComponent> = sub_file_entry.get_name();
+        assert_eq!(name, Some(PathComponent::from("apfs1")));
+
+        let result: Result<VfsFileEntry, ErrorTrace> =
+            vfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_apfs_container() -> Result<(), ErrorTrace> {
+        let mut vfs_file_entry: VfsFileEntry = get_apfs_container_file_entry("/")?;
+
+        let mut sub_file_entries_iterator: VfsFileEntriesIterator =
+            vfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<VfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(1).next();
+        assert!(result.is_none());
+
+        Ok(())
     }
 
     // Tests with APM.
@@ -1352,6 +2254,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_apm() -> Result<(), ErrorTrace> {
@@ -1683,6 +2587,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_ewf() -> Result<(), ErrorTrace> {
@@ -2045,6 +2951,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_ext() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_ext_file_entry("/testdir1/testfile1")?;
@@ -2373,6 +3281,7 @@ mod tests {
     }
 
     // TODO: add test_get_number_of_data_forks_with_fake
+    // TODO: add test for get_data_fork_by_index
     // TODO: add test_data_forks_with_fake
     // TODO: add test_get_data_stream_with_fake
     // TODO: add test_get_data_stream_by_name_with_fake
@@ -2583,6 +3492,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_fat() -> Result<(), ErrorTrace> {
@@ -2918,6 +3829,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_gpt() -> Result<(), ErrorTrace> {
@@ -3285,6 +4198,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_hfs() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_hfs_file_entry("/testdir1/testfile1")?;
@@ -3640,6 +4555,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_mbr() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_mbr_file_entry("/mbr2")?;
@@ -3991,6 +4908,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_ntfs() -> Result<(), ErrorTrace> {
@@ -4358,6 +5277,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_os() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_os_file_entry("directory/file.txt")?;
@@ -4690,6 +5611,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_pdi() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_pdi_file_entry("/pdi1")?;
@@ -5019,6 +5942,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_qcow() -> Result<(), ErrorTrace> {
@@ -5354,6 +6279,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_sparsebundle() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparsebundle_file_entry("/sparsebundle1")?;
@@ -5688,6 +6615,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_sparseimage() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_sparseimage_file_entry("/sparseimage1")?;
@@ -6017,6 +6946,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_splitraw() -> Result<(), ErrorTrace> {
@@ -6348,6 +7279,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_udif() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_udif_file_entry("/udif1")?;
@@ -6677,6 +7610,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_vhd() -> Result<(), ErrorTrace> {
@@ -7009,6 +7944,8 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add test for get_data_fork_by_index
+
     #[test]
     fn test_data_forks_with_vhdx() -> Result<(), ErrorTrace> {
         let mut vfs_file_entry: VfsFileEntry = get_vhdx_file_entry("/vhdx2")?;
@@ -7339,6 +8276,8 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add test for get_data_fork_by_index
 
     #[test]
     fn test_data_forks_with_vmdk() -> Result<(), ErrorTrace> {

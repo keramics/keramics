@@ -21,6 +21,7 @@ use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
 use crate::lru_cache::LruCache;
 
+use super::block_reader::NtfsBlockReader;
 use super::block_stream::NtfsBlockStream;
 use super::mft_attribute::NtfsMftAttribute;
 
@@ -87,9 +88,10 @@ impl NtfsWofCompressedStream {
                 "Unsupported resident WofCompressedData $DATA attribute"
             ));
         }
-        let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.cluster_block_size);
+        let mut block_reader: NtfsBlockReader =
+            NtfsBlockReader::new(data_stream, self.cluster_block_size);
 
-        match block_stream.open(data_stream, wof_data_attribute) {
+        match block_reader.open(wof_data_attribute) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -99,7 +101,7 @@ impl NtfsWofCompressedStream {
                 return Err(error);
             }
         }
-        self.data_stream = Some(Arc::new(RwLock::new(block_stream)));
+        self.data_stream = Some(Arc::new(RwLock::new(NtfsBlockStream::new(block_reader))));
         self.compressed_size = wof_data_attribute.valid_data_size;
         self.compression_unit_size = match self.compression_method {
             0 => 4096,

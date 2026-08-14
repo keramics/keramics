@@ -24,7 +24,7 @@ use super::constants::*;
 /// GUID Partition Table (GPT) parition information.
 struct GptPartitionInfo {
     /// The index of the corresponding partition table entry.
-    pub entry_index: usize,
+    pub partition_index: usize,
 
     /// The partition identifier.
     pub identifier: Uuid,
@@ -43,7 +43,7 @@ impl GptPartitionInfo {
     /// Creates new partition information.
     fn new() -> Self {
         Self {
-            entry_index: 0,
+            partition_index: 0,
             identifier: Uuid::new(),
             type_identifier: Uuid::new(),
             offset: 0,
@@ -63,7 +63,7 @@ impl GptPartitionInfo {
 impl fmt::Display for GptPartitionInfo {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "Partition: {}", self.entry_index + 1)?;
+        writeln!(formatter, "Partition: {}", self.partition_index + 1)?;
 
         writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
 
@@ -100,9 +100,9 @@ impl GptInfo {
     fn get_partition_information(gpt_partition: &GptPartition) -> GptPartitionInfo {
         let mut partition_information: GptPartitionInfo = GptPartitionInfo::new();
 
-        partition_information.entry_index = gpt_partition.entry_index;
-        partition_information.identifier = gpt_partition.identifier.clone();
-        partition_information.type_identifier = gpt_partition.type_identifier.clone();
+        partition_information.partition_index = gpt_partition.get_partition_index();
+        partition_information.identifier = gpt_partition.get_identifier().clone();
+        partition_information.type_identifier = gpt_partition.get_type_identifier().clone();
         partition_information.offset = gpt_partition.offset;
         partition_information.size = gpt_partition.size;
 
@@ -209,7 +209,7 @@ mod tests {
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
         let test_struct: GptPartitionInfo = GptInfo::get_partition_information(&gpt_partition);
 
-        assert_eq!(test_struct.entry_index, 0);
+        assert_eq!(test_struct.partition_index, 0);
         assert_eq!(
             test_struct.identifier,
             Uuid::from_string("0b119671-75ff-4e2a-a31a-0bc83f857fdd")?

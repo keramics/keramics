@@ -11,23 +11,365 @@
  * under the License.
  */
 
-use crate::block_stream::BlockStream;
+use std::cmp::min;
+use std::io::SeekFrom;
+use std::sync::{Arc, RwLock};
 
-use super::compressed_block_reader::NtfsCompressedBlockReader;
+use keramics_compression::Lznt1Context;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
-/// New Technologies File System (NTFS) compressed (block) stream.
-pub type NtfsCompressedStream = BlockStream<NtfsCompressedBlockReader>;
+use crate::block_tree::BlockTree;
+use crate::lru_cache::LruCache;
+use crate::traits::BlockReader;
+
+use super::block_reader::NtfsBlockReader;
+use super::block_stream::NtfsBlockStream;
+use super::compression_range::{NtfsCompressionRange, NtfsCompressionRangeType};
+use super::data_run::NtfsDataRunType;
+use super::mft_attribute::NtfsMftAttribute;
+
+/// New Technologies File System (NTFS) compressed block reader.
+pub struct NtfsCompressedBlockReader {
+    /// The data stream.
+    data_stream: Option<DataStreamReference>,
+
+    /// Cluster block size.
+    cluster_block_size: u32,
+
+    /// Compression block tree.
+    block_tree: BlockTree<NtfsCompressionRange>,
+
+    /// Compression unit size.
+    compression_unit_size: usize,
+
+    /// Decompressed block cache.
+    block_cache: LruCache<u64, Vec<u8>>,
+
+    /// The size.
+    size: u64,
+
+    /// The valid data size.
+    valid_data_size: u64,
+}
+
+impl NtfsCompressedBlockReader {
+    /// Creates a new compressed stream.
+    pub(super) fn new(cluster_block_size: u32) -> Self {
+        Self {
+            data_stream: None,
+            cluster_block_size,
+            block_tree: BlockTree::<NtfsCompressionRange>::new(0, 0, 0),
+            compression_unit_size: 0,
+            block_cache: LruCache::new(8),
+            size: 0,
+            valid_data_size: 0,
+        }
+    }
+
+    /// Opens a block stream.
+    pub(super) fn open(
+        &mut self,
+        data_stream: &DataStreamReference,
+        data_attribute: &NtfsMftAttribute,
+    ) -> Result<(), ErrorTrace> {
+        if !data_attribute.is_compressed() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported uncompressed $DATA attribute"
+            ));
+        }
+        if data_attribute.is_resident() {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported resident $DATA attribute"
+            ));
+        }
+        if data_attribute.compression_unit_size == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported compression unit size"
+            ));
+        }
+        let mut block_reader: NtfsBlockReader =
+            NtfsBlockReader::new(data_stream, self.cluster_block_size);
+
+        match block_reader.open(data_attribute) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open data stream");
+                return Err(error);
+            }
+        }
+        self.data_stream = Some(Arc::new(RwLock::new(NtfsBlockStream::new(block_reader))));
+
+        self.compression_unit_size =
+            (data_attribute.compression_unit_size as usize) * (self.cluster_block_size as usize);
+
+        if data_attribute.allocated_data_size % (self.compression_unit_size as u64) != 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported allocated data size not a multitude of compression unit size"
+            ));
+        }
+        let block_tree_size: u64 = data_attribute
+            .allocated_data_size
+            .div_ceil(self.compression_unit_size as u64)
+            * (self.compression_unit_size as u64);
+
+        self.block_tree = BlockTree::<NtfsCompressionRange>::new(
+            block_tree_size,
+            0,
+            self.compression_unit_size as u64,
+        );
+        if data_attribute.allocated_data_size > 0 {
+            let mut virtual_cluster_offset: u64 = 0;
+            let mut last_data_run_type: NtfsDataRunType = NtfsDataRunType::EndOfList;
+            let mut compression_range: NtfsCompressionRange = NtfsCompressionRange::new(
+                virtual_cluster_offset,
+                0,
+                NtfsCompressionRangeType::Uncompressed,
+            );
+            for cluster_group in data_attribute.data_cluster_groups.iter() {
+                for data_run in cluster_group.data_runs.iter() {
+                    let mut data_run_processed: bool = false;
+
+                    loop {
+                        if compression_range.size >= (self.compression_unit_size as u64) {
+                            let compression_range_size: u64 = match compression_range.range_type {
+                                NtfsCompressionRangeType::Compressed => {
+                                    self.compression_unit_size as u64
+                                }
+                                NtfsCompressionRangeType::Uncompressed => {
+                                    (compression_range.size / (self.compression_unit_size as u64))
+                                        * (self.compression_unit_size as u64)
+                                }
+                            };
+                            let remaining_range_size: u64 =
+                                compression_range.size - compression_range_size;
+
+                            compression_range.size = compression_range_size;
+
+                            match self.block_tree.insert_value(
+                                compression_range.offset,
+                                compression_range.size,
+                                compression_range,
+                            ) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to insert block range into block tree"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                            virtual_cluster_offset += compression_range_size;
+
+                            compression_range = NtfsCompressionRange::new(
+                                virtual_cluster_offset,
+                                remaining_range_size,
+                                NtfsCompressionRangeType::Uncompressed,
+                            );
+                        }
+                        if !data_run_processed {
+                            compression_range.size +=
+                                data_run.number_of_blocks * (self.cluster_block_size as u64);
+
+                            if data_run.run_type != last_data_run_type {
+                                // One or more sparse data runs after one or more regular data runs marks a
+                                // compressed range.
+                                if last_data_run_type == NtfsDataRunType::InFile
+                                    && data_run.run_type == NtfsDataRunType::Sparse
+                                {
+                                    compression_range.range_type =
+                                        NtfsCompressionRangeType::Compressed;
+                                }
+                                last_data_run_type = data_run.run_type.clone();
+                            }
+                            data_run_processed = true
+                        }
+                        if compression_range.size < (self.compression_unit_size as u64) {
+                            break;
+                        }
+                    }
+                }
+            }
+            if compression_range.size > 0 {
+                match self.block_tree.insert_value(
+                    compression_range.offset,
+                    compression_range.size,
+                    compression_range,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to insert block range into block tree"
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+        }
+        self.size = data_attribute.data_size;
+        self.valid_data_size = data_attribute.valid_data_size;
+
+        Ok(())
+    }
+}
+
+impl BlockReader for NtfsCompressedBlockReader {
+    /// Retrieves the size of the data.
+    fn get_size(&self) -> u64 {
+        self.size
+    }
+
+    /// Reads data based on the compression unit.
+    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
+        let read_size: usize = data.len();
+        let mut data_offset: usize = 0;
+        let mut current_offset: u64 = offset;
+
+        while data_offset < read_size {
+            if current_offset >= self.size {
+                break;
+            }
+            let read_count: usize = if current_offset >= self.valid_data_size {
+                let range_remainder_size: u64 = self.size - current_offset;
+                let read_remainder_size: usize = read_size - data_offset;
+                let range_read_size: usize =
+                    min(read_remainder_size, range_remainder_size as usize);
+                let data_end_offset: usize = data_offset + range_read_size;
+
+                data[data_offset..data_end_offset].fill(0);
+
+                range_read_size
+            } else {
+                let compression_unit: &NtfsCompressionRange =
+                    match self.block_tree.get_value(current_offset) {
+                        Ok(Some(value)) => value,
+                        Ok(None) => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing compression unit for offset: {} (0x{:08x})",
+                                current_offset, current_offset
+                            )));
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve compression unit for offset: {} (0x{:08x})",
+                                    current_offset, current_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    };
+                let range_offset: u64 = compression_unit.offset;
+                let range_size: u64 = compression_unit.size;
+
+                let range_relative_offset: u64 = current_offset - range_offset;
+                let range_end_offset: u64 = min(range_offset + range_size, self.size);
+
+                let range_remainder_size: u64 =
+                    (range_end_offset - range_offset) - range_relative_offset;
+                let read_remainder_size: usize = read_size - data_offset;
+
+                let range_read_size: usize =
+                    min(read_remainder_size, range_remainder_size as usize);
+
+                let data_end_offset: usize = data_offset + range_read_size;
+
+                match compression_unit.range_type {
+                    NtfsCompressionRangeType::Compressed => {
+                        let range_read_size: usize =
+                            min(read_remainder_size, self.compression_unit_size);
+                        let data_end_offset: usize = data_offset + range_read_size;
+
+                        if !self.block_cache.contains(&range_offset) {
+                            let data_stream: &DataStreamReference = match self.data_stream.as_ref()
+                            {
+                                Some(data_stream) => data_stream,
+                                None => {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Missing data stream"
+                                    ));
+                                }
+                            };
+                            let mut compressed_data: Vec<u8> = vec![0; range_size as usize];
+
+                            keramics_core::data_stream_read_exact_at_position!(
+                                data_stream,
+                                &mut compressed_data,
+                                SeekFrom::Start(range_offset)
+                            );
+                            keramics_core::debug_trace_data!(
+                                "NtfsLznt1CompressedData",
+                                range_offset,
+                                &compressed_data,
+                                range_size
+                            );
+                            let mut block_data: Vec<u8> = vec![0; self.compression_unit_size];
+
+                            let mut lznt1_context: Lznt1Context = Lznt1Context::new();
+
+                            match lznt1_context.decompress(&compressed_data, &mut block_data) {
+                                Ok(_) => {}
+                                Err(mut error) => {
+                                    keramics_core::error_trace_add_frame!(
+                                        error,
+                                        "Unable to decompress LZNT1 data"
+                                    );
+                                    return Err(error);
+                                }
+                            }
+                            self.block_cache.insert(range_offset, block_data);
+                        }
+                        let block_data: &[u8] = match self.block_cache.get(&range_offset) {
+                            Some(data) => data,
+                            None => {
+                                return Err(keramics_core::error_trace_new!(
+                                    "Unable to retrieve data from cache"
+                                ));
+                            }
+                        };
+                        let block_data_offset: usize = range_relative_offset as usize;
+                        let block_data_end_offset: usize = block_data_offset + range_read_size;
+
+                        data[data_offset..data_end_offset]
+                            .copy_from_slice(&block_data[block_data_offset..block_data_end_offset]);
+
+                        range_read_size
+                    }
+                    NtfsCompressionRangeType::Uncompressed => {
+                        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+                            Some(data_stream) => data_stream,
+                            None => {
+                                return Err(keramics_core::error_trace_new!("Missing data stream"));
+                            }
+                        };
+                        let read_count: usize = keramics_core::data_stream_read_at_position!(
+                            data_stream,
+                            &mut data[data_offset..data_end_offset],
+                            SeekFrom::Start(range_offset + range_relative_offset)
+                        );
+                        read_count
+                    }
+                }
+            };
+            if read_count == 0 {
+                break;
+            }
+            data_offset += read_count;
+            current_offset += read_count as u64;
+        }
+        Ok(data_offset)
+    }
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use std::fs;
-    use std::io::SeekFrom;
 
-    use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_fake_data_stream};
-
-    use crate::ntfs::mft_attribute::NtfsMftAttribute;
+    use keramics_core::open_fake_data_stream;
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -631,7 +973,8 @@ mod tests {
         ];
     }
 
-    fn get_block_stream() -> Result<NtfsCompressedStream, ErrorTrace> {
+    #[test]
+    fn test_open() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
@@ -642,107 +985,8 @@ mod tests {
         let mut block_reader: NtfsCompressedBlockReader = NtfsCompressedBlockReader::new(4096);
         block_reader.open(&data_stream, &data_attribute)?;
 
-        Ok(NtfsCompressedStream::new(block_reader))
-    }
-
-    // TODO: add tests for get_offset.
-
-    #[test]
-    fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        let size: u64 = block_stream.get_size()?;
-        assert_eq!(size, 11358);
-
         Ok(())
     }
 
-    #[test]
-    fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
-        assert_eq!(offset, 11358 - 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
-        assert_eq!(offset, 1024);
-
-        let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
-        assert_eq!(offset, 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
-        assert!(result.is_err());
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_beyond_file_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
-        assert_eq!(offset, 11358 + 512);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-        block_stream.seek(SeekFrom::Start(1024))?;
-
-        let mut uncompressed_data: Vec<u8> = vec![0; 512];
-        let read_size: usize = block_stream.read(&mut uncompressed_data)?;
-        assert_eq!(read_size, 512);
-
-        let expected_data: Vec<u8> = match fs::read("../LICENSE") {
-            Ok(data) => data,
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable read test reference file",
-                    error
-                ));
-            }
-        };
-        assert_eq!(&uncompressed_data, &expected_data[1024..1536]);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsCompressedStream = get_block_stream()?;
-
-        block_stream.seek(SeekFrom::End(512))?;
-
-        let mut data: Vec<u8> = vec![0; 512];
-        let read_size: usize = block_stream.read(&mut data)?;
-        assert_eq!(read_size, 0);
-
-        Ok(())
-    }
+    // TODO: add tests for read_data_from_blocks
 }

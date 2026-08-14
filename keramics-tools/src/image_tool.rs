@@ -96,17 +96,17 @@ struct BodyfileCommandArguments {
 /// File mode information.
 struct FileModeInfo {
     /// Flags.
-    file_mode: u16,
+    file_mode: u32,
 }
 
 impl FileModeInfo {
     /// Creates new file mode information.
-    fn new(file_mode: u16) -> Self {
+    fn new(file_mode: u32) -> Self {
         Self { file_mode }
     }
 
     /// Retrieves a file mode string representation.
-    fn get_file_mode_string(file_mode: u16) -> String {
+    fn get_file_mode_string(file_mode: u32) -> String {
         let mut string_parts: Vec<&str> = vec!["-"; 10];
 
         if file_mode & 0x0001 != 0 {
@@ -347,6 +347,9 @@ impl ImageTool {
             }
         };
         let file_identifier: String = match file_entry {
+            VfsFileEntry::Apfs(apfs_file_entry) => {
+                format!("{}", apfs_file_entry.get_identifier())
+            }
             VfsFileEntry::Ext(ext_file_entry) => {
                 format!("{}", ext_file_entry.get_inode_number())
             }
@@ -372,20 +375,16 @@ impl ImageTool {
         let file_type: VfsFileType = file_entry.get_file_type();
 
         let file_mode_string: String = match file_entry {
-            VfsFileEntry::Ext(ext_file_entry) => {
-                let file_mode: u16 = ext_file_entry.get_file_mode();
-                let file_mode_info: FileModeInfo = FileModeInfo::new(file_mode);
+            VfsFileEntry::Apfs(_) | VfsFileEntry::Ext(_) | VfsFileEntry::Hfs(_) => {
+                match file_entry.get_file_mode() {
+                    Some(file_mode) => {
+                        let file_mode_info: FileModeInfo = FileModeInfo::new(file_mode);
 
-                file_mode_info.to_string()
-            }
-            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_file_mode() {
-                Some(file_mode) => {
-                    let file_mode_info: FileModeInfo = FileModeInfo::new(*file_mode);
-
-                    file_mode_info.to_string()
+                        file_mode_info.to_string()
+                    }
+                    None => Self::get_file_mode_string_from_file_type(&file_type),
                 }
-                None => Self::get_file_mode_string_from_file_type(&file_type),
-            },
+            }
             VfsFileEntry::Fat(fat_file_entry) => {
                 let file_attribute_flags: u8 = fat_file_entry.get_file_attribute_flags();
 
@@ -404,29 +403,13 @@ impl ImageTool {
             }
             _ => Self::get_file_mode_string_from_file_type(&file_type),
         };
-        let owner_identifier: String = match file_entry {
-            VfsFileEntry::Ext(ext_file_entry) => {
-                let owner_identifier: u32 = ext_file_entry.get_owner_identifier();
-
-                format!("{}", owner_identifier)
-            }
-            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_owner_identifier() {
-                Some(owner_identifier) => format!("{}", owner_identifier),
-                None => String::from(""),
-            },
-            _ => String::from(""),
+        let owner_identifier: String = match file_entry.get_owner_identifier() {
+            Some(owner_identifier) => format!("{}", owner_identifier),
+            None => String::from(""),
         };
-        let group_identifier: String = match file_entry {
-            VfsFileEntry::Ext(ext_file_entry) => {
-                let group_identifier: u32 = ext_file_entry.get_group_identifier();
-
-                format!("{}", group_identifier)
-            }
-            VfsFileEntry::Hfs(hfs_file_entry) => match hfs_file_entry.get_group_identifier() {
-                Some(group_identifier) => format!("{}", group_identifier),
-                None => String::from(""),
-            },
-            _ => String::from(""),
+        let group_identifier: String = match file_entry.get_group_identifier() {
+            Some(group_identifier) => format!("{}", group_identifier),
+            None => String::from(""),
         };
         let size: u64 = file_entry.get_size();
 
@@ -741,9 +724,8 @@ impl ImageTool {
     ) -> Result<(), ErrorTrace> {
         if vfs_scan_node.is_empty() {
             // Only process scan nodes that contain a file system.
-            match vfs_scan_node.get_type() {
-                VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => {}
-                _ => return Ok(()),
+            if !vfs_scan_node.is_file_system() {
+                return Ok(());
             }
             let file_system: VfsFileSystemReference =
                 match self.vfs_resolver.open_file_system(&vfs_scan_node.location) {

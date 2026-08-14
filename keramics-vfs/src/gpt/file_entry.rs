@@ -62,7 +62,7 @@ impl GptFileEntry {
     pub fn get_identifier(&self) -> Option<Uuid> {
         match self {
             GptFileEntry::Partition { partition, .. } => match partition.read() {
-                Ok(gpt_partition) => Some(gpt_partition.identifier.clone()),
+                Ok(gpt_partition) => Some(gpt_partition.get_identifier().clone()),
                 Err(_) => None,
             },
             GptFileEntry::Root { .. } => None,
@@ -83,7 +83,7 @@ impl GptFileEntry {
     pub fn get_partition_number(&self) -> Option<usize> {
         match self {
             GptFileEntry::Partition { partition, .. } => match partition.read() {
-                Ok(gpt_partition) => Some(gpt_partition.entry_index + 1),
+                Ok(gpt_partition) => Some(gpt_partition.get_partition_index() + 1),
                 Err(_) => None,
             },
             GptFileEntry::Root { .. } => None,
@@ -175,7 +175,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_none());
 
@@ -186,7 +185,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let data_stream: Option<DataStreamReference> = file_entry.get_data_stream()?;
         assert!(data_stream.is_some());
 
@@ -200,7 +198,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
 
@@ -211,7 +208,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);
 
@@ -225,7 +221,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let identifier: Option<Uuid> = file_entry.get_identifier();
         assert_eq!(identifier, None);
 
@@ -236,7 +231,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let identifier: Option<Uuid> = file_entry.get_identifier();
         assert_eq!(
             identifier,
@@ -258,7 +252,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
@@ -269,7 +262,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("gpt1"));
 
@@ -283,7 +275,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let partition_number: Option<usize> = file_entry.get_partition_number();
         assert_eq!(partition_number, None);
 
@@ -294,7 +285,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let partition_number: Option<usize> = file_entry.get_partition_number();
         assert_eq!(partition_number, Some(1));
         Ok(())
@@ -307,7 +297,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
@@ -318,7 +307,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 1048576);
 
@@ -332,7 +320,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 2);
 
@@ -343,7 +330,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
 
@@ -357,7 +343,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         let sub_file_entry: GptFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
         let name: PathComponent = sub_file_entry.get_name();
@@ -376,7 +361,6 @@ mod tests {
         let file_entry = GptFileEntry::Root {
             volume_system: gpt_volume_system.clone(),
         };
-
         assert_eq!(file_entry.is_root_file_entry(), true);
 
         let gpt_partition: GptPartition = gpt_volume_system.get_partition_by_index(0)?;
@@ -386,7 +370,6 @@ mod tests {
             partition: Arc::new(RwLock::new(gpt_partition)),
             size: partition_size,
         };
-
         assert_eq!(file_entry.is_root_file_entry(), false);
 
         Ok(())

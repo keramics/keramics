@@ -207,6 +207,12 @@ impl ApfsFileSystemTree {
                     return Err(error);
                 }
             }
+            if (key.object_identifier > object_identifier)
+                || (key.object_identifier == object_identifier
+                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE)
+            {
+                break;
+            }
             if !is_branch {
                 if key.object_identifier == object_identifier
                     && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE
@@ -258,12 +264,6 @@ impl ApfsFileSystemTree {
                         return Err(error);
                     }
                 }
-            }
-            if (key.object_identifier > object_identifier)
-                || (key.object_identifier == object_identifier
-                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE)
-            {
-                break;
             }
             last_entry_index = entry_index;
 
@@ -474,6 +474,12 @@ impl ApfsFileSystemTree {
                     return Err(error);
                 }
             }
+            if (key.object_identifier > parent_object_identifier)
+                || (key.object_identifier == parent_object_identifier
+                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD)
+            {
+                break;
+            }
             if !is_branch {
                 if key.object_identifier == parent_object_identifier
                     && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
@@ -525,12 +531,6 @@ impl ApfsFileSystemTree {
                         return Err(error);
                     }
                 }
-            }
-            if (key.object_identifier > parent_object_identifier)
-                || (key.object_identifier == parent_object_identifier
-                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD)
-            {
-                break;
             }
             last_entry_index = entry_index;
 
@@ -770,6 +770,12 @@ impl ApfsFileSystemTree {
                     return Err(error);
                 }
             }
+            if (key.object_identifier > parent_object_identifier)
+                || (key.object_identifier == parent_object_identifier
+                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD)
+            {
+                break;
+            }
             if key.object_identifier == parent_object_identifier
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
             {
@@ -843,12 +849,6 @@ impl ApfsFileSystemTree {
                         }
                     }
                 }
-            }
-            if (key.object_identifier > parent_object_identifier)
-                || (key.object_identifier == parent_object_identifier
-                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD)
-            {
-                break;
             }
             last_entry_index = entry_index;
 
@@ -1060,6 +1060,12 @@ impl ApfsFileSystemTree {
                     return Err(error);
                 }
             }
+            if (key.object_identifier > object_identifier)
+                || (key.object_identifier == object_identifier
+                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT)
+            {
+                break;
+            }
             if !is_branch {
                 if key.object_identifier == object_identifier
                     && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT
@@ -1100,12 +1106,6 @@ impl ApfsFileSystemTree {
                         return Err(error);
                     }
                 }
-            }
-            if (key.object_identifier > object_identifier)
-                || (key.object_identifier == object_identifier
-                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT)
-            {
-                break;
             }
             last_entry_index = entry_index;
 

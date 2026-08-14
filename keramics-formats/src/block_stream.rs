@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStream, ErrorTrace};
@@ -55,11 +56,8 @@ impl<T: BlockReader + Send + Sync> DataStream for BlockStream<T> {
             return Ok(0);
         }
         let remaining_size: u64 = size - self.current_offset;
-        let mut read_size: usize = buf.len();
+        let read_size: usize = min(buf.len(), remaining_size as usize);
 
-        if (read_size as u64) > remaining_size {
-            read_size = remaining_size as usize;
-        }
         let read_count: usize = match self
             .block_reader
             .read_data_from_blocks(&mut buf[..read_size], self.current_offset)

@@ -165,11 +165,13 @@ impl ApfsContainer {
             }
         };
         let mut volume: ApfsVolume = ApfsVolume::new(
+            data_stream,
+            volume_index,
             self.bytes_per_sector,
             self.block_size,
             self.key_bag.as_ref(),
         );
-        match volume.open(data_stream, object_map_value.physical_address) {
+        match volume.open(object_map_value.physical_address) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

@@ -127,6 +127,9 @@ pub struct ApfsVolumeSuperblock {
     /// Incompatible feature flags.
     pub incompatible_feature_flags: u64,
 
+    /// Number of allocated blocks.
+    pub number_of_allocated_blocks: u64,
+
     /// Object map block number.
     pub object_map_block_number: u64,
 
@@ -152,6 +155,7 @@ impl ApfsVolumeSuperblock {
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
+            number_of_allocated_blocks: 0,
             object_map_block_number: 0,
             file_system_root_object_identifier: 0,
             volume_flags: 0,
@@ -201,6 +205,7 @@ impl ApfsVolumeSuperblock {
         self.feature_flags = bytes_to_u64_le!(data, 40);
         self.read_only_compatible_feature_flags = bytes_to_u64_le!(data, 48);
         self.incompatible_feature_flags = bytes_to_u64_le!(data, 56);
+        self.number_of_allocated_blocks = bytes_to_u64_le!(data, 88);
         self.object_map_block_number = bytes_to_u64_le!(data, 128);
         self.file_system_root_object_identifier = bytes_to_u64_le!(data, 136);
         self.volume_flags = bytes_to_u64_le!(data, 264);
@@ -532,6 +537,7 @@ mod tests {
         assert_eq!(test_struct.feature_flags, 0x00000002);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
+        assert_eq!(test_struct.number_of_allocated_blocks, 22);
         assert_eq!(test_struct.object_map_block_number, 137);
         assert_eq!(test_struct.file_system_root_object_identifier, 1028);
         assert_eq!(test_struct.volume_flags, 0x00000001);
@@ -606,6 +612,7 @@ mod tests {
         assert_eq!(test_struct.feature_flags, 0x00000002);
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
+        assert_eq!(test_struct.number_of_allocated_blocks, 22);
         assert_eq!(test_struct.object_map_block_number, 137);
         assert_eq!(test_struct.file_system_root_object_identifier, 1028);
         assert_eq!(test_struct.volume_flags, 0x00000001);

@@ -38,6 +38,11 @@ where
         }
     }
 
+    /// Determines if the indexed hash map contains a specific key.
+    pub fn contains_key(&self, key: &K) -> bool {
+        self.hashmap.contains_key(key)
+    }
+
     /// Retrieves a specific key and value pair by index.
     pub fn get_key_value_by_index(&self, value_index: usize) -> Option<(&K, &V)> {
         match self.keys.get(value_index) {

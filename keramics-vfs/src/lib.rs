@@ -28,6 +28,7 @@ mod path;
 mod types;
 
 // Format specific back-ends.
+mod apfs;
 mod apm;
 mod ewf;
 mod fake;

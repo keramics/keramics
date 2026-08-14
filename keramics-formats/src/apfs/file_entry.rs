@@ -18,19 +18,25 @@ use keramics_datetime::DateTime;
 use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
-use crate::decmpfs::DecmpfsHeader;
+use crate::decmpfs::{
+    DecmpfsBlockReader, DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader,
+};
 use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 use crate::traits::FileEntryIterator;
 
 use super::attribute_record::ApfsAttributeRecord;
+use super::block_reader::ApfsBlockReader;
+use super::block_stream::ApfsBlockStream;
 use super::constants::*;
 use super::directory_entry::ApfsDirectoryEntry;
+use super::enums::ApfsForkType;
 use super::extended_attribute::ApfsExtendedAttribute;
 use super::extended_attributes::ApfsExtendedAttributesIterator;
 use super::extent::ApfsExtent;
 use super::file_entries::ApfsFileEntriesIterator;
 use super::file_system_tree::ApfsFileSystemTree;
+use super::fork::ApfsFork;
 use super::inode::ApfsInode;
 use super::object_map_tree::ApfsObjectMapTree;
 
@@ -38,6 +44,9 @@ use super::object_map_tree::ApfsObjectMapTree;
 pub struct ApfsFileEntry {
     /// The data stream.
     data_stream: DataStreamReference,
+
+    /// Block size.
+    block_size: u32,
 
     /// Object map B-tree.
     object_map_tree: Arc<ApfsObjectMapTree>,
@@ -69,6 +78,9 @@ pub struct ApfsFileEntry {
     /// Value to indicate the sub directory entries were read.
     read_sub_directory_entries: bool,
 
+    /// Symbolic link target.
+    symbolic_link_target: Option<ByteString>,
+
     /// Attributes.
     attributes: IndexedHashMap<ByteString, ApfsAttributeRecord>,
 }
@@ -77,6 +89,7 @@ impl ApfsFileEntry {
     /// Creates a file entry.
     pub(super) fn new(
         data_stream: &DataStreamReference,
+        block_size: u32,
         object_map_tree: &Arc<ApfsObjectMapTree>,
         file_system_tree: &Arc<ApfsFileSystemTree>,
         identifier: u64,
@@ -86,6 +99,7 @@ impl ApfsFileEntry {
     ) -> Self {
         Self {
             data_stream: data_stream.clone(),
+            block_size,
             object_map_tree: object_map_tree.clone(),
             file_system_tree: file_system_tree.clone(),
             identifier,
@@ -96,6 +110,7 @@ impl ApfsFileEntry {
             extents: Vec::new(),
             sub_directory_entries: IndexedHashMap::new(),
             read_sub_directory_entries: false,
+            symbolic_link_target: None,
             attributes: IndexedHashMap::new(),
         }
     }
@@ -164,6 +179,162 @@ impl ApfsFileEntry {
         }
     }
 
+    /// Retrieves the symbolic link target.
+    pub fn get_symbolic_link_target(&mut self) -> Result<Option<&ByteString>, ErrorTrace> {
+        if self.symbolic_link_target.is_none() && self.is_symbolic_link() {
+            let lookup_name: ByteString = ByteString::from("com.apple.fs.symlink");
+
+            match self.attributes.get_value_by_key(&lookup_name) {
+                Some(attribute_record) => {
+                    if attribute_record.flags & 0x0002 != 0 {
+                        self.symbolic_link_target =
+                            Some(ByteString::from(attribute_record.inline_data.as_slice()));
+                    } else {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unsupported symlink attribute record type"
+                        ));
+                    }
+                }
+                None => {}
+            }
+        }
+        Ok(self.symbolic_link_target.as_ref())
+    }
+
+    /// Retrieves the block stream.
+    fn get_block_stream(&self) -> Result<ApfsBlockStream, ErrorTrace> {
+        let size: u64 = match self.inode.data_stream_descriptor.as_ref() {
+            Some(data_stream_descriptor) => data_stream_descriptor.size,
+            None => 0,
+        };
+        let mut block_reader: ApfsBlockReader =
+            ApfsBlockReader::new(&self.data_stream, self.block_size, size);
+
+        match block_reader.open(&self.extents) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
+                return Err(error);
+            }
+        }
+        Ok(ApfsBlockStream::new(block_reader))
+    }
+
+    /// Retrieves the default data stream.
+    pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        if !self.has_data_fork() {
+            return Ok(None);
+        }
+        match self.compressed_data_header.as_ref() {
+            Some(compressed_data_header) => {
+                let compression_method: DecmpfsCompressionMethod =
+                    match compressed_data_header.get_compression_method() {
+                        Some(compression_method) => compression_method,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Unsupported compression method: {}",
+                                compressed_data_header.compression_method
+                            )));
+                        }
+                    };
+                let data_stream: DataStreamReference =
+                    match compressed_data_header.compression_method {
+                        4 | 8 | 12 => match self.get_block_stream() {
+                            Ok(block_stream) => Arc::new(RwLock::new(block_stream)),
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    "Unable to retrieve block stream"
+                                );
+                                return Err(error);
+                            }
+                        },
+                        _ => {
+                            let lookup_name: ByteString = ByteString::from("com.apple.decmpfs");
+
+                            match self.attributes.get_value_by_key(&lookup_name) {
+                                Some(attribute_record) => {
+                                    if attribute_record.flags & 0x0002 != 0 {
+                                        let data_stream: FakeDataStream = FakeDataStream::new(
+                                            &attribute_record.inline_data,
+                                            attribute_record.data_size as u64,
+                                        );
+                                        Arc::new(RwLock::new(data_stream))
+                                    } else {
+                                        return Err(keramics_core::error_trace_new!(
+                                            "Unsupported decmpfs attribute record flags"
+                                        ));
+                                    }
+                                }
+                                None => {
+                                    return Err(keramics_core::error_trace_new!(
+                                        "Missing com.apple.decmpfs attribute record"
+                                    ));
+                                }
+                            }
+                        }
+                    };
+                let mut decmpfs_block_reader: DecmpfsBlockReader =
+                    DecmpfsBlockReader::new(&data_stream, compression_method);
+
+                match decmpfs_block_reader.open(compressed_data_header.uncompressed_data_size) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open decmpfs data stream"
+                        );
+                        return Err(error);
+                    }
+                }
+                Ok(Some(Arc::new(RwLock::new(DecmpfsDataStream::new(
+                    decmpfs_block_reader,
+                )))))
+            }
+            None => match self.get_block_stream() {
+                Ok(block_stream) => Ok(Some(Arc::new(RwLock::new(block_stream)))),
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
+                    Err(error)
+                }
+            },
+        }
+    }
+
+    /// Retrieves the data fork.
+    pub fn get_data_fork(&mut self) -> Result<Option<ApfsFork>, ErrorTrace> {
+        if !self.has_data_fork() {
+            return Ok(None);
+        }
+        match self.get_block_stream() {
+            Ok(block_stream) => Ok(Some(ApfsFork::new(
+                ApfsForkType::Data,
+                Arc::new(RwLock::new(block_stream)),
+            ))),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve block stream");
+                Err(error)
+            }
+        }
+    }
+
+    /// Retrieves the resource fork.
+    pub fn get_resource_fork(&mut self) -> Result<Option<ApfsFork>, ErrorTrace> {
+        todo!();
+    }
+
+    /// Determines if the file entry has a data fork.
+    pub fn has_data_fork(&self) -> bool {
+        self.inode.file_mode & 0xf000 == APFS_FILE_MODE_TYPE_REGULAR_FILE
+    }
+
+    /// Determines if the file entry has a resource fork.
+    pub fn has_resource_fork(&self) -> bool {
+        let lookup_name: ByteString = ByteString::from("com.apple.ResourceFork");
+
+        self.attributes.contains_key(&lookup_name)
+    }
+
     /// Determines if the file entry is a directory.
     pub fn is_directory(&self) -> bool {
         self.inode.file_mode & 0xf000 == APFS_FILE_MODE_TYPE_DIRECTORY
@@ -172,6 +343,11 @@ impl ApfsFileEntry {
     /// Determines if the file entry is the root directory.
     pub fn is_root_directory(&self) -> bool {
         self.identifier == APFS_ROOT_DIRECTORY_IDENTIFIER
+    }
+
+    /// Determines if the file entry is a symbolic link.
+    fn is_symbolic_link(&self) -> bool {
+        self.inode.file_mode & 0xf000 == APFS_FILE_MODE_TYPE_SYMBOLIC_LINK
     }
 
     /// Retrieves the data stream of an extended attribute.
@@ -318,6 +494,7 @@ impl ApfsFileEntry {
         };
         let mut file_entry: ApfsFileEntry = ApfsFileEntry::new(
             &self.data_stream,
+            self.block_size,
             &self.object_map_tree,
             &self.file_system_tree,
             identifier,
@@ -329,6 +506,13 @@ impl ApfsFileEntry {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                return Err(error);
+            }
+        }
+        match file_entry.read_extents() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read extents");
                 return Err(error);
             }
         }
@@ -380,7 +564,7 @@ impl ApfsFileEntry {
                     self.compressed_data_header = Some(compressed_data_header);
                 } else {
                     return Err(keramics_core::error_trace_new!(
-                        "Unsupported decmpfs attribute record type"
+                        "Unsupported decmpfs attribute record flags"
                     ));
                 }
             }
@@ -508,6 +692,7 @@ impl FileEntryIterator for ApfsFileEntry {
 
                 let mut file_entry: ApfsFileEntry = ApfsFileEntry::new(
                     &self.data_stream,
+                    self.block_size,
                     &self.object_map_tree,
                     &self.file_system_tree,
                     identifier,
@@ -519,6 +704,13 @@ impl FileEntryIterator for ApfsFileEntry {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read attributes");
+                        return Err(error);
+                    }
+                }
+                match file_entry.read_extents() {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to read extents");
                         return Err(error);
                     }
                 }
@@ -694,9 +886,17 @@ mod tests {
         Ok(())
     }
 
-    // TODO add tests for get_size
-    // TODO add tests for is_directory
-    // TODO add tests for is_root_directory
+    // TODO: add tests for get_size
+    // TODO: add tests for get_block_stream
+    // TODO: add tests for get_symbolic_link_target
+    // TODO: add tests for get_data_stream
+    // TODO: add tests for get_data_fork
+    // TODO: add tests for get_resource_fork
+    // TODO: add tests for has_data_fork
+    // TODO: add tests for has_resource_fork
+    // TODO: add tests for is_directory
+    // TODO: add tests for is_root_directory
+    // TODO: add tests for is_symbolic_link
 
     #[test]
     fn test_get_number_of_extended_attributes() -> Result<(), ErrorTrace> {

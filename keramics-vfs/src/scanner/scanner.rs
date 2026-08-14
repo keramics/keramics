@@ -15,6 +15,7 @@ use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
+use keramics_formats::apfs::ApfsContainer;
 use keramics_formats::apm::ApmVolumeSystem;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::ewf::EwfImage;
@@ -32,6 +33,7 @@ use keramics_formats::vhdx::VhdxImage;
 use keramics_formats::vmdk::VmdkImage;
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 
+use crate::apfs::ApfsContainerFileSystem;
 use crate::apm::ApmFileSystem;
 use crate::credential::VfsCredential;
 use crate::credential_store::VfsCredentialStore;
@@ -124,6 +126,7 @@ impl VfsScanner {
         // * next excludes overlapping signatures (phase 2)
         // * last looks for overlapping volume system signatures (phase 3)
 
+        self.phase1_volume_system_scanner.add_apfs_signatures();
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
         match self.phase1_volume_system_scanner.build() {
@@ -313,6 +316,15 @@ impl VfsScanner {
             }
         };
         match vfs_location.get_type() {
+            VfsType::Apfs
+            | VfsType::ApfsContainer
+            | VfsType::Ext
+            | VfsType::Fake
+            | VfsType::Fat
+            | VfsType::Hfs
+            | VfsType::Ntfs => Err(keramics_core::error_trace_new!(
+                "Unsupported VFS location type"
+            )),
             VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
                 self.scan_for_file_system_format(&data_stream)
             }
@@ -409,9 +421,6 @@ impl VfsScanner {
                 }
                 Ok(result)
             }
-            VfsType::Ext | VfsType::Fake | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => Err(
-                keramics_core::error_trace_new!("Unsupported VFS location type"),
-            ),
         }
     }
 
@@ -630,6 +639,49 @@ impl VfsScanner {
 
         // TODO: handle image with both GPT and MBR volume systems.
         match scan_node.get_type() {
+            VfsType::Apfs | VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => {}
+            VfsType::ApfsContainer => {
+                let mut apfs_container: ApfsContainer = ApfsContainer::new();
+
+                match ApfsContainerFileSystem::open_container(
+                    &mut apfs_container,
+                    file_system,
+                    path,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to open APFS container"
+                        );
+                        return Err(error);
+                    }
+                }
+                let number_of_volumes: usize = apfs_container.get_number_of_volumes();
+
+                // TODO: invoke mediator to ask which volumes to include.
+                for volume_index in 0..number_of_volumes {
+                    let volume_path: String = format!(
+                        "{}{}",
+                        ApfsContainerFileSystem::PATH_PREFIX,
+                        volume_index + 1
+                    );
+                    let volume_path: Path = Path::from(volume_path.as_str());
+                    let volume_vfs_location: VfsLocation =
+                        vfs_location.new_with_layer(&VfsType::ApfsContainer, volume_path);
+
+                    let file_system_path: Path = Path::from("/");
+                    let file_system_vfs_location: VfsLocation =
+                        volume_vfs_location.new_with_layer(&VfsType::Apfs, file_system_path);
+                    let file_system_scan_node: VfsScanNode =
+                        VfsScanNode::new(file_system_vfs_location);
+
+                    let mut volume_scan_node: VfsScanNode = VfsScanNode::new(volume_vfs_location);
+                    volume_scan_node.sub_nodes.push(file_system_scan_node);
+
+                    scan_node.sub_nodes.push(volume_scan_node);
+                }
+            }
             VfsType::Apm => {
                 let mut apm_volume_system: ApmVolumeSystem = ApmVolumeSystem::new();
 
@@ -686,7 +738,6 @@ impl VfsScanner {
                     }
                 }
             }
-            VfsType::Ext | VfsType::Fat | VfsType::Hfs | VfsType::Ntfs => {}
             VfsType::Fake => {
                 return Err(keramics_core::error_trace_new!(
                     "Unsupported VFS location type"
@@ -1054,6 +1105,7 @@ impl VfsScanner {
             }
         };
         match &format_identifier {
+            Some(FormatIdentifier::Apfs) => Ok(Some(VfsType::ApfsContainer)),
             Some(FormatIdentifier::Apm) => Ok(Some(VfsType::Apm)),
             Some(FormatIdentifier::Gpt) => Ok(Some(VfsType::Gpt)),
             None => {
@@ -1154,7 +1206,6 @@ impl VfsScanner {
 
         for volume_index in 0..number_of_volumes {
             let vfs_type: &VfsType = scan_node.get_type();
-
             match vfs_type {
                 VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
                     if scan_options.partitions == VfsScanOptionGroup::NotSet {
@@ -1316,6 +1367,41 @@ mod tests {
         let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
         let vfs_type: &VfsType = scan_node.get_type();
         assert_eq!(vfs_type, &VfsType::Ext);
+        assert_eq!(scan_node.sub_nodes.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_scan_with_apfs() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let mut scan_options: VfsScanOptions = VfsScanOptions::new();
+        scan_options.parse_partitions("1")?;
+
+        let mut scan_context: VfsScanContext = VfsScanContext::new();
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        format_scanner.scan(&scan_options, &mut scan_context, &vfs_location)?;
+
+        let scan_node: &VfsScanNode = scan_context.root_node.as_ref().unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Os);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::ApfsContainer);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::ApfsContainer);
+        assert_eq!(scan_node.sub_nodes.len(), 1);
+
+        let scan_node: &VfsScanNode = scan_node.sub_nodes.get(0).unwrap();
+        let vfs_type: &VfsType = scan_node.get_type();
+        assert_eq!(vfs_type, &VfsType::Apfs);
         assert_eq!(scan_node.sub_nodes.len(), 0);
 
         Ok(())
@@ -1625,6 +1711,21 @@ mod tests {
 
     // TODO: add tests for scan_for_storage_media_image_sub_nodes
     // TODO: add tests for scan_for_sub_nodes
+
+    #[test]
+    fn test_scan_for_volume_system_format_with_apfs() -> Result<(), ErrorTrace> {
+        let format_scanner: VfsScanner = get_format_scanner()?;
+
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let data_stream: DataStreamReference = get_data_stream(path_string.as_str())?;
+        let vfs_type: VfsType = format_scanner
+            .scan_for_volume_system_format(&data_stream)?
+            .unwrap();
+
+        assert_eq!(vfs_type, VfsType::ApfsContainer);
+
+        Ok(())
+    }
 
     #[test]
     fn test_scan_for_volume_system_format_with_apm() -> Result<(), ErrorTrace> {

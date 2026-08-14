@@ -211,11 +211,9 @@ impl ApfsObjectMapTree {
                     return Err(error);
                 }
             }
-            if key.object_identifier > object_identifier {
-                break;
-            }
-            if key.object_identifier == object_identifier
-                && key.object_transaction_identifier > object_transaction_identifier
+            if (key.object_identifier > object_identifier)
+                || (key.object_identifier == object_identifier
+                    && key.object_transaction_identifier > object_transaction_identifier)
             {
                 break;
             }

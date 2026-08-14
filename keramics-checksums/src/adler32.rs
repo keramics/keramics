@@ -15,6 +15,8 @@
 //!
 //! Provides support for calculating Adler-32 checksums.
 
+use std::slice::ChunksExact;
+
 /// Context for calculating an Adler-32 checksum.
 pub struct Adler32Context {
     /// The initial checksum value.
@@ -65,23 +67,21 @@ impl Adler32Context {
         let mut lower_16bit: u32 = self.checksum & 0x0000ffff;
         let mut upper_16bit: u32 = self.checksum >> 16;
 
-        let data_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut data_end_offset: usize = 5552;
-        while data_end_offset < data_size {
-            for byte_value in data[data_offset..data_end_offset].iter() {
+        let mut chunks: ChunksExact<'_, u8> = data.chunks_exact(5552);
+
+        for chunk in &mut chunks {
+            for byte_value in chunk.iter() {
                 lower_16bit = lower_16bit.wrapping_add(*byte_value as u32);
                 upper_16bit = upper_16bit.wrapping_add(lower_16bit);
             }
-            data_offset = data_end_offset;
-            data_end_offset += 5552;
-
             // The modulo calculation is needed per 5552 (0x15b0) bytes
             lower_16bit = Self::mod_65521(lower_16bit);
             upper_16bit = Self::mod_65521(upper_16bit);
         }
-        if data_offset < data_size {
-            for byte_value in data[data_offset..data_size].iter() {
+        let remainder: &[u8] = chunks.remainder();
+
+        if !remainder.is_empty() {
+            for byte_value in remainder.iter() {
                 lower_16bit = lower_16bit.wrapping_add(*byte_value as u32);
                 upper_16bit = upper_16bit.wrapping_add(lower_16bit);
             }

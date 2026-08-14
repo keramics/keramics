@@ -13,10 +13,10 @@
 
 use crate::block_stream::BlockStream;
 
-use super::block_reader::NtfsBlockReader;
+use super::block_reader::ApfsBlockReader;
 
-/// New Technologies File System (NTFS) (cluster) block stream.
-pub type NtfsBlockStream = BlockStream<NtfsBlockReader>;
+/// Apple File System (APFS) block stream.
+pub type ApfsBlockStream = BlockStream<ApfsBlockReader>;
 
 #[cfg(test)]
 mod tests {
@@ -27,40 +27,33 @@ mod tests {
 
     use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 
-    use crate::ntfs::mft_attribute::NtfsMftAttribute;
+    use crate::apfs::extent::ApfsExtent;
+
     use crate::tests::get_test_data_path;
 
-    fn get_test_mft_attribute_data() -> Vec<u8> {
-        return vec![
-            0x80, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x01, 0x00, 0x40, 0x00, 0x00, 0x00,
-            0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5e, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x5e, 0x2c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x21, 0x03, 0xe9, 0x00, 0x00, 0x00,
-            0x00, 0x00,
-        ];
-    }
-
-    fn get_block_stream() -> Result<NtfsBlockStream, ErrorTrace> {
-        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
+    fn get_block_stream() -> Result<ApfsBlockStream, ErrorTrace> {
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
-        let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
-        data_attribute.read_data(&test_mft_attribute_data)?;
+        let mut block_reader = ApfsBlockReader::new(&data_stream, 4096, 11358);
 
-        let mut block_reader: NtfsBlockReader = NtfsBlockReader::new(&data_stream, 4096);
-        block_reader.open(&data_attribute)?;
+        let extents: Vec<ApfsExtent> = vec![ApfsExtent {
+            logical_offset: 0,
+            size: 12288,
+            physical_block_number: 95,
+            encryption_identifier: 0,
+        }];
+        block_reader.open(&extents)?;
 
-        Ok(NtfsBlockStream::new(block_reader))
+        Ok(ApfsBlockStream::new(block_reader))
     }
 
     // TODO: add tests for get_offset.
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
 
         let size: u64 = block_stream.get_size()?;
         assert_eq!(size, 11358);
@@ -70,7 +63,7 @@ mod tests {
 
     #[test]
     fn test_seek_from_start() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
@@ -80,19 +73,20 @@ mod tests {
 
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
+        let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
-        assert_eq!(offset, 11358 - 512);
+        assert_eq!(offset, size - 512);
 
         Ok(())
     }
 
     #[test]
     fn test_seek_from_current() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
 
-        let offset: u64 = block_stream.seek(SeekFrom::Start(1024))?;
+        let offset = block_stream.seek(SeekFrom::Start(1024))?;
         assert_eq!(offset, 1024);
 
         let offset: u64 = block_stream.seek(SeekFrom::Current(-512))?;
@@ -103,7 +97,7 @@ mod tests {
 
     #[test]
     fn test_seek_before_zero() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
 
         let result: Result<u64, ErrorTrace> = block_stream.seek(SeekFrom::Current(-512));
         assert!(result.is_err());
@@ -113,17 +107,18 @@ mod tests {
 
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
+        let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
-        assert_eq!(offset, 11358 + 512);
+        assert_eq!(offset, size + 512);
 
         Ok(())
     }
 
     #[test]
     fn test_seek_and_read() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::Start(1024))?;
 
         let mut data: Vec<u8> = vec![0; 512];
@@ -176,8 +171,7 @@ mod tests {
 
     #[test]
     fn test_seek_and_read_beyond_size() -> Result<(), ErrorTrace> {
-        let mut block_stream: NtfsBlockStream = get_block_stream()?;
-
+        let mut block_stream: ApfsBlockStream = get_block_stream()?;
         block_stream.seek(SeekFrom::End(512))?;
 
         let mut data: Vec<u8> = vec![0; 512];
