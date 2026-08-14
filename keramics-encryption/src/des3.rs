@@ -263,7 +263,7 @@ impl Des3Context {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid encrypted data size value not a multitude of block size: {}",
                 DES3_BLOCK_SIZE
-            ),));
+            )));
         }
         if encrypted_data_size > data.len() {
             return Err(keramics_core::error_trace_new!(

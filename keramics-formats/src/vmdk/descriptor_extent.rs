@@ -17,6 +17,12 @@ use super::enums::{VmdkDescriptorExtentAccessMode, VmdkDescriptorExtentType};
 
 /// VMware Virtual Disk (VMDK) descriptor extent.
 pub struct VmdkDescriptorExtent {
+    /// Media start sector.
+    pub(super) media_start_sector: u64,
+
+    /// Media end sector.
+    pub(super) media_end_sector: u64,
+
     /// Start sector.
     pub start_sector: u64,
 
@@ -43,6 +49,8 @@ impl VmdkDescriptorExtent {
         access_mode: VmdkDescriptorExtentAccessMode,
     ) -> Self {
         Self {
+            media_start_sector: 0,
+            media_end_sector: 0,
             start_sector,
             number_of_sectors,
             file_name,

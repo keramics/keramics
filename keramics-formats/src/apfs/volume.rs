@@ -11,9 +11,18 @@
  * under the License.
  */
 
+use std::io::SeekFrom;
+use std::sync::Arc;
+
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, Uuid};
 
+use super::block_range::ApfsBlockRange;
+use super::file_system::ApfsFileSystem;
+use super::key_bag::ApfsKeyBag;
+use super::object_map::ApfsObjectMap;
+use super::object_map_tree::ApfsObjectMapTree;
+use super::object_map_value::ApfsObjectMapValue;
 use super::volume_superblock::ApfsVolumeSuperblock;
 
 /// Apple File System (APFS) volume.
@@ -21,54 +30,306 @@ pub struct ApfsVolume {
     /// The data stream.
     data_stream: Option<DataStreamReference>,
 
-    /// Volume superblock.
-    superblock: ApfsVolumeSuperblock,
+    /// Bytes per sector.
+    bytes_per_sector: u16,
+
+    /// Block size.
+    block_size: u32,
+
+    /// Container key bag.
+    container_key_bag: Option<Arc<ApfsKeyBag>>,
+
+    /// Identifier.
+    identifier: Uuid,
+
+    /// Features flags.
+    feature_flags: u64,
+
+    /// Read-only compatible feature flags.
+    read_only_compatible_feature_flags: u64,
+
+    /// Incompatible feature flags.
+    incompatible_feature_flags: u64,
+
+    /// Transaction identifier.
+    transaction_identifier: u64,
+
+    /// Volume label.
+    volume_label: ByteString,
+
+    /// Object map B-tree.
+    object_map_tree: Arc<ApfsObjectMapTree>,
+
+    /// File system root object identifier.
+    file_system_root_object_identifier: u64,
+
+    /// Value to indicate the volume is locked.
+    is_locked: bool,
 }
 
 impl ApfsVolume {
     /// Creates a volume.
-    pub(super) fn new(superblock: ApfsVolumeSuperblock) -> Self {
+    pub(super) fn new(
+        bytes_per_sector: u16,
+        block_size: u32,
+        container_key_bag: Option<&Arc<ApfsKeyBag>>,
+    ) -> Self {
         Self {
             data_stream: None,
-            superblock,
+            bytes_per_sector,
+            block_size,
+            container_key_bag: container_key_bag.cloned(),
+            identifier: Uuid::new(),
+            feature_flags: 0,
+            read_only_compatible_feature_flags: 0,
+            incompatible_feature_flags: 0,
+            transaction_identifier: 0,
+            volume_label: ByteString::new(),
+            object_map_tree: Arc::new(ApfsObjectMapTree::new()),
+            file_system_root_object_identifier: 0,
+            is_locked: false,
         }
     }
 
     /// Retrieves the feature flags.
     pub fn get_feature_flags(&self) -> u64 {
-        self.superblock.feature_flags
+        self.feature_flags
     }
 
     /// Retrieves the identifier.
     pub fn get_identifier(&self) -> &Uuid {
-        &self.superblock.volume_identifier
+        &self.identifier
     }
 
     /// Retrieves the incompatible feature flags.
     pub fn get_incompatible_feature_flags(&self) -> u64 {
-        self.superblock.incompatible_feature_flags
+        self.incompatible_feature_flags
+    }
+
+    /// Retrieves the file system.
+    pub fn get_file_system(&self) -> Result<ApfsFileSystem, ErrorTrace> {
+        if self.is_locked {
+            return Err(keramics_core::error_trace_new!("Volume is locked"));
+        }
+        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
+            Some(data_stream) => data_stream,
+            None => {
+                return Err(keramics_core::error_trace_new!("Missing data stream"));
+            }
+        };
+        let object_map_value: ApfsObjectMapValue =
+            match self.object_map_tree.get_value_by_identifier(
+                data_stream,
+                self.file_system_root_object_identifier,
+                self.transaction_identifier,
+            ) {
+                Ok(Some(object_map_value)) => object_map_value,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing object map value of file system object: {}",
+                        self.file_system_root_object_identifier
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve object map value of file system object: {}",
+                            self.file_system_root_object_identifier
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+        let use_case_folding: bool = self.incompatible_feature_flags & 0x00000000000000001 != 0;
+
+        let mut file_system: ApfsFileSystem =
+            ApfsFileSystem::new(self.block_size, &self.object_map_tree, use_case_folding);
+
+        match file_system.open(
+            data_stream,
+            object_map_value.physical_address,
+            self.transaction_identifier,
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open file system");
+                return Err(error);
+            }
+        }
+        Ok(file_system)
     }
 
     /// Retrieves the read-only compatible feature flags.
     pub fn get_read_only_compatible_feature_flags(&self) -> u64 {
-        self.superblock.read_only_compatible_feature_flags
+        self.read_only_compatible_feature_flags
     }
 
     /// Retrieves the volume label.
     pub fn get_volume_label(&self) -> Option<&ByteString> {
-        if self.superblock.volume_label.is_empty() {
+        if self.volume_label.is_empty() {
             None
         } else {
-            Some(&self.superblock.volume_label)
+            Some(&self.volume_label)
         }
     }
 
     /// Opens a volume.
-    pub(super) fn open(&mut self, data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    pub(super) fn open(
+        &mut self,
+        data_stream: &DataStreamReference,
+        superblock_block_number: u64,
+    ) -> Result<(), ErrorTrace> {
+        let superblock_offset: u64 = superblock_block_number * (self.block_size as u64);
+
+        let mut superblock: ApfsVolumeSuperblock = ApfsVolumeSuperblock::new();
+
+        match superblock.read_at_position(&data_stream, SeekFrom::Start(superblock_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read volume superblock at offset: {} (0x{:08x}))",
+                        superblock_offset, superblock_offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        if superblock.object_map_block_number == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid superblock - missing object map block number"
+            ));
+        }
+        if superblock.file_system_root_object_identifier == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid superblock - missing file system root object identifier"
+            ));
+        }
+        let volume_identifier: Uuid = Uuid::from_be_bytes(&superblock.volume_identifier);
+
+        let object_map_offset: u64 = superblock.object_map_block_number * (self.block_size as u64);
+
+        let mut object_map: ApfsObjectMap = ApfsObjectMap::new();
+
+        match object_map.read_at_position(&data_stream, SeekFrom::Start(object_map_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read object map at offset: {} (0x{:08x}))",
+                        object_map_offset, object_map_offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        if object_map.btree_block_number == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Invalid object map - missing B-tree block number"
+            ));
+        }
+        match Arc::get_mut(&mut self.object_map_tree) {
+            Some(object_map_tree) => {
+                object_map_tree.initialize(self.block_size, object_map.btree_block_number);
+            }
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Unable to obtain mutable reference to object map tree"
+                ));
+            }
+        }
+        if superblock.volume_flags & 0x0000000000000001 == 0 {
+            let container_key_bag: &Arc<ApfsKeyBag> = match &self.container_key_bag {
+                Some(container_key_bag) => container_key_bag,
+                None => {
+                    return Err(keramics_core::error_trace_new!(
+                        "Volume is encrypted and no container key bag was found"
+                    ));
+                }
+            };
+            // If the container key bag is locked the volume is also locked.
+            self.is_locked = container_key_bag.is_locked;
+
+            match container_key_bag.get_entry(&volume_identifier, 3) {
+                Some(entry_data) => {
+                    keramics_core::debug_trace_data_and_structure!(
+                        "ApfsVolumeKeyBagBlockRange",
+                        0,
+                        &entry_data,
+                        entry_data.len(),
+                        ApfsBlockRange::debug_read_data(&entry_data)
+                    );
+                    let mut block_range: ApfsBlockRange = ApfsBlockRange::new();
+
+                    match block_range.read_data(entry_data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read volume key bag block range"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if block_range.block_number == 0 || block_range.number_of_blocks == 0 {
+                        return Err(keramics_core::error_trace_new!(
+                            "Invalid volume key bag block range"
+                        ));
+                    }
+                    let key_bag_offset: u64 = block_range.block_number * (self.block_size as u64);
+                    let key_bag_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
+
+                    let mut key_bag: ApfsKeyBag = ApfsKeyBag::new(
+                        self.bytes_per_sector,
+                        &superblock.volume_identifier,
+                        &superblock.volume_identifier,
+                    );
+                    match key_bag.read_at_position(
+                        &data_stream,
+                        key_bag_size,
+                        SeekFrom::Start(key_bag_offset),
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read key bag at offset: {} (0x{:08x}))",
+                                    key_bag_offset, key_bag_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
+                    if key_bag.object_header.object_type != 0x72656373 {
+                        return Err(keramics_core::error_trace_new!(
+                            "Unsupported volume key bag object type"
+                        ));
+                    }
+                    // The volume has a key bag and therefore is locked.
+                    self.is_locked = true;
+                }
+                None => {}
+            }
+        }
+        // TODO: add snapshot support
+
+        self.identifier = volume_identifier;
+        self.feature_flags = superblock.feature_flags;
+        self.read_only_compatible_feature_flags = superblock.read_only_compatible_feature_flags;
+        self.incompatible_feature_flags = superblock.incompatible_feature_flags;
+        self.transaction_identifier = superblock.object_header.transaction_identifier;
+        self.volume_label = superblock.volume_label;
+        self.file_system_root_object_identifier = superblock.file_system_root_object_identifier;
         self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
+
+    // TODO: add unlock
 }
 
 #[cfg(test)]
@@ -80,6 +341,7 @@ mod tests {
     use keramics_core::open_os_data_stream;
 
     use crate::apfs::ApfsContainer;
+
     use crate::tests::get_test_data_path;
 
     fn get_volume() -> Result<ApfsVolume, ErrorTrace> {

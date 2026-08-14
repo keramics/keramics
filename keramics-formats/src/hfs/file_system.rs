@@ -627,10 +627,25 @@ mod tests {
     fn test_get_file_entry_by_identifier_with_hfs() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
 
-        let file_entry: HfsFileEntry = file_system.get_file_entry_by_identifier(18)?.unwrap();
-        assert_eq!(file_entry.identifier, 18);
+        let file_entry: HfsFileEntry = file_system.get_file_entry_by_identifier(19)?.unwrap();
+        assert_eq!(file_entry.identifier, 19);
 
         let result: Option<HfsFileEntry> = file_system.get_file_entry_by_identifier(0xffffffff)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_hfs() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/TestFile2");
+        let file_entry: HfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
+        assert_eq!(file_entry.identifier, 19);
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<HfsFileEntry> = file_system.get_file_entry_by_path(&path)?;
         assert!(result.is_none());
 
         Ok(())
@@ -646,6 +661,9 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for read_attributes_file
+    // TODO: add tests for read_catalog_file
+
     #[test]
     fn test_read_data_stream_with_hfs() -> Result<(), ErrorTrace> {
         let mut file_system: HfsFileSystem = HfsFileSystem::new();
@@ -659,6 +677,9 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read_extents_overflow_file
+    // TODO: add tests for read_metadata
 
     // Tests with HFS-wrapped HFS+.
 
@@ -732,6 +753,21 @@ mod tests {
     }
 
     #[test]
+    fn test_get_file_entry_by_path_with_hfsplus() -> Result<(), ErrorTrace> {
+        let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
+
+        let path: Path = Path::from("/testdir1/TestFile2");
+        let file_entry: HfsFileEntry = file_system.get_file_entry_by_path(&path)?.unwrap();
+        assert_eq!(file_entry.identifier, 21);
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<HfsFileEntry> = file_system.get_file_entry_by_path(&path)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_root_directory_with_hfsplus() -> Result<(), ErrorTrace> {
         let file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
@@ -740,6 +776,9 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read_attributes_file
+    // TODO: add tests for read_catalog_file
 
     #[test]
     fn test_read_data_stream_with_hfsplus() -> Result<(), ErrorTrace> {
@@ -754,4 +793,7 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO: add tests for read_extents_overflow_file
+    // TODO: add tests for read_metadata
 }

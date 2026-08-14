@@ -20,9 +20,9 @@ use keramics_formats::hfs::{
     HfsExtendedAttribute, HfsFileEntry, HfsFileSystem, HfsFormat, HfsString,
 };
 
-use super::posix::PosixFileModeInfo;
-
 use crate::formatters::ByteSize;
+
+use super::posix::PosixFileModeInfo;
 
 /// Hierarchical File System (HFS) file entry information.
 struct HfsFileEntryInfo {

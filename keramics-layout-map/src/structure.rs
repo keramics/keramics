@@ -13,9 +13,9 @@
 
 use std::str::FromStr;
 
-use proc_macro2::{Ident, Literal, TokenStream};
-
+use proc_macro2::{Ident, Literal, Span, TokenStream};
 use quote::{format_ident, quote};
+use syn::LitInt;
 
 use crate::enums::{ByteOrder, DataType, Format};
 
@@ -708,7 +708,7 @@ impl StructureLayout {
 
         let value_data_size = match bitfields_group.get_byte_size() {
             Some(byte_size) => byte_size,
-            None => panic!("Unable to determine byte size of bitfields",),
+            None => panic!("Unable to determine byte size of bitfields"),
         };
         let number_of_bits: usize = value_data_size * 8;
 
@@ -729,7 +729,8 @@ impl StructureLayout {
             let field_name: Ident = format_ident!("{}", bitfield.name);
 
             let bit_mask: usize = (1 << bitfield.number_of_bits) - 1;
-            let bit_mask_literal = Literal::usize_unsuffixed(bit_mask);
+            let bit_mask_string: String = format!("0x{:x}", bit_mask);
+            let bit_mask_literal = LitInt::new(&bit_mask_string, Span::call_site());
             let quote_from_packed_value = if bit_offset == 0 {
                 quote!(#packed_field_name & #bit_mask_literal)
             } else {
@@ -790,7 +791,7 @@ impl StructureLayout {
                 StructureLayoutMember::BitFields(structure_layout_bitfields) => {
                     let value_data_size = match structure_layout_bitfields.get_byte_size() {
                         Some(byte_size) => byte_size,
-                        None => panic!("Unable to determine byte size of bitfields",),
+                        None => panic!("Unable to determine byte size of bitfields"),
                     };
                     let debug_read_bitfields: TokenStream =
                         self.generate_debug_read_bitfields(data_offset, structure_layout_bitfields);
@@ -910,7 +911,7 @@ impl StructureLayout {
                 StructureLayoutMember::BitFields(structure_layout_bitfields) => {
                     match structure_layout_bitfields.get_byte_size() {
                         Some(byte_size) => byte_size,
-                        None => panic!("Unable to determine byte size of bitfields",),
+                        None => panic!("Unable to determine byte size of bitfields"),
                     }
                 }
                 StructureLayoutMember::Field(structure_layout_field) => {
@@ -1096,7 +1097,7 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_debug_read_data_with_bit_fields() {
+    fn test_generate_debug_read_data_with_bitfield32() {
         let mut structure_layout: StructureLayout =
             StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
 
@@ -1122,10 +1123,56 @@ mod tests {
 
                 let value_32bit: u32 = keramics_types::bytes_to_u32_le!(data, 0);
 
-                let field1: u32 = value_32bit & 511;
+                let field1: u32 = value_32bit & 0x1ff;
                 string_parts.push(format!("    field1: {},\n", field1));
 
-                let field2: u32 = (value_32bit >> 9) & 8388607;
+                let field2: u32 = (value_32bit >> 9) & 0x7fffff;
+                string_parts.push(format!("    field2: {},\n", field2));
+
+                string_parts.push(format!("}}\n\n"));
+
+                string_parts.join("")
+            }
+        };
+        let test_token_stream = structure_layout.generate_debug_read_data();
+
+        assert_eq!(
+            test_token_stream.to_string(),
+            expected_token_stream.to_string()
+        );
+    }
+
+    #[test]
+    fn test_generate_debug_read_data_with_bitfield64() {
+        let mut structure_layout: StructureLayout =
+            StructureLayout::new("TestStruct", &ByteOrder::LittleEndian);
+
+        let mut group: StructureLayoutBitFieldsGroup =
+            StructureLayoutBitFieldsGroup::new(&DataType::BitField64, &ByteOrder::NotSet);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field1", 60, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        let bitfield: StructureLayoutBitField =
+            StructureLayoutBitField::new("field2", 4, "", &Format::NotSet);
+        group.bitfields.push(bitfield);
+
+        structure_layout
+            .members
+            .push(StructureLayoutMember::BitFields(group));
+
+        let expected_token_stream = quote! {
+            pub fn debug_read_data(data: &[u8]) -> String {
+                let mut string_parts: Vec<String> = Vec::new();
+                string_parts.push(format!("TestStruct {{\n"));
+
+                let value_64bit: u64 = keramics_types::bytes_to_u64_le!(data, 0);
+
+                let field1: u64 = value_64bit & 0xfffffffffffffff;
+                string_parts.push(format!("    field1: {},\n", field1));
+
+                let field2: u64 = (value_64bit >> 60) & 0xf;
                 string_parts.push(format!("    field2: {},\n", field2));
 
                 string_parts.push(format!("}}\n\n"));

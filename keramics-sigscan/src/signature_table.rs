@@ -173,7 +173,7 @@ impl SignatureTable {
                 None => 0,
             };
             self.mediator
-                .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets,));
+                .debug_print(format!("    number_of_offsets: {}\n", number_of_offsets));
             self.mediator.debug_print("}\n\n");
         }
         self.byte_value_weights

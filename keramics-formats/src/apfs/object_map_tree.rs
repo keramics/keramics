@@ -24,7 +24,7 @@ use super::object_map_value::ApfsObjectMapValue;
 /// Apple File System (APFS) object map B-tree.
 pub struct ApfsObjectMapTree {
     /// Block size.
-    pub block_size: u64,
+    pub block_size: u32,
 
     /// Root (node) block number.
     pub root_block_number: u64,
@@ -39,61 +39,8 @@ impl ApfsObjectMapTree {
         }
     }
 
-    /// Retrieves a specific object map value.
-    pub fn get_value_by_object_identifier(
-        &self,
-        data_stream: &DataStreamReference,
-        object_identifier: u64,
-        object_transaction_identifier: u64,
-    ) -> Result<Option<ApfsObjectMapValue>, ErrorTrace> {
-        let mut read_node_block_numbers: HashSet<u64> = HashSet::new();
-
-        match self.get_value_by_object_identifier_from_node(
-            data_stream,
-            self.root_block_number,
-            object_identifier,
-            object_transaction_identifier,
-            &mut read_node_block_numbers,
-        ) {
-            Ok(result) => Ok(result),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to retrieve value from root node: {}",
-                        self.root_block_number
-                    )
-                );
-                Err(error)
-            }
-        }
-    }
-
-    /// Retrieves a specific object map value from a node.
-    fn get_value_by_object_identifier_from_node(
-        &self,
-        data_stream: &DataStreamReference,
-        block_number: u64,
-        object_identifier: u64,
-        object_transaction_identifier: u64,
-        read_node_block_numbers: &mut HashSet<u64>,
-    ) -> Result<Option<ApfsObjectMapValue>, ErrorTrace> {
-        if read_node_block_numbers.contains(&block_number) {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Node: {} already read",
-                block_number
-            )));
-        }
-        let node: ApfsBtreeNode = match self.get_node_by_number(data_stream, block_number) {
-            Ok(node) => node,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Unable to retrieve node: {}", block_number)
-                );
-                return Err(error);
-            }
-        };
+    /// Checks a node.
+    fn check_node(&self, block_number: u64, node: &ApfsBtreeNode) -> Result<(), ErrorTrace> {
         let expected_object_type: u32 = if block_number == self.root_block_number {
             0x40000002
         } else {
@@ -125,6 +72,118 @@ impl ApfsObjectMapTree {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Retrieves a specific node.
+    fn get_node_by_number(
+        &self,
+        data_stream: &DataStreamReference,
+        block_number: u64,
+    ) -> Result<ApfsBtreeNode, ErrorTrace> {
+        let node_offset: u64 = block_number * (self.block_size as u64);
+
+        let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
+
+        match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read object map B-tree root node at offset: {} (0x{:08x}))",
+                        node_offset, node_offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        Ok(node)
+    }
+
+    /// Retrieves a specific object map value.
+    pub fn get_value_by_identifier(
+        &self,
+        data_stream: &DataStreamReference,
+        object_identifier: u64,
+        object_transaction_identifier: u64,
+    ) -> Result<Option<ApfsObjectMapValue>, ErrorTrace> {
+        let mut read_node_block_numbers: HashSet<u64> = HashSet::new();
+
+        match self.get_value_data_by_identifier_from_node(
+            data_stream,
+            self.root_block_number,
+            object_identifier,
+            object_transaction_identifier,
+            &mut read_node_block_numbers,
+        ) {
+            Ok(Some(value_data)) => {
+                keramics_core::debug_trace_structure!(ApfsObjectMapValue::debug_read_data(
+                    &value_data
+                ));
+                let mut value: ApfsObjectMapValue = ApfsObjectMapValue::new();
+
+                match value.read_data(&value_data) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to read object map value"
+                        );
+                        return Err(error);
+                    }
+                }
+                Ok(Some(value))
+            }
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve value data from root node: {}",
+                        self.root_block_number
+                    )
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Retrieves specific value data from a node.
+    fn get_value_data_by_identifier_from_node(
+        &self,
+        data_stream: &DataStreamReference,
+        block_number: u64,
+        object_identifier: u64,
+        object_transaction_identifier: u64,
+        read_node_block_numbers: &mut HashSet<u64>,
+    ) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        if read_node_block_numbers.contains(&block_number) {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Node: {} already read",
+                block_number
+            )));
+        }
+        let node: ApfsBtreeNode = match self.get_node_by_number(data_stream, block_number) {
+            Ok(node) => node,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve node: {}", block_number)
+                );
+                return Err(error);
+            }
+        };
+        match self.check_node(block_number, &node) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Check of node: {} failed", block_number)
+                );
+                return Err(error);
+            }
+        }
         let mut last_key: ApfsObjectMapKey = ApfsObjectMapKey::new();
         let mut last_entry_index: usize = 0;
 
@@ -136,7 +195,7 @@ impl ApfsObjectMapTree {
                 Some(key_data) => key_data,
                 None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve key data of entry: {}",
+                        "Unable to retrieve entry: {} key data",
                         entry_index
                     )));
                 }
@@ -166,25 +225,10 @@ impl ApfsObjectMapTree {
             entry_index += 1;
         }
         if node.is_branch() {
-            let value_data: &[u8] = match node.get_value_data_by_index(last_entry_index) {
-                Some(value_data) => value_data,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unable to retrieve value data of entry: {}",
-                        last_entry_index
-                    )));
-                }
-            };
-            if value_data.len() < 16 {
-                return Err(keramics_core::error_trace_new!(
-                    "Unsupported value data size"
-                ));
-            }
-            let sub_node_block_number: u64 = bytes_to_u64_le!(value_data, 0);
-
-            match self.get_value_by_object_identifier_from_node(
+            match self.get_value_data_by_identifier_from_sub_node(
                 data_stream,
-                sub_node_block_number,
+                &node,
+                last_entry_index,
                 object_identifier,
                 object_transaction_identifier,
                 read_node_block_numbers,
@@ -193,79 +237,76 @@ impl ApfsObjectMapTree {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!(
-                            "Unable to retrieve value from node: {}",
-                            sub_node_block_number
-                        )
+                        format!("Unable to retrieve value from entry: {}", last_entry_index)
                     );
                     Err(error)
                 }
             }
-        } else {
-            if last_key.object_identifier != object_identifier {
-                Ok(None)
-            } else {
-                let value_data: &[u8] = match node.get_value_data_by_index(last_entry_index) {
-                    Some(value_data) => value_data,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(format!(
-                            "Unable to retrieve value data of entry: {}",
-                            last_entry_index
-                        )));
-                    }
-                };
-                keramics_core::debug_trace_structure!(ApfsObjectMapValue::debug_read_data(
-                    value_data
-                ));
-                let mut value: ApfsObjectMapValue = ApfsObjectMapValue::new();
-
-                match value.read_data(&value_data) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(error, "Unable to read value");
-                        return Err(error);
-                    }
+        } else if last_key.object_identifier == object_identifier {
+            match node.get_value_data_by_index(last_entry_index) {
+                Some(value_data) => Ok(Some(value_data.to_vec())),
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to retrieve entry: {} value data",
+                        last_entry_index
+                    )));
                 }
-                Ok(Some(value))
             }
+        } else {
+            Ok(None)
         }
     }
 
-    /// Retrieves a specific node.
-    fn get_node_by_number(
+    /// Retrieves specific value data from a sub node.
+    fn get_value_data_by_identifier_from_sub_node(
         &self,
         data_stream: &DataStreamReference,
-        block_number: u64,
-    ) -> Result<ApfsBtreeNode, ErrorTrace> {
-        let node_offset: u64 = block_number * self.block_size;
+        node: &ApfsBtreeNode,
+        entry_index: usize,
+        object_identifier: u64,
+        object_transaction_identifier: u64,
+        read_node_block_numbers: &mut HashSet<u64>,
+    ) -> Result<Option<Vec<u8>>, ErrorTrace> {
+        let value_data: &[u8] = match node.get_value_data_by_index(entry_index) {
+            Some(value_data) => value_data,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve entry: {} value data",
+                    entry_index
+                )));
+            }
+        };
+        if value_data.len() < 8 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported value data size"
+            ));
+        }
+        let sub_node_block_number: u64 = bytes_to_u64_le!(value_data, 0);
 
-        let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
-
-        match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
-            Ok(_) => {}
+        match self.get_value_data_by_identifier_from_node(
+            data_stream,
+            sub_node_block_number,
+            object_identifier,
+            object_transaction_identifier,
+            read_node_block_numbers,
+        ) {
+            Ok(result) => Ok(result),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     format!(
-                        "Unable to read object map B-tree root node at offset: {} (0x{:08x}))",
-                        node_offset, node_offset
+                        "Unable to retrieve value from node: {}",
+                        sub_node_block_number
                     )
                 );
-                return Err(error);
+                Err(error)
             }
         }
-        Ok(node)
     }
 
     /// Initializes the object map B-tree.
-    pub fn initialize(
-        &mut self,
-        block_size: u32,
-        root_block_number: u64,
-    ) -> Result<(), ErrorTrace> {
-        self.block_size = block_size as u64;
+    pub fn initialize(&mut self, block_size: u32, root_block_number: u64) {
+        self.block_size = block_size;
         self.root_block_number = root_block_number;
-
-        Ok(())
     }
 }

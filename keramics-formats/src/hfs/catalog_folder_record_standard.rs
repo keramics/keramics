@@ -110,7 +110,7 @@ mod tests {
                 timestamp: 3849937114,
             })
         );
-        assert_eq!(test_struct.backup_time, DateTime::NotSet,);
+        assert_eq!(test_struct.backup_time, DateTime::NotSet);
 
         Ok(())
     }

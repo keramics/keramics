@@ -82,8 +82,6 @@ used as the tweak value.
 The file system B-tree is encrypted using the volume master key and the sector number, relative to
 the start of the container, is used as the tweak value.
 
-### Key bag entries {#key_bag_entries}
-
 ## Objects
 
 APFS uses the "object" data type to distinguish between different data types.
@@ -433,8 +431,8 @@ The container superblock (nx_superblock_t) is 4096 bytes in size and consists of
 | 1272 | 8 | | [EFI jumpstart](#efi_jumpstart) (physical) object identifier (nx_efi_jumpstart), which contains a block number relative to the start of the container |
 | 1280 | 16 | | Fusion set identifier (nx_fusion_uuid), which contains a big-endian UUID |
 | <td colspan="4">*[Container key bag](#key_bag) area (nx_keylocker)*</td> |
-| 1296 | 8 | | Container key bag area block number (nx_keybag_base), which contains a block number relative to the start of the container |
-| 1304 | 8 | | Container key bag area number of blocks (nx_keybag_blocks) |
+| 1296 | 8 | | Container key bag block number (nx_keybag_base), which contains a block number relative to the start of the container |
+| 1304 | 8 | | Container key bag number of blocks (nx_keybag_blocks) |
 | <td colspan="4">&nbsp;</td> |
 | 1312 | 4 x 8 = 32 | | Ephemeral information (nx_ephemeral_info) |
 | 1344 | 8 | | Unknown (reserved for testing) (nx_test_oid) |
@@ -977,12 +975,14 @@ The key bag entry header (keybag_entry_t) is 24 bytes in size and consists of:
 | Value | Identifier | Description |
 | --- | --- | --- |
 | 0x00 | KB_TAG_UNKNOWN | Unknown |
-| 0x01 | KB_TAG_WRAPPING_KEY | Wrapping key |
+| 0x01 | KB_TAG_WRAPPING_KEY (or KB_TAG_RESERVED_1) | Wrapping key |
 | 0x02 | KB_TAG_VOLUME_KEY | Volume master key, which contains a [Key encrypted key (KEK) packed object](#key_bag_kek_packed_object) |
 | 0x03 | KB_TAG_VOLUME_UNLOCK_RECORDS | Volume [key bag extent](#key_bag_data_extent) |
 | 0x04 | KB_TAG_VOLUME_PASSPHRASE_HINT | Passphrase hint |
+| 0x05 | KB_TAG_WRAPPING_M_KEY | Key used to wrap a media key |
+| 0x06 | KB_TAG_VOLUME_M_KEY | Key used to wrap a media key |
 | | | |
-| 0xf8 | KB_TAG_USER_PAYLOAD | Unknown (user payload) |
+| 0xf8 | KB_TAG_USER_PAYLOAD (or KB_TAG_RESERVED_F8) | Unknown (user payload) |
 
 The volume master key is encryped with a volume key.
 
@@ -1352,7 +1352,7 @@ The inode key data (j_inode_key_t) is 8 bytes in size and consists of:
 
 #### Inode value data
 
-The inode value data (APFS_TYPE_INVALID) is 8 bytes in size and consists of:
+The inode value data (j_inode_val_t) is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1361,18 +1361,18 @@ The inode value data (APFS_TYPE_INVALID) is 8 bytes in size and consists of:
 | 16 | 8 | | Creation date and time (create_time), which consists of a signed integer that contains the number of nanoseconds since January 1, 1970 00:00:00 UTC or 0 if not set |
 | 24 | 8 | | Modification date and time (mod_time), which consists of a signed integer that contains the number of nanoseconds since January 1, 1970 00:00:00 UTC or 0 if not set |
 | 32 | 8 | | Inode change date and time (change_time), which consists of a signed integer that contains the number of nanoseconds since January 1, 1970 00:00:00 UTC or 0 if not set |
-| 48 | 8 | | Access date and time (access_time), which consists of a signed integer that contains the number of nanoseconds since January 1, 1970 00:00:00 UTC or 0 if not set |
-| 56 | 8 | | [Inode flags](#inode_flags) (internal_flags) |
-| 64 | 4 | | Number of children (nchildren) or number of (hard) links (nlink) |
-| 68 | 4 | | Unknown (default_protection_class) |
-| 72 | 4 | | Unknown (write_generation_counter) |
-| 76 | 4 | | [BSD file entry flags](#bsd_file_entry_flags) (bsd_flags) |
-| 80 | 4 | | Owner user identifier (owner) |
-| 84 | 4 | | Group identifier (gid) |
-| 86 | 2 | | [File mode](#file_modes) |
-| 88 | 2 | | Unknown (pad1) |
-| 90 | 8 | | Unknown (pad2) |
-| 98 | ... | | [Extended fields](#extended_fields) (xfields) |
+| 40 | 8 | | Access date and time (access_time), which consists of a signed integer that contains the number of nanoseconds since January 1, 1970 00:00:00 UTC or 0 if not set |
+| 48 | 8 | | [Inode flags](#inode_flags) (internal_flags) |
+| 56 | 4 | | Number of children (nchildren) or number of (hard) links (nlink) |
+| 60 | 4 | | Unknown (default_protection_class) |
+| 64 | 4 | | Unknown (write_generation_counter) |
+| 68 | 4 | | [BSD file entry flags](#bsd_file_entry_flags) (bsd_flags) |
+| 72 | 4 | | Owner user identifier (owner) |
+| 76 | 4 | | Group identifier (gid) |
+| 80 | 2 | | [File mode](#file_modes) |
+| 82 | 2 | | Unknown (pad1) |
+| 84 | 8 | | Unknown (pad2) |
+| 92 | ... | | [Extended fields](#extended_fields) (xfields) |
 
 > Note that Mac OS stat command treats nchildren equivalent to nlink.
 
@@ -1470,7 +1470,7 @@ The extended attribute value data (j_xattr_val_t) is of variable size and consis
 | 2 | 2 | | Extended attribute data size |
 | 4 | ... | | Extended attribute data |
 
-> Note that extended attribute data size can contain 0 if extended attribute flags
+> Note that extended attribute data size can contain 0 if the extended attribute flag
 > XATTR_DATA_EMBEDDED is set.
 
 #### Extended attribute names {#extended_attribute_names}
@@ -1481,7 +1481,7 @@ The extended attribute value data (j_xattr_val_t) is of variable size and consis
 | com.apple.assetsd.dbRebuildUuid | |
 | com.apple.assetsd.thumbnailCameraPreviewImageAssetID | |
 | com.apple.assetsd.UUID | |
-| com.apple.decmpfs | [Apple File System Compression (decmpfs)](decmpfs.md) extended attribute. |
+| com.apple.decmpfs | [Apple File System Compression (decmpfs)](decmpfs.md) extended attribute |
 | com.apple.FinderInfo | |
 | com.apple.fs.symlink | Symbolic link |
 | com.apple.genstore.info | |

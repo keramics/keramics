@@ -77,7 +77,7 @@ impl Pkcs7Context {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid padding size value out of bounds: {}",
                 padding_size
-            ),));
+            )));
         }
         let padding_offset: usize = padded_data_size - padding_size;
         let padding_value: u8 = padding_size as u8;

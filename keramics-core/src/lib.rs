@@ -25,7 +25,9 @@ pub use data_stream::{DataStream, DataStreamReference};
 pub use debug_trace::{DebugTrace, DebugTraceScope};
 pub use enums::ByteOrder;
 pub use errors::ErrorTrace;
-pub use fake_data_stream::{FakeDataStream, open_fake_data_stream};
+pub use fake_data_stream::{
+    FakeDataStream, open_fake_data_stream, open_fake_data_stream_with_offset,
+};
 pub use os_data_stream::open_os_data_stream;
 
 #[cfg(test)]

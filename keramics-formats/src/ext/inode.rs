@@ -12,11 +12,12 @@
  */
 
 use std::cmp::max;
-use std::collections::BTreeMap;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
+
+use crate::types::IndexedHashMap;
 
 use super::attributes_entry::ExtAttributesEntry;
 use super::block_numbers_tree::ExtBlockNumbersTree;
@@ -85,7 +86,7 @@ pub struct ExtInode {
     pub creation_time: Option<DateTime>,
 
     /// Attributes.
-    pub attributes: BTreeMap<ByteString, ExtAttributesEntry>,
+    pub attributes: IndexedHashMap<ByteString, ExtAttributesEntry>,
 }
 
 impl ExtInode {
@@ -110,7 +111,7 @@ impl ExtInode {
             file_acl_block_number: 0,
             checksum: 0,
             creation_time: None,
-            attributes: BTreeMap::new(),
+            attributes: IndexedHashMap::new(),
         }
     }
 

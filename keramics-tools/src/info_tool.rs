@@ -465,6 +465,9 @@ fn main() -> ExitCode {
 
     let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
+            FormatIdentifier::Apfs => {
+                ApfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
+            }
             FormatIdentifier::Ext => ExtInfo::print_file_entry_by_identifier(
                 &data_stream,
                 command_arguments.entry,
@@ -485,6 +488,7 @@ fn main() -> ExitCode {
             ))),
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
+            FormatIdentifier::Apfs => ApfsInfo::print_hierarchy(&data_stream),
             FormatIdentifier::Ext => {
                 ExtInfo::print_hierarchy(&data_stream, info_tool.character_encoding.as_ref())
             }
@@ -502,6 +506,7 @@ fn main() -> ExitCode {
             let path: Path = Path::from(&command_arguments.path);
 
             match &format_identifier {
+                FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_path(&data_stream, &path),
                 FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
                     &data_stream,
                     &path,

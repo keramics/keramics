@@ -163,7 +163,7 @@ impl FatFileSystem {
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to retrieve sub file entry: {}", path_component,)
+                        format!("Unable to retrieve sub file entry: {}", path_component)
                     );
                     return Err(error);
                 }

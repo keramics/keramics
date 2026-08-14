@@ -34,7 +34,7 @@ pub struct ApfsBlockRange {
 }
 
 impl ApfsBlockRange {
-    /// Creates a new range.
+    /// Creates a new block range.
     pub fn new() -> Self {
         Self {
             block_number: 0,
@@ -42,7 +42,7 @@ impl ApfsBlockRange {
         }
     }
 
-    /// Reads the range from a buffer.
+    /// Reads the block range from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

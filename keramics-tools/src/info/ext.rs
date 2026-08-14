@@ -20,9 +20,9 @@ use keramics_formats::Path;
 use keramics_formats::ext::{ExtExtendedAttribute, ExtFileEntry, ExtFileSystem};
 use keramics_types::ByteString;
 
-use super::posix::PosixFileModeInfo;
-
 use crate::formatters::ByteSize;
+
+use super::posix::PosixFileModeInfo;
 
 /// Extended File System (ext) compatible feature flags information.
 struct ExtCompatibleFeatureFlagsInfo {

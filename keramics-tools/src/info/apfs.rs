@@ -14,10 +14,14 @@
 use std::fmt;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-use keramics_formats::apfs::{ApfsContainer, ApfsVolume};
+use keramics_datetime::DateTime;
+use keramics_formats::Path;
+use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
 use keramics_types::{ByteString, Uuid};
 
 use crate::formatters::ByteSize;
+
+use super::posix::PosixFileModeInfo;
 
 /// Apple File System (APFS) container feature flags information.
 struct ApfsContainerFeatureFlagsInfo {
@@ -187,6 +191,132 @@ impl fmt::Display for ApfsContainerReadOnlyCompatibilityFeatureFlagsInfo {
         _ = self.flags;
 
         Ok(())
+    }
+}
+
+/// Apple File System (APFS) file entry information.
+struct ApfsFileEntryInfo {
+    /// The identifier.
+    pub identifier: u64,
+
+    /// The name.
+    pub name: Option<ByteString>,
+
+    /// The size.
+    pub size: u64,
+
+    /// Creation date and time.
+    pub creation_time: DateTime,
+
+    /// Modifiation date and time.
+    pub modification_time: DateTime,
+
+    /// Access date and time.
+    pub access_time: DateTime,
+
+    /// Change date and time.
+    pub change_time: DateTime,
+
+    /// Number of links.
+    pub number_of_links: u32,
+
+    /// Owner identifier.
+    pub owner_identifier: u32,
+
+    /// Group identifier.
+    pub group_identifier: u32,
+
+    /// File mode.
+    pub file_mode: u16,
+}
+
+impl ApfsFileEntryInfo {
+    /// Creates new file entry information.
+    fn new() -> Self {
+        Self {
+            identifier: 0,
+            name: None,
+            size: 0,
+            creation_time: DateTime::NotSet,
+            modification_time: DateTime::NotSet,
+            access_time: DateTime::NotSet,
+            change_time: DateTime::NotSet,
+            number_of_links: 0,
+            owner_identifier: 0,
+            group_identifier: 0,
+            file_mode: 0,
+        }
+    }
+
+    /// Retrieves the string representation of a date and time value.
+    fn get_date_time_string(date_time: &DateTime) -> String {
+        match date_time {
+            DateTime::ApfsTime(apfs_time) => apfs_time.to_iso8601_string(),
+            DateTime::NotSet => String::from("Not set (0)"),
+            _ => return String::from("Unsupported date time"),
+        }
+    }
+}
+
+impl fmt::Display for ApfsFileEntryInfo {
+    /// Formats file entry information for display.
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(formatter, "    Identifier\t\t\t\t\t: {}", self.identifier)?;
+
+        // TODO: print parent identifier
+        // TODO: print link identifier
+
+        if let Some(name) = &self.name {
+            writeln!(formatter, "    Name\t\t\t\t\t: {}", name)?;
+        };
+        let byte_size: ByteSize = ByteSize::new(self.size, 1024);
+        writeln!(formatter, "    Size\t\t\t\t\t: {}", byte_size)?;
+
+        // TODO: convert to formatter.
+        let date_time_string: String = Self::get_date_time_string(&self.creation_time);
+
+        writeln!(formatter, "    Creation time\t\t\t\t: {}", date_time_string)?;
+
+        // TODO: convert to formatter.
+        let date_time_string: String = Self::get_date_time_string(&self.modification_time);
+
+        writeln!(
+            formatter,
+            "    Modification time\t\t\t\t: {}",
+            date_time_string
+        )?;
+        // TODO: convert to formatter.
+        let date_time_string: String = Self::get_date_time_string(&self.access_time);
+
+        writeln!(formatter, "    Access time\t\t\t\t\t: {}", date_time_string)?;
+
+        // TODO: convert to formatter.
+        let date_time_string: String = Self::get_date_time_string(&self.change_time);
+
+        writeln!(formatter, "    Change time\t\t\t\t\t: {}", date_time_string)?;
+
+        writeln!(
+            formatter,
+            "    Number of links\t\t\t\t: {}",
+            self.number_of_links
+        )?;
+        writeln!(
+            formatter,
+            "    Owner identifier\t\t\t\t: {}",
+            self.owner_identifier
+        )?;
+        writeln!(
+            formatter,
+            "    Group identifier\t\t\t\t: {}",
+            self.group_identifier
+        )?;
+        let file_mode_info: PosixFileModeInfo = PosixFileModeInfo::new(self.file_mode);
+
+        writeln!(formatter, "    File mode\t\t\t\t\t: {}", file_mode_info)?;
+
+        // TODO: print extended attributes
+
+        writeln!(formatter)
     }
 }
 
@@ -420,6 +550,25 @@ impl ApfsInfo {
         container_information
     }
 
+    /// Retrieves the file entry information.
+    fn get_file_entry_information(file_entry: &ApfsFileEntry) -> ApfsFileEntryInfo {
+        let mut file_entry_information: ApfsFileEntryInfo = ApfsFileEntryInfo::new();
+
+        file_entry_information.identifier = file_entry.get_identifier();
+        file_entry_information.name = file_entry.get_name().cloned();
+        // TODO: file_entry_information.size = file_entry.get_size();
+        file_entry_information.creation_time = file_entry.get_creation_time().clone();
+        file_entry_information.modification_time = file_entry.get_modification_time().clone();
+        file_entry_information.access_time = file_entry.get_access_time().clone();
+        file_entry_information.change_time = file_entry.get_change_time().clone();
+        file_entry_information.number_of_links = file_entry.get_number_of_links();
+        file_entry_information.owner_identifier = file_entry.get_owner_identifier();
+        file_entry_information.group_identifier = file_entry.get_group_identifier();
+        file_entry_information.file_mode = file_entry.get_file_mode();
+
+        file_entry_information
+    }
+
     /// Retrieves the volume information.
     fn get_volume_information(volume_index: usize, apfs_volume: &ApfsVolume) -> ApfsVolumeInfo {
         let mut volume_information: ApfsVolumeInfo = ApfsVolumeInfo::new();
@@ -453,7 +602,7 @@ impl ApfsInfo {
     /// Prints information about a container.
     pub fn print_container(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
         let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
-            Ok(apfs_container) => apfs_container,
+            Ok(container) => container,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open container");
                 return Err(error);
@@ -465,7 +614,7 @@ impl ApfsInfo {
 
         for (volume_index, result) in apfs_container.volumes().enumerate() {
             let apfs_volume: ApfsVolume = match result {
-                Ok(apfs_volume) => apfs_volume,
+                Ok(volume) => volume,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
@@ -481,6 +630,270 @@ impl ApfsInfo {
         }
         Ok(())
     }
+
+    /// Prints information about a file entry.
+    fn print_file_entry(file_entry: &mut ApfsFileEntry) -> Result<(), ErrorTrace> {
+        let file_entry_information: ApfsFileEntryInfo =
+            Self::get_file_entry_information(file_entry);
+
+        print!("{}", file_entry_information);
+
+        Ok(())
+    }
+
+    /// Prints information about a specific file entry.
+    pub fn print_file_entry_by_identifier(
+        data_stream: &DataStreamReference,
+        apfs_entry_identifier: u64,
+    ) -> Result<(), ErrorTrace> {
+        let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
+            Ok(container) => container,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open container");
+                return Err(error);
+            }
+        };
+        // TODO: refactor into function get_file_system_by_path
+        let number_of_volumes: usize = apfs_container.get_number_of_volumes();
+
+        let volume_index: usize = if number_of_volumes == 1 {
+            // Strip/check for volume prefix in path
+            0
+        } else {
+            // TODO: handle a number of volumes of 0
+            // TODO: determine volume based on path
+            todo!();
+        };
+        let apfs_volume: ApfsVolume = match apfs_container.get_volume_by_index(volume_index) {
+            Ok(volume) => volume,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open volume: {}", volume_index)
+                );
+                return Err(error);
+            }
+        };
+        let apfs_file_system: ApfsFileSystem = match apfs_volume.get_file_system() {
+            Ok(file_system) => file_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve file system in volume: {}", volume_index)
+                );
+                return Err(error);
+            }
+        };
+        let mut file_entry: ApfsFileEntry =
+            match apfs_file_system.get_file_entry_by_identifier(apfs_entry_identifier) {
+                Ok(Some(file_entry)) => file_entry,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!("Missing file entry"));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve file entry: {}", apfs_entry_identifier)
+                    );
+                    return Err(error);
+                }
+            };
+        println!("Apple File System (APFS) file entry information:");
+
+        match Self::print_file_entry(&mut file_entry) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to print file entry: {}", apfs_entry_identifier)
+                );
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    /// Prints information about a specific file entry.
+    pub fn print_file_entry_by_path(
+        data_stream: &DataStreamReference,
+        path: &Path,
+    ) -> Result<(), ErrorTrace> {
+        let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
+            Ok(container) => container,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open container");
+                return Err(error);
+            }
+        };
+        // TODO: refactor into function get_file_system_by_path
+        let number_of_volumes: usize = apfs_container.get_number_of_volumes();
+
+        let volume_index: usize = if number_of_volumes == 1 {
+            // Strip/check for volume prefix in path
+            0
+        } else {
+            // TODO: handle a number of volumes of 0
+            // TODO: determine volume based on path
+            todo!();
+        };
+        let apfs_volume: ApfsVolume = match apfs_container.get_volume_by_index(volume_index) {
+            Ok(volume) => volume,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open volume: {}", volume_index)
+                );
+                return Err(error);
+            }
+        };
+        let apfs_file_system: ApfsFileSystem = match apfs_volume.get_file_system() {
+            Ok(file_system) => file_system,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve file system in volume: {}", volume_index)
+                );
+                return Err(error);
+            }
+        };
+        let mut file_entry: ApfsFileEntry = match apfs_file_system.get_file_entry_by_path(path) {
+            Ok(Some(file_entry)) => file_entry,
+            Ok(None) => return Err(keramics_core::error_trace_new!("Missing file entry")),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
+                return Err(error);
+            }
+        };
+        println!("Apple File System (APFS) file entry information:");
+
+        println!("    Path\t\t\t\t\t: {}", path);
+
+        match Self::print_file_entry(&mut file_entry) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to print file entry");
+                return Err(error);
+            }
+        }
+        Ok(())
+    }
+
+    /// Prints the file system hierarchy.
+    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+        let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
+            Ok(container) => container,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open container");
+                return Err(error);
+            }
+        };
+        println!("Apple File System (APFS) hierarchy:");
+
+        for (volume_index, result) in apfs_container.volumes().enumerate() {
+            let apfs_volume: ApfsVolume = match result {
+                Ok(volume) => volume,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve volume: {}", volume_index)
+                    );
+                    return Err(error);
+                }
+            };
+            let volume_identifier: &Uuid = apfs_volume.get_identifier();
+
+            let apfs_file_system: ApfsFileSystem = match apfs_volume.get_file_system() {
+                Ok(file_system) => file_system,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to retrieve file system of volume: {}", volume_index)
+                    );
+                    return Err(error);
+                }
+            };
+            let mut file_entry: ApfsFileEntry = match apfs_file_system.get_root_directory() {
+                Ok(result) => match result {
+                    Some(file_entry) => file_entry,
+                    None => {
+                        println!("No root directory found");
+                        return Ok(());
+                    }
+                },
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve root directory"
+                    );
+                    return Err(error);
+                }
+            };
+            let mut path_components: Vec<String> = vec![format!("{{{}}}", volume_identifier)];
+
+            match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to print file entry hierarchy"
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Prints the file entry hierarchy.
+    fn print_hierarchy_file_entry(
+        file_entry: &mut ApfsFileEntry,
+        path_components: &mut Vec<String>,
+    ) -> Result<(), ErrorTrace> {
+        let path: String = if file_entry.is_root_directory() {
+            String::from("/")
+        } else {
+            let name_string: String = match file_entry.get_name() {
+                Some(name) => name.to_string(),
+                None => String::new(),
+            };
+            path_components.push(name_string);
+            format!("/{}", path_components.join("/"))
+        };
+        println!("{}", path);
+
+        for (sub_file_entry_index, result) in file_entry.sub_file_entries().enumerate() {
+            let mut sub_file_entry: ApfsFileEntry = match result {
+                Ok(file_entry) => file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            };
+            match Self::print_hierarchy_file_entry(&mut sub_file_entry, path_components) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to print hierarchy of sub file entry: {}",
+                            sub_file_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        if !file_entry.is_root_directory() {
+            path_components.pop();
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -490,6 +903,7 @@ mod tests {
     use std::path::PathBuf;
 
     use keramics_core::open_os_data_stream;
+    use keramics_datetime::ApfsTime;
 
     #[test]
     fn test_get_container_information() -> Result<(), ErrorTrace> {
@@ -507,6 +921,54 @@ mod tests {
         assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
         assert_eq!(test_struct.incompatible_feature_flags, 0x00000002);
         assert_eq!(test_struct.number_of_volumes, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_information() -> Result<(), ErrorTrace> {
+        let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let apfs_container: ApfsContainer = ApfsInfo::open_container(&data_stream)?;
+        let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
+        let apfs_file_system: ApfsFileSystem = apfs_volume.get_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let apfs_file_entry: ApfsFileEntry =
+            apfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+        let test_struct: ApfsFileEntryInfo = ApfsInfo::get_file_entry_information(&apfs_file_entry);
+
+        assert_eq!(test_struct.identifier, 18);
+        assert_eq!(test_struct.name, Some(ByteString::from("testfile1")));
+        assert_eq!(test_struct.size, 0);
+        assert_eq!(
+            test_struct.creation_time,
+            DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765254516511
+            })
+        );
+        assert_eq!(
+            test_struct.modification_time,
+            DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765254251713
+            })
+        );
+        assert_eq!(
+            test_struct.access_time,
+            DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765254251713
+            })
+        );
+        assert_eq!(
+            test_struct.change_time,
+            DateTime::ApfsTime(ApfsTime {
+                timestamp: 1785841765262832871
+            })
+        );
+        assert_eq!(test_struct.number_of_links, 2);
+        assert_eq!(test_struct.owner_identifier, 99);
+        assert_eq!(test_struct.group_identifier, 99);
+        assert_eq!(test_struct.file_mode, 0o100644);
 
         Ok(())
     }

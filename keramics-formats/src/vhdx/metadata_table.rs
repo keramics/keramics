@@ -23,7 +23,7 @@ use super::metadata_table_header::VhdxMetadataTableHeader;
 /// Virtual Hard Disk version 2 (VHDX) metadata table.
 pub struct VhdxMetadataTable {
     /// Entries.
-    pub entries: HashMap<Uuid, VhdxMetadataTableEntry>,
+    entries: HashMap<Uuid, VhdxMetadataTableEntry>,
 }
 
 impl VhdxMetadataTable {
@@ -32,6 +32,11 @@ impl VhdxMetadataTable {
         Self {
             entries: HashMap::new(),
         }
+    }
+
+    /// Retrieves a specific entry.
+    pub fn get_entry(&self, identifier: &Uuid) -> Option<&VhdxMetadataTableEntry> {
+        self.entries.get(identifier)
     }
 
     /// Reads the metadata table from a buffer.

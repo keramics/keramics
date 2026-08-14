@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -164,13 +164,25 @@ impl PdiImageLayer {
         let mut data_offset: usize = 0;
         let mut media_offset: u64 = self.current_offset;
 
-        let mut extent_offset: u64 = 0;
-        let mut extent_index: usize = self.extents.partition_point(|extent| {
-            extent_offset += extent.size;
-            media_offset >= extent_offset
-        });
-        let mut extent_size: u64 = match self.extents.get(extent_index) {
-            Some(extent) => extent.size,
+        let mut extent_index: usize = match self.extents.binary_search_by(|extent| {
+            if media_offset >= extent.end_offset {
+                Ordering::Less
+            } else if media_offset < extent.start_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(extent_index) => extent_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing extent for media offset: {} (0x{:08x})",
+                    media_offset, media_offset
+                )));
+            }
+        };
+        let extent: &PdiImageExtent = match self.extents.get(extent_index) {
+            Some(extent) => extent,
             None => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unable to retrieve extent: {} for media offset: {} (0x{:08x})",
@@ -178,11 +190,8 @@ impl PdiImageLayer {
                 )));
             }
         };
-        extent_offset = self.extents[0..extent_index]
-            .iter()
-            .map(|extent| extent.size)
-            .sum::<u64>();
-        extent_offset = media_offset - extent_offset;
+        let mut extent_offset: u64 = media_offset - extent.start_offset;
+        let mut extent_size: u64 = extent.size;
 
         while data_offset < read_size {
             let extent_file: &mut PdiExtentFile = match self.get_extent_file(extent_index) {

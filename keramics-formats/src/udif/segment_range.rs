@@ -13,11 +13,14 @@
 
 /// Universal Disk Image Format (UDIF) segment range.
 pub struct UdifSegmentRange {
-    /// Segment offset.
-    pub segment_offset: u64,
-
     /// Segment number.
     pub segment_number: u32,
+
+    /// Start offset.
+    pub start_offset: u64,
+
+    /// End offset.
+    pub end_offset: u64,
 
     /// Size.
     pub size: u64,
@@ -25,10 +28,11 @@ pub struct UdifSegmentRange {
 
 impl UdifSegmentRange {
     /// Creates a new segment range.
-    pub fn new(segment_offset: u64, segment_number: u32, size: u64) -> Self {
+    pub fn new(segment_number: u32, segment_offset: u64, size: u64) -> Self {
         Self {
-            segment_offset,
             segment_number,
+            start_offset: segment_offset,
+            end_offset: segment_offset + size,
             size,
         }
     }

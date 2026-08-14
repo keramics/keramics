@@ -22,6 +22,8 @@ mod os_file_resolver;
 mod path;
 mod path_component;
 mod scanner;
+mod traits;
+mod types;
 mod util;
 
 // Data formats used in other formats.
@@ -60,6 +62,8 @@ pub use os_file_resolver::{OsFileResolver, open_os_file_resolver};
 pub use path::Path;
 pub use path_component::PathComponent;
 pub use scanner::FormatScanner;
+pub use traits::FileEntryIterator;
+pub use types::FileEntriesIterator;
 
 #[cfg(test)]
 mod tests {

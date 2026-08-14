@@ -11,12 +11,12 @@
  * under the License.
  */
 
-use std::collections::BTreeMap;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::ByteString;
 
+use crate::types::IndexedHashMap;
 use crate::util::calculate_alignment_padding;
 
 use super::attributes_block_header::ExtAttributesBlockHeader;
@@ -40,7 +40,7 @@ impl ExtAttributesBlock {
         data: &[u8],
         data_offset: usize,
         data_size: usize,
-        entries: &mut BTreeMap<ByteString, ExtAttributesEntry>,
+        entries: &mut IndexedHashMap<ByteString, ExtAttributesEntry>,
     ) -> Result<(), ErrorTrace> {
         let mut entry_data_offset: usize = data_offset;
 
@@ -132,7 +132,7 @@ impl ExtAttributesBlock {
         data_stream: &DataStreamReference,
         position: SeekFrom,
         data_size: usize,
-        entries: &mut BTreeMap<ByteString, ExtAttributesEntry>,
+        entries: &mut IndexedHashMap<ByteString, ExtAttributesEntry>,
     ) -> Result<(), ErrorTrace> {
         if data_size < 32 || data_size > 65536 {
             return Err(keramics_core::error_trace_new!(format!(
@@ -262,7 +262,7 @@ mod tests {
 
         let test_struct = ExtAttributesBlock::new(0);
 
-        let mut entries: BTreeMap<ByteString, ExtAttributesEntry> = BTreeMap::new();
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
         test_struct.read_entries(&test_data, 32, 1024, &mut entries)?;
 
         assert_eq!(entries.len(), 1);
@@ -277,7 +277,7 @@ mod tests {
 
         let mut test_struct = ExtAttributesBlock::new(0);
 
-        let mut entries: BTreeMap<ByteString, ExtAttributesEntry> = BTreeMap::new();
+        let mut entries: IndexedHashMap<ByteString, ExtAttributesEntry> = IndexedHashMap::new();
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 1024, &mut entries)?;
 
         assert_eq!(entries.len(), 1);

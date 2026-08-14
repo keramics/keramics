@@ -31,7 +31,7 @@ pub struct Utf16CharacterMappings {
 }
 
 impl Utf16CharacterMappings {
-    /// Creates a new UCS-2 character mappings.
+    /// Creates a new UTF-16 character mappings.
     pub fn new(mappings: &[(u32, u32)]) -> Self {
         Self {
             mappings: HashMap::new(),

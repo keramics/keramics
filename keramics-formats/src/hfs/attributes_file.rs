@@ -11,10 +11,12 @@
  * under the License.
  */
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
+
+use crate::types::IndexedHashMap;
 
 use super::attribute_extents_record::HfsAttributeExtentsRecord;
 use super::attribute_fork_data_record::HfsAttributeForkDataRecord;
@@ -46,7 +48,7 @@ impl HfsAttributesFile {
         &self,
         data_stream: &DataStreamReference,
         identifier: u32,
-        attributes: &mut BTreeMap<HfsString, HfsAttributeRecord>,
+        attributes: &mut IndexedHashMap<HfsString, HfsAttributeRecord>,
     ) -> Result<(), ErrorTrace> {
         if self.btree_file.root_node_number == 0 {
             return Ok(());
@@ -77,7 +79,7 @@ impl HfsAttributesFile {
         data_stream: &DataStreamReference,
         node_number: u32,
         identifier: u32,
-        attributes: &mut BTreeMap<HfsString, HfsAttributeRecord>,
+        attributes: &mut IndexedHashMap<HfsString, HfsAttributeRecord>,
         read_node_numbers: &mut HashSet<u32>,
     ) -> Result<(), ErrorTrace> {
         if read_node_numbers.contains(&node_number) {
@@ -409,7 +411,7 @@ mod tests {
         let data_stream: DataStreamReference = get_data_stream()?;
         let test_struct: HfsAttributesFile = get_attributes_file(&data_stream)?;
 
-        let mut attributes: BTreeMap<HfsString, HfsAttributeRecord> = BTreeMap::new();
+        let mut attributes: IndexedHashMap<HfsString, HfsAttributeRecord> = IndexedHashMap::new();
         test_struct.get_attributes_by_identifier(&data_stream, 34, &mut attributes)?;
         assert_eq!(attributes.len(), 1);
 

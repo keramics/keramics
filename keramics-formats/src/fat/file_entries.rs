@@ -11,60 +11,9 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
+use crate::types::FileEntriesIterator;
 
 use super::file_entry::FatFileEntry;
 
 /// File Allocation Table (FAT) file entries iterator.
-pub struct FatFileEntriesIterator<'a> {
-    /// File entry.
-    file_entry: &'a mut FatFileEntry,
-
-    /// Number of sub file entries.
-    number_of_sub_file_entries: usize,
-
-    /// Sub file entry index.
-    sub_file_entry_index: usize,
-
-    /// Value to indicate whether the iterator is initialized.
-    is_initialized: bool,
-}
-
-impl<'a> FatFileEntriesIterator<'a> {
-    /// Creates a new iterator.
-    pub fn new(file_entry: &'a mut FatFileEntry) -> Self {
-        Self {
-            file_entry,
-            number_of_sub_file_entries: 0,
-            sub_file_entry_index: 0,
-            is_initialized: false,
-        }
-    }
-}
-
-impl<'a> Iterator for FatFileEntriesIterator<'a> {
-    type Item = Result<FatFileEntry, ErrorTrace>;
-
-    /// Retrieves the next file entry.
-    fn next(&mut self) -> Option<Self::Item> {
-        if !self.is_initialized {
-            match self.file_entry.get_number_of_sub_file_entries() {
-                Ok(number_of_sub_file_entries) => {
-                    self.number_of_sub_file_entries = number_of_sub_file_entries;
-                }
-                Err(error) => return Some(Err(error)),
-            }
-            self.is_initialized = true;
-        }
-        if self.sub_file_entry_index >= self.number_of_sub_file_entries {
-            return None;
-        }
-        let item: Self::Item = self
-            .file_entry
-            .get_sub_file_entry_by_index(self.sub_file_entry_index);
-
-        self.sub_file_entry_index += 1;
-
-        Some(item)
-    }
-}
+pub type FatFileEntriesIterator<'a> = FileEntriesIterator<'a, FatFileEntry>;

@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::Ordering;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -66,13 +67,33 @@ impl HfsBtreeFile {
         node_number: u32,
     ) -> Result<HfsBtreeNode, ErrorTrace> {
         let node_logical_offset: u64 = (node_number as u64) * (self.node_size as u64);
+        let node_block_number: u64 = node_logical_offset / (self.block_size as u64);
 
-        let block_range_index: usize = self.block_ranges.partition_point(|block_range| {
-            let range_logical_end_offset: u64 = ((block_range.logical_block_number as u64)
-                + (block_range.number_of_blocks as u64))
-                * (self.block_size as u64);
-            node_logical_offset >= range_logical_end_offset
-        });
+        if node_block_number > u32::MAX as u64 {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid node number: {} value out of bounds",
+                node_number
+            )));
+        }
+        let block_range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let range_end_block_number: u64 =
+                (block_range.logical_block_number as u64) + (block_range.number_of_blocks as u64);
+            if node_block_number >= range_end_block_number {
+                Ordering::Less
+            } else if node_block_number < (block_range.logical_block_number as u64) {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(extent_index) => extent_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for node: {}",
+                    node_number
+                )));
+            }
+        };
         let node_physical_offset: u64 = match self.block_ranges.get(block_range_index) {
             Some(block_range) => {
                 let range_logical_offset: u64 =

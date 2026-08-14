@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -332,7 +332,7 @@ impl UdifSegmentStream {
         self.size += segment_file.data_fork_size;
 
         let segment_range: UdifSegmentRange =
-            UdifSegmentRange::new(segment_file.segment_offset, 1, segment_file.data_fork_size);
+            UdifSegmentRange::new(1, segment_file.segment_offset, segment_file.data_fork_size);
         self.segment_ranges.push(segment_range);
 
         self.segment_set_identifier = segment_file.segment_set_identifier.clone();
@@ -388,8 +388,8 @@ impl UdifSegmentStream {
             self.size += segment_file.data_fork_size;
 
             let segment_range: UdifSegmentRange = UdifSegmentRange::new(
-                segment_file.segment_offset,
                 segment_number,
+                segment_file.segment_offset,
                 segment_file.data_fork_size,
             );
             self.segment_ranges.push(segment_range);
@@ -469,10 +469,23 @@ impl UdifSegmentStream {
         let mut data_offset: usize = 0;
         let mut segment_offset: u64 = self.current_offset;
 
-        let mut segment_index: usize = self.segment_ranges.partition_point(|segment_range| {
-            let segment_end_offset: u64 = segment_range.segment_offset + segment_range.size;
-            segment_offset >= segment_end_offset
-        });
+        let mut segment_index: usize = match self.segment_ranges.binary_search_by(|segment_range| {
+            if segment_offset >= segment_range.end_offset {
+                Ordering::Less
+            } else if segment_offset < segment_range.start_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(extent_index) => extent_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing segment ragnage for segment offset: {} (0x{:08x})",
+                    segment_offset, segment_offset
+                )));
+            }
+        };
         while data_offset < read_size {
             if segment_offset >= self.size {
                 break;
@@ -486,7 +499,7 @@ impl UdifSegmentStream {
                     )));
                 }
             };
-            let range_relative_offset: u64 = segment_offset - segment_range.segment_offset;
+            let range_relative_offset: u64 = segment_offset - segment_range.start_offset;
             let range_remainder_size: u64 = segment_range.size - range_relative_offset;
 
             let range_read_size: usize =
