@@ -19,6 +19,7 @@ mod attribute_record;
 mod attributes_file;
 mod block_range;
 mod block_ranges;
+mod block_reader;
 mod block_stream;
 mod btree_file;
 mod btree_header_record;

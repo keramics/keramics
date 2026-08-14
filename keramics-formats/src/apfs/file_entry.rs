@@ -19,15 +19,16 @@ use keramics_encodings::CharacterEncoding;
 use keramics_types::ByteString;
 
 use crate::decmpfs::DecmpfsHeader;
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 use crate::traits::FileEntryIterator;
-use crate::types::IndexedHashMap;
 
 use super::attribute_record::ApfsAttributeRecord;
 use super::constants::*;
 use super::directory_entry::ApfsDirectoryEntry;
 use super::extended_attribute::ApfsExtendedAttribute;
 use super::extended_attributes::ApfsExtendedAttributesIterator;
+use super::extent::ApfsExtent;
 use super::file_entries::ApfsFileEntriesIterator;
 use super::file_system_tree::ApfsFileSystemTree;
 use super::inode::ApfsInode;
@@ -59,6 +60,9 @@ pub struct ApfsFileEntry {
     /// Compressed data header.
     compressed_data_header: Option<DecmpfsHeader>,
 
+    /// Extents.
+    extents: Vec<ApfsExtent>,
+
     /// Sub directory entries.
     sub_directory_entries: IndexedHashMap<ByteString, ApfsDirectoryEntry>,
 
@@ -89,6 +93,7 @@ impl ApfsFileEntry {
             inode,
             directory_entry,
             compressed_data_header: None,
+            extents: Vec::new(),
             sub_directory_entries: IndexedHashMap::new(),
             read_sub_directory_entries: false,
             attributes: IndexedHashMap::new(),
@@ -134,7 +139,7 @@ impl ApfsFileEntry {
     pub fn get_name(&self) -> Option<&ByteString> {
         match &self.directory_entry {
             Some(directory_entry) => directory_entry.name.as_ref(),
-            None => None,
+            None => self.inode.name.as_ref(),
         }
     }
 
@@ -150,7 +155,13 @@ impl ApfsFileEntry {
 
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
-        todo!();
+        match self.compressed_data_header.as_ref() {
+            Some(compressed_data_header) => compressed_data_header.uncompressed_data_size,
+            None => match self.inode.data_stream_descriptor.as_ref() {
+                Some(data_stream_descriptor) => data_stream_descriptor.size,
+                None => 0,
+            },
+        }
     }
 
     /// Determines if the file entry is a directory.
@@ -374,6 +385,30 @@ impl ApfsFileEntry {
                 }
             }
             None => {}
+        }
+        Ok(())
+    }
+
+    /// Reads the extents.
+    pub(super) fn read_extents(&mut self) -> Result<(), ErrorTrace> {
+        match self.file_system_tree.get_extents_by_identifier(
+            &self.data_stream,
+            &self.object_map_tree,
+            self.inode.data_stream_identifier,
+            self.transaction_identifier,
+            &mut self.extents,
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve data stream: {} extents from file system tree",
+                        self.inode.data_stream_identifier
+                    )
+                );
+                return Err(error);
+            }
         }
         Ok(())
     }

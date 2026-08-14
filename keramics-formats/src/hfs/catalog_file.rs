@@ -18,8 +18,8 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_encodings::CharacterEncoding;
 use keramics_types::{Utf16CharacterMappings, bytes_to_u16_be, bytes_to_u32_be};
 
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
-use crate::types::IndexedHashMap;
 use crate::util::calculate_alignment_padding;
 
 use super::block_range::HfsBlockRange;

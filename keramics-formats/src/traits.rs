@@ -13,6 +13,15 @@
 
 use keramics_core::ErrorTrace;
 
+/// Block reader trait.
+pub trait BlockReader {
+    /// Retrieves the size of the data.
+    fn get_size(&self) -> u64;
+
+    /// Reads data from blocks.
+    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace>;
+}
+
 /// File entry iterator trait.
 pub trait FileEntryIterator {
     /// Retrieves the number of sub file entries.

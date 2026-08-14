@@ -263,16 +263,16 @@ The B-tree node header is 24 bytes in size and consists of:
 | 4 | 4 | | Number of keys in the node (btn_nkeys) |
 | <td colspan="4">*Table space (btn_table_space)*</td> |
 | 8 | 2 | | Entries data offset, which contains an offset relative to the end of the B-tree node header or -1 (0xffff) if not set (invalid) |
-| 10 | 2 | | Entries data size |
+| 10 | 2 | | Entries data size, in number of bytes |
 | <td colspan="4">*Free space (btn_free_space)*</td> |
 | 12 | 2 | | Unused data offset, which contains an offset relative to the end of the entries data or -1 (0xffff) if not set (invalid) |
-| 14 | 2 | | Unused data size |
+| 14 | 2 | | Unused data size, in number of bytes |
 | <td colspan="4">*Key free list (btn_key_free_list)*</td> |
 | 16 | 2 | | Unused key list offset, which contains an offset relative to unknown or -1 (0xffff) if not set (invalid) |
-| 18 | 2 | | Unused key list size |
+| 18 | 2 | | Unused key list size, in number of bytes |
 | <td colspan="4">*Value free list (btn_val_free_list)*</td> |
 | 20 | 2 | | Unused value list offset, which contains an offset relative to unknown or -1 (0xffff) if not set (invalid) |
-| 22 | 2 | | Unused value list size |
+| 22 | 2 | | Unused value list size, in number of bytes |
 
 <!-- rumdl-enable MD033 MD056 -->
 
@@ -308,9 +308,9 @@ The variable-size B-tree entry is 8 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 2 | | Key data offset (key_offs), which contains an offset relative to the end of the entries data |
-| 2 | 2 | | Key data size (key_len) |
+| 2 | 2 | | Key data size (key_len), in number of bytes |
 | 4 | 2 | | Value data offset (value_offs), which contains a reversed offset relative to the start of the B-Tree footer |
-| 6 | 2 | | Value data size (value_len) |
+| 6 | 2 | | Value data size (value_len), in number of bytes |
 
 ### B-tree footer
 
@@ -324,12 +324,12 @@ The B-tree footer (btree_info_t) is 40 bytes in size and consists of:
 | --- | --- | --- | --- |
 | <td colspan="4">*Static information (btree_info_fixed_t)*</td> |
 | 0 | 4 | | [Flags](#btree_flags) (bt_flags) |
-| 4 | 4 | | Node size (bt_node_size) |
-| 8 | 4 | | Key size (bt_key_size), which is set to 0 if key has a variable size |
-| 12 | 4 | | Value size (bt_val_size), which is set to 0 if value has a variable size |
+| 4 | 4 | | Node size (bt_node_size), in number of bytes |
+| 8 | 4 | | Key size (bt_key_size), in number of bytes and is set to 0 if key has a variable size |
+| 12 | 4 | | Value size (bt_val_size), in number of bytes and is set to 0 if value has a variable size |
 | <td colspan="4">&nbsp;</td> |
-| 16 | 4 | | Maximum key size (bt_longest_key) |
-| 20 | 4 | | Maximum value size (bt_longest_val) |
+| 16 | 4 | | Maximum key size (bt_longest_key), in number of bytes |
+| 20 | 4 | | Maximum value size (bt_longest_val), in number of bytes |
 | 24 | 8 | | Total number of keys (bt_key_count) |
 | 32 | 8 | | Total number of nodes (bt_node_count) |
 
@@ -397,7 +397,7 @@ The container superblock (nx_superblock_t) is 4096 bytes in size and consists of
 | 28 | 4 | 0x00000000 | [Object subtype](#object_subtypes) |
 | <td colspan="4">*Object values*</td> |
 | 32 | 4 | "NXSB" | Signature (nx_magix) |
-| 36 | 4 | | Block size (nx_block_size) |
+| 36 | 4 | | Block size (nx_block_size), in number of bytes |
 | 40 | 8 | | Number of blocks (nx_block_count) |
 | 48 | 8 | | [Container feature flags](#container_feature_flags) (nx_features) |
 | 56 | 8 | | [Read-only compatible feature flags](#container_read_only_compatible_feature_flags) (nx_readonly_compatible_features) |
@@ -539,7 +539,7 @@ The checkpoint map entry (checkpoint_mapping_t) is 40 bytes in size and consists
 | --- | --- | --- | --- |
 | 0 | 4 | | [Object type](#object_types) (cpm_type) |
 | 4 | 4 | | [Object subtype](#object_subtypes) (cpm_subtype) |
-| 8 | 4 | | Size (cpm_size) in number of bytes |
+| 8 | 4 | | Size (cpm_size), in number of bytes |
 | 12 | 4 | | Unknown (padding) (cpm_pad) |
 | 16 | 8 | | File system object identifier (cpm_fs_oid) |
 | 24 | 8 | | (Container) object identifier (cpm_oid) |
@@ -627,7 +627,7 @@ The object map value (omap_val_t) is 16 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 4 | | [Value object flags](#object_map_value_flags) (ov_flags) |
-| 4 | 4 | | Value object size (ov_size) |
+| 4 | 4 | | Value object size (ov_size), in number of bytes |
 | 8 | 8 | | Value object physical address (ov_paddr), which contains a block number relative to the start of the container |
 
 ##### Object map value flags {#object_map_value_flags}
@@ -660,7 +660,7 @@ The space manager (spaceman_phys_t) is of variable size and consists of:
 | 24 | 4 | 0x80000005 | [Object type](#object_types) |
 | 28 | 4 | 0x00000000 | [Object subtype](#object_subtypes) |
 | <td colspan="4">*Object values*</td> |
-| 32 | 4 | | Block size (sm_block_size) |
+| 32 | 4 | | Block size (sm_block_size), in number of bytes |
 | 36 | 4 | | Number of blocks per chunk (sm_blocks_per_chunk) |
 | 40 | 4 | | Number of chunks per chunk information block (CIB) (sm_chunks_per_cib) |
 | 44 | 4 | | Number of chunk information blocks (CIBs) per chunk information address block (CAB) (sm_cibs_per_cab) |
@@ -883,7 +883,7 @@ The reaper list entry is 40 bytes in size and consists of:
 | 0 | 4 | | Forward link (fwlink) |
 | 4 | 4 | | Unknown |
 | 8 | 4 | | Type (type) |
-| 12 | 4 | | Block size (blksize) |
+| 12 | 4 | | Block size (blksize), in number of bytes |
 | 16 | 8 | | Object identifier (oid) |
 | 24 | 8 | | Physical address (paddr), which contains a block number relative to the start of the container |
 | 32 | 8 | | Object transaction identifier (xid) |
@@ -942,7 +942,7 @@ The key bag header (kb_locker_t) is 16 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 2 | 2 | Format version (kl_version) |
 | 2 | 2 | | Number of entries (kl_nkeys) |
-| 4 | 4 | | Key bag data size (kl_nbytes), which contains the size of the key bag data, this includes the size of key bag header |
+| 4 | 4 | | Key bag data size (kl_nbytes), in number of bytes and includes the size of key bag header |
 | 8 | 8 | | Unknown (padding) |
 
 ### Key bag entries {#key_bag_entries}
@@ -965,7 +965,7 @@ The key bag entry header (keybag_entry_t) is 24 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 16 | | Volume identifer (ke_uuid), which contains a big-endian UUID |
 | 16 | 2 | | [Entry type](#key_bag_entry_types) (ke_tag) |
-| 18 | 2 | | Entry data size (ke_keylen) |
+| 18 | 2 | | Entry data size (ke_keylen), in number of bytes |
 | 20 | 4 | | Unknown (padding) |
 
 #### Key bag entry types {#key_bag_entry_types}
@@ -1006,7 +1006,7 @@ The key bag packed value is of variable size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | | Value tag (or value type), where the most-significant bit represents a flag |
-| 1 | 1 | | Value data size, where the most-significant bit represents a flag |
+| 1 | 1 | | Value data size, in number of bytes, where the most-significant bit represents a flag |
 | ... | ... | | Value data |
 
 A packed value with a tag and size of 0 signifies the end of the packed values.
@@ -1302,7 +1302,7 @@ The snapshot metadata value (j_snap_metadata_val_t) is of variable size and cons
 | 32 | 8 | | Unknown (inum) |
 | 40 | 4 | | Extent-reference tree [object type](#object_types) (extentref_tree_type) |
 | 44 | 4 | | [Flags](#snapshot_metadata_flags) |
-| 48 | 2 | | Name string size (name_len), which includes the size of the end-of-string character |
+| 48 | 2 | | Name string size (name_len), in number of bytes, which includes the size of the end-of-string character |
 | 50 | ... | | Name string (name), which contains an UTF-8 encoded string with an end-of-string character |
 
 #### Snapshot metadata flags {#snapshot_metadata_flags}
@@ -1331,7 +1331,7 @@ The extent value data (j_phys_ext_val_t) is 20 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Extent size and data type (len_and_kind)*</td> |
-| 0 | 60 bits | | Extent data size |
+| 0 | 60 bits | | Extent size, in number of bytes |
 | 7.4 | 4 bits | | [File system data type](#file_system_data_types) |
 | <td colspan="4">&nbsp;</td> |
 | 8 | 8 | | File system object identifier of owner (owning_obj_id) |
@@ -1454,7 +1454,7 @@ The extended attribute key data (j_xattr_key_t) is of variable size and consists
 | --- | --- | --- | --- |
 | 0 | 60 bits | | File system object identifier (FSOID) |
 | 7.4 | 4 bits | 0x4 | [File system data type](#file_system_data_types) |
-| 8 | 2 | | Name string size (name_len), which includes the size of the end-of-string character |
+| 8 | 2 | | Name string size (name_len), in number of bytes, which includes the size of the end-of-string character |
 | 10 | ... | | [Name string](#extended_attribute_names) (name), which contains an UTF-8 encoded string with an end-of-string character |
 
 > Note that the name of an extended attribute appears to be case senstive even on a case
@@ -1467,7 +1467,7 @@ The extended attribute value data (j_xattr_val_t) is of variable size and consis
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 2 | | [Flags](#extended_attribute_flags) (flags) |
-| 2 | 2 | | Extended attribute data size |
+| 2 | 2 | | Extended attribute data size, in number of bytes |
 | 4 | ... | | Extended attribute data |
 
 > Note that extended attribute data size can contain 0 if the extended attribute flag
@@ -1522,7 +1522,7 @@ The extended attribute data stream (j_xattr_dstream_t) is 48 bytes in size and c
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | | Data stream file system object identifier (xattr_obj_id), which contains the file system object identifier of the file extents that make up the data stream |
-| 8 | 48 | | [Data stream attribute](#data_stream_attribute) |
+| 8 | 48 | | [Data stream descriptor](#data_stream_descriptor) |
 
 ### Sibling link {#sibling_link}
 
@@ -1543,7 +1543,7 @@ The sibling link value data (j_sibling_val_t) is of variable size and consists o
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | | Parent file system object identifier (parent_id) |
-| 8 | 2 | | Name string size (name_len), which includes the size of the end-of-string character |
+| 8 | 2 | | Name string size (name_len), in number of bytes, which includes the size of the end-of-string character |
 | 10 | ... | | Name string (name), which contains an UTF-8 encoded string with an end-of-string character |
 
 ### Data stream identifier {#data_stream_identifier}
@@ -1575,7 +1575,7 @@ The file extent key data (j_file_extent_key_t) is 16 bytes in size and consists 
 | --- | --- | --- | --- |
 | 0 | 60 bits | | File system object identifier (FSOID) |
 | 7.4 | 4 bits | 0x8 | [File system data type](#file_system_data_types) |
-| 8 | 8 | | Logical address (logical_addr), which contains an offset relative to the start of the file entry data |
+| 8 | 8 | | Logical extent offset (or address) (logical_addr), which contains an offset relative to the start of the file entry data |
 
 #### File extent value data
 
@@ -1585,9 +1585,10 @@ The file extent value data (j_file_extent_val_t) is 24 bytes in size and consist
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| <td colspan="4">*Extent data size and flags (len_and_flags)*</td> |
-| 0 | 7 | | Extent data size |
+| <td colspan="4">*Extent size and flags (len_and_flags)*</td> |
+| 0 | 7 | | Extent size, in number of bytes |
 | 7 | 1 | | [Flags](#file_extent_flags) |
+| <td colspan="4">&nbsp;</td> |
 | 8 | 8 | | Physical block number (phys_block_num), which contains a block number relative to the start of the container |
 | 16 | 8 | | Encryption identifier (crypto_id), which contains an unknown value and 0 if not set |
 
@@ -1599,8 +1600,9 @@ The file extent value data (j_file_extent_val_t) is 24 bytes in size and consist
 | --- | --- | --- |
 | 0x01 | | Unknown (Is encrypted?) |
 
-> Note at according to the Apple File System Reference documentation there are currently no flags
-> defined. It also refers to `len_and_flags` as `len_and_kind` interchangeably.
+> Note that according to the Apple File System Reference documentation there are currently no flags
+> defined. The reference documentation also refers to `len_and_flags` as `len_and_kind`
+> interchangeably.
 
 ### Directory record {#directory_record}
 
@@ -1632,7 +1634,7 @@ The directory record key data with name (j_drec_key_t) is of variable size and c
 | 0 | 60 bits | | File system object identifier (FSOID) |
 | 7.4 | 4 bits | 0x9 | [File system data type](#file_system_data_types) |
 | <td colspan="4">&nbsp;</td> |
-| 8 | 2 | | Name string size (name_len), which includes the size of the end-of-string character |
+| 8 | 2 | | Name string size (name_len), in number of bytes, which includes the size of the end-of-string character |
 | 10 | ... | | Name string (name), which contains an UTF-8 encoded string with an end-of-string character |
 
 <!-- rumdl-enable MD033 MD056 -->
@@ -1650,7 +1652,7 @@ consists of:
 | 0 | 60 bits | | File system object identifier (FSOID) |
 | 7.4 | 4 bits | 0x9 | [File system data type](#file_system_data_types) |
 | <td colspan="4">*Name string size and hash (name_len_and_hash)*</td> |
-| 8 | 11 bits | | Name string size, which includes the size of the end-of-string character |
+| 8 | 11 bits | | Name string size, in number of bytes, which includes the size of the end-of-string character |
 | 9.3 | 21 bits | | [Name hash](#directory_entry_name_hash) |
 | <td colspan="4">&nbsp;</td> |
 | 12 | ... | | Name string (name), which contains an UTF-8 encoded string with an end-of-string character |
@@ -1726,7 +1728,7 @@ The directory stats value data (j_dir_stats_val_t) is 32 bytes in size and consi
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | | Number of children (num_children) |
-| 8 | 8 | | Total size (total_size) |
+| 8 | 8 | | Total size (total_size), in number of bytes |
 | 16 | 8 | | Parent directory file system object identifier (chained_key) |
 | 24 | 8 | | Generation count (gen_count) |
 
@@ -1770,10 +1772,10 @@ The extended fields (xf_blob_t) consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 2 | | Number of extended fields (xf_num_exts) |
-| 2 | 2 | | Extended field value data size (xf_used_data) |
-| <td colspan="4">*Extended field data (xf_data)*</td> |
+| 2 | 2 | | Extended fields data size (xf_used_data), in number of bytes |
+| <td colspan="4">*Extended fields data (xf_data)*</td> |
 | 4 | ... | | Array of [extended field descriptors](#extended_field_descriptor) |
-| ... | ... | | Extended field value data |
+| ... | ... | | Extended fields data |
 
 <!-- rumdl-enable MD033 MD056 -->
 
@@ -1787,7 +1789,7 @@ An extended field descriptor (x_field_t) is 4 bytes in size and consists of:
 | --- | --- | --- | --- |
 | 0 | 1 | | [Extended field type](#extended_field_types) (x_type) |
 | 1 | 1 | | [Extended field flags](#extended_field_flags) (x_flags) |
-| 2 | 2 | | Extended field data size (x_size) |
+| 2 | 2 | | Extended field data size (x_size), in number of bytes |
 
 #### Extended field types {#extended_field_types}
 
@@ -1805,10 +1807,10 @@ An extended field descriptor (x_field_t) is 4 bytes in size and consists of:
 | 2 | INO_EXT_TYPE_DELTA_TREE_OID | Object identifier of the snapshot extent delta list, where the extended field data contains a 64-bit integer value |
 | 3 | INO_EXT_TYPE_DOCUMENT_ID | Document identifier, where the extended field data contains a 32-bit integer value |
 | 4 | INO_EXT_TYPE_NAME | Filename, where the extended field data contains an UTF-8 string with end-of-string character |
-| 5 | INO_EXT_TYPE_PREV_FSIZE | Previous file size, where the extended field data contains a 64-bit integer value |
+| 5 | INO_EXT_TYPE_PREV_FSIZE | Previous file size, in number of bytes, where the extended field data contains a 64-bit integer value |
 | 6 | INO_EXT_TYPE_RESERVED_6 | Unknown (Reserved) |
 | 7 | INO_EXT_TYPE_FINDER_INFO | Finder information, where the extended field data contains a 32-bit integer value |
-| 8 | INO_EXT_TYPE_DSTREAM | Data stream, where the extended field data contains a [data stream attribute](#data_stream_attribute) |
+| 8 | INO_EXT_TYPE_DSTREAM | Data stream, where the extended field data contains a [data stream descriptor](#data_stream_descriptor) |
 | 9 | INO_EXT_TYPE_RESERVED_9 | Unknown (Reserved) |
 | 10 | INO_EXT_TYPE_DIR_STATS_KEY | Directory statistics; it is unknown if the extended field data contains an object identifier of the directory statistics or a j_dir_stats_val_t structure, seen 8 byte value |
 | 11 | INO_EXT_TYPE_FS_UUID | Mounted file system identifier, where the extended field data contains a 128-bit UUID value |
@@ -1875,14 +1877,14 @@ The "bsdos" alternative device identifier is 4 bytes in size and consists of:
 | 1.0 | 12 bits | | Unit number |
 | 2.4 | 12 bits | | Major device number |
 
-### Data stream attribute {#data_stream_attribute}
+### Data stream descriptor {#data_stream_descriptor}
 
-The data stream attribute (j_dstream_t) is 40 bytes in size and consist of:
+The data stream descriptor (j_dstream_t) is 40 bytes in size and consist of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | Used size (size) |
-| 8 | 8 | | Allocated size (alloced_size) |
+| 0 | 8 | | Used size (size), in number of bytes |
+| 8 | 8 | | Allocated size (alloced_size), in number of bytes |
 | 16 | 8 | | (Default) encryption identifier (default_crypto_id) |
 | 24 | 8 | | Total number of bytes written to data stream (total_bytes_written) |
 | 32 | 8 | | Total number of bytes read from data stream (total_bytes_written) |

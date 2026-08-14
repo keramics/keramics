@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use crate::types::FileEntriesIterator;
+use crate::file_entries_iterator::FileEntriesIterator;
 
 use super::file_entry::HfsFileEntry;
 

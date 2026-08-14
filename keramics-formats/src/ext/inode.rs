@@ -17,7 +17,7 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
-use crate::types::IndexedHashMap;
+use crate::indexed_hash_map::IndexedHashMap;
 
 use super::attributes_entry::ExtAttributesEntry;
 use super::block_numbers_tree::ExtBlockNumbersTree;

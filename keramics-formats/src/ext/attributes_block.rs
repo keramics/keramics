@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, DebugTrace, ErrorTrace};
 use keramics_types::ByteString;
 
-use crate::types::IndexedHashMap;
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::util::calculate_alignment_padding;
 
 use super::attributes_block_header::ExtAttributesBlockHeader;
