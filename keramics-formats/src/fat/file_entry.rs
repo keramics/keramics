@@ -20,6 +20,7 @@ use crate::path_component::PathComponent;
 use crate::traits::FileEntryIterator;
 
 use super::block_allocation_table::FatBlockAllocationTable;
+use super::block_reader::FatBlockReader;
 use super::block_stream::FatBlockStream;
 use super::constants::*;
 use super::directory_entries::FatDirectoryEntries;
@@ -133,21 +134,21 @@ impl FatFileEntry {
             ),
             None => (0, 0),
         };
-        let mut block_stream: FatBlockStream =
-            FatBlockStream::new(self.block_allocation_table.cluster_block_size, data_size);
-
-        match block_stream.open(
+        let mut block_reader: FatBlockReader = FatBlockReader::new(
             &self.data_stream,
-            &self.block_allocation_table,
-            data_start_cluster as u32,
-        ) {
+            self.block_allocation_table.cluster_block_size,
+            data_size,
+        );
+        match block_reader.open(&self.block_allocation_table, data_start_cluster as u32) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
                 return Err(error);
             }
         }
-        Ok(Some(Arc::new(RwLock::new(block_stream))))
+        Ok(Some(Arc::new(RwLock::new(FatBlockStream::new(
+            block_reader,
+        )))))
     }
 
     /// Retrieves a sub file entries iterator.

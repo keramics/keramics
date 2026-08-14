@@ -13,6 +13,7 @@
 
 mod block_allocation_table;
 mod block_range;
+mod block_reader;
 mod block_stream;
 mod boot_record;
 mod boot_record_fat12;

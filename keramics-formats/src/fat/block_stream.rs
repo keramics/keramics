@@ -11,242 +11,22 @@
  * under the License.
  */
 
-use std::collections::HashSet;
-use std::io::SeekFrom;
-use std::sync::Arc;
+use crate::block_stream::BlockStream;
 
-use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
-
-use crate::block_tree::BlockTree;
-
-use super::block_allocation_table::FatBlockAllocationTable;
-use super::block_range::FatBlockRange;
+use super::block_reader::FatBlockReader;
 
 /// File Allocation Table (FAT) block stream.
-pub struct FatBlockStream {
-    /// The data stream.
-    data_stream: Option<DataStreamReference>,
-
-    /// Block size.
-    block_size: u32,
-
-    /// Block tree.
-    block_tree: BlockTree<FatBlockRange>,
-
-    /// The current offset.
-    current_offset: u64,
-
-    /// The size.
-    size: u64,
-}
-
-impl FatBlockStream {
-    /// Creates a new block stream.
-    pub(super) fn new(block_size: u32, size: u32) -> Self {
-        Self {
-            data_stream: None,
-            block_size,
-            block_tree: BlockTree::<FatBlockRange>::new(0, 0, 0),
-            current_offset: 0,
-            size: size as u64,
-        }
-    }
-
-    /// Opens a block stream.
-    pub(super) fn open(
-        &mut self,
-        data_stream: &DataStreamReference,
-        block_allocation_table: &Arc<FatBlockAllocationTable>,
-        mut cluster_block_number: u32,
-    ) -> Result<(), ErrorTrace> {
-        let largest_cluster_block_number: u32 =
-            block_allocation_table.get_largest_cluster_block_number();
-
-        let block_tree_data_size: u64 =
-            self.size.div_ceil(self.block_size as u64) * (self.block_size as u64);
-        self.block_tree =
-            BlockTree::<FatBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
-
-        let mut read_cluster_block_numbers: HashSet<u32> = HashSet::new();
-        let mut logical_offset: u64 = 0;
-
-        while cluster_block_number >= 2 && cluster_block_number < largest_cluster_block_number {
-            if read_cluster_block_numbers.contains(&cluster_block_number) {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Cluster block: {} already read",
-                    cluster_block_number
-                )));
-            }
-            let physical_offset: u64 = block_allocation_table.first_cluster_offset
-                + (((cluster_block_number - 2) as u64)
-                    * (block_allocation_table.cluster_block_size as u64));
-
-            // TODO: merge successive blocks into a single range
-            let block_range: FatBlockRange =
-                FatBlockRange::new(logical_offset, physical_offset, self.block_size);
-
-            match self
-                .block_tree
-                .insert_value(logical_offset, self.block_size as u64, block_range)
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-            logical_offset += self.block_size as u64;
-
-            read_cluster_block_numbers.insert(cluster_block_number);
-
-            cluster_block_number =
-                match block_allocation_table.read_entry(data_stream, cluster_block_number) {
-                    Ok(entry) => entry,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to read next cluster block number from block allocation table"
-                        );
-                        return Err(error);
-                    }
-                };
-        }
-        self.data_stream = Some(data_stream.clone());
-
-        Ok(())
-    }
-
-    /// Reads media data based on the block ranges.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
-        let read_size: usize = data.len();
-        let mut data_offset: usize = 0;
-        let mut current_offset: u64 = self.current_offset;
-
-        while data_offset < read_size {
-            if current_offset >= self.size {
-                break;
-            }
-            let block_range: &FatBlockRange = match self.block_tree.get_value(current_offset) {
-                Ok(Some(value)) => value,
-                Ok(None) => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        current_offset, current_offset
-                    )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            current_offset, current_offset
-                        )
-                    );
-                    return Err(error);
-                }
-            };
-            let range_relative_offset: u64 = current_offset - block_range.logical_offset;
-            let range_remainder_size: u64 = (block_range.size as u64) - range_relative_offset;
-
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
-            let data_end_offset: usize = data_offset + range_read_size;
-
-            let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-                Some(data_stream) => data_stream,
-                None => {
-                    return Err(keramics_core::error_trace_new!("Missing data stream"));
-                }
-            };
-            let range_read_count: usize = keramics_core::data_stream_read_at_position!(
-                data_stream,
-                &mut data[data_offset..data_end_offset],
-                SeekFrom::Start(block_range.physical_offset + range_relative_offset)
-            );
-            if range_read_count == 0 {
-                break;
-            }
-            data_offset += range_read_count;
-            current_offset += range_read_count as u64;
-        }
-        Ok(data_offset)
-    }
-}
-
-impl DataStream for FatBlockStream {
-    /// Retrieves the current position.
-    fn get_offset(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.current_offset)
-    }
-
-    /// Retrieves the size of the data.
-    fn get_size(&mut self) -> Result<u64, ErrorTrace> {
-        Ok(self.size)
-    }
-
-    /// Reads data at the current position.
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace> {
-        if self.current_offset >= self.size {
-            return Ok(0);
-        }
-        let remaining_size: u64 = self.size - self.current_offset;
-        let mut read_size: usize = buf.len();
-
-        if (read_size as u64) > remaining_size {
-            read_size = remaining_size as usize;
-        }
-        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                return Err(error);
-            }
-        };
-        self.current_offset += read_count as u64;
-
-        Ok(read_count)
-    }
-
-    /// Sets the current position of the data.
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64, ErrorTrace> {
-        self.current_offset = match pos {
-            SeekFrom::Current(relative_offset) => {
-                match self.current_offset.checked_add_signed(relative_offset) {
-                    Some(offset) => offset,
-                    None => {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid offset value out of bounds"
-                        ));
-                    }
-                }
-            }
-            SeekFrom::End(relative_offset) => match self.size.checked_add_signed(relative_offset) {
-                Some(offset) => offset,
-                None => {
-                    return Err(keramics_core::error_trace_new!(
-                        "Invalid offset value out of bounds"
-                    ));
-                }
-            },
-            SeekFrom::Start(offset) => offset,
-        };
-        Ok(self.current_offset)
-    }
-}
+pub type FatBlockStream = BlockStream<FatBlockReader>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    use std::io::SeekFrom;
     use std::path::PathBuf;
+    use std::sync::Arc;
 
-    use keramics_core::open_os_data_stream;
+    use keramics_core::{DataStream, DataStreamReference, ErrorTrace, open_os_data_stream};
 
     use crate::fat::block_allocation_table::FatBlockAllocationTable;
     use crate::fat::enums::FatFormat;
@@ -254,39 +34,19 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_block_stream() -> Result<FatBlockStream, ErrorTrace> {
-        let mut block_stream = FatBlockStream::new(2048, 11358);
-
         let path_string: String = get_test_data_path("fat/fat12.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let block_allocation_table: Arc<FatBlockAllocationTable> = Arc::new(
-            FatBlockAllocationTable::new(&FatFormat::Fat12, 512, 244, 23040, 2048),
-        );
-
-        block_stream.open(&data_stream, &block_allocation_table, 5)?;
-
-        Ok(block_stream)
-    }
-
-    #[test]
-    fn test_open() -> Result<(), ErrorTrace> {
-        let mut block_stream = FatBlockStream::new(2048, 11358);
-
-        let path_string: String = get_test_data_path("fat/fat12.raw");
-        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
-        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        let mut block_reader = FatBlockReader::new(&data_stream, 2048, 11358);
 
         let block_allocation_table: Arc<FatBlockAllocationTable> = Arc::new(
             FatBlockAllocationTable::new(&FatFormat::Fat12, 512, 244, 23040, 2048),
         );
+        block_reader.open(&block_allocation_table, 5)?;
 
-        block_stream.open(&data_stream, &block_allocation_table, 5)?;
-
-        Ok(())
+        Ok(FatBlockStream::new(block_reader))
     }
-
-    // TODO: add tests for read_data_from_blocks
 
     // TODO: add tests for get_offset.
 
@@ -313,9 +73,10 @@ mod tests {
     #[test]
     fn test_seek_from_end() -> Result<(), ErrorTrace> {
         let mut block_stream: FatBlockStream = get_block_stream()?;
+        let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(-512))?;
-        assert_eq!(offset, (block_stream.size as u64) - 512);
+        assert_eq!(offset, size - 512);
 
         Ok(())
     }
@@ -346,9 +107,10 @@ mod tests {
     #[test]
     fn test_seek_beyond_size() -> Result<(), ErrorTrace> {
         let mut block_stream: FatBlockStream = get_block_stream()?;
+        let size: u64 = block_stream.get_size()?;
 
         let offset: u64 = block_stream.seek(SeekFrom::End(512))?;
-        assert_eq!(offset, (block_stream.size as u64) + 512);
+        assert_eq!(offset, size + 512);
 
         Ok(())
     }
