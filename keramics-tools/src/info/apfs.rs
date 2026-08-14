@@ -556,7 +556,7 @@ impl ApfsInfo {
 
         file_entry_information.identifier = file_entry.get_identifier();
         file_entry_information.name = file_entry.get_name().cloned();
-        // TODO: file_entry_information.size = file_entry.get_size();
+        file_entry_information.size = file_entry.get_size();
         file_entry_information.creation_time = file_entry.get_creation_time().clone();
         file_entry_information.modification_time = file_entry.get_modification_time().clone();
         file_entry_information.access_time = file_entry.get_access_time().clone();
@@ -801,6 +801,7 @@ impl ApfsInfo {
                 }
             };
             let volume_identifier: &Uuid = apfs_volume.get_identifier();
+            let volume_path_component: String = format!("{{{}}}", volume_identifier);
 
             let apfs_file_system: ApfsFileSystem = match apfs_volume.get_file_system() {
                 Ok(file_system) => file_system,
@@ -828,7 +829,7 @@ impl ApfsInfo {
                     return Err(error);
                 }
             };
-            let mut path_components: Vec<String> = vec![format!("{{{}}}", volume_identifier)];
+            let mut path_components: Vec<String> = vec![volume_path_component];
 
             match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
                 Ok(_) => {}
@@ -850,7 +851,7 @@ impl ApfsInfo {
         path_components: &mut Vec<String>,
     ) -> Result<(), ErrorTrace> {
         let path: String = if file_entry.is_root_directory() {
-            String::from("/")
+            format!("/{}/", path_components.join("/"))
         } else {
             let name_string: String = match file_entry.get_name() {
                 Some(name) => name.to_string(),
@@ -940,7 +941,7 @@ mod tests {
 
         assert_eq!(test_struct.identifier, 18);
         assert_eq!(test_struct.name, Some(ByteString::from("testfile1")));
-        assert_eq!(test_struct.size, 0);
+        assert_eq!(test_struct.size, 9);
         assert_eq!(
             test_struct.creation_time,
             DateTime::ApfsTime(ApfsTime {

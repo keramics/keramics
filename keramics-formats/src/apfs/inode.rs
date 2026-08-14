@@ -14,7 +14,12 @@
 use keramics_core::ErrorTrace;
 use keramics_datetime::{ApfsTime, DateTime};
 use keramics_layout_map::LayoutMap;
-use keramics_types::{bytes_to_i64_le, bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
+use keramics_types::{
+    ByteString, bytes_to_i64_le, bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le,
+};
+
+use super::data_stream_descriptor::ApfsDataStreamDescriptor;
+use super::extended_fields::ApfsExtendedFields;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -44,6 +49,9 @@ pub struct ApfsInode {
     /// Parent identifier.
     pub parent_identifier: u64,
 
+    /// Data stream identifier.
+    pub data_stream_identifier: u64,
+
     /// Modification date and time.
     pub modification_time: DateTime,
 
@@ -67,6 +75,12 @@ pub struct ApfsInode {
 
     /// File mode.
     pub file_mode: u16,
+
+    /// Name.
+    pub name: Option<ByteString>,
+
+    /// Data stream descriptor.
+    pub data_stream_descriptor: Option<ApfsDataStreamDescriptor>,
 }
 
 impl ApfsInode {
@@ -74,6 +88,7 @@ impl ApfsInode {
     pub fn new() -> Self {
         Self {
             parent_identifier: 0,
+            data_stream_identifier: 0,
             modification_time: DateTime::NotSet,
             creation_time: DateTime::NotSet,
             change_time: DateTime::NotSet,
@@ -82,29 +97,75 @@ impl ApfsInode {
             owner_identifier: 0,
             group_identifier: 0,
             file_mode: 0,
+            name: None,
+            data_stream_descriptor: None,
         }
     }
 
     /// Reads the value from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 98 {
+        let data_size: usize = data.len();
+
+        if data_size < 98 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.parent_identifier = bytes_to_u64_le!(data, 0);
+        self.data_stream_identifier = bytes_to_u64_le!(data, 8);
 
         let timestamp: i64 = bytes_to_i64_le!(data, 16);
         self.modification_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
+
         let timestamp: i64 = bytes_to_i64_le!(data, 24);
         self.creation_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
+
         let timestamp: i64 = bytes_to_i64_le!(data, 32);
         self.change_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
+
         let timestamp: i64 = bytes_to_i64_le!(data, 40);
         self.access_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
+
         self.number_of_links = bytes_to_u32_le!(data, 56);
         self.owner_identifier = bytes_to_u32_le!(data, 72);
         self.group_identifier = bytes_to_u32_le!(data, 76);
         self.file_mode = bytes_to_u16_le!(data, 80);
 
+        if data_size >= 96 {
+            let mut extended_fields: ApfsExtendedFields = ApfsExtendedFields::new();
+
+            match extended_fields.read_data(&data, 92) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read extended fields");
+                    return Err(error);
+                }
+            }
+            self.name = match extended_fields.get(&4) {
+                Some(field_data) => Some(ByteString::from(field_data)),
+                None => None,
+            };
+            self.data_stream_descriptor = match extended_fields.get(&8) {
+                Some(field_data) => {
+                    keramics_core::debug_trace_structure!(
+                        ApfsDataStreamDescriptor::debug_read_data(&field_data,)
+                    );
+                    let mut data_stream_descriptor: ApfsDataStreamDescriptor =
+                        ApfsDataStreamDescriptor::new();
+
+                    match data_stream_descriptor.read_data(field_data) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to read data stream descriptor"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    Some(data_stream_descriptor)
+                }
+                None => None,
+            };
+        }
         Ok(())
     }
 }
@@ -134,6 +195,7 @@ mod tests {
         test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.parent_identifier, 1);
+        assert_eq!(test_struct.data_stream_identifier, 2);
         assert_eq!(
             test_struct.modification_time,
             DateTime::ApfsTime(ApfsTime {

@@ -25,6 +25,7 @@ use crate::traits::FileEntryIterator;
 
 use super::attributes_block::ExtAttributesBlock;
 use super::attributes_entry::ExtAttributesEntry;
+use super::block_reader::ExtBlockReader;
 use super::block_stream::ExtBlockStream;
 use super::constants::*;
 use super::directory_entries::ExtDirectoryEntries;
@@ -114,17 +115,19 @@ impl ExtFileEntry {
                 .div_ceil(self.inode_table.block_size as u64),
             self.inode.number_of_blocks,
         );
-        let mut block_stream: ExtBlockStream =
-            ExtBlockStream::new(self.inode_table.block_size, self.inode.data_size);
-
-        match block_stream.open(&self.data_stream, number_of_blocks, block_ranges) {
+        let mut block_reader: ExtBlockReader = ExtBlockReader::new(
+            &self.data_stream,
+            self.inode_table.block_size,
+            self.inode.data_size,
+        );
+        match block_reader.open(number_of_blocks, block_ranges) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
                 return Err(error);
             }
         }
-        Ok(block_stream)
+        Ok(ExtBlockStream::new(block_reader))
     }
 
     /// Retrieves the change time.

@@ -16,7 +16,7 @@ use std::collections::HashSet;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u32_be;
 
-use crate::types::IndexedHashMap;
+use crate::indexed_hash_map::IndexedHashMap;
 
 use super::attribute_extents_record::HfsAttributeExtentsRecord;
 use super::attribute_fork_data_record::HfsAttributeForkDataRecord;

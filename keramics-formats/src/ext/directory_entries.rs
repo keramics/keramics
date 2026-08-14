@@ -13,7 +13,7 @@
 
 use keramics_types::ByteString;
 
-use crate::types::IndexedHashMap;
+use crate::indexed_hash_map::IndexedHashMap;
 
 use super::directory_entry::ExtDirectoryEntry;
 

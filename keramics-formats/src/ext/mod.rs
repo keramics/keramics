@@ -16,6 +16,7 @@ mod attributes_block_header;
 mod attributes_entry;
 mod block_numbers_tree;
 mod block_range;
+mod block_reader;
 mod block_stream;
 pub mod constants;
 mod directory_entries;

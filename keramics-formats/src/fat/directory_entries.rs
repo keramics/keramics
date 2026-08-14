@@ -18,8 +18,8 @@ use std::sync::Arc;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{ByteString, Ucs2CharacterMappings, Ucs2String};
 
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
-use crate::types::IndexedHashMap;
 
 use super::block_allocation_table::FatBlockAllocationTable;
 use super::constants::*;

@@ -13,18 +13,19 @@
 
 use std::sync::{Arc, RwLock};
 
-use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
+use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
 use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader};
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 use crate::traits::FileEntryIterator;
-use crate::types::IndexedHashMap;
 
 use super::attribute_record::HfsAttributeRecord;
 use super::attributes_file::HfsAttributesFile;
 use super::block_ranges::HfsBlockRanges;
+use super::block_reader::HfsBlockReader;
 use super::block_stream::HfsBlockStream;
 use super::catalog_file::HfsCatalogFile;
 use super::constants::*;
@@ -152,11 +153,10 @@ impl HfsFileEntry {
                 return Err(error);
             }
         }
-        let mut block_stream: HfsBlockStream =
-            HfsBlockStream::new(self.block_size, fork_descriptor.size);
+        let mut block_reader: HfsBlockReader =
+            HfsBlockReader::new(&self.data_stream, self.block_size, fork_descriptor.size);
 
-        match block_stream.open(
-            &self.data_stream,
+        match block_reader.open(
             fork_descriptor.number_of_blocks as u64,
             &block_ranges.ranges,
         ) {
@@ -166,7 +166,7 @@ impl HfsFileEntry {
                 return Err(error);
             }
         }
-        Ok(block_stream)
+        Ok(HfsBlockStream::new(block_reader))
     }
 
     /// Retrieves the change time.
@@ -272,7 +272,7 @@ impl HfsFileEntry {
             };
             let mut data: Vec<u8> = vec![0; fork_descriptor.size as usize];
 
-            match block_stream.read_data_from_blocks(&mut data) {
+            match block_stream.read(&mut data) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

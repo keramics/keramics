@@ -21,15 +21,18 @@ use keramics_types::{
     ByteString, Utf16CharacterMappings, Utf16String, bytes_to_u16_le, bytes_to_u64_le,
 };
 
+use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
-use crate::types::IndexedHashMap;
 
 use super::attribute_record::ApfsAttributeRecord;
 use super::btree_node::ApfsBtreeNode;
 use super::constants::*;
 use super::directory_entry::ApfsDirectoryEntry;
 use super::directory_record::ApfsDirectoryRecord;
+use super::extent::ApfsExtent;
+use super::extent_record::ApfsExtentRecord;
 use super::file_system_key::ApfsFileSystemKey;
+use super::file_system_key_with_extent::ApfsFileSystemKeyWithExtent;
 use super::file_system_key_with_name::ApfsFileSystemKeyWithName;
 use super::file_system_key_with_name_and_hash::ApfsFileSystemKeyWithNameAndHash;
 use super::inode::ApfsInode;
@@ -298,7 +301,7 @@ impl ApfsFileSystemTree {
         Ok(())
     }
 
-    /// Retrieves attributes from a node.
+    /// Retrieves attributes from a sub node.
     fn get_attributes_by_identifier_from_sub_node(
         &self,
         data_stream: &DataStreamReference,
@@ -565,7 +568,7 @@ impl ApfsFileSystemTree {
         Ok(())
     }
 
-    /// Retrieves directory entries from a node.
+    /// Retrieves directory entries from a sub node.
     fn get_directory_entries_by_identifier_from_sub_node(
         &self,
         data_stream: &DataStreamReference,
@@ -958,6 +961,262 @@ impl ApfsFileSystemTree {
         }
     }
 
+    /// Retrieves extents.
+    pub fn get_extents_by_identifier(
+        &self,
+        data_stream: &DataStreamReference,
+        object_map_tree: &Arc<ApfsObjectMapTree>,
+        object_identifier: u64,
+        object_transaction_identifier: u64,
+        extents: &mut Vec<ApfsExtent>,
+    ) -> Result<(), ErrorTrace> {
+        let mut read_node_block_numbers: HashSet<u64> = HashSet::new();
+
+        match self.get_extents_by_identifier_from_node(
+            data_stream,
+            object_map_tree,
+            self.root_block_number,
+            object_identifier,
+            object_transaction_identifier,
+            extents,
+            &mut read_node_block_numbers,
+        ) {
+            Ok(result) => Ok(result),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve extents from root node"
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Retrieves extents from a node.
+    fn get_extents_by_identifier_from_node(
+        &self,
+        data_stream: &DataStreamReference,
+        object_map_tree: &Arc<ApfsObjectMapTree>,
+        block_number: u64,
+        object_identifier: u64,
+        object_transaction_identifier: u64,
+        extents: &mut Vec<ApfsExtent>,
+        read_node_block_numbers: &mut HashSet<u64>,
+    ) -> Result<(), ErrorTrace> {
+        if read_node_block_numbers.contains(&block_number) {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Node: {} already read",
+                block_number
+            )));
+        }
+        let node: ApfsBtreeNode = match self.get_node_by_number(data_stream, block_number) {
+            Ok(node) => node,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve node: {}", block_number)
+                );
+                return Err(error);
+            }
+        };
+        if node.object_header.object_type == 0x00000000 {
+            return Ok(());
+        }
+        match self.check_node(block_number, &node) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Check of node: {} failed", block_number)
+                );
+                return Err(error);
+            }
+        }
+        let is_branch: bool = node.is_branch();
+
+        let mut last_entry_index: usize = 0;
+
+        let mut entry_index: usize = 0;
+        let number_of_entries: usize = node.entries.len();
+
+        while entry_index < number_of_entries {
+            let key_data: &[u8] = match node.get_key_data_by_index(entry_index) {
+                Some(key_data) => key_data,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to retrieve entry: {} key data",
+                        entry_index
+                    )));
+                }
+            };
+            keramics_core::debug_trace_structure!(ApfsFileSystemKey::debug_read_data(key_data));
+
+            let mut key: ApfsFileSystemKey = ApfsFileSystemKey::new();
+
+            match key.read_data(&key_data) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read key");
+                    return Err(error);
+                }
+            }
+            if !is_branch {
+                if key.object_identifier == object_identifier
+                    && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT
+                {
+                    match self.read_extent(&node, &key_data, entry_index) {
+                        Ok(extent) => {
+                            extents.push(extent);
+                        }
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to read extent entry: {}", entry_index)
+                            );
+                            return Err(error);
+                        }
+                    }
+                }
+            } else if entry_index > 0 {
+                match self.get_extents_by_identifier_from_sub_node(
+                    data_stream,
+                    object_map_tree,
+                    &node,
+                    last_entry_index,
+                    object_identifier,
+                    object_transaction_identifier,
+                    extents,
+                    read_node_block_numbers,
+                ) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to retrieve extents from entry: {}",
+                                last_entry_index
+                            )
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            if (key.object_identifier > object_identifier)
+                || (key.object_identifier == object_identifier
+                    && key.data_type > APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT)
+            {
+                break;
+            }
+            last_entry_index = entry_index;
+
+            entry_index += 1;
+        }
+        if is_branch {
+            if entry_index == 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "Invalid entry index value out of bounds"
+                ));
+            }
+            match self.get_extents_by_identifier_from_sub_node(
+                data_stream,
+                object_map_tree,
+                &node,
+                last_entry_index,
+                object_identifier,
+                object_transaction_identifier,
+                extents,
+                read_node_block_numbers,
+            ) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to retrieve extents from entry: {}",
+                            last_entry_index
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Retrieves extents from a sub node.
+    fn get_extents_by_identifier_from_sub_node(
+        &self,
+        data_stream: &DataStreamReference,
+        object_map_tree: &Arc<ApfsObjectMapTree>,
+        node: &ApfsBtreeNode,
+        entry_index: usize,
+        object_identifier: u64,
+        object_transaction_identifier: u64,
+        extents: &mut Vec<ApfsExtent>,
+        read_node_block_numbers: &mut HashSet<u64>,
+    ) -> Result<(), ErrorTrace> {
+        let value_data: &[u8] = match node.get_value_data_by_index(entry_index) {
+            Some(value_data) => value_data,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve entry: {} value data",
+                    entry_index
+                )));
+            }
+        };
+        if value_data.len() < 8 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported value data size"
+            ));
+        }
+        let sub_node_object_identifier: u64 = bytes_to_u64_le!(value_data, 0);
+
+        let object_map_value: ApfsObjectMapValue = match object_map_tree.get_value_by_identifier(
+            data_stream,
+            sub_node_object_identifier,
+            object_transaction_identifier,
+        ) {
+            Ok(Some(object_map_value)) => object_map_value,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing object map value of file system sub node object: {}",
+                    sub_node_object_identifier
+                )));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve object map value of file system sub node object: {}",
+                        sub_node_object_identifier
+                    )
+                );
+                return Err(error);
+            }
+        };
+        match self.get_extents_by_identifier_from_node(
+            data_stream,
+            object_map_tree,
+            object_map_value.physical_address,
+            object_identifier,
+            object_transaction_identifier,
+            extents,
+            read_node_block_numbers,
+        ) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to retrieve extents from node: {} block: {}",
+                        sub_node_object_identifier, object_map_value.physical_address
+                    )
+                );
+                Err(error)
+            }
+        }
+    }
+
     /// Retrieves a specific inode.
     pub fn get_inode_by_identifier(
         &self,
@@ -979,6 +1238,7 @@ impl ApfsFileSystemTree {
         ) {
             Ok(Some(value_data)) => {
                 keramics_core::debug_trace_structure!(ApfsInode::debug_read_data(&value_data));
+
                 let mut inode: ApfsInode = ApfsInode::new();
 
                 match inode.read_data(&value_data) {
@@ -1282,6 +1542,61 @@ impl ApfsFileSystemTree {
             }
         }
         Ok(ApfsDirectoryEntry::new(directory_record))
+    }
+
+    /// Reads an extent.
+    fn read_extent(
+        &self,
+        node: &ApfsBtreeNode,
+        key_data: &[u8],
+        entry_index: usize,
+    ) -> Result<ApfsExtent, ErrorTrace> {
+        let key_data_size: usize = key_data.len();
+
+        if key_data_size < 10 {
+            return Err(keramics_core::error_trace_new!("Unsupported key data size"));
+        }
+        keramics_core::debug_trace_structure!(ApfsFileSystemKeyWithExtent::debug_read_data(
+            key_data
+        ));
+        let mut key: ApfsFileSystemKeyWithExtent = ApfsFileSystemKeyWithExtent::new();
+
+        match key.read_data(&key_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to read extent key: {}", entry_index)
+                );
+                return Err(error);
+            }
+        }
+        let value_data: &[u8] = match node.get_value_data_by_index(entry_index) {
+            Some(value_data) => value_data,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve entry: {} value data",
+                    entry_index
+                )));
+            }
+        };
+        keramics_core::debug_trace_structure!(ApfsDirectoryRecord::debug_read_data(&value_data));
+
+        let mut extent_record: ApfsExtentRecord = ApfsExtentRecord::new();
+
+        match extent_record.read_data(&value_data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read extent record");
+                return Err(error);
+            }
+        }
+        Ok(ApfsExtent::new(
+            key.extent_offset,
+            extent_record.extent_size,
+            extent_record.physical_block_number,
+            extent_record.encryption_identifier,
+        ))
     }
 
     /// Reads a name.
