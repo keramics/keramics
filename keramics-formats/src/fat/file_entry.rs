@@ -142,7 +142,7 @@ impl FatFileEntry {
         match block_reader.open(&self.block_allocation_table, data_start_cluster as u32) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
                 return Err(error);
             }
         }

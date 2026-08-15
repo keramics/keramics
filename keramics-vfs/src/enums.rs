@@ -29,6 +29,8 @@ pub enum VfsFileType {
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum VfsType {
+    Apfs,
+    ApfsContainer,
     Apm,
     Ext,
     Ewf,
@@ -54,6 +56,8 @@ impl fmt::Display for VfsType {
     /// Formats the VFS type for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         let string: &str = match self {
+            VfsType::Apfs => "APFS",
+            VfsType::ApfsContainer => "APFS (Container)",
             VfsType::Apm => "APM",
             VfsType::Ext => "EXT",
             VfsType::Ewf => "EWF",
@@ -84,6 +88,14 @@ mod tests {
 
     #[test]
     fn test_vfs_type_fmt() {
+        let vfs_type: VfsType = VfsType::Apfs;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "APFS");
+
+        let vfs_type: VfsType = VfsType::ApfsContainer;
+        let string: String = vfs_type.to_string();
+        assert_eq!(string, "APFS (Container)");
+
         let vfs_type: VfsType = VfsType::Apm;
         let string: String = vfs_type.to_string();
         assert_eq!(string, "APM");

@@ -64,6 +64,12 @@ impl Bodyfile {
 
         let string: String = match date_time {
             Some(date_time) => match date_time {
+                DateTime::ApfsTime(apfs_time) => {
+                    let number_of_seconds: i64 = apfs_time.timestamp / 1000000000;
+                    let fraction: i64 = apfs_time.timestamp % 1000000000;
+
+                    format!("{}.{:09}", number_of_seconds, fraction)
+                }
                 DateTime::FatDate(fat_date) => {
                     let number_of_seconds: u32 = fat_date.get_number_of_seconds();
 

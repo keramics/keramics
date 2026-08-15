@@ -12,12 +12,14 @@
  */
 
 use keramics_core::{DataStreamReference, ErrorTrace};
+use keramics_formats::apfs::ApfsFileSystem;
 use keramics_formats::ext::ExtFileSystem;
 use keramics_formats::fat::FatFileSystem;
 use keramics_formats::hfs::HfsFileSystem;
 use keramics_formats::ntfs::NtfsFileSystem;
 use keramics_formats::{Path, PathComponent};
 
+use super::apfs::{ApfsContainerFileEntry, ApfsContainerFileSystem};
 use super::apm::{ApmFileEntry, ApmFileSystem};
 use super::enums::VfsType;
 use super::ewf::{EwfFileEntry, EwfFileSystem};
@@ -40,6 +42,8 @@ use super::vmdk::{VmdkFileEntry, VmdkFileSystem};
 
 /// Virtual File System (VFS) file system.
 pub enum VfsFileSystem {
+    Apfs(Option<ApfsFileSystem>),
+    ApfsContainer(ApfsContainerFileSystem),
     Apm(ApmFileSystem),
     Ewf(EwfFileSystem),
     Ext(ExtFileSystem),
@@ -65,6 +69,8 @@ impl VfsFileSystem {
     /// Creates a new file system.
     pub fn new(location_type: &VfsType) -> Self {
         match location_type {
+            VfsType::Apfs => VfsFileSystem::Apfs(None),
+            VfsType::ApfsContainer => VfsFileSystem::ApfsContainer(ApfsContainerFileSystem::new()),
             VfsType::Apm => VfsFileSystem::Apm(ApmFileSystem::new()),
             VfsType::Ewf => VfsFileSystem::Ewf(EwfFileSystem::new()),
             VfsType::Ext => VfsFileSystem::Ext(ExtFileSystem::new()),
@@ -87,9 +93,55 @@ impl VfsFileSystem {
         }
     }
 
+    /// Retrieves the type.
+    pub(super) fn get_type(&self) -> VfsType {
+        match self {
+            VfsFileSystem::Apfs(_) => VfsType::Apfs,
+            VfsFileSystem::ApfsContainer(_) => VfsType::ApfsContainer,
+            VfsFileSystem::Apm(_) => VfsType::Apm,
+            VfsFileSystem::Ewf(_) => VfsType::Ewf,
+            VfsFileSystem::Ext(_) => VfsType::Ext,
+            VfsFileSystem::Fake(_) => VfsType::Fake,
+            VfsFileSystem::Fat(_) => VfsType::Fat,
+            VfsFileSystem::Gpt(_) => VfsType::Gpt,
+            VfsFileSystem::Hfs(_) => VfsType::Hfs,
+            VfsFileSystem::Mbr(_) => VfsType::Mbr,
+            VfsFileSystem::Ntfs(_) => VfsType::Ntfs,
+            VfsFileSystem::Os => VfsType::Os,
+            VfsFileSystem::Pdi(_) => VfsType::Pdi,
+            VfsFileSystem::Qcow(_) => VfsType::Qcow,
+            VfsFileSystem::SparseBundle(_) => VfsType::SparseBundle,
+            VfsFileSystem::SparseImage(_) => VfsType::SparseImage,
+            VfsFileSystem::SplitRaw(_) => VfsType::SplitRaw,
+            VfsFileSystem::Udif(_) => VfsType::Udif,
+            VfsFileSystem::Vhd(_) => VfsType::Vhd,
+            VfsFileSystem::Vhdx(_) => VfsType::Vhdx,
+            VfsFileSystem::Vmdk(_) => VfsType::Vmdk,
+        }
+    }
+
     /// Determines if the file entry with the specified path exists.
     pub fn file_entry_exists(&self, path: &Path) -> Result<bool, ErrorTrace> {
         match self {
+            VfsFileSystem::Apfs(value) => match value {
+                Some(apfs_file_system) => match apfs_file_system.get_file_entry_by_path(path) {
+                    Ok(Some(_)) => Ok(true),
+                    Ok(None) => Ok(false),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve APFS file entry"
+                        );
+                        return Err(error);
+                    }
+                },
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing APFS file system"));
+                }
+            },
+            VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
+                Ok(apfs_container_file_system.file_entry_exists(path))
+            }
             VfsFileSystem::Apm(apm_file_system) => Ok(apm_file_system.file_entry_exists(path)),
             VfsFileSystem::Ewf(ewf_file_system) => Ok(ewf_file_system.file_entry_exists(path)),
             VfsFileSystem::Ext(ext_file_system) => {
@@ -250,6 +302,23 @@ impl VfsFileSystem {
     /// Retrieves a file entry with the specified path.
     pub fn get_file_entry_by_path(&self, path: &Path) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         let result: Result<Option<VfsFileEntry>, ErrorTrace> = match self {
+            VfsFileSystem::Apfs(value) => match value {
+                Some(apfs_file_system) => match apfs_file_system.get_file_entry_by_path(path)? {
+                    Some(apfs_file_entry) => Ok(Some(VfsFileEntry::Apfs(apfs_file_entry))),
+                    None => Ok(None),
+                },
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing APFS file system"));
+                }
+            },
+            VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
+                match apfs_container_file_system.get_file_entry_by_path(path)? {
+                    Some(apfs_container_file_entry) => {
+                        Ok(Some(VfsFileEntry::ApfsContainer(apfs_container_file_entry)))
+                    }
+                    None => Ok(None),
+                }
+            }
             VfsFileSystem::Apm(apm_file_system) => {
                 match apm_file_system.get_file_entry_by_path(path)? {
                     Some(apm_file_entry) => Ok(Some(VfsFileEntry::Apm(apm_file_entry))),
@@ -381,6 +450,28 @@ impl VfsFileSystem {
     /// Retrieves the root file entry.
     pub fn get_root_file_entry(&self) -> Result<Option<VfsFileEntry>, ErrorTrace> {
         match self {
+            VfsFileSystem::Apfs(value) => match value {
+                Some(apfs_file_system) => match apfs_file_system.get_root_directory() {
+                    Ok(Some(apfs_file_entry)) => Ok(Some(VfsFileEntry::Apfs(apfs_file_entry))),
+                    Ok(None) => Ok(None),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve APFS root directory"
+                        );
+                        Err(error)
+                    }
+                },
+                None => {
+                    return Err(keramics_core::error_trace_new!("Missing APFS file system"));
+                }
+            },
+            VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
+                let apfs_container_file_entry: ApfsContainerFileEntry =
+                    apfs_container_file_system.get_root_file_entry();
+
+                Ok(Some(VfsFileEntry::ApfsContainer(apfs_container_file_entry)))
+            }
             VfsFileSystem::Apm(apm_file_system) => {
                 let apm_file_entry: ApmFileEntry = apm_file_system.get_root_file_entry();
 
@@ -520,6 +611,19 @@ impl VfsFileSystem {
         vfs_location: &VfsLocation,
     ) -> Result<(), ErrorTrace> {
         let result: Result<(), ErrorTrace> = match self {
+            VfsFileSystem::Apfs(value) => {
+                match Self::open_apfs_file_system(parent_file_system, vfs_location) {
+                    Ok(apfs_file_system) => {
+                        *value = Some(apfs_file_system);
+
+                        Ok(())
+                    }
+                    Err(error) => Err(error),
+                }
+            }
+            VfsFileSystem::ApfsContainer(apfs_container_file_system) => {
+                apfs_container_file_system.open(parent_file_system, vfs_location)
+            }
             VfsFileSystem::Apm(apm_file_system) => {
                 apm_file_system.open(parent_file_system, vfs_location)
             }
@@ -586,6 +690,55 @@ impl VfsFileSystem {
                 keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                 Err(error)
             }
+        }
+    }
+
+    /// Opens an APFS file system.
+    fn open_apfs_file_system(
+        parent_file_system: Option<&VfsFileSystemReference>,
+        vfs_location: &VfsLocation,
+    ) -> Result<ApfsFileSystem, ErrorTrace> {
+        let file_system: &VfsFileSystemReference = match parent_file_system {
+            Some(file_system) => file_system,
+            None => {
+                return Err(keramics_core::error_trace_new!(
+                    "Missing parent file system"
+                ));
+            }
+        };
+        let path: &Path = vfs_location.get_path();
+
+        let file_entry: VfsFileEntry = match file_system.get_file_entry_by_path(path) {
+            Ok(Some(file_entry)) => file_entry,
+            Ok(None) => {
+                return Err(keramics_core::error_trace_new!("Missing parent file entry"));
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to retrieve parent file entry"
+                );
+                return Err(error);
+            }
+        };
+        match &file_entry {
+            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                match apfs_container_file_entry.get_apfs_file_system() {
+                    Ok(Some(apfs_file_system)) => Ok(apfs_file_system),
+                    Ok(None) => Err(keramics_core::error_trace_new!("Missing APFS file system")),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve APFS file system"
+                        );
+                        Err(error)
+                    }
+                }
+            }
+            _ => Err(keramics_core::error_trace_new!(format!(
+                "Unsupported parent file entry: {}",
+                file_entry.get_type()
+            ))),
         }
     }
 
@@ -767,6 +920,143 @@ mod tests {
     use crate::location::new_os_vfs_location;
 
     use crate::tests::get_test_data_path;
+
+    // Tests with APFS.
+
+    fn get_apfs_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::ApfsContainer);
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        let container_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(vfs_file_system);
+
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::Apfs);
+        let vfs_location: VfsLocation = new_os_vfs_location("/apfs1");
+        vfs_file_system.open(Some(&container_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_apfs() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_apfs_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_file_system()?;
+
+        let path: Path = Path::from("/bogus");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_apfs_file() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_file_system()?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_apfs_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    // Tests with APFS container.
+
+    fn get_apfs_container_file_system() -> Result<VfsFileSystem, ErrorTrace> {
+        let mut vfs_file_system: VfsFileSystem = VfsFileSystem::new(&VfsType::ApfsContainer);
+
+        let parent_file_system: VfsFileSystemReference =
+            VfsFileSystemReference::new(VfsFileSystem::new(&VfsType::Os));
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
+        let vfs_location: VfsLocation = new_os_vfs_location(path_string.as_str());
+        vfs_file_system.open(Some(&parent_file_system), &vfs_location)?;
+
+        Ok(vfs_file_system)
+    }
+
+    #[test]
+    fn test_file_entry_exists_with_apfs_container() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_container_file_system()?;
+
+        let path: Path = Path::from("/apfs1");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, true);
+
+        let path: Path = Path::from("/bogus2");
+        assert_eq!(vfs_file_system.file_entry_exists(&path)?, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_apfs_container_non_existing() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_container_file_system()?;
+
+        let path: Path = Path::from("/bogus2");
+        let result: Option<VfsFileEntry> = vfs_file_system.get_file_entry_by_path(&path)?;
+
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_apfs_container_root() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_container_file_system()?;
+
+        let path: Path = Path::from("/");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::Directory);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_entry_by_path_with_apfs_container_volume() -> Result<(), ErrorTrace> {
+        let vfs_file_system: VfsFileSystem = get_apfs_container_file_system()?;
+
+        let path: Path = Path::from("/apfs1");
+        let vfs_file_entry: VfsFileEntry = vfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let vfs_file_type: VfsFileType = vfs_file_entry.get_file_type();
+        assert_eq!(vfs_file_type, VfsFileType::File);
+
+        Ok(())
+    }
 
     // Tests with APM.
 

@@ -17,7 +17,9 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace, FakeDataStream};
 use keramics_types::Ucs2String;
 
+use super::block_reader::NtfsBlockReader;
 use super::block_stream::NtfsBlockStream;
+use super::compressed_block_reader::NtfsCompressedBlockReader;
 use super::compressed_stream::NtfsCompressedStream;
 use super::constants::*;
 use super::mft_attribute::NtfsMftAttribute;
@@ -292,10 +294,10 @@ impl NtfsMftAttributes {
                 FakeDataStream::new(&data_attribute.resident_data, data_attribute.data_size);
             Ok(Some(Arc::new(RwLock::new(data_stream))))
         } else if data_attribute.is_compressed() {
-            let mut compressed_stream: NtfsCompressedStream =
-                NtfsCompressedStream::new(cluster_block_size);
+            let mut compressed_block_reader: NtfsCompressedBlockReader =
+                NtfsCompressedBlockReader::new(cluster_block_size);
 
-            match compressed_stream.open(data_stream, data_attribute) {
+            match compressed_block_reader.open(data_stream, data_attribute) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -305,17 +307,23 @@ impl NtfsMftAttributes {
                     return Err(error);
                 }
             }
-            Ok(Some(Arc::new(RwLock::new(compressed_stream))))
+            Ok(Some(Arc::new(RwLock::new(NtfsCompressedStream::new(
+                compressed_block_reader,
+            )))))
         } else {
-            let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(cluster_block_size);
-            match block_stream.open(data_stream, data_attribute) {
+            let mut block_reader: NtfsBlockReader =
+                NtfsBlockReader::new(data_stream, cluster_block_size);
+
+            match block_reader.open(data_attribute) {
                 Ok(_) => {}
                 Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                    keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
                     return Err(error);
                 }
             }
-            Ok(Some(Arc::new(RwLock::new(block_stream))))
+            Ok(Some(Arc::new(RwLock::new(NtfsBlockStream::new(
+                block_reader,
+            )))))
         }
     }
 }

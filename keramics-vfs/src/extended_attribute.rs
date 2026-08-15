@@ -13,11 +13,13 @@
 
 use keramics_core::DataStreamReference;
 use keramics_formats::PathComponent;
+use keramics_formats::apfs::ApfsExtendedAttribute;
 use keramics_formats::ext::ExtExtendedAttribute;
 use keramics_formats::hfs::{HfsExtendedAttribute, HfsString};
 
 /// Virtual File System (VFS) extended attribute.
 pub enum VfsExtendedAttribute {
+    Apfs(ApfsExtendedAttribute),
     Ext(ExtExtendedAttribute),
     Hfs(HfsExtendedAttribute),
 }
@@ -26,6 +28,9 @@ impl VfsExtendedAttribute {
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> &DataStreamReference {
         match self {
+            VfsExtendedAttribute::Apfs(apfs_extended_attribute) => {
+                apfs_extended_attribute.get_data_stream()
+            }
             VfsExtendedAttribute::Ext(ext_extended_attribute) => {
                 ext_extended_attribute.get_data_stream()
             }
@@ -38,6 +43,9 @@ impl VfsExtendedAttribute {
     /// Retrieves the name.
     pub fn get_name(&self) -> PathComponent {
         match self {
+            VfsExtendedAttribute::Apfs(apfs_extended_attribute) => {
+                PathComponent::from(apfs_extended_attribute.get_name())
+            }
             VfsExtendedAttribute::Ext(ext_extended_attribute) => {
                 PathComponent::from(ext_extended_attribute.get_name())
             }
@@ -60,11 +68,72 @@ mod tests {
     use keramics_core::{ErrorTrace, open_os_data_stream};
     use keramics_encodings::CharacterEncoding;
     use keramics_formats::Path;
+    use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
     use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
     use keramics_types::{ByteString, Utf16String};
 
     use crate::tests::get_test_data_path;
+
+    // Tests with APFS.
+
+    fn get_apfs_file_system(path_string: &str) -> Result<ApfsFileSystem, ErrorTrace> {
+        let mut container: ApfsContainer = ApfsContainer::new();
+
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        container.read_data_stream(&data_stream)?;
+
+        let volume: ApfsVolume = container.get_volume_by_index(0)?;
+        volume.get_file_system()
+    }
+
+    fn get_apfs_file_entry(path_string: &str) -> Result<ApfsFileEntry, ErrorTrace> {
+        let apfs_file_system: ApfsFileSystem = get_apfs_file_system("apfs/apfs.raw")?;
+
+        let path: Path = Path::from(path_string);
+        match apfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_apfs() -> Result<(), ErrorTrace> {
+        let apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+
+        let apfs_extended_attribute: ApfsExtendedAttribute =
+            apfs_file_entry.get_extended_attribute_by_index(0)?;
+        let vfs_extended_attribute: VfsExtendedAttribute =
+            VfsExtendedAttribute::Apfs(apfs_extended_attribute);
+
+        let _ = vfs_extended_attribute.get_data_stream();
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_apfs() -> Result<(), ErrorTrace> {
+        let apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/xattr1")?;
+
+        let apfs_extended_attribute: ApfsExtendedAttribute =
+            apfs_file_entry.get_extended_attribute_by_index(0)?;
+        let vfs_extended_attribute: VfsExtendedAttribute =
+            VfsExtendedAttribute::Apfs(apfs_extended_attribute);
+
+        let name: PathComponent = vfs_extended_attribute.get_name();
+        let expected_name: PathComponent = PathComponent::ByteString(ByteString {
+            encoding: CharacterEncoding::Utf8,
+            elements: vec![109, 121, 120, 97, 116, 116, 114, 49],
+        });
+        assert_eq!(name, expected_name);
+
+        Ok(())
+    }
 
     // Tests with ext.
 

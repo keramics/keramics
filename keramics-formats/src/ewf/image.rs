@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
@@ -336,10 +337,10 @@ impl EwfImage {
     }
 
     /// Reads media data based on the chunk tables.
-    fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
+    fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut media_offset: u64 = self.current_offset;
+        let mut media_offset: u64 = offset;
 
         while data_offset < read_size {
             if media_offset >= self.media_size {
@@ -1134,18 +1135,16 @@ impl DataStream for EwfImage {
             return Ok(0);
         }
         let remaining_media_size: u64 = self.media_size - self.current_offset;
-        let mut read_size: usize = buf.len();
+        let read_size: usize = min(buf.len(), remaining_media_size as usize);
 
-        if (read_size as u64) > remaining_media_size {
-            read_size = remaining_media_size as usize;
-        }
-        let read_count: usize = match self.read_data_from_blocks(&mut buf[..read_size]) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
-                return Err(error);
-            }
-        };
+        let read_count: usize =
+            match self.read_data_from_blocks(&mut buf[..read_size], self.current_offset) {
+                Ok(read_count) => read_count,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read data from blocks");
+                    return Err(error);
+                }
+            };
         self.current_offset += read_count as u64;
 
         Ok(read_count)

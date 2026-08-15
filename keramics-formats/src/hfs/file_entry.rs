@@ -17,7 +17,9 @@ use keramics_core::{DataStream, DataStreamReference, ErrorTrace, FakeDataStream}
 use keramics_datetime::DateTime;
 use keramics_types::ByteString;
 
-use crate::decmpfs::{DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader};
+use crate::decmpfs::{
+    DecmpfsBlockReader, DecmpfsCompressionMethod, DecmpfsDataStream, DecmpfsHeader,
+};
 use crate::indexed_hash_map::IndexedHashMap;
 use crate::path_component::PathComponent;
 use crate::traits::FileEntryIterator;
@@ -129,46 +131,6 @@ impl HfsFileEntry {
         }
     }
 
-    /// Retrieves the block stream.
-    fn get_block_stream(
-        &self,
-        fork_descriptor: &HfsForkDescriptor,
-    ) -> Result<HfsBlockStream, ErrorTrace> {
-        let identifier: u32 = self.get_identifier();
-        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
-
-        match block_ranges.read_fork_descriptor(
-            self.data_area_block_number,
-            identifier,
-            fork_descriptor,
-            &self.data_stream,
-            &self.extents_overflow_file,
-        ) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to determine block ranges from fork descriptor"
-                );
-                return Err(error);
-            }
-        }
-        let mut block_reader: HfsBlockReader =
-            HfsBlockReader::new(&self.data_stream, self.block_size, fork_descriptor.size);
-
-        match block_reader.open(
-            fork_descriptor.number_of_blocks as u64,
-            &block_ranges.ranges,
-        ) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
-                return Err(error);
-            }
-        }
-        Ok(HfsBlockStream::new(block_reader))
-    }
-
     /// Retrieves the change time.
     pub fn get_change_time(&self) -> Option<&DateTime> {
         match &self.indirect_node {
@@ -251,6 +213,43 @@ impl HfsFileEntry {
         }
     }
 
+    /// Retrieves the block stream.
+    fn get_block_stream(
+        &self,
+        fork_descriptor: &HfsForkDescriptor,
+    ) -> Result<HfsBlockStream, ErrorTrace> {
+        let identifier: u32 = self.get_identifier();
+        let mut block_ranges: HfsBlockRanges = HfsBlockRanges::new();
+
+        match block_ranges.read_fork_descriptor(
+            self.data_area_block_number,
+            identifier,
+            fork_descriptor,
+            &self.data_stream,
+            &self.extents_overflow_file,
+        ) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to determine block ranges from fork descriptor"
+                );
+                return Err(error);
+            }
+        }
+        let mut block_reader: HfsBlockReader =
+            HfsBlockReader::new(&self.data_stream, self.block_size, fork_descriptor.size);
+
+        match block_reader.open(block_ranges.number_of_blocks, &block_ranges.ranges) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
+                return Err(error);
+            }
+        }
+        Ok(HfsBlockStream::new(block_reader))
+    }
+
     /// Retrieves the symbolic link target.
     pub fn get_symbolic_link_target(&mut self) -> Result<Option<&ByteString>, ErrorTrace> {
         if self.symbolic_link_target.is_none() && self.is_symbolic_link() {
@@ -289,6 +288,9 @@ impl HfsFileEntry {
 
     /// Retrieves the default data stream.
     pub fn get_data_stream(&self) -> Result<Option<DataStreamReference>, ErrorTrace> {
+        if !self.has_data_fork() {
+            return Ok(None);
+        }
         match self.compressed_data_header.as_ref() {
             Some(compressed_data_header) => {
                 let compression_method: DecmpfsCompressionMethod =
@@ -347,12 +349,10 @@ impl HfsFileEntry {
                         }
                     }
                 };
-                let mut decmpfs_stream: DecmpfsDataStream =
-                    DecmpfsDataStream::new(compression_method);
+                let mut decmpfs_block_reader: DecmpfsBlockReader =
+                    DecmpfsBlockReader::new(&data_stream, compression_method);
 
-                match decmpfs_stream
-                    .open(&data_stream, compressed_data_header.uncompressed_data_size)
-                {
+                match decmpfs_block_reader.open(compressed_data_header.uncompressed_data_size) {
                     Ok(_) => {}
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
@@ -362,7 +362,9 @@ impl HfsFileEntry {
                         return Err(error);
                     }
                 }
-                Ok(Some(Arc::new(RwLock::new(decmpfs_stream))))
+                Ok(Some(Arc::new(RwLock::new(DecmpfsDataStream::new(
+                    decmpfs_block_reader,
+                )))))
             }
             None => {
                 let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
@@ -385,6 +387,9 @@ impl HfsFileEntry {
 
     /// Retrieves the data fork.
     pub fn get_data_fork(&mut self) -> Result<Option<HfsFork>, ErrorTrace> {
+        if !self.has_data_fork() {
+            return Ok(None);
+        }
         let fork_descriptor: &HfsForkDescriptor = match self.get_data_fork_descriptor() {
             Some(fork_descriptor) => fork_descriptor,
             None => return Ok(None),
@@ -595,7 +600,7 @@ impl HfsFileEntry {
     pub fn has_data_fork(&self) -> bool {
         match self.get_file_mode() {
             Some(file_mode) => *file_mode & 0xf000 == HFS_FILE_MODE_TYPE_REGULAR_FILE,
-            None => false,
+            None => self.directory_entry.is_file(),
         }
     }
 
@@ -828,6 +833,7 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
     use keramics_datetime::HfsTime;
+    use keramics_encodings::CharacterEncoding;
     use keramics_types::Utf16String;
 
     use crate::hfs::file_system::HfsFileSystem;
@@ -846,10 +852,473 @@ mod tests {
         Ok(file_system)
     }
 
+    // Tests with HFS.
+
+    #[test]
+    fn test_get_access_time_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_access_time(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_backup_time_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_backup_time(), &DateTime::NotSet);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_change_time_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_change_time(), None,);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_creation_time_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(
+            hfs_file_entry.get_creation_time(),
+            &DateTime::HfsTime(HfsTime {
+                timestamp: 3849937114
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_file_mode_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_file_mode(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_group_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_group_identifier(), None);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_identifier
+    // TODO: add tests for get_link_reference
+
+    #[test]
+    fn test_get_modification_time_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(
+            hfs_file_entry.get_modification_time(),
+            &DateTime::HfsTime(HfsTime {
+                timestamp: 3849937114
+            })
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let name: Option<&HfsString> = hfs_file_entry.get_name();
+        let expected_name: HfsString = HfsString::ByteString(ByteString {
+            encoding: CharacterEncoding::MacRoman,
+            elements: vec![116, 101, 115, 116, 102, 105, 108, 101, 49],
+        });
+        assert_eq!(name, Some(expected_name).as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_links_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_number_of_links(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_owner_identifier_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_owner_identifier(), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.get_size(), 9);
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_block_stream
+
+    #[test]
+    fn test_get_symbolic_link_target_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let symbolic_link_target: Option<&ByteString> =
+            hfs_file_entry.get_symbolic_link_target()?;
+        assert_eq!(symbolic_link_target, None);
+
+        let path: Path = Path::from("/file_symboliclink1");
+        let result: Option<HfsFileEntry> = hfs_file_system.get_file_entry_by_path(&path)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_data_stream_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Option<DataStreamReference> = hfs_file_entry.get_data_stream()?;
+        assert!(result.is_none());
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Option<DataStreamReference> = hfs_file_entry.get_data_stream()?;
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_data_fork
+
+    #[test]
+    fn test_get_data_fork_descriptor_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Option<&HfsForkDescriptor> = hfs_file_entry.get_data_fork_descriptor();
+        assert!(result.is_none());
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Option<&HfsForkDescriptor> = hfs_file_entry.get_data_fork_descriptor();
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    // TODO: add tests for get_resource_fork
+
+    #[test]
+    fn test_get_resource_fork_descriptor_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Option<&HfsForkDescriptor> = hfs_file_entry.get_resource_fork_descriptor();
+        assert!(result.is_none());
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Option<&HfsForkDescriptor> = hfs_file_entry.get_resource_fork_descriptor();
+        assert!(result.is_some());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_extended_attributes_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let number_of_attributes: usize = hfs_file_entry.get_number_of_extended_attributes()?;
+        assert_eq!(number_of_attributes, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_index_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: Result<HfsExtendedAttribute, ErrorTrace> =
+            hfs_file_entry.get_extended_attribute_by_index(0);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_extended_attribute_by_name_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let name: PathComponent = PathComponent::from("myxattr1");
+        let result: Option<HfsExtendedAttribute> =
+            hfs_file_entry.get_extended_attribute_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_extended_attributes_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let mut extended_attributes_iterator: HfsExtendedAttributesIterator =
+            hfs_file_entry.extended_attributes();
+
+        let result: Option<Result<HfsExtendedAttribute, ErrorTrace>> =
+            extended_attributes_iterator.next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_sub_file_entries_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let number_of_sub_file_entries: usize = hfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 2);
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let number_of_sub_file_entries: usize = hfs_file_entry.get_number_of_sub_file_entries()?;
+        assert_eq!(number_of_sub_file_entries, 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_index_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let sub_file_entry: HfsFileEntry = hfs_file_entry.get_sub_file_entry_by_index(0)?;
+
+        let name: Option<&HfsString> = sub_file_entry.get_name();
+        let expected_name: HfsString = HfsString::ByteString(ByteString {
+            encoding: CharacterEncoding::MacRoman,
+            elements: vec![116, 101, 115, 116, 102, 105, 108, 101, 49],
+        });
+        assert_eq!(name, Some(expected_name).as_ref());
+
+        let result: Result<HfsFileEntry, ErrorTrace> =
+            hfs_file_entry.get_sub_file_entry_by_index(99);
+        assert!(result.is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_sub_file_entry_by_name_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let name: PathComponent = PathComponent::ByteString(ByteString::from("testfile1"));
+        let result: Option<HfsFileEntry> = hfs_file_entry.get_sub_file_entry_by_name(&name)?;
+        assert!(result.is_some());
+
+        let name: PathComponent = PathComponent::ByteString(ByteString::from("bogus"));
+        let result: Option<HfsFileEntry> = hfs_file_entry.get_sub_file_entry_by_name(&name)?;
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_file_entries_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let mut hfs_file_entry: HfsFileEntry =
+            hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let mut sub_file_entries_iterator: HfsFileEntriesIterator =
+            hfs_file_entry.sub_file_entries();
+
+        let result: Option<Result<HfsFileEntry, ErrorTrace>> = sub_file_entries_iterator.next();
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+
+        let result: Option<Result<HfsFileEntry, ErrorTrace>> =
+            sub_file_entries_iterator.skip(12).next();
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_has_data_fork_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: bool = hfs_file_entry.has_data_fork();
+        assert_eq!(result, false);
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: bool = hfs_file_entry.has_data_fork();
+        assert_eq!(result, true);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_has_resource_fork_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: bool = hfs_file_entry.has_resource_fork();
+        assert_eq!(result, false);
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        let result: bool = hfs_file_entry.has_resource_fork();
+        assert_eq!(result, false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_directory_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.is_directory(), true);
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.is_directory(), true);
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.is_directory(), false);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_root_directory_with_hfs() -> Result<(), ErrorTrace> {
+        let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfs.raw")?;
+
+        let path: Path = Path::from("/");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.is_root_directory(), true);
+
+        let path: Path = Path::from("/testdir1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.is_root_directory(), false);
+
+        let path: Path = Path::from("/testdir1/testfile1");
+        let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
+
+        assert_eq!(hfs_file_entry.is_root_directory(), false);
+
+        Ok(())
+    }
+
+    // TODO: add tests for read_attributes
+    // TODO: add tests for read_indirect_node
+    // TODO: add tests for read_sub_directory_entries
+
     // Tests with HFS+.
 
     #[test]
-    fn test_get_access_time() -> Result<(), ErrorTrace> {
+    fn test_get_access_time_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -865,7 +1334,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_backup_time() -> Result<(), ErrorTrace> {
+    fn test_get_backup_time_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -876,10 +1345,8 @@ mod tests {
         Ok(())
     }
 
-    // TODO: add tests for get_block_stream
-
     #[test]
-    fn test_get_change_time() -> Result<(), ErrorTrace> {
+    fn test_get_change_time_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -895,7 +1362,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_creation_time() -> Result<(), ErrorTrace> {
+    fn test_get_creation_time_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -911,7 +1378,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_file_mode() -> Result<(), ErrorTrace> {
+    fn test_get_file_mode_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -923,7 +1390,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_group_identifier() -> Result<(), ErrorTrace> {
+    fn test_get_group_identifier_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -938,7 +1405,7 @@ mod tests {
     // TODO: add tests for get_link_reference
 
     #[test]
-    fn test_get_modification_time() -> Result<(), ErrorTrace> {
+    fn test_get_modification_time_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -954,7 +1421,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_name() -> Result<(), ErrorTrace> {
+    fn test_get_name_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -967,7 +1434,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_links() -> Result<(), ErrorTrace> {
+    fn test_get_number_of_links_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -979,7 +1446,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_owner_identifier() -> Result<(), ErrorTrace> {
+    fn test_get_owner_identifier_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -991,7 +1458,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_size() -> Result<(), ErrorTrace> {
+    fn test_get_size_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -1002,8 +1469,10 @@ mod tests {
         Ok(())
     }
 
+    // TODO: add tests for get_block_stream
+
     #[test]
-    fn test_get_symbolic_link_target() -> Result<(), ErrorTrace> {
+    fn test_get_symbolic_link_target_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/testfile1");
@@ -1028,7 +1497,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_data_stream() -> Result<(), ErrorTrace> {
+    fn test_get_data_stream_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1049,7 +1518,7 @@ mod tests {
     // TODO: add tests for get_data_fork
 
     #[test]
-    fn test_get_data_fork_descriptor() -> Result<(), ErrorTrace> {
+    fn test_get_data_fork_descriptor_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1070,7 +1539,7 @@ mod tests {
     // TODO: add tests for get_resource_fork
 
     #[test]
-    fn test_get_resource_fork_descriptor() -> Result<(), ErrorTrace> {
+    fn test_get_resource_fork_descriptor_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1089,7 +1558,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_extended_attributes() -> Result<(), ErrorTrace> {
+    fn test_get_number_of_extended_attributes_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
@@ -1102,7 +1571,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_extended_attribute_by_index() -> Result<(), ErrorTrace> {
+    fn test_get_extended_attribute_by_index_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
@@ -1123,7 +1592,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_extended_attribute_by_name() -> Result<(), ErrorTrace> {
+    fn test_get_extended_attribute_by_name_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
@@ -1147,7 +1616,7 @@ mod tests {
     }
 
     #[test]
-    fn test_extended_attributes() -> Result<(), ErrorTrace> {
+    fn test_extended_attributes_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1/xattr1");
@@ -1170,7 +1639,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
+    fn test_get_number_of_sub_file_entries_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1191,7 +1660,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
+    fn test_get_sub_file_entry_by_index_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1211,7 +1680,7 @@ mod tests {
     }
 
     #[test]
-    fn test_get_sub_file_entry_by_name() -> Result<(), ErrorTrace> {
+    fn test_get_sub_file_entry_by_name_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1230,7 +1699,7 @@ mod tests {
     }
 
     #[test]
-    fn test_sub_file_entries() -> Result<(), ErrorTrace> {
+    fn test_sub_file_entries_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1252,7 +1721,7 @@ mod tests {
     }
 
     #[test]
-    fn test_has_data_fork() -> Result<(), ErrorTrace> {
+    fn test_has_data_fork_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1271,7 +1740,7 @@ mod tests {
     }
 
     #[test]
-    fn test_has_resource_fork() -> Result<(), ErrorTrace> {
+    fn test_has_resource_fork_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/testdir1");
@@ -1290,7 +1759,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_directory() -> Result<(), ErrorTrace> {
+    fn test_is_directory_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/");
@@ -1312,7 +1781,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_root_directory() -> Result<(), ErrorTrace> {
+    fn test_is_root_directory_with_hfsplus() -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = get_file_system("hfs/hfsplus.raw")?;
 
         let path: Path = Path::from("/");

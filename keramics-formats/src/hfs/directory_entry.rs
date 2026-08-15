@@ -182,10 +182,18 @@ impl HfsDirectoryEntry {
         }
     }
 
-    /// Determines if the directory entry is a directory.
+    /// Determines if the directory entry is a directory (folder record).
     pub fn is_directory(&self) -> bool {
         match &self.record {
             HfsCatalogFileEntryRecord::Folder(_) => true,
+            _ => false,
+        }
+    }
+
+    /// Determines if the directory entry is a file (record).
+    pub fn is_file(&self) -> bool {
+        match &self.record {
+            HfsCatalogFileEntryRecord::File(_) => true,
             _ => false,
         }
     }

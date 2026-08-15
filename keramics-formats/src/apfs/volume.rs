@@ -28,7 +28,10 @@ use super::volume_superblock::ApfsVolumeSuperblock;
 /// Apple File System (APFS) volume.
 pub struct ApfsVolume {
     /// The data stream.
-    data_stream: Option<DataStreamReference>,
+    data_stream: DataStreamReference,
+
+    /// Volume index.
+    volume_index: usize,
 
     /// Bytes per sector.
     bytes_per_sector: u16,
@@ -39,8 +42,14 @@ pub struct ApfsVolume {
     /// Container key bag.
     container_key_bag: Option<Arc<ApfsKeyBag>>,
 
+    /// Object map B-tree.
+    object_map_tree: Arc<ApfsObjectMapTree>,
+
     /// Identifier.
     identifier: Uuid,
+
+    /// Transaction identifier.
+    transaction_identifier: u64,
 
     /// Features flags.
     feature_flags: u64,
@@ -51,14 +60,11 @@ pub struct ApfsVolume {
     /// Incompatible feature flags.
     incompatible_feature_flags: u64,
 
-    /// Transaction identifier.
-    transaction_identifier: u64,
-
     /// Volume label.
     volume_label: ByteString,
 
-    /// Object map B-tree.
-    object_map_tree: Arc<ApfsObjectMapTree>,
+    /// Size.
+    size: u64,
 
     /// File system root object identifier.
     file_system_root_object_identifier: u64,
@@ -70,22 +76,26 @@ pub struct ApfsVolume {
 impl ApfsVolume {
     /// Creates a volume.
     pub(super) fn new(
+        data_stream: &DataStreamReference,
+        volume_index: usize,
         bytes_per_sector: u16,
         block_size: u32,
         container_key_bag: Option<&Arc<ApfsKeyBag>>,
     ) -> Self {
         Self {
-            data_stream: None,
+            data_stream: data_stream.clone(),
+            volume_index,
             bytes_per_sector,
             block_size,
             container_key_bag: container_key_bag.cloned(),
+            object_map_tree: Arc::new(ApfsObjectMapTree::new()),
             identifier: Uuid::new(),
+            transaction_identifier: 0,
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,
-            transaction_identifier: 0,
             volume_label: ByteString::new(),
-            object_map_tree: Arc::new(ApfsObjectMapTree::new()),
+            size: 0,
             file_system_root_object_identifier: 0,
             is_locked: false,
         }
@@ -111,15 +121,9 @@ impl ApfsVolume {
         if self.is_locked {
             return Err(keramics_core::error_trace_new!("Volume is locked"));
         }
-        let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
-            Some(data_stream) => data_stream,
-            None => {
-                return Err(keramics_core::error_trace_new!("Missing data stream"));
-            }
-        };
         let object_map_value: ApfsObjectMapValue =
             match self.object_map_tree.get_value_by_identifier(
-                data_stream,
+                &self.data_stream,
                 self.file_system_root_object_identifier,
                 self.transaction_identifier,
             ) {
@@ -147,7 +151,7 @@ impl ApfsVolume {
             ApfsFileSystem::new(self.block_size, &self.object_map_tree, use_case_folding);
 
         match file_system.open(
-            data_stream,
+            &self.data_stream,
             object_map_value.physical_address,
             self.transaction_identifier,
         ) {
@@ -165,6 +169,16 @@ impl ApfsVolume {
         self.read_only_compatible_feature_flags
     }
 
+    /// Retrieves the size.
+    pub fn get_size(&self) -> u64 {
+        self.size
+    }
+
+    /// Retrieves the volume index.
+    pub fn get_volume_index(&self) -> usize {
+        self.volume_index
+    }
+
     /// Retrieves the volume label.
     pub fn get_volume_label(&self) -> Option<&ByteString> {
         if self.volume_label.is_empty() {
@@ -175,16 +189,12 @@ impl ApfsVolume {
     }
 
     /// Opens a volume.
-    pub(super) fn open(
-        &mut self,
-        data_stream: &DataStreamReference,
-        superblock_block_number: u64,
-    ) -> Result<(), ErrorTrace> {
+    pub(super) fn open(&mut self, superblock_block_number: u64) -> Result<(), ErrorTrace> {
         let superblock_offset: u64 = superblock_block_number * (self.block_size as u64);
 
         let mut superblock: ApfsVolumeSuperblock = ApfsVolumeSuperblock::new();
 
-        match superblock.read_at_position(&data_stream, SeekFrom::Start(superblock_offset)) {
+        match superblock.read_at_position(&self.data_stream, SeekFrom::Start(superblock_offset)) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -213,7 +223,7 @@ impl ApfsVolume {
 
         let mut object_map: ApfsObjectMap = ApfsObjectMap::new();
 
-        match object_map.read_at_position(&data_stream, SeekFrom::Start(object_map_offset)) {
+        match object_map.read_at_position(&self.data_stream, SeekFrom::Start(object_map_offset)) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -288,7 +298,7 @@ impl ApfsVolume {
                         &superblock.volume_identifier,
                     );
                     match key_bag.read_at_position(
-                        &data_stream,
+                        &self.data_stream,
                         key_bag_size,
                         SeekFrom::Start(key_bag_offset),
                     ) {
@@ -318,13 +328,13 @@ impl ApfsVolume {
         // TODO: add snapshot support
 
         self.identifier = volume_identifier;
+        self.transaction_identifier = superblock.object_header.transaction_identifier;
         self.feature_flags = superblock.feature_flags;
         self.read_only_compatible_feature_flags = superblock.read_only_compatible_feature_flags;
         self.incompatible_feature_flags = superblock.incompatible_feature_flags;
-        self.transaction_identifier = superblock.object_header.transaction_identifier;
         self.volume_label = superblock.volume_label;
+        self.size = superblock.number_of_allocated_blocks * (self.block_size as u64);
         self.file_system_root_object_identifier = superblock.file_system_root_object_identifier;
-        self.data_stream = Some(data_stream.clone());
 
         Ok(())
     }
@@ -393,6 +403,26 @@ mod tests {
 
         let feature_flags: u64 = volume.get_read_only_compatible_feature_flags();
         assert_eq!(feature_flags, 0x00000000);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_size() -> Result<(), ErrorTrace> {
+        let volume: ApfsVolume = get_volume()?;
+
+        let size: u64 = volume.get_size();
+        assert_eq!(size, 77824);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_volume_index() -> Result<(), ErrorTrace> {
+        let volume: ApfsVolume = get_volume()?;
+
+        let volume_index: usize = volume.get_volume_index();
+        assert_eq!(volume_index, 0);
 
         Ok(())
     }

@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use keramics_core::formatters::format_as_string;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::Path;
-use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
+use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
 use keramics_hashes::{DigestHashContext, Md5Context};
 
 fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), ErrorTrace> {
@@ -47,9 +47,9 @@ fn read_data_stream(data_stream: &DataStreamReference) -> Result<(u64, String), 
     Ok((offset, hash_string))
 }
 
-fn read_path(file_system: &HfsFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
+fn read_path(file_system: &ApfsFileSystem, path_string: &str) -> Result<(u64, String), ErrorTrace> {
     let path: Path = Path::from(path_string);
-    let result: Option<HfsFileEntry> = match file_system.get_file_entry_by_path(&path) {
+    let result: Option<ApfsFileEntry> = match file_system.get_file_entry_by_path(&path) {
         Ok(result) => result,
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(
@@ -59,7 +59,7 @@ fn read_path(file_system: &HfsFileSystem, path_string: &str) -> Result<(u64, Str
             return Err(error);
         }
     };
-    let file_entry: HfsFileEntry = match result {
+    let file_entry: ApfsFileEntry = match result {
         Some(file_entry) => file_entry,
         None => {
             return Err(keramics_core::error_trace_new!(format!(
@@ -73,7 +73,7 @@ fn read_path(file_system: &HfsFileSystem, path_string: &str) -> Result<(u64, Str
     read_data_stream(&data_stream)
 }
 
-fn open_file_system(path: &PathBuf) -> Result<HfsFileSystem, ErrorTrace> {
+fn open_file_system(path: &PathBuf) -> Result<ApfsFileSystem, ErrorTrace> {
     let data_stream: DataStreamReference = match open_os_data_stream(path) {
         Ok(data_stream) => data_stream,
         Err(error) => {
@@ -83,14 +83,34 @@ fn open_file_system(path: &PathBuf) -> Result<HfsFileSystem, ErrorTrace> {
             ));
         }
     };
-    let mut file_system: HfsFileSystem = HfsFileSystem::new();
+    let mut container: ApfsContainer = ApfsContainer::new();
 
-    match file_system.read_data_stream(&data_stream) {
+    match container.read_data_stream(&data_stream) {
         Ok(_) => {}
         Err(mut error) => {
             keramics_core::error_trace_add_frame!(
                 error,
-                "Unable to read HFS file system from data stream"
+                "Unable to read APFS container from data stream"
+            );
+            return Err(error);
+        }
+    };
+    let volume: ApfsVolume = match container.get_volume_by_index(0) {
+        Ok(volume) => volume,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to retrieve volume: 0 from container"
+            );
+            return Err(error);
+        }
+    };
+    let file_system: ApfsFileSystem = match volume.get_file_system() {
+        Ok(file_system) => file_system,
+        Err(mut error) => {
+            keramics_core::error_trace_add_frame!(
+                error,
+                "Unable to retrieve file system from volume: 0"
             );
             return Err(error);
         }
@@ -99,9 +119,9 @@ fn open_file_system(path: &PathBuf) -> Result<HfsFileSystem, ErrorTrace> {
 }
 
 #[test]
-fn read_hfs_empty_file() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfs.raw");
-    let file_system: HfsFileSystem = open_file_system(&path_buf)?;
+fn read_apfs_empty_file() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
+    let file_system: ApfsFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
     assert_eq!(offset, 0);
@@ -111,33 +131,9 @@ fn read_hfs_empty_file() -> Result<(), ErrorTrace> {
 }
 
 #[test]
-fn read_hfs_file_regular() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfs.raw");
-    let file_system: HfsFileSystem = open_file_system(&path_buf)?;
-
-    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
-    assert_eq!(offset, 11358);
-    assert_eq!(md5_hash.as_str(), "3b83ef96387f14655fc854ddc3c6bd57");
-
-    Ok(())
-}
-
-#[test]
-fn read_hfsplus_empty_file() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
-    let file_system: HfsFileSystem = open_file_system(&path_buf)?;
-
-    let (offset, md5_hash): (u64, String) = read_path(&file_system, "/emptyfile")?;
-    assert_eq!(offset, 0);
-    assert_eq!(md5_hash.as_str(), "d41d8cd98f00b204e9800998ecf8427e");
-
-    Ok(())
-}
-
-#[test]
-fn read_hfsplus_file_regular() -> Result<(), ErrorTrace> {
-    let path_buf: PathBuf = PathBuf::from("../test_data/hfs/hfsplus.raw");
-    let file_system: HfsFileSystem = open_file_system(&path_buf)?;
+fn read_apfs_file_regular() -> Result<(), ErrorTrace> {
+    let path_buf: PathBuf = PathBuf::from("../test_data/apfs/apfs.raw");
+    let file_system: ApfsFileSystem = open_file_system(&path_buf)?;
 
     let (offset, md5_hash): (u64, String) = read_path(&file_system, "/testdir1/TestFile2")?;
     assert_eq!(offset, 11358);

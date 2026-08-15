@@ -19,10 +19,10 @@ use keramics_core::{DataStreamReference, ErrorTrace};
 use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
-use super::block_range::{ExtBlockRange, ExtBlockRangeType};
+use super::extent::ApfsExtent;
 
-/// Extended File System (ext) block reader.
-pub struct ExtBlockReader {
+/// Apple File System (APFS) block reader.
+pub struct ApfsBlockReader {
     /// The data stream.
     data_stream: DataStreamReference,
 
@@ -30,48 +30,48 @@ pub struct ExtBlockReader {
     block_size: u32,
 
     /// Block tree.
-    block_tree: BlockTree<ExtBlockRange>,
+    block_tree: BlockTree<ApfsExtent>,
 
     /// The size.
     size: u64,
 }
 
-impl ExtBlockReader {
-    /// Creates a new block reader.
+impl ApfsBlockReader {
+    /// Creates a new block stream.
     pub(super) fn new(data_stream: &DataStreamReference, block_size: u32, size: u64) -> Self {
         Self {
             data_stream: data_stream.clone(),
             block_size,
-            block_tree: BlockTree::<ExtBlockRange>::new(0, 0, 0),
+            block_tree: BlockTree::<ApfsExtent>::new(0, 0, 0),
             size,
         }
     }
 
     /// Opens a block stream.
-    pub(super) fn open(
-        &mut self,
-        number_of_blocks: u64,
-        block_ranges: &[ExtBlockRange],
-    ) -> Result<(), ErrorTrace> {
-        let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
+    pub(super) fn open(&mut self, extents: &[ApfsExtent]) -> Result<(), ErrorTrace> {
+        let block_tree_data_size: u64 = self.size.next_multiple_of(self.block_size as u64);
         self.block_tree =
-            BlockTree::<ExtBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
+            BlockTree::<ApfsExtent>::new(block_tree_data_size, 0, self.block_size as u64);
 
-        for block_range in block_ranges.iter() {
-            let range_logical_offset: u64 =
-                block_range.logical_block_number * (self.block_size as u64);
-            let range_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
-
-            match self.block_tree.insert_value(
-                range_logical_offset,
-                range_size,
-                block_range.clone(),
-            ) {
+        for (extent_index, extent) in extents.iter().enumerate() {
+            if extent.logical_offset >= block_tree_data_size {
+                break;
+            }
+            let extent_size: u64 = min(extent.size, block_tree_data_size - extent.logical_offset);
+            match self
+                .block_tree
+                .insert_value(extent.logical_offset, extent_size, extent.clone())
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        "Unable to insert block range into block tree"
+                        format!(
+                            "Unable to insert extent: {} [{} - {}] into block tree",
+                            extent_index,
+                            extent.logical_offset,
+                            extent.logical_offset + extent_size,
+                        )
                     );
                     return Err(error);
                 }
@@ -81,13 +81,13 @@ impl ExtBlockReader {
     }
 }
 
-impl BlockReader for ExtBlockReader {
+impl BlockReader for ApfsBlockReader {
     /// Retrieves the size of the data.
     fn get_size(&self) -> u64 {
         self.size
     }
 
-    /// Reads media data based on the block ranges.
+    /// Reads media data based on the extents.
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
@@ -97,11 +97,11 @@ impl BlockReader for ExtBlockReader {
             if current_offset >= self.size {
                 break;
             }
-            let block_range: &ExtBlockRange = match self.block_tree.get_value(current_offset) {
+            let extent: &ApfsExtent = match self.block_tree.get_value(current_offset) {
                 Ok(Some(value)) => value,
                 Ok(None) => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
+                        "Missing extent for offset: {} (0x{:08x})",
                         current_offset, current_offset
                     )));
                 }
@@ -109,40 +109,28 @@ impl BlockReader for ExtBlockReader {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
+                            "Unable to retrieve extent for offset: {} (0x{:08x})",
                             current_offset, current_offset
                         )
                     );
                     return Err(error);
                 }
             };
-            let range_logical_offset: u64 =
-                block_range.logical_block_number * (self.block_size as u64);
-            let range_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
-
-            let range_relative_offset: u64 = current_offset - range_logical_offset;
-            let range_remainder_size: u64 = range_size - range_relative_offset;
+            let range_relative_offset: u64 = current_offset - extent.logical_offset;
+            let range_remainder_size: u64 = extent.size - range_relative_offset;
 
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
-
             let data_end_offset: usize = data_offset + range_read_size;
 
-            match block_range.range_type {
-                ExtBlockRangeType::InFile => {
-                    let range_physical_offset: u64 =
-                        block_range.physical_block_number * (self.block_size as u64);
+            let range_physical_offset: u64 =
+                (extent.physical_block_number as u64) * (self.block_size as u64);
 
-                    keramics_core::data_stream_read_exact_at_position!(
-                        &self.data_stream,
-                        &mut data[data_offset..data_end_offset],
-                        SeekFrom::Start(range_physical_offset + range_relative_offset)
-                    );
-                }
-                ExtBlockRangeType::Sparse => {
-                    data[data_offset..data_end_offset].fill(0);
-                }
-            };
+            keramics_core::data_stream_read_exact_at_position!(
+                &self.data_stream,
+                &mut data[data_offset..data_end_offset],
+                SeekFrom::Start(range_physical_offset + range_relative_offset)
+            );
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
         }
@@ -162,28 +150,22 @@ mod tests {
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {
-        let path_string: String = get_test_data_path("ext/ext2.raw");
+        let path_string: String = get_test_data_path("apfs/apfs.raw");
         let path_buf: PathBuf = PathBuf::from(path_string.as_str());
         let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
 
-        let mut block_reader = ExtBlockReader::new(&data_stream, 1024, 11358);
+        let mut block_reader = ApfsBlockReader::new(&data_stream, 4096, 11358);
 
-        let block_ranges: Vec<ExtBlockRange> = vec![
-            ExtBlockRange {
-                logical_block_number: 0,
-                physical_block_number: 3073,
-                number_of_blocks: 12,
-                range_type: ExtBlockRangeType::InFile,
-            },
-            ExtBlockRange {
-                logical_block_number: 12,
-                physical_block_number: 0,
-                number_of_blocks: 14,
-                range_type: ExtBlockRangeType::Sparse,
-            },
-        ];
-        block_reader.open(26, &block_ranges)?;
+        let extents: Vec<ApfsExtent> = vec![ApfsExtent {
+            logical_offset: 0,
+            size: 12288,
+            physical_block_number: 95,
+            encryption_identifier: 0,
+        }];
+        block_reader.open(&extents)?;
 
         Ok(())
     }
+
+    // TODO: add tests for read_data_from_blocks
 }

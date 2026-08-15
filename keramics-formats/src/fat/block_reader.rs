@@ -158,16 +158,13 @@ impl BlockReader for FatBlockReader {
 
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_read_count: usize = keramics_core::data_stream_read_at_position!(
+            keramics_core::data_stream_read_exact_at_position!(
                 &self.data_stream,
                 &mut data[data_offset..data_end_offset],
                 SeekFrom::Start(block_range.physical_offset + range_relative_offset)
             );
-            if range_read_count == 0 {
-                break;
-            }
-            data_offset += range_read_count;
-            current_offset += range_read_count as u64;
+            data_offset = data_end_offset;
+            current_offset += range_read_size as u64;
         }
         Ok(data_offset)
     }

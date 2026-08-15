@@ -50,10 +50,10 @@ impl HfsBlockReader {
     /// Opens a block stream.
     pub(super) fn open(
         &mut self,
-        number_of_blocks: u64,
+        number_of_blocks: u32,
         block_ranges: &[HfsBlockRange],
     ) -> Result<(), ErrorTrace> {
-        let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
+        let block_tree_data_size: u64 = (number_of_blocks as u64) * (self.block_size as u64);
         self.block_tree =
             BlockTree::<HfsBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
 
@@ -134,26 +134,20 @@ impl BlockReader for HfsBlockReader {
             let range_relative_offset: u64 = current_offset - range_logical_offset;
             let range_remainder_size: u64 = range_size - range_relative_offset;
 
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
+            let range_read_size: usize =
+                min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
 
             let range_physical_offset: u64 =
                 (block_range.physical_block_number as u64) * (self.block_size as u64);
 
-            let read_count: usize = keramics_core::data_stream_read_at_position!(
+            keramics_core::data_stream_read_exact_at_position!(
                 &self.data_stream,
                 &mut data[data_offset..data_end_offset],
                 SeekFrom::Start(range_physical_offset + range_relative_offset)
             );
-            if read_count == 0 {
-                break;
-            }
-            data_offset += read_count;
-            current_offset += read_count as u64;
+            data_offset = data_end_offset;
+            current_offset += range_read_size as u64;
         }
         Ok(data_offset)
     }

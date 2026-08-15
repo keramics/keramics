@@ -19,6 +19,7 @@ use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u16_le};
 
 use crate::path::Path;
 
+use super::block_reader::NtfsBlockReader;
 use super::block_stream::NtfsBlockStream;
 use super::boot_record::NtfsBootRecord;
 use super::constants::*;
@@ -316,15 +317,18 @@ impl NtfsFileSystem {
                 "Unsupported compressed $Data attribute"
             ));
         }
-        let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(self.mft.cluster_block_size);
+        let mut block_reader: NtfsBlockReader =
+            NtfsBlockReader::new(data_stream, self.mft.cluster_block_size);
 
-        match block_stream.open(data_stream, data_attribute) {
+        match block_reader.open(data_attribute) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open block stream");
+                keramics_core::error_trace_add_frame!(error, "Unable to open block reader");
                 return Err(error);
             }
         }
+        let mut block_stream: NtfsBlockStream = NtfsBlockStream::new(block_reader);
+
         let mut data: Vec<u8> = vec![0; 131072];
 
         match block_stream.read_exact_at_position(&mut data, SeekFrom::Start(0)) {

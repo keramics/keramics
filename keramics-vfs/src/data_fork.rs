@@ -13,12 +13,14 @@
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
+use keramics_formats::apfs::{ApfsFork, ApfsForkType};
 use keramics_formats::hfs::{HfsFork, HfsForkType};
 use keramics_formats::ntfs::NtfsDataFork;
 
 /// Virtual File System (VFS) data fork.
 pub enum VfsDataFork {
     DataStream(DataStreamReference),
+    Apfs(ApfsFork),
     Hfs(HfsFork),
     Ntfs(NtfsDataFork),
 }
@@ -27,6 +29,7 @@ impl VfsDataFork {
     /// Retrieves the data stream.
     pub fn get_data_stream(&self) -> Result<&DataStreamReference, ErrorTrace> {
         match self {
+            VfsDataFork::Apfs(apfs_fork) => Ok(apfs_fork.get_data_stream()),
             VfsDataFork::DataStream(data_stream) => Ok(data_stream),
             VfsDataFork::Hfs(hfs_fork) => Ok(hfs_fork.get_data_stream()),
             VfsDataFork::Ntfs(ntfs_data_fork) => ntfs_data_fork.get_data_stream(),
@@ -36,6 +39,10 @@ impl VfsDataFork {
     /// Retrieves the name.
     pub fn get_name(&self) -> Option<PathComponent> {
         match self {
+            VfsDataFork::Apfs(fork) => match fork.get_type() {
+                ApfsForkType::Data => None,
+                ApfsForkType::Resource => Some(PathComponent::from("rsrc")),
+            },
             VfsDataFork::DataStream(_) => None,
             VfsDataFork::Hfs(fork) => match fork.get_type() {
                 HfsForkType::Data => None,
@@ -57,12 +64,65 @@ mod tests {
 
     use keramics_core::open_os_data_stream;
     use keramics_formats::Path;
+    use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
     use keramics_formats::ext::{ExtFileEntry, ExtFileSystem};
     use keramics_formats::hfs::{HfsFileEntry, HfsFileSystem};
     use keramics_formats::ntfs::{NtfsFileEntry, NtfsFileSystem};
     use keramics_types::Ucs2String;
 
     use crate::tests::get_test_data_path;
+
+    // Tests with APFS.
+
+    fn get_apfs_file_system(path_string: &str) -> Result<ApfsFileSystem, ErrorTrace> {
+        let mut container: ApfsContainer = ApfsContainer::new();
+
+        let test_data_path_string: String = get_test_data_path(path_string);
+        let path_buf: PathBuf = PathBuf::from(test_data_path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+        container.read_data_stream(&data_stream)?;
+
+        let volume: ApfsVolume = container.get_volume_by_index(0)?;
+        volume.get_file_system()
+    }
+
+    fn get_apfs_file_entry(path_string: &str) -> Result<ApfsFileEntry, ErrorTrace> {
+        let apfs_file_system: ApfsFileSystem = get_apfs_file_system("apfs/apfs.raw")?;
+
+        let path: Path = Path::from(path_string);
+        match apfs_file_system.get_file_entry_by_path(&path)? {
+            Some(file_entry) => Ok(file_entry),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Missing file entry: {}",
+                path_string
+            ))),
+        }
+    }
+
+    #[test]
+    fn test_get_data_stream_with_apfs() -> Result<(), ErrorTrace> {
+        let apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let data_stream: DataStreamReference = apfs_file_entry.get_data_stream()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+
+        let _ = vfs_data_fork.get_data_stream()?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_name_with_apfs() -> Result<(), ErrorTrace> {
+        let apfs_file_entry: ApfsFileEntry = get_apfs_file_entry("/testdir1/testfile1")?;
+
+        let data_stream: DataStreamReference = apfs_file_entry.get_data_stream()?.unwrap();
+        let vfs_data_fork: VfsDataFork = VfsDataFork::DataStream(data_stream);
+
+        let name: Option<PathComponent> = vfs_data_fork.get_name();
+        assert_eq!(name, None);
+
+        Ok(())
+    }
 
     // Tests with ext.
 

@@ -12,15 +12,16 @@
  */
 
 /// Apple File System (APFS) extent.
+#[derive(Clone, Debug)]
 pub struct ApfsExtent {
-    /// Extent (logical) offset.
-    pub extent_offset: u64,
+    /// Logical offset.
+    pub logical_offset: u64,
 
-    /// Extent size.
-    pub extent_size: u64,
+    /// Size.
+    pub size: u64,
 
-    /// (Physical) block number.
-    pub block_number: u64,
+    /// Physical block number.
+    pub physical_block_number: u64,
 
     /// Encryption identifier.
     pub encryption_identifier: u64,
@@ -29,15 +30,15 @@ pub struct ApfsExtent {
 impl ApfsExtent {
     /// Creates a new extent.
     pub fn new(
-        extent_offset: u64,
-        extent_size: u64,
+        logical_offset: u64,
+        size: u64,
+        physical_block_number: u64,
         encryption_identifier: u64,
-        block_number: u64,
     ) -> Self {
         Self {
-            extent_offset,
-            extent_size,
-            block_number,
+            logical_offset,
+            size,
+            physical_block_number,
             encryption_identifier,
         }
     }
