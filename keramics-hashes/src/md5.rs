@@ -15,7 +15,7 @@
 //!
 //! Provides support for calculating a MD5 hash (RFC 1321).
 
-use keramics_types::bytes_to_u32_le;
+use std::slice::ChunksExact;
 
 use super::traits::DigestHashContext;
 
@@ -55,6 +55,18 @@ const MD5_VALUES_32BIT_INDEX: [usize; 64] = [
     8, 15, 6, 13, 4, 11, 2, 9,
 ];
 
+macro_rules! md5_transform_step {
+    ($initial_hash:expr, $block_hash0:expr, $block_hash1:expr, $values_32bit:expr, $index:expr) => {
+        let block_hash: u32 = $initial_hash
+            .wrapping_add($block_hash0)
+            .wrapping_add($values_32bit[MD5_VALUES_32BIT_INDEX[$index]])
+            .wrapping_add(MD5_SINES[$index])
+            .rotate_left(MD5_BIT_SHIFTS[$index]);
+
+        $block_hash0 = $block_hash1.wrapping_add(block_hash);
+    };
+}
+
 /// Context for calculating a MD5 hash.
 pub struct Md5Context {
     /// Hash values.
@@ -83,50 +95,156 @@ impl Md5Context {
 
     /// Calculates the hash of a block of data.
     #[inline(always)]
-    fn transform_block(
-        &self,
-        hash_values: &[u32],
-        data: &[u8],
-        mut data_offset: usize,
-    ) -> [u32; 4] {
+    fn transform_block(&self, hash_values: &mut [u32], data: &[u8]) {
         let mut values_32bit: [u32; 16] = [0; 16];
 
         // Break the block of data into 16 x 32-bit little-endian values
-        for value_32bit in &mut values_32bit {
-            *value_32bit = bytes_to_u32_le!(data, data_offset);
-
-            data_offset += 4;
+        for (index, chunk) in data[0..MD5_BLOCK_SIZE].chunks_exact(4).enumerate() {
+            values_32bit[index] = u32::from_le_bytes(chunk.try_into().unwrap());
         }
         // Calculate the hash values
-        let mut block_hashes: [u32; 4] = [0; 4];
-        block_hashes.copy_from_slice(hash_values);
+        let mut block_hash0: u32 = hash_values[0];
+        let mut block_hash1: u32 = hash_values[1];
+        let mut block_hash2: u32 = hash_values[2];
+        let mut block_hash3: u32 = hash_values[3];
 
-        for value_index in 0..64 {
-            let block_hash: u32 = if value_index < 16 {
-                (block_hashes[1] & block_hashes[2]) | (!(block_hashes[1]) & block_hashes[3])
-            } else if value_index < 32 {
-                (block_hashes[1] & block_hashes[3]) | (block_hashes[2] & !(block_hashes[3]))
-            } else if value_index < 48 {
-                block_hashes[1] ^ block_hashes[2] ^ block_hashes[3]
-            } else {
-                block_hashes[2] ^ (block_hashes[1] | !(block_hashes[3]))
-            }
-            .wrapping_add(block_hashes[0])
-            .wrapping_add(values_32bit[MD5_VALUES_32BIT_INDEX[value_index]])
-            .wrapping_add(MD5_SINES[value_index])
-            .rotate_left(MD5_BIT_SHIFTS[value_index]);
+        for index in (0..16).step_by(4) {
+            let initial_hash: u32 = (block_hash1 & block_hash2) | (!block_hash1 & block_hash3);
 
-            block_hashes[0] = block_hashes[3];
-            block_hashes[3] = block_hashes[2];
-            block_hashes[2] = block_hashes[1];
-            block_hashes[1] = block_hashes[1].wrapping_add(block_hash);
+            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
+
+            let initial_hash: u32 = (block_hash0 & block_hash1) | (!block_hash0 & block_hash2);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash3,
+                block_hash0,
+                values_32bit,
+                index + 1
+            );
+            let initial_hash: u32 = (block_hash3 & block_hash0) | (!block_hash3 & block_hash1);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash2,
+                block_hash3,
+                values_32bit,
+                index + 2
+            );
+            let initial_hash: u32 = (block_hash2 & block_hash3) | (!block_hash2 & block_hash0);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash1,
+                block_hash2,
+                values_32bit,
+                index + 3
+            );
+        }
+        for index in (16..32).step_by(4) {
+            let initial_hash: u32 = (block_hash1 & block_hash3) | (block_hash2 & !block_hash3);
+
+            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
+
+            let initial_hash: u32 = (block_hash0 & block_hash2) | (block_hash1 & !block_hash2);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash3,
+                block_hash0,
+                values_32bit,
+                index + 1
+            );
+            let initial_hash: u32 = (block_hash3 & block_hash1) | (block_hash0 & !block_hash1);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash2,
+                block_hash3,
+                values_32bit,
+                index + 2
+            );
+            let initial_hash: u32 = (block_hash2 & block_hash0) | (block_hash3 & !block_hash0);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash1,
+                block_hash2,
+                values_32bit,
+                index + 3
+            );
+        }
+        for index in (32..48).step_by(4) {
+            let initial_hash: u32 = block_hash1 ^ block_hash2 ^ block_hash3;
+
+            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
+
+            let initial_hash: u32 = block_hash0 ^ block_hash1 ^ block_hash2;
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash3,
+                block_hash0,
+                values_32bit,
+                index + 1
+            );
+            let initial_hash: u32 = block_hash3 ^ block_hash0 ^ block_hash1;
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash2,
+                block_hash3,
+                values_32bit,
+                index + 2
+            );
+            let initial_hash: u32 = block_hash2 ^ block_hash3 ^ block_hash0;
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash1,
+                block_hash2,
+                values_32bit,
+                index + 3
+            );
+        }
+        for index in (48..64).step_by(4) {
+            let initial_hash: u32 = block_hash2 ^ (block_hash1 | !block_hash3);
+
+            md5_transform_step!(initial_hash, block_hash0, block_hash1, values_32bit, index);
+
+            let initial_hash: u32 = block_hash1 ^ (block_hash0 | !block_hash2);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash3,
+                block_hash0,
+                values_32bit,
+                index + 1
+            );
+            let initial_hash: u32 = block_hash0 ^ (block_hash3 | !block_hash1);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash2,
+                block_hash3,
+                values_32bit,
+                index + 2
+            );
+            let initial_hash: u32 = block_hash3 ^ (block_hash2 | !block_hash0);
+
+            md5_transform_step!(
+                initial_hash,
+                block_hash1,
+                block_hash2,
+                values_32bit,
+                index + 3
+            );
         }
         // Update the hash values
-        for value_index in 0..4 {
-            block_hashes[value_index] =
-                block_hashes[value_index].wrapping_add(hash_values[value_index]);
-        }
-        block_hashes
+        hash_values[0] = block_hash0.wrapping_add(hash_values[0]);
+        hash_values[1] = block_hash1.wrapping_add(hash_values[1]);
+        hash_values[2] = block_hash2.wrapping_add(hash_values[2]);
+        hash_values[3] = block_hash3.wrapping_add(hash_values[3]);
     }
 }
 
@@ -153,14 +271,13 @@ impl DigestHashContext for Md5Context {
         self.block[self.block_offset + 1..bit_size_block_offset].fill(0);
         self.block[bit_size_block_offset..padding_size].copy_from_slice(&bit_size.to_le_bytes());
 
-        for block_offset in (0..padding_size).step_by(MD5_BLOCK_SIZE) {
-            let hash_values: [u32; 4] =
-                self.transform_block(&self.hash_values, &self.block, block_offset);
+        let mut hash_values: [u32; 4] = [0; 4];
+        hash_values.copy_from_slice(&self.hash_values);
 
-            self.hash_values.copy_from_slice(&hash_values);
+        for chunk in self.block[0..padding_size].chunks_exact(MD5_BLOCK_SIZE) {
+            self.transform_block(&mut hash_values, chunk);
         }
-        let hash: Vec<u8> = self
-            .hash_values
+        let hash: Vec<u8> = hash_values
             .iter()
             .flat_map(|hash_value| hash_value.to_le_bytes())
             .collect::<Vec<u8>>();
@@ -175,41 +292,40 @@ impl DigestHashContext for Md5Context {
 
     /// Calculates the digest hash of the data.
     fn update(&mut self, data: &[u8]) {
-        let data_size: usize = data.len();
-        let mut data_offset: usize = 0;
+        let mut hash_values: [u32; 4] = [0; 4];
+        hash_values.copy_from_slice(&self.hash_values);
 
-        if self.block_offset > 0 {
-            while self.block_offset < MD5_BLOCK_SIZE {
-                if data_offset >= data_size {
-                    break;
-                }
-                self.block[self.block_offset] = data[data_offset];
+        let data_offset: usize = if self.block_offset == 0 {
+            0
+        } else {
+            let data_end_offset: usize = MD5_BLOCK_SIZE - self.block_offset;
+
+            for byte_value in data[0..data_end_offset].iter() {
+                self.block[self.block_offset] = *byte_value;
                 self.block_offset += 1;
-
-                data_offset += 1;
             }
             if self.block_offset == MD5_BLOCK_SIZE {
-                let hash_values: [u32; 4] = self.transform_block(&self.hash_values, &self.block, 0);
+                self.transform_block(&mut hash_values, &self.block);
 
-                self.hash_values.copy_from_slice(&hash_values);
                 self.number_of_bytes_hashed += MD5_BLOCK_SIZE as u64;
-
                 self.block_offset = 0;
             }
-        }
-        while data_offset + MD5_BLOCK_SIZE < data_size {
-            let hash_values: [u32; 4] = self.transform_block(&self.hash_values, data, data_offset);
+            data_end_offset
+        };
+        let mut chunks: ChunksExact<'_, u8> = data[data_offset..].chunks_exact(MD5_BLOCK_SIZE);
 
-            self.hash_values.copy_from_slice(&hash_values);
+        for chunk in &mut chunks {
+            self.transform_block(&mut hash_values, chunk);
+
             self.number_of_bytes_hashed += MD5_BLOCK_SIZE as u64;
-
-            data_offset += MD5_BLOCK_SIZE;
         }
-        while data_offset < data_size {
-            self.block[self.block_offset] = data[data_offset];
-            self.block_offset += 1;
+        self.hash_values.copy_from_slice(&hash_values);
 
-            data_offset += 1;
+        let remainder: &[u8] = chunks.remainder();
+
+        for byte_value in remainder.iter() {
+            self.block[self.block_offset] = *byte_value;
+            self.block_offset += 1;
         }
     }
 }

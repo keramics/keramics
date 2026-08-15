@@ -19,7 +19,7 @@ use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;
 
-/// Apple Partition Map (APM) parition information.
+/// Apple Partition Map (APM) partition information.
 struct ApmPartitionInfo {
     /// The partition index.
     pub index: usize,

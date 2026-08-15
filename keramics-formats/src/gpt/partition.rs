@@ -25,7 +25,7 @@ pub struct GptPartition {
     current_offset: u64,
 
     /// The index of the corresponding partition table entry.
-    parition_index: usize,
+    partition_index: usize,
 
     /// The offset of the partition relative to start of the volume system.
     pub offset: u64,
@@ -43,7 +43,7 @@ pub struct GptPartition {
 impl GptPartition {
     /// Creates a new partition.
     pub(super) fn new(
-        parition_index: usize,
+        partition_index: usize,
         offset: u64,
         size: u64,
         type_identifier: &Uuid,
@@ -52,7 +52,7 @@ impl GptPartition {
         Self {
             data_stream: None,
             current_offset: 0,
-            parition_index,
+            partition_index,
             offset,
             size,
             type_identifier: type_identifier.clone(),
@@ -67,7 +67,7 @@ impl GptPartition {
 
     /// Retrieves the partition (table entry) index.
     pub fn get_partition_index(&self) -> usize {
-        self.parition_index
+        self.partition_index
     }
 
     /// Retrieves the type identifier.

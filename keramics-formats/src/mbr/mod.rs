@@ -11,7 +11,8 @@
  * under the License.
  */
 
-pub(crate) mod constants;
+mod chs_address;
+pub mod constants;
 mod extended_boot_record;
 mod master_boot_record;
 mod partition;

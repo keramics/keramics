@@ -37,7 +37,7 @@ A FAT file system consists of:
 
 | Term | Description |
 | --- | --- |
-| Hidden sectors | The sectors stored before the FAT volume, such as those used to store a parition table |
+| Hidden sectors | The sectors stored before the FAT volume, such as those used to store a partition table |
 
 ### Determing the FAT format version
 

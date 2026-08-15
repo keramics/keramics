@@ -21,7 +21,7 @@ use crate::formatters::ByteSize;
 
 use super::constants::*;
 
-/// GUID Partition Table (GPT) parition information.
+/// GUID Partition Table (GPT) partition information.
 struct GptPartitionInfo {
     /// The index of the corresponding partition table entry.
     pub partition_index: usize,

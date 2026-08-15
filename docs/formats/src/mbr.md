@@ -36,7 +36,7 @@ derive the sector size from the data:
 * check the "boot signature" of the first EPR, if present
 * check the content of well known partition types
 
-## Cylinder Head Sector (CHS) address
+## Cylinder Head Sector (CHS) address {#chs_address}
 
 The Cylinder Head Sector (CHS) address is 24 bits in size and consists of:
 
@@ -49,7 +49,7 @@ The Cylinder Head Sector (CHS) address is 24 bits in size and consists of:
 The logical block address (LBA) can be determined from the CHS with the following calculation:
 
 ```python
-lba = (((cylinder * heads_per_cylinder) + head) * sectors_per_track) + sector - 1
+lba = (((cylinder * heads_per_cylinder) + head) * sectors_per_track) + (sector - 1)
 ```
 
 ## The Master Boot Record (MBR)
@@ -119,8 +119,8 @@ about the logical partition (volume) and additional extended partition tables.
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 446 | 0x00 | Unknown (Unused), which should contain zero bytes |
-| 446 | 16 | | Partition table entry 1 |
-| 462 | 16 | | Partition table entry 2, which should contain an extended partition |
+| 446 | 16 | | Partition table entry 1, contains the logical partition |
+| 462 | 16 | | Partition table entry 2, which should contain an extended partition (of type 0x05) or be unused and contain zero bytes |
 | 478 | 16 | 0x00 | Partition table entry 3, which should be unused and contain zero bytes |
 | 494 | 16 | 0x00 | Partition table entry 4, which should be unused and contain zero bytes |
 | 510 | 2 | "\x55\xaa" | Signature |
@@ -128,8 +128,8 @@ about the logical partition (volume) and additional extended partition tables.
 The second partition entry contains an extended partition which points to the next EPR. The LBA
 addresses in the EPR are relative to the start of the first EPR.
 
-The first EPR typically has a [partition type](#partition_types) of 0x05 but certain version of
-Windows are known to use a partition type 0x0f, such as Windows 98.
+The first EPR typically has a [partition type](#partition_types) of "Extended (CHS)" (0x05) or
+"Extended (LBA)" (0x0f).
 
 ## The partition table entry
 
@@ -138,11 +138,17 @@ The partition table entry is 16 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 1 | | [Partition flags](#partition_flags) |
-| 1 | 3 | | The partition start address, which contains a CHS relative from the start of the harddisk |
+| 1 | 3 | | The partition [start CHS address](#chs_address), which is relative from the start of the MBR |
 | 4 | 1 | | [Partition type](#partition_types) |
-| 5 | 3 | | The partition end address, which contains a CHS relative from the start of the harddisk |
-| 8 | 4 | | The partition start address, which contains a LBA (sectors) relative from the start of the harddisk |
+| 5 | 3 | | The partition [end CHS address](#chs_address), which is relative from the start of the MBR |
+| 8 | 4 | | The partition start LBA (sector address) |
 | 12 | 4 | | Size of the partition in number of sectors |
+
+For partition table entry 1 (logical partition), the partition start LBA is relative from the start
+of the **current** extended partition record.
+
+For partition table entry 2 (next extended partition), the partition start LBA is relative from the
+start of the **first** extended partition record.
 
 ### Partition flags {#partition_flags}
 

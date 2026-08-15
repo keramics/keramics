@@ -73,7 +73,7 @@ macro_rules! error_trace_function {
 #[macro_export]
 macro_rules! error_trace_new {
     ( $message:expr $(,)? ) => {
-        $crate::ErrorTrace::new(format!("{}: {}", $crate::error_trace_function!(), $message,))
+        $crate::ErrorTrace::new(format!("{}: {}", $crate::error_trace_function!(), $message))
     };
 }
 
@@ -94,7 +94,7 @@ macro_rules! error_trace_new_with_error {
 #[macro_export]
 macro_rules! error_trace_add_frame {
     ( $error:expr, $message:expr $(,)? ) => {
-        $error.add_frame(format!("{}: {}", $crate::error_trace_function!(), $message,))
+        $error.add_frame(format!("{}: {}", $crate::error_trace_function!(), $message))
     };
 }
 

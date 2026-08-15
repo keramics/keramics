@@ -885,7 +885,7 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(hfs_file_entry.get_change_time(), None,);
+        assert_eq!(hfs_file_entry.get_change_time(), None);
         Ok(())
     }
 
@@ -1340,7 +1340,7 @@ mod tests {
         let path: Path = Path::from("/testdir1/testfile1");
         let hfs_file_entry: HfsFileEntry = hfs_file_system.get_file_entry_by_path(&path)?.unwrap();
 
-        assert_eq!(hfs_file_entry.get_backup_time(), &DateTime::NotSet,);
+        assert_eq!(hfs_file_entry.get_backup_time(), &DateTime::NotSet);
 
         Ok(())
     }

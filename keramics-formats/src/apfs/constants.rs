@@ -24,7 +24,7 @@ pub(super) const APFS_CONTAINER_KEY_BAG_SIGNATURE: &[u8] = b"syek\x00\x00\x00\x0
 pub(super) const APFS_VOLUME_KEY_BAG_SIGNATURE: &[u8] = b"scer\x00\x00\x00\x00";
 
 /// APFS file system B-tree metadata data type.
-pub(super) const APFS_FILE_SYSTEM_DATA_TYPE_METADATA: u8 = 1;
+// pub(super) const APFS_FILE_SYSTEM_DATA_TYPE_METADATA: u8 = 1;
 
 /// APFS file system B-tree inode data type.
 pub(super) const APFS_FILE_SYSTEM_DATA_TYPE_INODE: u8 = 3;

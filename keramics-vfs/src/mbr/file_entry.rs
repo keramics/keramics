@@ -71,7 +71,7 @@ impl MbrFileEntry {
     pub fn get_partition_number(&self) -> Option<usize> {
         match self {
             MbrFileEntry::Partition { partition, .. } => match partition.read() {
-                Ok(mbr_partition) => Some(mbr_partition.entry_index + 1),
+                Ok(mbr_partition) => Some(mbr_partition.get_partition_index() + 1),
                 Err(_) => None,
             },
             MbrFileEntry::Root { .. } => None,

@@ -31,9 +31,6 @@ pub struct MbrVolumeSystem {
     /// Bytes per sector.
     pub bytes_per_sector: u32,
 
-    /// First extended boot record LBA.
-    first_extended_boot_record_lba: u64,
-
     /// Disk identity.
     pub disk_identity: u32,
 
@@ -49,7 +46,6 @@ impl MbrVolumeSystem {
         Self {
             data_stream: None,
             bytes_per_sector: 0,
-            first_extended_boot_record_lba: 0,
             disk_identity: 0,
             partition_entries: Vec::new(),
         }
@@ -173,7 +169,7 @@ impl MbrVolumeSystem {
         let mut extended_boot_record_lba: u64 = 0;
 
         while let Some(mut partition_entry) = master_boot_record.partition_entries.pop_front() {
-            if partition_entry.partition_type == 5 || partition_entry.partition_type == 15 {
+            if partition_entry.partition_type == 0x05 || partition_entry.partition_type == 0x0f {
                 if self.bytes_per_sector == 0 {
                     return Err(keramics_core::error_trace_new!(
                         "Unsupported bytes per sector: 0"
@@ -192,12 +188,16 @@ impl MbrVolumeSystem {
             entry_index += 1;
         }
         if extended_boot_record_lba != 0 {
-            self.first_extended_boot_record_lba = extended_boot_record_lba;
-
             let extended_boot_record_offset: u64 =
                 extended_boot_record_lba * (self.bytes_per_sector as u64);
 
-            match self.read_extended_boot_record(data_stream, extended_boot_record_offset, 4) {
+            match self.read_extended_boot_record(
+                data_stream,
+                extended_boot_record_offset,
+                4,
+                extended_boot_record_lba,
+                extended_boot_record_lba,
+            ) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -275,6 +275,8 @@ impl MbrVolumeSystem {
         data_stream: &DataStreamReference,
         offset: u64,
         first_entry_index: usize,
+        first_extended_boot_record_lba: u64,
+        current_extended_boot_record_lba: u64,
     ) -> Result<(), ErrorTrace> {
         if first_entry_index >= 1024 {
             return Err(keramics_core::error_trace_new!(
@@ -296,34 +298,52 @@ impl MbrVolumeSystem {
                 return Err(error);
             }
         }
-        let mut entry_index: usize = 0;
-        let mut extended_boot_record_offset: u64 = 0;
+        let mut next_extended_boot_record_offset: u64 = 0;
+        let mut next_extended_boot_record_lba: u64 = 0;
 
-        while let Some(mut partition_entry) = extended_boot_record.partition_entries.pop_front() {
-            if partition_entry.partition_type == 0 {
-                continue;
-            }
-            if partition_entry.partition_type == 5 {
-                if extended_boot_record_offset != 0 {
-                    return Err(keramics_core::error_trace_new!(
-                        "More than 1 extended partition entry per boot record is not supported"
-                    ));
+        if let Some(mut partition_entry) = extended_boot_record.partition_entries.get(1) {
+            if partition_entry.partition_type != 0 {
+                if partition_entry.partition_type != 0x05 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported partition entry: 1 - unusuppored type: 0x{:02x}",
+                        partition_entry.partition_type
+                    )));
                 }
-                extended_boot_record_offset = (self.first_extended_boot_record_lba
-                    + partition_entry.start_address_lba)
-                    * (self.bytes_per_sector as u64);
-            } else if partition_entry.partition_type != 0 {
-                partition_entry.index = first_entry_index + entry_index;
-                partition_entry.start_address_lba += self.first_extended_boot_record_lba;
-                self.partition_entries.push(partition_entry);
+                next_extended_boot_record_lba = first_extended_boot_record_lba + partition_entry.start_address_lba;
+                next_extended_boot_record_offset = next_extended_boot_record_lba * (self.bytes_per_sector as u64);
+
+                // TODO check bounds
             }
-            entry_index += 1;
         }
-        if extended_boot_record_offset != 0 {
+        for index in 2..4 {
+            if let Some(mut partition_entry) = extended_boot_record.partition_entries.get(index) {
+                if partition_entry.partition_type != 0 {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unsupported partition entry: {} - unsupported type: 0x{:02x}",
+                        index, partition_entry.partition_type
+                    )));
+                }
+            }
+        }
+        if let Some(mut partition_entry) = extended_boot_record.partition_entries.pop_front() {
+            if partition_entry.partition_type == 0 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported partition entry: 0 - unsupported type: 0x{:02x}",
+                    partition_entry.partition_type
+                )));
+            }
+            partition_entry.index = first_entry_index;
+            partition_entry.start_address_lba += current_extended_boot_record_lba;
+
+            self.partition_entries.push(partition_entry);
+        }
+        if next_extended_boot_record_offset != 0 {
             match self.read_extended_boot_record(
                 data_stream,
-                extended_boot_record_offset,
+                next_extended_boot_record_offset,
                 first_entry_index + 4,
+                first_extended_boot_record_lba,
+                next_extended_boot_record_lba,
             ) {
                 Ok(_) => {}
                 Err(mut error) => {

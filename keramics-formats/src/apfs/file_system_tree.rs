@@ -217,17 +217,17 @@ impl ApfsFileSystemTree {
                 if key.object_identifier == object_identifier
                     && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE
                 {
-                    let (name, _): (ByteString, u32) =
-                        match self.read_name(&node, &key_data, entry_index) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    format!("Unable to read entry: {} name", entry_index)
-                                );
-                                return Err(error);
-                            }
-                        };
+                    let (name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
+                    {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to read entry: {} name", entry_index)
+                            );
+                            return Err(error);
+                        }
+                    };
                     match self.read_attribute(&node, entry_index) {
                         Ok(attribute) => {
                             attributes.insert(name, attribute);
@@ -484,17 +484,17 @@ impl ApfsFileSystemTree {
                 if key.object_identifier == parent_object_identifier
                     && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
                 {
-                    let (name, _): (ByteString, u32) =
-                        match self.read_name(&node, &key_data, entry_index) {
-                            Ok(result) => result,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    format!("Unable to read entry: {} name", entry_index)
-                                );
-                                return Err(error);
-                            }
-                        };
+                    let (name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
+                    {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!("Unable to read entry: {} name", entry_index)
+                            );
+                            return Err(error);
+                        }
+                    };
                     match self.read_directory_entry(&node, entry_index) {
                         Ok(directory_entry) => {
                             directory_entries.insert(name, directory_entry);
@@ -779,17 +779,17 @@ impl ApfsFileSystemTree {
             if key.object_identifier == parent_object_identifier
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
             {
-                let (key_name, _): (ByteString, u32) =
-                    match self.read_name(&node, &key_data, entry_index) {
-                        Ok(result) => result,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!("Unable to read entry: {} name", entry_index)
-                            );
-                            return Err(error);
-                        }
-                    };
+                let (key_name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
+                {
+                    Ok(result) => result,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Unable to read entry: {} name", entry_index)
+                        );
+                        return Err(error);
+                    }
+                };
                 let utf16_string: Utf16String = if self.use_case_folding {
                     match Utf16String::from_byte_string_with_case_folding(
                         &key_name,
@@ -1602,7 +1602,6 @@ impl ApfsFileSystemTree {
     /// Reads a name.
     fn read_name(
         &self,
-        node: &ApfsBtreeNode,
         key_data: &[u8],
         entry_index: usize,
     ) -> Result<(ByteString, u32), ErrorTrace> {
