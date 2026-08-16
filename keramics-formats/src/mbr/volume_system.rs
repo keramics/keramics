@@ -309,8 +309,10 @@ impl MbrVolumeSystem {
                         partition_entry.partition_type
                     )));
                 }
-                next_extended_boot_record_lba = first_extended_boot_record_lba + partition_entry.start_address_lba;
-                next_extended_boot_record_offset = next_extended_boot_record_lba * (self.bytes_per_sector as u64);
+                next_extended_boot_record_lba =
+                    first_extended_boot_record_lba + partition_entry.start_address_lba;
+                next_extended_boot_record_offset =
+                    next_extended_boot_record_lba * (self.bytes_per_sector as u64);
 
                 // TODO check bounds
             }
