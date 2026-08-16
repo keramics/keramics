@@ -27,15 +27,19 @@ use super::partition_entry::MbrPartitionEntry;
         field(name = "unknown1", data_type = "[u8; 446]", format = "hex"),
         field(
             name = "partition_entries",
-            data_type = "[Struct<MbrPartitionEntry; 16>; 4]"
+            data_type = "[Struct<MbrPartitionEntry; 16>; 2]"
         ),
+        field(name = "unused_partition_entries", data_type = "[u8; 32]"),
         field(name = "boot_signature", data_type = "[u8; 2]", format = "hex"),
     ),
     methods("debug_read_data", "read_at_position")
 )]
 /// Extended Boot Record (MBR).
 pub struct MbrExtendedBootRecord {
+    /// Disk identity.
     pub disk_identity: u32,
+
+    /// Partition entries.
     pub partition_entries: VecDeque<MbrPartitionEntry>,
 }
 
@@ -50,7 +54,7 @@ impl MbrExtendedBootRecord {
 
     /// Reads the extended boot record from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 512 {
+        if data.len() < 512 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         if &data[510..512] != MBR_BOOT_SIGNATURE {

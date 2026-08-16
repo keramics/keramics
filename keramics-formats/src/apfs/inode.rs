@@ -146,7 +146,7 @@ impl ApfsInode {
             self.data_stream_descriptor = match extended_fields.get(&8) {
                 Some(field_data) => {
                     keramics_core::debug_trace_structure!(
-                        ApfsDataStreamDescriptor::debug_read_data(&field_data,)
+                        ApfsDataStreamDescriptor::debug_read_data(&field_data)
                     );
                     let mut data_stream_descriptor: ApfsDataStreamDescriptor =
                         ApfsDataStreamDescriptor::new();

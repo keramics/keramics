@@ -15,7 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
-use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
+use keramics_formats::cdsaencr::CdsaEncrCredential;
 use keramics_formats::ewf::EwfImage;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
 use keramics_formats::qcow::{QcowImage, QcowImageLayer};
@@ -27,9 +27,9 @@ use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::vhdx::{VhdxImage, VhdxImageLayer};
 use keramics_formats::vmdk::{VmdkImage, VmdkImageLayer};
 use keramics_formats::{
-    FileResolverReference, FormatIdentifier, FormatScanner, PathComponent, open_os_file_resolver,
+    FileResolverReference, FormatIdentifier, PathComponent, open_os_file_resolver,
 };
-use keramics_vfs::{VfsCredential, VfsCredentialStore};
+use keramics_vfs::{VfsCredential, VfsCredentialStore, VfsScanner};
 
 /// Storage media image.
 pub enum StorageMediaImage {
@@ -41,6 +41,9 @@ pub enum StorageMediaImage {
     },
     Qcow {
         qcow_image_layer: QcowImageLayer,
+    },
+    Raw {
+        data_stream: DataStreamReference,
     },
     SparseBundle {
         sparsebundle_image: Arc<RwLock<SparseBundleImage>>,
@@ -101,6 +104,7 @@ impl StorageMediaImage {
             Self::Qcow {
                 qcow_image_layer, ..
             } => qcow_image_layer.clone(),
+            Self::Raw { data_stream } => data_stream.clone(),
             Self::SparseBundle { sparsebundle_image } => sparsebundle_image.clone(),
             Self::SparseImage { sparseimage_file } => sparseimage_file.clone(),
             Self::SplitRaw { splitraw_image } => splitraw_image.clone(),
@@ -164,40 +168,71 @@ impl StorageMediaImage {
                 return Err(error);
             }
         };
-        match Self::scan_for_storage_image_formats(&data_stream) {
-            Ok(Some(format_identifier)) => match format_identifier {
-                FormatIdentifier::CdsaEncr => Err(keramics_core::error_trace_new!(
-                    "Store media image is encrypted and requires a credential to be unlocked",
-                )),
-                FormatIdentifier::Ewf => Self::open_ewf_image(path),
-                FormatIdentifier::Pdi => Self::open_pdi_image(path),
-                FormatIdentifier::Qcow => Self::open_qcow_image(path),
-                FormatIdentifier::SparseImage => Self::open_sparseimage_file(path),
-                FormatIdentifier::Udif => Self::open_udif_image(path),
-                FormatIdentifier::Vhd => Self::open_vhd_image(path),
-                FormatIdentifier::Vhdx => Self::open_vhdx_image(path),
-                FormatIdentifier::Vmdk => Self::open_vmdk_image(path),
-                _ => Err(keramics_core::error_trace_new!(format!(
-                    "Unsupported format: {}",
-                    format_identifier.to_string()
-                ))),
-            },
-            Ok(None) => {
-                match Self::open_splitraw_image(path) {
-                    Ok(storage_media_image) => Ok(storage_media_image),
-                    Err(_) => {
-                        // TODO: scan for volume and file system formats to detect raw storage
-                        // media image format.
-                        Err(keramics_core::error_trace_new!(
-                            "No storage media image formats found"
-                        ))
-                    }
-                }
+        let mut vfs_scanner: VfsScanner = VfsScanner::new();
+
+        match vfs_scanner.build() {
+            Ok(_) => {}
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to build VFS scanner",
+                    error
+                ));
             }
+        }
+
+        match vfs_scanner.scan_for_storage_media_image_format(&data_stream) {
+            Ok(Some(FormatIdentifier::CdsaEncr)) => {
+                return Err(keramics_core::error_trace_new!(
+                    "Store media image is encrypted and requires a credential to be unlocked",
+                ));
+            }
+            Ok(Some(FormatIdentifier::Ewf)) => return Self::open_ewf_image(path),
+            Ok(Some(FormatIdentifier::Pdi)) => return Self::open_pdi_image(path),
+            Ok(Some(FormatIdentifier::Qcow)) => return Self::open_qcow_image(path),
+            Ok(Some(FormatIdentifier::SparseImage)) => return Self::open_sparseimage_file(path),
+            Ok(Some(FormatIdentifier::Udif)) => return Self::open_udif_image(path),
+            Ok(Some(FormatIdentifier::Vhd)) => return Self::open_vhd_image(path),
+            Ok(Some(FormatIdentifier::Vhdx)) => return Self::open_vhdx_image(path),
+            Ok(Some(FormatIdentifier::Vmdk)) => return Self::open_vmdk_image(path),
+            Ok(Some(format_identifier)) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported format: {}",
+                    format_identifier
+                )));
+            }
+            Ok(None) => match Self::open_splitraw_image(path) {
+                Ok(storage_media_image) => return Ok(storage_media_image),
+                Err(_) => {}
+            },
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
                     "Unable to scan data stream for storage media image format signatures"
+                );
+                return Err(error);
+            }
+        }
+        // Scan for volume and file system formats to detect raw storage media images.
+        match vfs_scanner.scan_for_volume_system_format(&data_stream) {
+            Ok(Some(_)) => return Self::open_raw_image(path),
+            Ok(None) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for volume system format signatures"
+                );
+                return Err(error);
+            }
+        }
+        match vfs_scanner.scan_for_file_system_format(&data_stream) {
+            Ok(Some(_)) => Self::open_raw_image(path),
+            Ok(None) => Err(keramics_core::error_trace_new!(
+                "No storage media image formats found"
+            )),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for file system format signatures"
                 );
                 Err(error)
             }
@@ -347,6 +382,24 @@ impl StorageMediaImage {
                 Err(error)
             }
         }
+    }
+
+    /// Opens a raw image.
+    fn open_raw_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+        let data_stream: DataStreamReference = match open_os_data_stream(path) {
+            Ok(data_stream) => data_stream,
+            Err(mut error) => {
+                // TODO: get printable version of path instead of using display().
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to open data stream: {}", path.display())
+                );
+                return Err(error);
+            }
+        };
+        Ok(Self::Raw {
+            data_stream: data_stream,
+        })
     }
 
     /// Opens a sparsebundle image.
@@ -719,115 +772,5 @@ impl StorageMediaImage {
                 Err(error)
             }
         }
-    }
-
-    /// Scans a data stream for storage media image format signatures.
-    fn scan_for_storage_image_formats(
-        data_stream: &DataStreamReference,
-    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
-        let mut format_scanner: FormatScanner = FormatScanner::new();
-        format_scanner.add_cdsaencr_signatures();
-        format_scanner.add_ewf_signatures();
-        format_scanner.add_pdi_signatures();
-        format_scanner.add_qcow_signatures();
-        // TODO: support for sparse bundle.
-        format_scanner.add_sparseimage_signatures();
-        format_scanner.add_udif_signatures();
-        format_scanner.add_vhd_signatures();
-        format_scanner.add_vhdx_signatures();
-        format_scanner.add_vmdk_signatures();
-
-        match format_scanner.build() {
-            Ok(_) => {}
-            Err(error) => {
-                return Err(keramics_core::error_trace_new_with_error!(
-                    "Unable to build format scanner",
-                    error
-                ));
-            }
-        }
-        let mut format_identifier: Option<FormatIdentifier> =
-            match format_scanner.scan_data_stream(data_stream) {
-                Ok(mut scan_results) => {
-                    if scan_results.len() > 1 {
-                        return Err(keramics_core::error_trace_new!(
-                            "Unsupported multiple format signatures"
-                        ));
-                    }
-                    scan_results.drain().next()
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to scan data stream for format signatures"
-                    );
-                    return Err(error);
-                }
-            };
-        if format_identifier == Some(FormatIdentifier::CdsaEncr) {
-            let mut cdsaencr_container: CdsaEncrContainer = CdsaEncrContainer::new();
-
-            match cdsaencr_container.read_data_stream(data_stream) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to open Mac OS Encrypted Encoding container"
-                    );
-                    return Err(error);
-                }
-            }
-            let credential_store: &VfsCredentialStore = VfsCredentialStore::current();
-            let mut credentials: Vec<CdsaEncrCredential> = Vec::new();
-
-            for vfs_credential in credential_store.iter() {
-                match vfs_credential {
-                    VfsCredential::Passphrase(passphrase) => {
-                        credentials.push(CdsaEncrCredential::Passphrase(passphrase.clone()))
-                    }
-                    _ => {}
-                }
-            }
-            match cdsaencr_container.unlock(&credentials) {
-                Ok(false) => {}
-                Ok(true) => {
-                    let container_data_stream: DataStreamReference =
-                        Arc::new(RwLock::new(cdsaencr_container));
-
-                    format_identifier = match format_scanner
-                        .scan_data_stream(&container_data_stream)
-                    {
-                        Ok(mut scan_results) => {
-                            if scan_results.len() > 1 {
-                                return Err(keramics_core::error_trace_new!(
-                                    "Unsupported multiple format signatures in Mac OS Encrypted Encoding container"
-                                ));
-                            }
-                            match scan_results.drain().next() {
-                                Some(format_identifier) => Some(format_identifier),
-                                // If no format was found treat the contents of the encrypted
-                                // container as an encrypted uncompressed UDIF image.
-                                None => Some(FormatIdentifier::Udif),
-                            }
-                        }
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                "Unable to scan Mac OS Encrypted Encoding container for format signatures"
-                            );
-                            return Err(error);
-                        }
-                    };
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to unlock Mac OS Encrypted Encoding container"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        Ok(format_identifier)
     }
 }

@@ -115,9 +115,6 @@ pub struct ApfsVolumeSuperblock {
     /// Object header.
     pub object_header: ApfsObjectHeader,
 
-    /// Number of blocks.
-    pub number_of_blocks: u64,
-
     /// Features flags.
     pub feature_flags: u64,
 
@@ -151,7 +148,6 @@ impl ApfsVolumeSuperblock {
     pub fn new() -> Self {
         Self {
             object_header: ApfsObjectHeader::new(),
-            number_of_blocks: 0,
             feature_flags: 0,
             read_only_compatible_feature_flags: 0,
             incompatible_feature_flags: 0,

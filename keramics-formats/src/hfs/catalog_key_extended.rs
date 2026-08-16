@@ -26,7 +26,7 @@ use super::catalog_key::HfsCatalogKey;
             size_condition = ">= 6",
             field(name = "parent_identifier", data_type = "u32"),
         ),
-        group(size_condition = ">= 8", field(name = "name_size", data_type = "u16"),)
+        group(size_condition = ">= 8", field(name = "name_size", data_type = "u16"))
     ),
     methods("debug_read_data")
 )]

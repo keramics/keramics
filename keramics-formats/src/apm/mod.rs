@@ -11,7 +11,7 @@
  * under the License.
  */
 
-mod constants;
+pub mod constants;
 mod partition;
 mod partition_map_entry;
 mod partitions;

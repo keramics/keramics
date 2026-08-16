@@ -11,7 +11,7 @@
  * under the License.
  */
 
-pub(crate) mod constants;
+pub mod constants;
 mod partition;
 mod partition_entry;
 mod partition_table_header;

@@ -15,9 +15,12 @@ use std::fmt;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::mpsc::sync_channel;
+use std::thread;
 
 use clap::{Args, Parser, Subcommand};
-use indicatif::{ProgressBar, ProgressState, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressState, ProgressStyle};
+use sysinfo::System;
 
 use keramics_core::formatters::format_as_string;
 use keramics_core::mediator::Mediator;
@@ -954,13 +957,18 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            let progress_bar_template: &str = concat!(
-                "Hashing at {percent}% [{wide_bar}] ",
+            let calculate_md5_hash: bool = stored_md5_hash.is_some() || stored_sha1_hash.is_none();
+            let calculate_sha1_hash: bool = stored_sha1_hash.is_some();
+
+            let multi_progress: MultiProgress = MultiProgress::new();
+
+            let reader_progress_bar_template: &str = concat!(
+                "Reading at {percent}% [{wide_bar}] ",
                 "{bytes}/{total_bytes} ({binary_bytes_per_sec}) ",
                 "elapsed: {elapsed_precise} (remaining: {eta_precise})",
             );
-            let progress_bar_style: ProgressStyle =
-                match ProgressStyle::with_template(progress_bar_template) {
+            let reader_progress_bar_style: ProgressStyle =
+                match ProgressStyle::with_template(reader_progress_bar_template) {
                     Ok(style) => {
                         style.with_key("eta", |state: &ProgressState, writer: &mut dyn Write| {
                             write!(writer, "{:.1}s", state.eta().as_secs_f64()).unwrap()
@@ -974,16 +982,98 @@ fn main() -> ExitCode {
                         return ExitCode::FAILURE;
                     }
                 };
-            let progress_bar: ProgressBar = ProgressBar::new(media_size);
-            progress_bar.set_style(progress_bar_style.progress_chars("#>-"));
+            let read_progress_bar: ProgressBar = multi_progress.add(ProgressBar::new(media_size));
+            read_progress_bar.set_style(reader_progress_bar_style.progress_chars("#>-"));
 
+            let md5_progress_bar: ProgressBar = if !calculate_md5_hash {
+                ProgressBar::hidden()
+            } else {
+                let md5_progress_bar_template: &str = concat!(
+                    "MD5 at {percent}% [{wide_bar}] ",
+                    "{bytes}/{total_bytes} ({binary_bytes_per_sec}) ",
+                    "elapsed: {elapsed_precise} (remaining: {eta_precise})",
+                );
+                let md5_progress_bar_style: ProgressStyle =
+                    match ProgressStyle::with_template(md5_progress_bar_template) {
+                        Ok(style) => style.with_key(
+                            "eta",
+                            |state: &ProgressState, writer: &mut dyn Write| {
+                                write!(writer, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+                            },
+                        ),
+                        Err(error) => {
+                            println!(
+                                "Unable to create progress bar style from template with error: {}",
+                                error
+                            );
+                            return ExitCode::FAILURE;
+                        }
+                    };
+                let progress_bar: ProgressBar = multi_progress.add(ProgressBar::new(media_size));
+                progress_bar.set_style(md5_progress_bar_style.progress_chars("#>-"));
+                progress_bar
+            };
+            let sha1_progress_bar: ProgressBar = if !calculate_sha1_hash {
+                ProgressBar::hidden()
+            } else {
+                let sha1_progress_bar_template: &str = concat!(
+                    "SHA1 at {percent}% [{wide_bar}] ",
+                    "{bytes}/{total_bytes} ({binary_bytes_per_sec}) ",
+                    "elapsed: {elapsed_precise} (remaining: {eta_precise})",
+                );
+                let sha1_progress_bar_style: ProgressStyle =
+                    match ProgressStyle::with_template(sha1_progress_bar_template) {
+                        Ok(style) => style.with_key(
+                            "eta",
+                            |state: &ProgressState, writer: &mut dyn Write| {
+                                write!(writer, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+                            },
+                        ),
+                        Err(error) => {
+                            println!(
+                                "Unable to create progress bar style from template with error: {}",
+                                error
+                            );
+                            return ExitCode::FAILURE;
+                        }
+                    };
+                let progress_bar: ProgressBar = multi_progress.add(ProgressBar::new(media_size));
+                progress_bar.set_style(sha1_progress_bar_style.progress_chars("#>-"));
+                progress_bar
+            };
+            let mut system: System = System::new_all();
+            system.refresh_memory();
+
+            // Limit channels at 80% of available memory.
+            let channel_limit: usize =
+                ((system.available_memory() as usize) * 80) / (65536 * 2 * 100);
+
+            let (md5_sender, md5_receiver) = sync_channel::<Vec<u8>>(channel_limit);
+
+            let md5_thread = thread::spawn(move || {
+                let mut md5_context: Md5Context = Md5Context::new();
+
+                while let Ok(buffer) = md5_receiver.recv() {
+                    md5_context.update(&buffer);
+                    md5_progress_bar.inc(buffer.len() as u64);
+                }
+                md5_progress_bar.finish();
+                md5_context
+            });
+            let (sha1_sender, sha1_receiver) = sync_channel::<Vec<u8>>(channel_limit);
+
+            let sha1_thread = thread::spawn(move || {
+                let mut sha1_context: Sha1Context = Sha1Context::new();
+
+                while let Ok(buffer) = sha1_receiver.recv() {
+                    sha1_context.update(&buffer);
+                    sha1_progress_bar.inc(buffer.len() as u64);
+                }
+                sha1_progress_bar.finish();
+                sha1_context
+            });
             let mut media_offset: u64 = 0;
             let mut data: [u8; 65536] = [0; 65536];
-
-            let mut md5_context: Md5Context = Md5Context::new();
-            let mut sha1_context: Sha1Context = Sha1Context::new();
-
-            let calculate_md5_hash: bool = stored_md5_hash.is_some() || stored_sha1_hash.is_none();
 
             match data_stream.write() {
                 Ok(mut data_stream) => loop {
@@ -1001,14 +1091,14 @@ fn main() -> ExitCode {
                         break;
                     }
                     if calculate_md5_hash {
-                        md5_context.update(&data[0..read_count]);
+                        _ = md5_sender.send(data[0..read_count].to_vec());
                     }
-                    if stored_sha1_hash.is_some() {
-                        sha1_context.update(&data[0..read_count]);
+                    if calculate_sha1_hash {
+                        _ = sha1_sender.send(data[0..read_count].to_vec());
                     }
                     media_offset += read_count as u64;
 
-                    progress_bar.set_position(media_offset);
+                    read_progress_bar.set_position(media_offset);
                 },
                 Err(error) => {
                     println!(
@@ -1018,7 +1108,14 @@ fn main() -> ExitCode {
                     return ExitCode::FAILURE;
                 }
             };
-            progress_bar.finish();
+            read_progress_bar.finish();
+
+            drop(md5_sender);
+            drop(sha1_sender);
+
+            // Both threads need to be completed before printing the results.
+            let mut md5_context: Md5Context = md5_thread.join().expect("MD5 thread panicked");
+            let mut sha1_context: Sha1Context = sha1_thread.join().expect("SHA1 thread panicked");
 
             let mut md5_hash_mismatch: bool = false;
 
@@ -1039,17 +1136,19 @@ fn main() -> ExitCode {
             }
             let mut sha1_hash_mismatch: bool = false;
 
-            if let Some(stored_hash) = stored_sha1_hash {
+            if calculate_sha1_hash {
                 let sha1_hash: Vec<u8> = sha1_context.finalize();
 
                 let hash_string: String = format_as_string(&sha1_hash);
                 println!("\nCalculated SHA1 hash\t: {}", hash_string);
 
-                let hash_string: String = format_as_string(&stored_hash);
-                println!("Stored SHA1 hash\t: {}", hash_string);
+                if let Some(stored_hash) = stored_sha1_hash {
+                    let hash_string: String = format_as_string(&stored_hash);
+                    println!("Stored SHA1 hash\t: {}", hash_string);
 
-                if stored_hash != sha1_hash.as_slice() {
-                    sha1_hash_mismatch = true;
+                    if stored_hash != sha1_hash.as_slice() {
+                        sha1_hash_mismatch = true;
+                    }
                 }
             }
             if md5_hash_mismatch || sha1_hash_mismatch {

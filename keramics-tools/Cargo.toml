@@ -37,3 +37,4 @@ keramics-formats = { version = "0.0.1", path = "../keramics-formats" }
 keramics-hashes = { version = "0.0.1", path = "../keramics-hashes" }
 keramics-types = { version = "0.0.1", path = "../keramics-types" }
 keramics-vfs = { version = "0.0.1", path = "../keramics-vfs" }
+sysinfo = { version = "0.39.6" }

@@ -15,14 +15,16 @@ use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::bytes_to_u32_le;
 
+use super::chs_address::MbrChsAddress;
+
 #[derive(Clone, LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",
         field(name = "flags", data_type = "u8", format = "hex"),
-        field(name = "start_address_chs", data_type = "[u8; 3]"),
-        field(name = "partition_type", data_type = "u8"),
-        field(name = "end_address_chs", data_type = "[u8; 3]"),
+        field(name = "start_address_chs", data_type = "Struct<MbrChsAddress; 3>"),
+        field(name = "partition_type", data_type = "u8", format = "hex"),
+        field(name = "end_address_chs", data_type = "Struct<MbrChsAddress; 3>"),
         field(name = "start_address_lba", data_type = "u32"),
         field(name = "number_of_sectors", data_type = "u32"),
     ),
@@ -39,6 +41,12 @@ pub struct MbrPartitionEntry {
     /// The partition type.
     pub partition_type: u8,
 
+    /// The start CHS address of the partition.
+    pub start_address_chs: MbrChsAddress,
+
+    /// The end CHS address of the partition.
+    pub end_address_chs: MbrChsAddress,
+
     /// The start LBA of the partition.
     pub start_address_lba: u64,
 
@@ -53,6 +61,8 @@ impl MbrPartitionEntry {
             index: 0,
             flags: 0,
             partition_type: 0,
+            start_address_chs: MbrChsAddress::new(),
+            end_address_chs: MbrChsAddress::new(),
             start_address_lba: 0,
             number_of_sectors: 0,
         }
@@ -60,11 +70,27 @@ impl MbrPartitionEntry {
 
     /// Reads the partition entry from a buffer.
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() != 16 {
+        if data.len() < 16 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
         self.flags = data[0];
+
+        match self.start_address_chs.read_data(&data[1..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read start CHS address");
+                return Err(error);
+            }
+        }
         self.partition_type = data[4];
+
+        match self.end_address_chs.read_data(&data[5..]) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to read end CHS address");
+                return Err(error);
+            }
+        }
         self.start_address_lba = bytes_to_u32_le!(data, 8) as u64;
         self.number_of_sectors = bytes_to_u32_le!(data, 12);
 

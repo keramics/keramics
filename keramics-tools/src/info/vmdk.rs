@@ -58,7 +58,7 @@ impl VmdkImageLayerInfo {
     const DISK_TYPES: &[(VmdkDiskType, &'static str); 16] = &[
         (VmdkDiskType::Custom, "Custom"),
         (VmdkDiskType::Device, "Device"),
-        (VmdkDiskType::DevicePartitioned, "Device paritioned"),
+        (VmdkDiskType::DevicePartitioned, "Device partitioned"),
         (VmdkDiskType::Flat2GbExtent, "2GB extent flat"),
         (VmdkDiskType::MonolithicFlat, "Monolithic flat"),
         (VmdkDiskType::MonolithicSparse, "Monolithic sparse"),

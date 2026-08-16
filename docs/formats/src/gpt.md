@@ -10,7 +10,7 @@ A GUID Partition Table (GPT) consists of:
 * A protective or hybrid Master Boot Record (MBR) stored in block (LBA) 0
 * A GPT partition table header stored in block (LBA) 1
 * GPT partition entries stored in blocks (LBA) 2 - 33
-* paritions area
+* partitions area
   * GPT partitions
   * MBR partitions if hybrid MBR/GPT
 * backup GPT partition entries (typically stored the blocks (LBA) before the last block -33 - -2)

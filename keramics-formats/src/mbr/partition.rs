@@ -24,7 +24,7 @@ pub struct MbrPartition {
     current_offset: u64,
 
     /// The index of the corresponding partition table entry.
-    pub entry_index: usize,
+    partition_index: usize,
 
     /// The offset of the partition relative to start of the volume system.
     pub offset: u64,
@@ -33,16 +33,16 @@ pub struct MbrPartition {
     pub size: u64,
 
     /// The partition type.
-    pub partition_type: u8,
+    partition_type: u8,
 
     /// The flags.
-    pub flags: u8,
+    flags: u8,
 }
 
 impl MbrPartition {
     /// Creates a new partition.
     pub(super) fn new(
-        entry_index: usize,
+        partition_index: usize,
         offset: u64,
         size: u64,
         partition_type: u8,
@@ -51,12 +51,27 @@ impl MbrPartition {
         Self {
             data_stream: None,
             current_offset: 0,
-            entry_index,
+            partition_index,
             offset,
             size,
             partition_type,
             flags,
         }
+    }
+
+    /// Retrieves the flags.
+    pub fn get_flags(&self) -> u8 {
+        self.flags
+    }
+
+    /// Retrieves the partition (table entry) index.
+    pub fn get_partition_index(&self) -> usize {
+        self.partition_index
+    }
+
+    /// Retrieves the type identifier.
+    pub fn get_partition_type(&self) -> u8 {
+        self.partition_type
     }
 
     /// Opens a partition.
@@ -152,6 +167,10 @@ mod tests {
 
         Ok(partition)
     }
+
+    // TODO: add tests for get_flags
+    // TODO: add tests for get_partition_index
+    // TODO: add tests for get_partition_type
 
     #[test]
     fn test_open() -> Result<(), ErrorTrace> {

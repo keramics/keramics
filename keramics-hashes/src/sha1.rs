@@ -15,7 +15,7 @@
 //!
 //! Provides support for calculating a SHA-1 hash (RFC 1321, FIPS 180-1).
 
-use keramics_types::bytes_to_u32_be;
+use std::slice::ChunksExact;
 
 use super::traits::DigestHashContext;
 
@@ -53,19 +53,12 @@ impl Sha1Context {
 
     /// Calculates the hash of a block of data.
     #[inline(always)]
-    fn transform_block(
-        &self,
-        hash_values: &[u32],
-        data: &[u8],
-        mut data_offset: usize,
-    ) -> [u32; 5] {
+    fn transform_block(&self, hash_values: &mut [u32], data: &[u8]) {
         let mut values_32bit: [u32; 80] = [0; 80];
 
         // Break the block of data into 16 x 32-bit big-endian values
-        for value_32bit in &mut values_32bit[0..16] {
-            *value_32bit = bytes_to_u32_be!(data, data_offset);
-
-            data_offset += 4;
+        for (index, chunk) in data[0..SHA1_BLOCK_SIZE].chunks_exact(4).enumerate() {
+            values_32bit[index] = u32::from_be_bytes(chunk.try_into().unwrap());
         }
         // Extend to 80 x 32-bit values
         for value_index in 16..80 {
@@ -76,41 +69,43 @@ impl Sha1Context {
             values_32bit[value_index] = values_32bit[value_index].rotate_left(1);
         }
         // Calculate the hash values
-        let mut block_hashes: [u32; 5] = [0; 5];
-        block_hashes.copy_from_slice(hash_values);
+        let mut block_hash0: u32 = hash_values[0];
+        let mut block_hash1: u32 = hash_values[1];
+        let mut block_hash2: u32 = hash_values[2];
+        let mut block_hash3: u32 = hash_values[3];
+        let mut block_hash4: u32 = hash_values[4];
 
         for (value_index, value_32bit) in values_32bit.iter().enumerate() {
             let block_hash: u32 = if value_index < 20 {
-                0x5a827999_u32.wrapping_add(
-                    (block_hashes[1] & block_hashes[2]) | (!(block_hashes[1]) & block_hashes[3]),
-                )
+                0x5a827999_u32
+                    .wrapping_add((block_hash1 & block_hash2) | (!(block_hash1) & block_hash3))
             } else if value_index < 40 {
-                0x6ed9eba1_u32.wrapping_add(block_hashes[1] ^ block_hashes[2] ^ block_hashes[3])
+                0x6ed9eba1_u32.wrapping_add(block_hash1 ^ block_hash2 ^ block_hash3)
             } else if value_index < 60 {
                 0x8f1bbcdc_u32.wrapping_add(
-                    (block_hashes[1] & block_hashes[2])
-                        | (block_hashes[1] & block_hashes[3])
-                        | (block_hashes[2] & block_hashes[3]),
+                    (block_hash1 & block_hash2)
+                        | (block_hash1 & block_hash3)
+                        | (block_hash2 & block_hash3),
                 )
             } else {
-                0xca62c1d6_u32.wrapping_add(block_hashes[1] ^ block_hashes[2] ^ block_hashes[3])
+                0xca62c1d6_u32.wrapping_add(block_hash1 ^ block_hash2 ^ block_hash3)
             }
-            .wrapping_add(block_hashes[4])
-            .wrapping_add(block_hashes[0].rotate_left(5))
+            .wrapping_add(block_hash4)
+            .wrapping_add(block_hash0.rotate_left(5))
             .wrapping_add(*value_32bit);
 
-            block_hashes[4] = block_hashes[3];
-            block_hashes[3] = block_hashes[2];
-            block_hashes[2] = block_hashes[1].rotate_left(30);
-            block_hashes[1] = block_hashes[0];
-            block_hashes[0] = block_hash;
+            block_hash4 = block_hash3;
+            block_hash3 = block_hash2;
+            block_hash2 = block_hash1.rotate_left(30);
+            block_hash1 = block_hash0;
+            block_hash0 = block_hash;
         }
         // Update the hash values
-        for value_index in 0..5 {
-            block_hashes[value_index] =
-                block_hashes[value_index].wrapping_add(hash_values[value_index]);
-        }
-        block_hashes
+        hash_values[0] = block_hash0.wrapping_add(hash_values[0]);
+        hash_values[1] = block_hash1.wrapping_add(hash_values[1]);
+        hash_values[2] = block_hash2.wrapping_add(hash_values[2]);
+        hash_values[3] = block_hash3.wrapping_add(hash_values[3]);
+        hash_values[4] = block_hash4.wrapping_add(hash_values[4]);
     }
 }
 
@@ -137,14 +132,13 @@ impl DigestHashContext for Sha1Context {
         self.block[self.block_offset + 1..bit_size_block_offset].fill(0);
         self.block[bit_size_block_offset..padding_size].copy_from_slice(&bit_size.to_be_bytes());
 
-        for block_offset in (0..padding_size).step_by(SHA1_BLOCK_SIZE) {
-            let hash_values: [u32; 5] =
-                self.transform_block(&self.hash_values, &self.block, block_offset);
+        let mut hash_values: [u32; 5] = [0; 5];
+        hash_values.copy_from_slice(&self.hash_values);
 
-            self.hash_values.copy_from_slice(&hash_values);
+        for chunk in self.block[0..padding_size].chunks_exact(SHA1_BLOCK_SIZE) {
+            self.transform_block(&mut hash_values, chunk);
         }
-        let hash: Vec<u8> = self
-            .hash_values
+        let hash: Vec<u8> = hash_values
             .iter()
             .flat_map(|hash_value| hash_value.to_be_bytes())
             .collect::<Vec<u8>>();
@@ -159,41 +153,41 @@ impl DigestHashContext for Sha1Context {
 
     /// Calculates the digest hash of the data.
     fn update(&mut self, data: &[u8]) {
-        let data_size: usize = data.len();
-        let mut data_offset: usize = 0;
+        let mut hash_values: [u32; 5] = [0; 5];
+        hash_values.copy_from_slice(&self.hash_values);
 
-        if self.block_offset > 0 {
-            while self.block_offset < SHA1_BLOCK_SIZE {
-                if data_offset >= data_size {
-                    break;
-                }
-                self.block[self.block_offset] = data[data_offset];
+        let data_offset: usize = if self.block_offset == 0 {
+            0
+        } else {
+            let data_end_offset: usize = SHA1_BLOCK_SIZE - self.block_offset;
+
+            for byte_value in data[0..data_end_offset].iter() {
+                self.block[self.block_offset] = *byte_value;
                 self.block_offset += 1;
-
-                data_offset += 1;
             }
             if self.block_offset == SHA1_BLOCK_SIZE {
-                let hash_values: [u32; 5] = self.transform_block(&self.hash_values, &self.block, 0);
+                self.transform_block(&mut hash_values, &self.block);
 
-                self.hash_values.copy_from_slice(&hash_values);
                 self.number_of_bytes_hashed += SHA1_BLOCK_SIZE as u64;
 
                 self.block_offset = 0;
             }
-        }
-        while data_offset + SHA1_BLOCK_SIZE < data_size {
-            let hash_values: [u32; 5] = self.transform_block(&self.hash_values, data, data_offset);
+            data_end_offset
+        };
+        let mut chunks: ChunksExact<'_, u8> = data[data_offset..].chunks_exact(SHA1_BLOCK_SIZE);
 
-            self.hash_values.copy_from_slice(&hash_values);
+        for chunk in &mut chunks {
+            self.transform_block(&mut hash_values, chunk);
+
             self.number_of_bytes_hashed += SHA1_BLOCK_SIZE as u64;
-
-            data_offset += SHA1_BLOCK_SIZE;
         }
-        while data_offset < data_size {
-            self.block[self.block_offset] = data[data_offset];
-            self.block_offset += 1;
+        self.hash_values.copy_from_slice(&hash_values);
 
-            data_offset += 1;
+        let remainder: &[u8] = chunks.remainder();
+
+        for byte_value in remainder.iter() {
+            self.block[self.block_offset] = *byte_value;
+            self.block_offset += 1;
         }
     }
 }

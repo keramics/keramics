@@ -20,10 +20,10 @@ use crate::formatters::ByteSize;
 
 use super::constants::*;
 
-/// Master Boot Record (MBR) parition information.
+/// Master Boot Record (MBR) partition information.
 struct MbrPartitionInfo {
     /// The index of the corresponding partition table entry.
-    pub entry_index: usize,
+    pub partition_index: usize,
 
     /// The partition type.
     pub partition_type: u8,
@@ -42,7 +42,7 @@ impl MbrPartitionInfo {
     /// Creates new partition information.
     fn new() -> Self {
         Self {
-            entry_index: 0,
+            partition_index: 0,
             partition_type: 0,
             offset: 0,
             size: 0,
@@ -61,7 +61,7 @@ impl MbrPartitionInfo {
 impl fmt::Display for MbrPartitionInfo {
     /// Formats partition information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(formatter, "Partition: {}", self.entry_index + 1)?;
+        writeln!(formatter, "Partition: {}", self.partition_index + 1)?;
 
         match self.get_partition_type_string() {
             Some(partition_type_string) => {
@@ -101,11 +101,11 @@ impl MbrInfo {
     fn get_partition_information(mbr_partition: &MbrPartition) -> MbrPartitionInfo {
         let mut partition_information: MbrPartitionInfo = MbrPartitionInfo::new();
 
-        partition_information.entry_index = mbr_partition.entry_index;
-        partition_information.partition_type = mbr_partition.partition_type;
+        partition_information.partition_index = mbr_partition.get_partition_index();
+        partition_information.partition_type = mbr_partition.get_partition_type();
         partition_information.offset = mbr_partition.offset;
         partition_information.size = mbr_partition.size;
-        partition_information.flags = mbr_partition.flags;
+        partition_information.flags = mbr_partition.get_flags();
 
         partition_information
     }
@@ -223,7 +223,7 @@ mod tests {
         let mbr_partition: MbrPartition = mbr_volume_system.get_partition_by_index(0)?;
         let test_struct: MbrPartitionInfo = MbrInfo::get_partition_information(&mbr_partition);
 
-        assert_eq!(test_struct.entry_index, 0);
+        assert_eq!(test_struct.partition_index, 0);
         assert_eq!(test_struct.partition_type, 0x83);
         assert_eq!(test_struct.offset, 512);
         assert_eq!(test_struct.size, 1049088);
