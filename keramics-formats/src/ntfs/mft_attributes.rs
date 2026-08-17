@@ -295,9 +295,9 @@ impl NtfsMftAttributes {
             Ok(Some(Arc::new(RwLock::new(data_stream))))
         } else if data_attribute.is_compressed() {
             let mut compressed_block_reader: NtfsCompressedBlockReader =
-                NtfsCompressedBlockReader::new(cluster_block_size);
+                NtfsCompressedBlockReader::new(data_stream, cluster_block_size);
 
-            match compressed_block_reader.open(data_stream, data_attribute) {
+            match compressed_block_reader.open(data_attribute) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

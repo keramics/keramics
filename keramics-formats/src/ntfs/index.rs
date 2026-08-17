@@ -11,11 +11,10 @@
  * under the License.
  */
 
+use std::cmp::Ordering;
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
-
-use crate::block_tree::BlockTree;
 
 use super::block_range::{NtfsBlockRange, NtfsBlockRangeType};
 use super::data_run::NtfsDataRunType;
@@ -30,8 +29,8 @@ pub struct NtfsIndex {
     /// Index entry size.
     pub index_entry_size: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<NtfsBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<NtfsBlockRange>,
 }
 
 impl NtfsIndex {
@@ -40,7 +39,7 @@ impl NtfsIndex {
         Self {
             cluster_block_size,
             index_entry_size: 0,
-            block_tree: BlockTree::<NtfsBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
         }
     }
 
@@ -52,23 +51,32 @@ impl NtfsIndex {
     ) -> Result<NtfsIndexEntry, ErrorTrace> {
         let virtual_cluster_offset: u64 = virtual_cluster_number * (self.cluster_block_size as u64);
 
-        let block_range: &NtfsBlockRange = match self.block_tree.get_value(virtual_cluster_offset) {
-            Ok(Some(value)) => value,
-            Ok(None) => {
+        let range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let range_end_offset: u64 = block_range.virtual_cluster_offset + block_range.size;
+
+            if virtual_cluster_offset >= range_end_offset {
+                Ordering::Less
+            } else if virtual_cluster_offset < block_range.virtual_cluster_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing block range for VCN: {}",
-                    virtual_cluster_number
+                    "Missing block range for offset: {} (0x{:08x})",
+                    virtual_cluster_offset, virtual_cluster_offset
                 )));
             }
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!(
-                        "Unable to retrieve block range for VCN: {}",
-                        virtual_cluster_number
-                    )
-                );
-                return Err(error);
+        };
+        let block_range: &NtfsBlockRange = match self.block_ranges.get(range_index) {
+            Some(block_range) => block_range,
+            None => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                    range_index, virtual_cluster_offset, virtual_cluster_offset,
+                )));
             }
         };
         let range_relative_offset: u64 =
@@ -102,7 +110,7 @@ impl NtfsIndex {
                 );
                 return Err(error);
             }
-        };
+        }
         Ok(index_entry)
     }
 
@@ -122,12 +130,6 @@ impl NtfsIndex {
                 "Unsupported compressed $INDEX_ALLOCATION attribute"
             ));
         }
-        let block_tree_size: u64 = (index_allocation_attribute.allocated_data_size
-            / (self.cluster_block_size as u64))
-            * (self.cluster_block_size as u64);
-        self.block_tree =
-            BlockTree::<NtfsBlockRange>::new(block_tree_size, 0, self.cluster_block_size as u64);
-
         let mut virtual_cluster_number: u64 = 0;
         let mut virtual_cluster_offset: u64 = 0;
 
@@ -153,19 +155,8 @@ impl NtfsIndex {
                     range_size,
                     range_type,
                 );
-                match self
-                    .block_tree
-                    .insert_value(virtual_cluster_offset, range_size, block_range)
-                {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to insert block range into block tree"
-                        );
-                        return Err(error);
-                    }
-                }
+                self.block_ranges.push(block_range);
+
                 virtual_cluster_number += data_run.number_of_blocks as u64;
                 virtual_cluster_offset += range_size;
             }

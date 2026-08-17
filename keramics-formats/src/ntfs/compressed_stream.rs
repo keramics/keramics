@@ -639,8 +639,9 @@ mod tests {
         let mut data_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
         data_attribute.read_data(&test_mft_attribute_data)?;
 
-        let mut block_reader: NtfsCompressedBlockReader = NtfsCompressedBlockReader::new(4096);
-        block_reader.open(&data_stream, &data_attribute)?;
+        let mut block_reader: NtfsCompressedBlockReader =
+            NtfsCompressedBlockReader::new(&data_stream, 4096);
+        block_reader.open(&data_attribute)?;
 
         Ok(NtfsCompressedStream::new(block_reader))
     }
