@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
 use keramics_formats::pdi::{PdiImage, PdiImageLayer};
+use keramics_types::Uuid;
 
 use crate::enums::VfsFileType;
 
@@ -31,6 +32,9 @@ pub enum PdiFileEntry {
 
         /// Size.
         size: u64,
+
+        /// Identifier.
+        identifier: Uuid,
     },
 
     /// Root file entry.
@@ -54,6 +58,22 @@ impl PdiFileEntry {
         match self {
             PdiFileEntry::Layer { .. } => VfsFileType::File,
             PdiFileEntry::Root { .. } => VfsFileType::Directory,
+        }
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> Option<&Uuid> {
+        match self {
+            PdiFileEntry::Layer { identifier, .. } => Some(&identifier),
+            PdiFileEntry::Root { .. } => None,
+        }
+    }
+
+    /// Retrieves the (image) layer number.
+    pub fn get_layer_number(&self) -> Option<usize> {
+        match self {
+            PdiFileEntry::Layer { index, .. } => Some(index + 1),
+            PdiFileEntry::Root { .. } => None,
         }
     }
 
@@ -92,19 +112,25 @@ impl PdiFileEntry {
             }
             PdiFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
                 Ok(image_layer) => {
-                    let media_size: u64 = match image_layer.read() {
-                        Ok(pdi_image_layer) => pdi_image_layer.get_media_size(),
+                    let media_size: u64;
+                    let identifier: Uuid;
+                    match image_layer.read() {
+                        Ok(pdi_image_layer) => {
+                            media_size = pdi_image_layer.get_media_size();
+                            identifier = pdi_image_layer.get_identifier().clone();
+                        }
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
                                 "Unable to obtain read lock on image layer",
                                 error
                             ));
                         }
-                    };
+                    }
                     Ok(PdiFileEntry::Layer {
                         index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
+                        identifier,
                     })
                 }
                 Err(mut error) => {
@@ -151,10 +177,26 @@ mod tests {
     fn get_layer_file_entry(image: &Arc<PdiImage>) -> Result<PdiFileEntry, ErrorTrace> {
         let image_layer: Arc<RwLock<PdiImageLayer>> = image.get_layer_by_index(0)?;
 
+        let media_size: u64;
+        let identifier: Uuid;
+
+        match image_layer.read() {
+            Ok(pdi_image_layer) => {
+                media_size = pdi_image_layer.get_media_size();
+                identifier = pdi_image_layer.get_identifier().clone();
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on image layer",
+                    error
+                ));
+            }
+        }
         Ok(PdiFileEntry::Layer {
             index: 0,
             layer: image_layer,
-            size: image.get_media_size(),
+            size: media_size,
+            identifier,
         })
     }
 
@@ -180,6 +222,30 @@ mod tests {
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::File);
 
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let test_image: Arc<PdiImage> = get_image()?;
+
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
+        let identifier: Option<&Uuid> = file_entry.get_identifier();
+        assert_eq!(identifier, None);
+
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
+        let identifier: Option<&Uuid> = file_entry.get_identifier();
+        assert_eq!(
+            identifier,
+            Some(Uuid {
+                part1: 0x5fbaabe3,
+                part2: 0x6958,
+                part3: 0x40ff,
+                part4: 0x92a7,
+                part5: 0x860e329aab41,
+            })
+            .as_ref()
+        );
         Ok(())
     }
 

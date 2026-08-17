@@ -658,45 +658,60 @@ impl VfsScanner {
         }
         let vfs_type: &VfsType = scan_node.get_type();
 
-        // TODO: add support for configuration driven scanning older image layers
-
-        // TODO: use layer identifier in path?
-        let image_layer_path: String = format!("{}{}", path_prefix, number_of_layers);
-        let node_path: Path = Path::from(image_layer_path.as_str());
-        let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
+        let path: Path = Path::from("/");
+        let file_system_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, path);
         let node_file_system: VfsFileSystemReference =
-            match self.resolver.open_file_system(&node_vfs_location) {
+            match self.resolver.open_file_system(&file_system_vfs_location) {
                 Ok(file_system) => file_system,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to open file system");
                     return Err(error);
                 }
             };
-        match self.scan_for_format(&node_file_system, &node_vfs_location)? {
-            Some(sub_node_vfs_type) => {
-                let sub_node_path: Path = Path::from("/");
-                let sub_node_vfs_location: VfsLocation =
-                    node_vfs_location.new_with_layer(&sub_node_vfs_type, sub_node_path);
-                let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+        // TODO: add support for configuration driven scanning older image layers
 
-                match self.scan_for_sub_nodes(
-                    scan_options,
-                    &node_file_system,
-                    &node_vfs_location,
-                    &mut sub_scan_node,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to scan for sub nodes"
-                        );
-                        return Err(error);
-                    }
-                }
-                scan_node.sub_nodes.push(sub_scan_node);
+        // TODO: invoke mediator to ask which image layers to include.
+        for layer_index in 0..number_of_layers {
+            if scan_options.image_layer != 0 && scan_options.image_layer != layer_index + 1 {
+                continue;
             }
-            None => {}
+            let vfs_type: &VfsType = scan_node.get_type();
+
+            // TODO: use layer identifier in location?
+            let layer_path: String = format!("{}{}", path_prefix, layer_index + 1);
+
+            let node_path: Path = Path::from(layer_path.as_str());
+            let node_vfs_location: VfsLocation = vfs_location.new_with_layer(vfs_type, node_path);
+            let mut layer_scan_node: VfsScanNode = VfsScanNode::new(node_vfs_location);
+
+            match self.scan_for_format(&node_file_system, &layer_scan_node.location)? {
+                Some(sub_node_vfs_type) => {
+                    let sub_node_path: Path = Path::from("/");
+                    let sub_node_vfs_location: VfsLocation = layer_scan_node
+                        .location
+                        .new_with_layer(&sub_node_vfs_type, sub_node_path);
+                    let mut sub_scan_node: VfsScanNode = VfsScanNode::new(sub_node_vfs_location);
+
+                    match self.scan_for_sub_nodes(
+                        scan_options,
+                        &node_file_system,
+                        &layer_scan_node.location,
+                        &mut sub_scan_node,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan for sub nodes"
+                            );
+                            return Err(error);
+                        }
+                    }
+                    layer_scan_node.sub_nodes.push(sub_scan_node);
+                }
+                None => {}
+            }
+            scan_node.sub_nodes.push(layer_scan_node);
         }
         Ok(())
     }
@@ -1356,6 +1371,7 @@ impl VfsScanner {
 
         for volume_index in 0..number_of_volumes {
             let vfs_type: &VfsType = scan_node.get_type();
+
             match vfs_type {
                 VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
                     if scan_options.partitions == VfsScanOptionGroup::NotSet {

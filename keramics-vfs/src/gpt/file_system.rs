@@ -16,6 +16,7 @@ use std::sync::{Arc, RwLock};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_formats::gpt::{GptPartition, GptVolumeSystem};
+use keramics_types::Uuid;
 
 use crate::location::VfsLocation;
 use crate::path::VfsPath;
@@ -106,11 +107,13 @@ impl GptFileSystem {
                         }
                     };
                 let partition_size: u64 = gpt_partition.size;
+                let identifier: Uuid = gpt_partition.get_identifier().clone();
 
                 Ok(Some(GptFileEntry::Partition {
                     index: partition_index,
                     partition: Arc::new(RwLock::new(gpt_partition)),
                     size: partition_size,
+                    identifier,
                 }))
             }
             None => {

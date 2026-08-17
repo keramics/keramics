@@ -144,7 +144,7 @@ impl UdifImage {
                 } else {
                     self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                     self.number_of_segments = segment_stream.number_of_segments;
-                    let mut block_table_reader: UdifBlockTableReader = match segment_stream
+                    let block_table_reader: UdifBlockTableReader = match segment_stream
                         .read_metadata(self.bytes_per_sector)
                     {
                         Ok(block_table_reader) => block_table_reader,
@@ -366,7 +366,7 @@ impl UdifImage {
                     self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                     self.number_of_segments = segment_stream.number_of_segments;
 
-                    let mut block_table_reader: UdifBlockTableReader = match segment_stream
+                    let block_table_reader: UdifBlockTableReader = match segment_stream
                         .read_metadata(self.bytes_per_sector)
                     {
                         Ok(block_table_reader) => block_table_reader,
