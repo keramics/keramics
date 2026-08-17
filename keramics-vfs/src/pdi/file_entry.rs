@@ -93,7 +93,7 @@ impl PdiFileEntry {
             PdiFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
                 Ok(image_layer) => {
                     let media_size: u64 = match image_layer.read() {
-                        Ok(vhd_file) => vhd_file.media_size,
+                        Ok(pdi_image_layer) => pdi_image_layer.get_media_size(),
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
                                 "Unable to obtain read lock on image layer",
@@ -154,7 +154,7 @@ mod tests {
         Ok(PdiFileEntry::Layer {
             index: 0,
             layer: image_layer,
-            size: image.media_size,
+            size: image.get_media_size(),
         })
     }
 

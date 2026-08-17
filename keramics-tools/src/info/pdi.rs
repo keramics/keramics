@@ -15,8 +15,12 @@ use std::fmt;
 use std::path::PathBuf;
 
 use keramics_core::ErrorTrace;
-use keramics_formats::pdi::PdiImage;
+use keramics_formats::pdi::{
+    PdiImage, PdiSegmentDescriptor, PdiSegmentFileDescriptor, PdiSegmentFileType,
+    PdiSnapshotDescriptor,
+};
 use keramics_formats::{FileResolverReference, open_os_file_resolver};
+use keramics_types::Uuid;
 
 use crate::formatters::ByteSize;
 
@@ -27,6 +31,12 @@ struct PdiImageInfo {
 
     /// Bytes per sector.
     pub bytes_per_sector: u16,
+
+    /// Number of segments.
+    pub number_of_segments: usize,
+
+    /// Number of snapshots.
+    pub number_of_snapshots: usize,
 }
 
 impl PdiImageInfo {
@@ -35,6 +45,8 @@ impl PdiImageInfo {
         Self {
             media_size: 0,
             bytes_per_sector: 0,
+            number_of_segments: 0,
+            number_of_snapshots: 0,
         }
     }
 }
@@ -44,6 +56,18 @@ impl fmt::Display for PdiImageInfo {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         writeln!(formatter, "Parallels Disk Image (PDI) information:")?;
 
+        writeln!(
+            formatter,
+            "    Number of segments\t\t\t\t: {}",
+            self.number_of_segments
+        )?;
+        writeln!(
+            formatter,
+            "    Number of snapshots\t\t\t\t: {}",
+            self.number_of_snapshots
+        )?;
+        writeln!(formatter)?;
+
         writeln!(formatter, "    Media information:")?;
 
         let byte_size: ByteSize = ByteSize::new(self.media_size, 1024);
@@ -51,7 +75,7 @@ impl fmt::Display for PdiImageInfo {
 
         writeln!(
             formatter,
-            "        Bytes per sector\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {}",
             self.bytes_per_sector
         )?;
 
@@ -69,8 +93,10 @@ impl PdiInfo {
     fn get_image_information(pdi_image: &PdiImage) -> PdiImageInfo {
         let mut image_information: PdiImageInfo = PdiImageInfo::new();
 
-        image_information.media_size = pdi_image.media_size;
-        image_information.bytes_per_sector = pdi_image.bytes_per_sector;
+        image_information.media_size = pdi_image.get_media_size();
+        image_information.bytes_per_sector = pdi_image.get_bytes_per_sector();
+        image_information.number_of_segments = pdi_image.get_number_of_segments();
+        image_information.number_of_snapshots = pdi_image.get_number_of_snapshots();
 
         image_information
     }
@@ -92,7 +118,7 @@ impl PdiInfo {
         match pdi_image.open(&file_resolver) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to open VMDK image");
+                keramics_core::error_trace_add_frame!(error, "Unable to open PDI image");
                 return Err(error);
             }
         }
@@ -112,6 +138,74 @@ impl PdiInfo {
 
         print!("{}", image_information);
 
+        for segment_index in 0..image_information.number_of_segments {
+            let segment: &PdiSegmentDescriptor = match pdi_image.get_segment_by_index(segment_index)
+            {
+                Some(segment) => segment,
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing segment: {}",
+                        segment_index + 1
+                    )));
+                }
+            };
+            println!("    Segment: {}", segment_index + 1);
+
+            let byte_size: ByteSize = ByteSize::new(segment.get_size(), 1024);
+            println!("        Size\t\t\t\t\t: {}", byte_size);
+
+            let number_of_files: usize = segment.get_number_of_files();
+            println!("        Number of files\t\t\t\t: {}", number_of_files);
+
+            for file_index in 0..number_of_files {
+                let segment_file: &PdiSegmentFileDescriptor =
+                    match segment.get_file_by_index(file_index) {
+                        Some(segment_file) => segment_file,
+                        None => {
+                            return Err(keramics_core::error_trace_new!(format!(
+                                "Missing segment: {} file: {}",
+                                segment_index + 1,
+                                file_index + 1
+                            )));
+                        }
+                    };
+                println!("        Segment file: {}", file_index + 1);
+
+                let snapshot_identifier: &Uuid = segment_file.get_snapshot_identifier();
+                println!("            Snapshot identifier\t\t\t: {}", snapshot_identifier);
+
+                println!("            Path\t\t\t\t: {}", segment_file.get_path());
+
+                let file_type_string: &str = match segment_file.get_file_type() {
+                    &PdiSegmentFileType::Compressed => "Compressed",
+                    &PdiSegmentFileType::Plain => "Plain",
+                    _ => "Unknown",
+                };
+                println!("            Type\t\t\t\t: {}", file_type_string);
+            }
+            println!();
+        }
+        for snapshot_index in 0..image_information.number_of_snapshots {
+            let snapshot: &PdiSnapshotDescriptor =
+                match pdi_image.get_snapshot_by_index(snapshot_index) {
+                    Some(snapshot) => snapshot,
+                    None => {
+                        return Err(keramics_core::error_trace_new!(format!(
+                            "Missing snapshot: {}",
+                            snapshot_index + 1
+                        )));
+                    }
+                };
+            println!("    Snapshot: {}", snapshot_index + 1);
+
+            let identifier: &Uuid = snapshot.get_identifier();
+            println!("            Identifier\t\t\t\t: {}", identifier);
+
+            if let Some(parent_identifier) = snapshot.get_parent_identifier() {
+                println!("            Parent identifier\t\t\t: {}", parent_identifier);
+            }
+            println!();
+        }
         Ok(())
     }
 }
@@ -132,9 +226,12 @@ mod tests {
 
         let expected_string: &str = concat!(
             "Parallels Disk Image (PDI) information:\n",
+            "    Number of segments\t\t\t\t: 1\n",
+            "    Number of snapshots\t\t\t\t: 1\n",
+            "\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 32.0 MiB (33554432 bytes)\n",
-            "        Bytes per sector\t\t\t: 512 bytes\n",
+            "        Bytes per sector\t\t\t: 512\n",
             "\n"
         );
         assert_lines_eq(test_struct.to_string().as_str(), expected_string);
@@ -150,6 +247,8 @@ mod tests {
 
         assert_eq!(test_struct.media_size, 33554432);
         assert_eq!(test_struct.bytes_per_sector, 512);
+        assert_eq!(test_struct.number_of_segments, 1);
+        assert_eq!(test_struct.number_of_snapshots, 1);
 
         Ok(())
     }

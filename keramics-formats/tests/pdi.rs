@@ -92,7 +92,7 @@ fn read_media() -> Result<(), ErrorTrace> {
             ));
         }
     };
-    assert_eq!(media_offset, image.media_size);
+    assert_eq!(media_offset, image.get_media_size());
     assert_eq!(md5_hash.as_str(), "ecaef634016fc699807cec47cef11dda");
 
     Ok(())

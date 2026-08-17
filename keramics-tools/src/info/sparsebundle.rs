@@ -83,7 +83,7 @@ impl fmt::Display for SparseBundleImageInfo {
 
         writeln!(
             formatter,
-            "        Bytes per sector\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {}",
             self.bytes_per_sector
         )?;
         writeln!(formatter)
@@ -187,7 +187,7 @@ mod tests {
             "    Band size\t\t\t\t\t: 8.0 MiB (8388608 bytes)\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
-            "        Bytes per sector\t\t\t: 512 bytes\n",
+            "        Bytes per sector\t\t\t: 512\n",
             "\n"
         );
         assert_lines_eq(test_struct.to_string().as_str(), expected_string);

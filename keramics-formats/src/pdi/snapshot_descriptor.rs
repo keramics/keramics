@@ -13,32 +13,32 @@
 
 use keramics_types::Uuid;
 
-use super::enums::PdiDescriptorImageType;
-
-/// Parallels Disk Image (PDI) descriptor image.
+/// Parallels Disk Image (PDI) snapshot descriptor.
 #[derive(Debug)]
-pub(super) struct PdiDescriptorImage {
-    /// File.
-    pub file: String,
+pub struct PdiSnapshotDescriptor {
+    /// Identifier.
+    pub(super) identifier: Uuid,
 
-    /// Image type.
-    pub image_type: PdiDescriptorImageType,
-
-    /// Snapshot identifier.
-    pub snapshot_identifier: Uuid,
+    /// Parent identifier.
+    pub(super) parent_identifier: Option<Uuid>,
 }
 
-impl PdiDescriptorImage {
-    /// Creates a new descriptor image.
-    pub fn new(
-        file: String,
-        image_type: PdiDescriptorImageType,
-        snapshot_identifier: Uuid,
-    ) -> Self {
+impl PdiSnapshotDescriptor {
+    /// Creates a new snapshot descriptor.
+    pub fn new(identifier: Uuid, parent_identifier: Option<Uuid>) -> Self {
         Self {
-            file,
-            image_type,
-            snapshot_identifier,
+            identifier,
+            parent_identifier,
         }
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> &Uuid {
+        &self.identifier
+    }
+
+    /// Retrieves the parent identifier.
+    pub fn get_parent_identifier(&self) -> Option<&Uuid> {
+        self.parent_identifier.as_ref()
     }
 }

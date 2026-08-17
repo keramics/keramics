@@ -12,14 +12,14 @@
  */
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum PdiDescriptorImageType {
-    Compressed,
-    NotSet,
-    Plain,
+pub(super) enum PdiExtentType {
+    Raw,
+    Sparse,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum PdiExtentType {
-    Raw,
-    Sparse,
+pub enum PdiSegmentFileType {
+    Compressed,
+    NotSet,
+    Plain,
 }

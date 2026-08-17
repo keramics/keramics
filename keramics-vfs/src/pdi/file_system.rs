@@ -76,7 +76,7 @@ impl PdiFileSystem {
 
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        Ok(self.image.bytes_per_sector as u32)
+        Ok(self.image.get_bytes_per_sector() as u32)
     }
 
     /// Retrieves the file entry with the specific location.
@@ -111,7 +111,7 @@ impl PdiFileSystem {
                         }
                     };
                 let media_size: u64 = match image_layer.read() {
-                    Ok(pdi_file) => pdi_file.media_size,
+                    Ok(pdi_file) => pdi_file.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
                             "Unable to obtain read lock on image layer",

@@ -141,7 +141,7 @@ impl GptInfo {
             gpt_volume_system.disk_identifier
         );
         println!(
-            "    Bytes per sector\t\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {}",
             gpt_volume_system.bytes_per_sector
         );
         let number_of_partitions: usize = gpt_volume_system.get_number_of_partitions();

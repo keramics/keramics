@@ -1905,7 +1905,7 @@ The file content size is stored in an INO_EXT_TYPE_DSTREAM
 [inode extended field type](#inode_extended_field_types).
 
 The file content data can be located through the [file extents](#file_extent) for the data stream
-file system object identifier in the [file system tree](#file_system).
+file system object identifier in the [file system tree](#file_system_tree).
 
 If the volume is encrypted the file content is encrypted with the encryption identifier in defined
 by the [file extent](#file_extent).

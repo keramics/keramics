@@ -23,11 +23,11 @@ use crate::file_resolver::FileResolverReference;
 use crate::path_component::PathComponent;
 use crate::xml::{XmlDocument, XmlElement};
 
-use super::descriptor_extent::PdiDescriptorExtent;
-use super::descriptor_image::PdiDescriptorImage;
-use super::descriptor_snapshot::PdiDescriptorSnapshot;
-use super::enums::{PdiDescriptorImageType, PdiExtentType};
+use super::enums::{PdiExtentType, PdiSegmentFileType};
 use super::image_layer::PdiImageLayer;
+use super::segment_descriptor::PdiSegmentDescriptor;
+use super::segment_file_descriptor::PdiSegmentFileDescriptor;
+use super::snapshot_descriptor::PdiSnapshotDescriptor;
 use super::sparse_file_header::PdiSparseFileHeader;
 
 /// Parallels Disk Image (PDI).
@@ -36,19 +36,19 @@ pub struct PdiImage {
     file_resolver: FileResolverReference,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 
-    /// Extents.
-    extents: Vec<PdiDescriptorExtent>,
+    /// Segments.
+    segments: Vec<PdiSegmentDescriptor>,
 
     /// Snapshots.
-    snapshots: Vec<PdiDescriptorSnapshot>,
+    snapshots: Vec<PdiSnapshotDescriptor>,
 
     /// Layers.
     layers: Vec<Arc<RwLock<PdiImageLayer>>>,
 
     /// Media size.
-    pub media_size: u64,
+    media_size: u64,
 }
 
 impl PdiImage {
@@ -57,11 +57,41 @@ impl PdiImage {
         Self {
             file_resolver: FileResolverReference::new(Box::new(FakeFileResolver::new())),
             bytes_per_sector: 0,
-            extents: Vec::new(),
+            segments: Vec::new(),
             snapshots: Vec::new(),
             layers: Vec::new(),
             media_size: 0,
         }
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
+    }
+
+    /// Retrieves the number of segments.
+    pub fn get_number_of_segments(&self) -> usize {
+        self.segments.len()
+    }
+
+    /// Retrieves a segment by index.
+    pub fn get_segment_by_index(&self, segment_index: usize) -> Option<&PdiSegmentDescriptor> {
+        self.segments.get(segment_index)
+    }
+
+    /// Retrieves the number of snapshots.
+    pub fn get_number_of_snapshots(&self) -> usize {
+        self.snapshots.len()
+    }
+
+    /// Retrieves a snapshot by index.
+    pub fn get_snapshot_by_index(&self, snapshot_index: usize) -> Option<&PdiSnapshotDescriptor> {
+        self.snapshots.get(snapshot_index)
     }
 
     /// Retrieves the number of layers.
@@ -136,10 +166,13 @@ impl PdiImage {
         }
         let mut data: Vec<u8> = vec![0; data_stream_size as usize];
 
-        keramics_core::data_stream_read_at_position!(data_stream, &mut data, SeekFrom::Start(0));
-
-        keramics_core::debug_trace_data!("PdiImageXml", 0, &data, data_stream_size);
-
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "PdiImageXml",
+            data_stream,
+            &mut data,
+            data_stream_size,
+            SeekFrom::Start(0)
+        );
         let string: String = match String::from_utf8(data) {
             Ok(string) => string,
             Err(error) => {
@@ -344,38 +377,38 @@ impl PdiImage {
         let snapshots: HashSet<&Uuid> = self
             .snapshots
             .iter()
-            .map(|descriptor_snapshot| &descriptor_snapshot.identifier)
+            .map(|snapshot_descriptor| &snapshot_descriptor.identifier)
             .collect();
 
         let mut last_end_sector: u64 = 0;
 
-        for descriptor_extent in self.extents.iter() {
-            if descriptor_extent.start_sector >= descriptor_extent.end_sector {
+        for segment_descriptor in self.segments.iter() {
+            if segment_descriptor.start_sector >= segment_descriptor.end_sector {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported extent start sector: {} value exceeds end sector: {}",
-                    descriptor_extent.start_sector, descriptor_extent.end_sector
+                    segment_descriptor.start_sector, segment_descriptor.end_sector
                 )));
             }
             let extent_number_of_sectors: u64 =
-                descriptor_extent.end_sector - descriptor_extent.start_sector;
+                segment_descriptor.end_sector - segment_descriptor.start_sector;
 
-            if descriptor_extent.start_sector != last_end_sector {
+            if segment_descriptor.start_sector != last_end_sector {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported extent start sector: {} value not aligned with last end sector: {}",
-                    descriptor_extent.start_sector, last_end_sector
+                    segment_descriptor.start_sector, last_end_sector
                 )));
             }
-            last_end_sector = descriptor_extent.end_sector;
+            last_end_sector = segment_descriptor.end_sector;
 
-            for descriptor_image in descriptor_extent.images.iter() {
-                if !snapshots.contains(&descriptor_image.snapshot_identifier) {
+            for segment_file_descriptor in segment_descriptor.files.iter() {
+                if !snapshots.contains(&segment_file_descriptor.snapshot_identifier) {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Missing snapshot: {}",
-                        descriptor_image.snapshot_identifier
+                        segment_file_descriptor.snapshot_identifier
                     )));
                 }
                 let path_components: [PathComponent; 1] =
-                    [PathComponent::from(&descriptor_image.file)];
+                    [PathComponent::from(&segment_file_descriptor.path)];
 
                 let data_stream: DataStreamReference =
                     match file_resolver.get_data_stream(&path_components) {
@@ -383,19 +416,22 @@ impl PdiImage {
                         Ok(None) => {
                             return Err(keramics_core::error_trace_new!(format!(
                                 "Missing image data stream: {}",
-                                descriptor_image.file
+                                segment_file_descriptor.path
                             )));
                         }
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                format!("Unable to open image file: {}", descriptor_image.file)
+                                format!(
+                                    "Unable to open image file: {}",
+                                    segment_file_descriptor.path
+                                )
                             );
                             return Err(error);
                         }
                     };
-                match &descriptor_image.image_type {
-                    PdiDescriptorImageType::Compressed => {
+                match &segment_file_descriptor.file_type {
+                    PdiSegmentFileType::Compressed => {
                         let mut file_header: PdiSparseFileHeader = PdiSparseFileHeader::new();
 
                         match file_header.read_at_position(&data_stream, SeekFrom::Start(0)) {
@@ -415,7 +451,7 @@ impl PdiImage {
                             )));
                         }
                     }
-                    PdiDescriptorImageType::Plain => {
+                    PdiSegmentFileType::Plain => {
                         let file_size: u64 = keramics_core::data_stream_get_size!(data_stream);
 
                         let extent_size: u64 =
@@ -437,37 +473,39 @@ impl PdiImage {
         // Note that the snapshots are not necessarily stored in-order.
         let mut layers: HashMap<&Uuid, PdiImageLayer> = HashMap::new();
 
-        for descriptor_snapshot in self.snapshots.iter() {
+        for snapshot_descriptor in self.snapshots.iter() {
             let mut image_layer: PdiImageLayer = PdiImageLayer::new(
-                &descriptor_snapshot.identifier,
-                descriptor_snapshot.parent_identifier.as_ref(),
+                &snapshot_descriptor.identifier,
+                snapshot_descriptor.parent_identifier.as_ref(),
                 self.media_size,
             );
-            for descriptor_extent in self.extents.iter() {
-                for descriptor_image in descriptor_extent.images.iter() {
-                    if descriptor_image.snapshot_identifier == descriptor_snapshot.identifier {
+            for segment_descriptor in self.segments.iter() {
+                for segment_file_descriptor in segment_descriptor.files.iter() {
+                    if segment_file_descriptor.snapshot_identifier == snapshot_descriptor.identifier
+                    {
                         let offset: u64 =
-                            descriptor_extent.start_sector * (self.bytes_per_sector as u64);
-                        let size: u64 = (descriptor_extent.end_sector
-                            - descriptor_extent.start_sector)
+                            segment_descriptor.start_sector * (self.bytes_per_sector as u64);
+                        let size: u64 = (segment_descriptor.end_sector
+                            - segment_descriptor.start_sector)
                             * (self.bytes_per_sector as u64);
 
-                        let extent_type: PdiExtentType =
-                            if descriptor_image.image_type == PdiDescriptorImageType::Compressed {
-                                PdiExtentType::Sparse
-                            } else {
-                                PdiExtentType::Raw
-                            };
+                        let extent_type: PdiExtentType = if segment_file_descriptor.file_type
+                            == PdiSegmentFileType::Compressed
+                        {
+                            PdiExtentType::Sparse
+                        } else {
+                            PdiExtentType::Raw
+                        };
                         image_layer.add_extent(
                             offset,
                             size,
-                            descriptor_image.file.as_str(),
+                            segment_file_descriptor.path.as_str(),
                             extent_type,
                         );
                     }
                 }
             }
-            layers.insert(&descriptor_snapshot.identifier, image_layer);
+            layers.insert(&snapshot_descriptor.identifier, image_layer);
         }
         // Determine the order of the layers based on the number of ancestors.
         let mut layer_chains: Vec<(usize, &Uuid)> = Vec::new();
@@ -544,9 +582,9 @@ impl PdiImage {
     }
 
     /// Reads an image from DiskDescriptor.xml.
-    fn read_image(&self, xml_element: &XmlElement) -> Result<PdiDescriptorImage, ErrorTrace> {
+    fn read_image(&self, xml_element: &XmlElement) -> Result<PdiSegmentFileDescriptor, ErrorTrace> {
         let mut file: String = String::new();
-        let mut image_type: PdiDescriptorImageType = PdiDescriptorImageType::NotSet;
+        let mut segment_file_type: PdiSegmentFileType = PdiSegmentFileType::NotSet;
         let mut snapshot_identifier: Uuid = Uuid::new();
 
         for sub_xml_element in xml_element.sub_elements.iter() {
@@ -564,9 +602,9 @@ impl PdiImage {
                     }
                 }
                 "Type" => {
-                    image_type = match sub_xml_element.value.as_str() {
-                        "Compressed" => PdiDescriptorImageType::Compressed,
-                        "Plain" => PdiDescriptorImageType::Plain,
+                    segment_file_type = match sub_xml_element.value.as_str() {
+                        "Compressed" => PdiSegmentFileType::Compressed,
+                        "Plain" => PdiSegmentFileType::Plain,
                         _ => {
                             return Err(keramics_core::error_trace_new!(format!(
                                 "Unsupported Type value: {}",
@@ -581,7 +619,7 @@ impl PdiImage {
         if file.is_empty() {
             return Err(keramics_core::error_trace_new!("Missing File value"));
         }
-        if image_type == PdiDescriptorImageType::NotSet {
+        if segment_file_type == PdiSegmentFileType::NotSet {
             return Err(keramics_core::error_trace_new!("Missing Type value"));
         }
         if snapshot_identifier.is_nil() {
@@ -589,15 +627,15 @@ impl PdiImage {
                 "Missing or unsupported GUID value"
             ));
         }
-        Ok(PdiDescriptorImage::new(
+        Ok(PdiSegmentFileDescriptor::new(
             file,
-            image_type,
+            segment_file_type,
             snapshot_identifier,
         ))
     }
 
     /// Reads a snapshot from DiskDescriptor.xml.
-    fn read_snapshot(&self, xml_element: &XmlElement) -> Result<PdiDescriptorSnapshot, ErrorTrace> {
+    fn read_snapshot(&self, xml_element: &XmlElement) -> Result<PdiSnapshotDescriptor, ErrorTrace> {
         let mut identifier: Uuid = Uuid::new();
         let mut parent_identifier: Option<Uuid> = None;
 
@@ -639,7 +677,7 @@ impl PdiImage {
                 "Missing or unsupported GUID value"
             ));
         }
-        Ok(PdiDescriptorSnapshot::new(identifier, parent_identifier))
+        Ok(PdiSnapshotDescriptor::new(identifier, parent_identifier))
     }
 
     /// Reads snapshots from DiskDescriptor.xml.
@@ -647,7 +685,7 @@ impl PdiImage {
         for sub_xml_element in xml_element.sub_elements.iter() {
             match sub_xml_element.name.as_str() {
                 "Shot" => match self.read_snapshot(sub_xml_element) {
-                    Ok(descriptor_snapshot) => self.snapshots.push(descriptor_snapshot),
+                    Ok(snapshot_descriptor) => self.snapshots.push(snapshot_descriptor),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read snapshot");
                         return Err(error);
@@ -660,10 +698,10 @@ impl PdiImage {
     }
 
     /// Reads a storage from DiskDescriptor.xml.
-    fn read_storage(&self, xml_element: &XmlElement) -> Result<PdiDescriptorExtent, ErrorTrace> {
+    fn read_storage(&self, xml_element: &XmlElement) -> Result<PdiSegmentDescriptor, ErrorTrace> {
         let mut block_size: u64 = 0;
         let mut end_sector: u64 = 0;
-        let mut images: Vec<PdiDescriptorImage> = Vec::new();
+        let mut files: Vec<PdiSegmentFileDescriptor> = Vec::new();
         let mut start_sector: u64 = 0;
 
         for sub_xml_element in xml_element.sub_elements.iter() {
@@ -691,7 +729,7 @@ impl PdiImage {
                     }
                 }
                 "Image" => match self.read_image(sub_xml_element) {
-                    Ok(descriptor_image) => images.push(descriptor_image),
+                    Ok(segment_file_descriptor) => files.push(segment_file_descriptor),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read image");
                         return Err(error);
@@ -717,7 +755,14 @@ impl PdiImage {
                 block_size
             )));
         }
-        Ok(PdiDescriptorExtent::new(start_sector, end_sector, images))
+        let size: u64 = (end_sector - start_sector) * (self.bytes_per_sector as u64);
+
+        Ok(PdiSegmentDescriptor::new(
+            start_sector,
+            end_sector,
+            size,
+            files,
+        ))
     }
 
     /// Reads storage data from DiskDescriptor.xml.
@@ -725,7 +770,7 @@ impl PdiImage {
         for sub_xml_element in xml_element.sub_elements.iter() {
             match sub_xml_element.name.as_str() {
                 "Storage" => match self.read_storage(sub_xml_element) {
-                    Ok(descriptor_extent) => self.extents.push(descriptor_extent),
+                    Ok(segment_descriptor) => self.segments.push(segment_descriptor),
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(error, "Unable to read storage");
                         return Err(error);
@@ -760,10 +805,77 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let image: PdiImage = get_image()?;
+
+        let bytes_per_sector: u16 = image.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let image: PdiImage = get_image()?;
+
+        let media_size: u64 = image.get_media_size();
+        assert_eq!(media_size, 33554432);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_segments() -> Result<(), ErrorTrace> {
+        let image: PdiImage = get_image()?;
+
+        let number_of_segments: usize = image.get_number_of_segments();
+        assert_eq!(number_of_segments, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_segment_by_index() -> Result<(), ErrorTrace> {
+        let image: PdiImage = get_image()?;
+
+        let result: Option<&PdiSegmentDescriptor> = image.get_segment_by_index(0);
+        assert!(result.is_some());
+
+        let result: Option<&PdiSegmentDescriptor> = image.get_segment_by_index(99);
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_number_of_snapshots() -> Result<(), ErrorTrace> {
+        let image: PdiImage = get_image()?;
+
+        let number_of_snapshots: usize = image.get_number_of_snapshots();
+        assert_eq!(number_of_snapshots, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_snapshot_by_index() -> Result<(), ErrorTrace> {
+        let image: PdiImage = get_image()?;
+
+        let result: Option<&PdiSnapshotDescriptor> = image.get_snapshot_by_index(0);
+        assert!(result.is_some());
+
+        let result: Option<&PdiSnapshotDescriptor> = image.get_snapshot_by_index(99);
+        assert!(result.is_none());
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_layers() -> Result<(), ErrorTrace> {
         let image: PdiImage = get_image()?;
 
-        assert_eq!(image.get_number_of_layers(), 1);
+        let number_of_layers: usize = image.get_number_of_layers();
+        assert_eq!(number_of_layers, 1);
 
         Ok(())
     }
