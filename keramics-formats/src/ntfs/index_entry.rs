@@ -15,7 +15,7 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use super::fixup_values::apply_fixup_values;
+use super::fixup_values::NtfsFixupValues;
 use super::index_entry_header::NtfsIndexEntryHeader;
 
 /// New Technologies File System (NTFS) index entry.
@@ -54,7 +54,7 @@ impl NtfsIndexEntry {
             )));
         }
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
-        match apply_fixup_values(
+        match NtfsFixupValues::apply_fixup_values(
             data,
             index_entry_header.fixup_values_offset as usize,
             index_entry_header.number_of_fixup_values,
@@ -95,7 +95,13 @@ impl NtfsIndexEntry {
         match self.read_data(&mut data) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read index entry");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read index entry at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
                 return Err(error);
             }
         }

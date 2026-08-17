@@ -28,3 +28,8 @@ keywords = []
 license = "Apache-2.0"
 repository = "https://github.com/keramics/keramics"
 version = "0.0.1"
+
+[profile.profiling]
+inherits = "release"
+debug = true
+force-frame-pointers = true

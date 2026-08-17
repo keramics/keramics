@@ -12,7 +12,9 @@
  */
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::DebugTrace;
 
 use super::constants::*;
 use super::junction_reparse_data::NtfsJunctionReparseData;
@@ -102,22 +104,22 @@ impl NtfsReparsePoint {
                 return Err(error);
             }
         }
-        let mediator = Mediator::current();
-
-        if mediator.debug_output {
-            match reparse_point_header.tag {
-                0x80000017 => mediator.debug_print(NtfsWofReparseData::debug_read_data(
-                    &mft_attribute.resident_data[8..],
-                )),
-                0xa0000003 => mediator.debug_print(NtfsJunctionReparseData::debug_read_data(
-                    &mft_attribute.resident_data[8..],
-                )),
-                0xa000000c => mediator.debug_print(NtfsSymbolicLinkReparseData::debug_read_data(
-                    &mft_attribute.resident_data[8..],
-                )),
-                _ => {}
-            }
-        }
+        #[cfg(feature = "debug-trace")]
+        DebugTrace::static_scope(|debug_trace| match reparse_point_header.tag {
+            0x80000017 => debug_trace.print_structure(
+                NtfsWofReparseData::debug_read_data,
+                &mft_attribute.resident_data[8..],
+            ),
+            0xa0000003 => debug_trace.print_structure(
+                NtfsJunctionReparseData::debug_read_data,
+                &mft_attribute.resident_data[8..],
+            ),
+            0xa000000c => debug_trace.print_structure(
+                NtfsSymbolicLinkReparseData::debug_read_data,
+                &mft_attribute.resident_data[8..],
+            ),
+            _ => {}
+        });
         let mut reparse_point: NtfsReparsePoint = NtfsReparsePoint::new(reparse_point_header.tag);
 
         match reparse_point.read_data(&mft_attribute.resident_data[8..]) {

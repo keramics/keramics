@@ -116,6 +116,7 @@ impl ExtInode {
     }
 
     /// Reads the inode for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(format_version: u8, data: &[u8]) -> String {
         let mut string_parts: Vec<String> = Vec::new();
 

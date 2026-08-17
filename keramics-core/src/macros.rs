@@ -15,14 +15,17 @@
 #[macro_export]
 macro_rules! debug_trace_data {
     ( $description:expr, $offset:expr, $data:expr, $data_size:expr $(,)? ) => {
-        let mediator = $crate::mediator::Mediator::current();
+        #[cfg(feature = "debug-trace")]
+        {
+            let mediator = $crate::mediator::Mediator::current();
 
-        if mediator.debug_output {
-            mediator.debug_print(format!(
-                "{} data of size: {} at offset: {} (0x{:08x})\n",
-                $description, $data_size, $offset, $offset
-            ));
-            mediator.debug_print_data($data, true);
+            if mediator.debug_output {
+                mediator.debug_print(format!(
+                    "{} data of size: {} at offset: {} (0x{:08x})\n",
+                    $description, $data_size, $offset, $offset
+                ));
+                mediator.debug_print_data($data, true);
+            }
         }
     };
 }
@@ -31,15 +34,18 @@ macro_rules! debug_trace_data {
 #[macro_export]
 macro_rules! debug_trace_data_and_structure {
     ( $description:expr, $offset:expr, $data:expr, $data_size:expr, $structure:expr $(,)? ) => {
-        let mediator = $crate::mediator::Mediator::current();
+        #[cfg(feature = "debug-trace")]
+        {
+            let mediator = $crate::mediator::Mediator::current();
 
-        if mediator.debug_output {
-            mediator.debug_print(format!(
-                "{} data of size: {} at offset: {} (0x{:08x})\n",
-                $description, $data_size, $offset, $offset
-            ));
-            mediator.debug_print_data($data, true);
-            mediator.debug_print($structure);
+            if mediator.debug_output {
+                mediator.debug_print(format!(
+                    "{} data of size: {} at offset: {} (0x{:08x})\n",
+                    $description, $data_size, $offset, $offset
+                ));
+                mediator.debug_print_data($data, true);
+                mediator.debug_print($structure);
+            }
         }
     };
 }
@@ -48,10 +54,13 @@ macro_rules! debug_trace_data_and_structure {
 #[macro_export]
 macro_rules! debug_trace_structure {
     ( $structure:expr $(,)? ) => {
-        let mediator = $crate::mediator::Mediator::current();
+        #[cfg(feature = "debug-trace")]
+        {
+            let mediator = $crate::mediator::Mediator::current();
 
-        if mediator.debug_output {
-            mediator.debug_print($structure);
+            if mediator.debug_output {
+                mediator.debug_print($structure);
+            }
         }
     };
 }
@@ -152,6 +161,41 @@ macro_rules! data_stream_read_exact_at_position {
         match $data_stream.write() {
             Ok(mut data_stream) => match data_stream.read_exact_at_position($buf, $pos) {
                 Ok(offset) => offset,
+                Err(mut error) => {
+                    $crate::error_trace_add_frame!(error, "Unable to read from data stream");
+                    return Err(error);
+                }
+            },
+            Err(error) => {
+                return Err($crate::error_trace_new_with_error!(
+                    "Unable to obtain write lock on data stream",
+                    error
+                ));
+            }
+        };
+    };
+}
+
+/// Convenience macro for combined data_stream_read_exact_at_position and debug_trace_data.
+#[macro_export]
+macro_rules! data_stream_read_exact_at_position_with_debug_trace_data {
+    ( $description:expr, $data_stream:expr, $buf:expr, $data_size:expr, $pos:expr $(,)? ) => {
+        match $data_stream.write() {
+            Ok(mut data_stream) => match data_stream.read_exact_at_position($buf, $pos) {
+                Ok(offset) => {
+                    #[cfg(feature = "debug-trace")]
+                    {
+                        let mediator = $crate::mediator::Mediator::current();
+
+                        if mediator.debug_output {
+                            mediator.debug_print(format!(
+                                "{} data of size: {} at offset: {} (0x{:08x})\n",
+                                $description, $data_size, offset, offset
+                            ));
+                            mediator.debug_print_data($buf, true);
+                        }
+                    }
+                }
                 Err(mut error) => {
                     $crate::error_trace_add_frame!(error, "Unable to read from data stream");
                     return Err(error);

@@ -4,4 +4,6 @@
 book
 Cargo.lock
 coverage.xml
+perf.data
+perf.data.old
 target

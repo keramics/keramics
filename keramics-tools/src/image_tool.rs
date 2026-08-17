@@ -23,7 +23,6 @@ use indicatif::{MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use sysinfo::System;
 
 use keramics_core::formatters::format_as_string;
-use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::Path;
 use keramics_formats::ntfs::NtfsAttribute;
@@ -34,6 +33,9 @@ use keramics_vfs::{
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions,
     VfsScanner, VfsType, new_os_vfs_location,
 };
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::mediator::Mediator;
 
 mod bodyfile;
 mod display_path;
@@ -51,6 +53,7 @@ pub const FILE_ATTRIBUTE_FLAG_SYSTEM: u32 = 0x00000004;
 #[derive(Parser)]
 #[command(version, about = "Analyzes the contents of a storage media image", long_about = None)]
 struct CommandLineArguments {
+    #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
@@ -89,7 +92,6 @@ struct BodyfileCommandArguments {
     calculate_md5: bool,
 
     // TODO: allow to set the path component/segment separator
-
     // TODO: allow to set the data stream name separator
     /// Volume or partition path type
     #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
@@ -179,9 +181,7 @@ impl ImageTool {
         let mut display_path: DisplayPath = DisplayPath::new(&DisplayPathType::Index);
 
         // Escape | as \|
-        display_path
-            .translation_table
-            .insert('|' as u32, String::from("\\|"));
+        display_path.translation_table.insert('|' as u32, "\\|");
 
         Self {
             vfs_resolver: VfsResolver::current(),
@@ -689,6 +689,20 @@ impl ImageTool {
 
         let path_string: String = match result.as_ref() {
             Some(file_entry) => match file_entry {
+                VfsFileEntry::ApfsContainer(apfs_container_file_entry) => {
+                    let path_string: String = match apfs_container_file_entry.get_volume_number() {
+                        Some(volume_number) => format!("/apfs{}", volume_number),
+                        _ => path.to_string(),
+                    };
+                    match apfs_container_file_entry.get_identifier() {
+                        Some(identifier) => format!(
+                            "{} (alias: /apfs{{{}}})",
+                            path_string,
+                            identifier.to_string()
+                        ),
+                        _ => path_string,
+                    }
+                }
                 VfsFileEntry::Gpt(gpt_file_entry) => {
                     let path_string: String = match gpt_file_entry.get_partition_number() {
                         Some(partition_number) => format!("/p{}", partition_number),
@@ -866,11 +880,13 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    Mediator {
-        debug_output: arguments.debug,
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
     }
-    .make_current();
-
     let vfs_credential_store: &VfsCredentialStore = VfsCredentialStore::current();
 
     for password in arguments.password.iter() {

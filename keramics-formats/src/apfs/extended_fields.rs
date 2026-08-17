@@ -40,18 +40,16 @@ impl ApfsExtendedFields {
     }
 
     /// Reads the extended fields from a buffer.
-    pub fn read_data(&mut self, data: &[u8], mut data_offset: usize) -> Result<(), ErrorTrace> {
+    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         let data_size: usize = data.len();
 
         if data_size < 4 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));
         }
-        keramics_core::debug_trace_structure!(ApfsExtendedFieldsHeader::debug_read_data(
-            &data[data_offset..]
-        ));
+        keramics_core::debug_trace_structure!(ApfsExtendedFieldsHeader::debug_read_data(data));
         let mut extended_fields_header: ApfsExtendedFieldsHeader = ApfsExtendedFieldsHeader::new();
 
-        match extended_fields_header.read_data(&data[data_offset..]) {
+        match extended_fields_header.read_data(data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
@@ -61,7 +59,7 @@ impl ApfsExtendedFields {
                 return Err(error);
             }
         }
-        data_offset += 4;
+        let mut data_offset: usize = 4;
 
         if (extended_fields_header.number_of_fields as usize) > ((data_size - data_offset) / 4) {
             return Err(keramics_core::error_trace_new!(
@@ -121,7 +119,8 @@ impl ApfsExtendedFields {
             );
             value_data_offset = value_data_end_offset;
 
-            let alignment_padding: usize = calculate_alignment_padding(value_data_offset, 8);
+            let alignment_padding: usize =
+                calculate_alignment_padding(extended_fields_entry.data_size as usize, 8);
 
             if alignment_padding > 0 {
                 // TODO: debug print alignment padding.
@@ -147,7 +146,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = ApfsExtendedFields::new();
-        test_struct.read_data(&test_data, 0)?;
+        test_struct.read_data(&test_data)?;
 
         assert_eq!(test_struct.fields.len(), 1);
         assert_eq!(
@@ -163,7 +162,7 @@ mod tests {
         let mut test_struct = ApfsExtendedFields::new();
 
         let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..3], 0);
+        let result = test_struct.read_data(&test_data[0..3]);
         assert!(result.is_err());
     }
 }

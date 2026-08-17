@@ -30,14 +30,16 @@ pub trait DataStream: Send + Sync {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, ErrorTrace>;
 
     /// Reads data at a specific position.
-    #[inline(always)]
+    #[cfg_attr(feature = "no-inline", inline(never))]
+    #[cfg_attr(not(feature = "no-inline"), inline(always))]
     fn read_at_position(&mut self, buf: &mut [u8], pos: SeekFrom) -> Result<usize, ErrorTrace> {
         self.seek(pos)?;
         self.read(buf)
     }
 
     /// Reads an exact amount of data at the current position.
-    #[inline(always)]
+    #[cfg_attr(feature = "no-inline", inline(never))]
+    #[cfg_attr(not(feature = "no-inline"), inline(always))]
     fn read_exact(&mut self, buf: &mut [u8]) -> Result<(), ErrorTrace> {
         let read_size: usize = buf.len();
         let read_count: usize = self.read(buf)?;
@@ -49,7 +51,8 @@ pub trait DataStream: Send + Sync {
     }
 
     /// Reads an exact amount of data at a specific position.
-    #[inline(always)]
+    #[cfg_attr(feature = "no-inline", inline(never))]
+    #[cfg_attr(not(feature = "no-inline"), inline(always))]
     fn read_exact_at_position(&mut self, buf: &mut [u8], pos: SeekFrom) -> Result<u64, ErrorTrace> {
         let offset: u64 = self.seek(pos)?;
         let read_size: usize = buf.len();

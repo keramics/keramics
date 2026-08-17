@@ -59,17 +59,26 @@ impl HfsStandardCatalogFolderRecord {
         folder_record.identifier = bytes_to_u32_be!(data, 6);
 
         let timestamp: u32 = bytes_to_u32_be!(data, 10);
-        if timestamp > 0 {
-            folder_record.creation_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        folder_record.creation_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 14);
-        if timestamp > 0 {
-            folder_record.modification_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        folder_record.modification_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 18);
-        if timestamp > 0 {
-            folder_record.backup_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        folder_record.backup_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         Ok(())
     }
 }

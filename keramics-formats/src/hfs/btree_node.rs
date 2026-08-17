@@ -23,6 +23,7 @@ use super::btree_node_record::HfsBtreeNodeRecord;
 use super::enums::HfsBtreeNodeType;
 
 /// Hierarchical File System (HFS) B-tree node.
+#[derive(Clone)]
 pub struct HfsBtreeNode {
     /// Offset.
     pub offset: u64,

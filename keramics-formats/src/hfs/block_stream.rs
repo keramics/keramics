@@ -43,7 +43,7 @@ mod tests {
             physical_block_number: 275,
             number_of_blocks: 3,
         }];
-        block_reader.open(26, &block_ranges)?;
+        block_reader.open(block_ranges)?;
 
         Ok(HfsBlockStream::new(block_reader))
     }

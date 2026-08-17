@@ -44,6 +44,7 @@ impl HfsExtentsOverflowKey {
     }
 
     /// Reads the extents overflow key for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(format: &HfsFormat, data: &[u8]) -> String {
         match format {
             HfsFormat::Hfs => HfsStandardExtentsOverflowKey::debug_read_data(data),

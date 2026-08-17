@@ -16,6 +16,8 @@ use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
+use crate::lru_cache::SharedLruCache;
+
 use super::block_range::HfsBlockRange;
 use super::btree_header_record::HfsBtreeHeaderRecord;
 use super::btree_node::HfsBtreeNode;
@@ -36,6 +38,9 @@ pub struct HfsBtreeFile {
     /// Root node number.
     pub root_node_number: u32,
 
+    /// Node cache.
+    node_cache: SharedLruCache<u32, HfsBtreeNode>,
+
     /// Size.
     size: u64,
 
@@ -54,6 +59,7 @@ impl HfsBtreeFile {
             block_size: 0,
             node_size: 0,
             root_node_number: 0,
+            node_cache: SharedLruCache::new(256),
             size: 0,
             block_ranges: Vec::new(),
             key_comparion_method: HfsKeyComparisonMethod::CaseFold,
@@ -66,66 +72,101 @@ impl HfsBtreeFile {
         data_stream: &DataStreamReference,
         node_number: u32,
     ) -> Result<HfsBtreeNode, ErrorTrace> {
-        let node_logical_offset: u64 = (node_number as u64) * (self.node_size as u64);
-        let node_block_number: u64 = node_logical_offset / (self.block_size as u64);
-
-        if node_block_number > u32::MAX as u64 {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Invalid node number: {} value out of bounds",
-                node_number
-            )));
-        }
-        let block_range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
-            let range_end_block_number: u64 =
-                (block_range.logical_block_number as u64) + (block_range.number_of_blocks as u64);
-            if node_block_number >= range_end_block_number {
-                Ordering::Less
-            } else if node_block_number < (block_range.logical_block_number as u64) {
-                Ordering::Greater
-            } else {
-                Ordering::Equal
-            }
-        }) {
-            Ok(extent_index) => extent_index,
-            Err(_) => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Missing block range for node: {}",
-                    node_number
-                )));
-            }
-        };
-        let node_physical_offset: u64 = match self.block_ranges.get(block_range_index) {
-            Some(block_range) => {
-                let range_logical_offset: u64 =
-                    (block_range.logical_block_number as u64) * (self.block_size as u64);
-                let range_physical_offset: u64 =
-                    (block_range.physical_block_number as u64) * (self.block_size as u64);
-
-                range_physical_offset + (node_logical_offset - range_logical_offset)
-            }
-            None => {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Unable to retrieve block range: {} of node: {}",
-                    block_range_index, node_number
-                )));
-            }
-        };
-        let mut node: HfsBtreeNode = HfsBtreeNode::new();
-
-        match node.read_at_position(data_stream, node_physical_offset, self.node_size) {
-            Ok(_) => {}
+        let result: bool = match self.node_cache.contains(&node_number) {
+            Ok(result) => result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!(
-                        "Unable to read node: {} at offset: {} (0x{:08x}",
-                        node_number, node_physical_offset, node_physical_offset
-                    )
+                    format!("Unable to determine if node: {} is cached", node_number)
                 );
                 return Err(error);
             }
+        };
+        if !result {
+            let node_logical_offset: u64 = (node_number as u64) * (self.node_size as u64);
+            let node_block_number: u64 = node_logical_offset / (self.block_size as u64);
+
+            if node_block_number > u32::MAX as u64 {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Invalid node number: {} value out of bounds",
+                    node_number
+                )));
+            }
+            let block_range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+                let range_end_block_number: u64 = (block_range.logical_block_number as u64)
+                    + (block_range.number_of_blocks as u64);
+                if node_block_number >= range_end_block_number {
+                    Ordering::Less
+                } else if node_block_number < (block_range.logical_block_number as u64) {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
+            }) {
+                Ok(extent_index) => extent_index,
+                Err(_) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing block range for node: {}",
+                        node_number
+                    )));
+                }
+            };
+            let node_physical_offset: u64 = match self.block_ranges.get(block_range_index) {
+                Some(block_range) => {
+                    let range_logical_offset: u64 =
+                        (block_range.logical_block_number as u64) * (self.block_size as u64);
+                    let range_physical_offset: u64 =
+                        (block_range.physical_block_number as u64) * (self.block_size as u64);
+
+                    range_physical_offset + (node_logical_offset - range_logical_offset)
+                }
+                None => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to retrieve block range: {} of node: {}",
+                        block_range_index, node_number
+                    )));
+                }
+            };
+            let mut node: HfsBtreeNode = HfsBtreeNode::new();
+
+            match node.read_at_position(data_stream, node_physical_offset, self.node_size) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read node: {} at offset: {} (0x{:08x}",
+                            node_number, node_physical_offset, node_physical_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            match self.node_cache.insert(node_number, node) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to insert node: {} in cache", node_number)
+                    );
+                    return Err(error);
+                }
+            }
         }
-        Ok(node)
+        match self.node_cache.get(&node_number) {
+            Ok(Some(node)) => Ok(node),
+            Ok(None) => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve node: {} from cache",
+                node_number
+            ))),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Failed to retrieve node: {} from cache", node_number)
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Initializes the B-tree file.

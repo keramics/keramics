@@ -14,10 +14,70 @@
 use keramics_core::ErrorTrace;
 use keramics_types::bytes_to_u16_le;
 
-struct NtfsFixupValues {}
+pub struct NtfsFixupValues {}
 
 impl NtfsFixupValues {
+    /// Applies the fix-up values to the buffer.
+    pub fn apply_fixup_values(
+        buffer: &mut [u8],
+        fixup_values_offset: usize,
+        number_of_fixup_values: u16,
+    ) -> Result<(), ErrorTrace> {
+        let buffer_size: usize = buffer.len();
+
+        if fixup_values_offset >= buffer_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid fix-up values offset: {} value out of bounds",
+                fixup_values_offset,
+            )));
+        }
+        let fixup_values_size: usize = 2 + (number_of_fixup_values as usize) * 2;
+        let fixup_values_end_offset: usize = fixup_values_offset + fixup_values_size;
+
+        if fixup_values_end_offset > buffer_size {
+            return Err(keramics_core::error_trace_new!(format!(
+                "Invalid number of fix-up values: {} value out of bounds",
+                number_of_fixup_values,
+            )));
+        }
+        keramics_core::debug_trace_data_and_structure!(
+            "NtfsFixupValues",
+            fixup_values_offset,
+            &buffer[fixup_values_offset..fixup_values_end_offset],
+            fixup_values_size,
+            NtfsFixupValues::debug_read_data(&buffer[fixup_values_offset..fixup_values_end_offset])
+        );
+        let mut placeholder_value_data: [u8; 2] = [0; 2];
+        placeholder_value_data
+            .clone_from_slice(&buffer[fixup_values_offset..fixup_values_offset + 2]);
+
+        let mut fixup_value_offset: usize = fixup_values_offset + 2;
+        let mut buffer_offset: usize = 510;
+
+        for _ in 1..number_of_fixup_values {
+            let fixup_value_end_offset: usize = fixup_value_offset + 2;
+            let buffer_end_offset: usize = buffer_offset + 2;
+
+            if buffer_end_offset <= buffer_size {
+                if &buffer[buffer_offset..buffer_end_offset] != &placeholder_value_data {
+                    // TODO: flag corruption
+                    let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
+                    let fixup_value: u16 = bytes_to_u16_le!(buffer, fixup_value_offset);
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "corruption detected - mismatch between placeholder: {} and value: {} at offset: {} (0x{:08x})",
+                        placeholder_value, fixup_value, fixup_value_offset, fixup_value_offset,
+                    )));
+                }
+                buffer.copy_within(fixup_value_offset..fixup_value_end_offset, buffer_offset);
+            }
+            fixup_value_offset = fixup_value_end_offset;
+            buffer_offset += 512;
+        }
+        Ok(())
+    }
+
     /// Reads the fix-up values for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(data: &[u8]) -> String {
         let placeholder_value: u16 = bytes_to_u16_le!(data, 0);
 
@@ -37,64 +97,6 @@ impl NtfsFixupValues {
             fixup_values.join(", ")
         )
     }
-}
-
-/// Applies the fix-up values to the buffer.
-pub fn apply_fixup_values(
-    buffer: &mut [u8],
-    fixup_values_offset: usize,
-    number_of_fixup_values: u16,
-) -> Result<(), ErrorTrace> {
-    let buffer_size: usize = buffer.len();
-
-    if fixup_values_offset >= buffer_size {
-        return Err(keramics_core::error_trace_new!(format!(
-            "Invalid fix-up values offset: {} value out of bounds",
-            fixup_values_offset,
-        )));
-    }
-    let fixup_values_size: usize = 2 + (number_of_fixup_values as usize) * 2;
-    let fixup_values_end_offset: usize = fixup_values_offset + fixup_values_size;
-
-    if fixup_values_end_offset > buffer_size {
-        return Err(keramics_core::error_trace_new!(format!(
-            "Invalid number of fix-up values: {} value out of bounds",
-            number_of_fixup_values,
-        )));
-    }
-    keramics_core::debug_trace_data_and_structure!(
-        "NtfsFixupValues",
-        fixup_values_offset,
-        &buffer[fixup_values_offset..fixup_values_end_offset],
-        fixup_values_size,
-        NtfsFixupValues::debug_read_data(&buffer[fixup_values_offset..fixup_values_end_offset])
-    );
-    let mut placeholder_value_data: [u8; 2] = [0; 2];
-    placeholder_value_data.clone_from_slice(&buffer[fixup_values_offset..fixup_values_offset + 2]);
-
-    let mut fixup_value_offset: usize = fixup_values_offset + 2;
-    let mut buffer_offset: usize = 510;
-
-    for _ in 1..number_of_fixup_values {
-        let fixup_value_end_offset: usize = fixup_value_offset + 2;
-        let buffer_end_offset: usize = buffer_offset + 2;
-
-        if buffer_end_offset <= buffer_size {
-            if &buffer[buffer_offset..buffer_end_offset] != &placeholder_value_data {
-                // TODO: flag corruption
-                let placeholder_value: u16 = bytes_to_u16_le!(placeholder_value_data, 0);
-                let fixup_value: u16 = bytes_to_u16_le!(buffer, fixup_value_offset);
-                return Err(keramics_core::error_trace_new!(format!(
-                    "corruption detected - mismatch between placeholder: {} and value: {} at offset: {} (0x{:08x})",
-                    placeholder_value, fixup_value, fixup_value_offset, fixup_value_offset,
-                )));
-            }
-            buffer.copy_within(fixup_value_offset..fixup_value_end_offset, buffer_offset);
-        }
-        fixup_value_offset = fixup_value_end_offset;
-        buffer_offset += 512;
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -187,7 +189,7 @@ mod tests {
         assert_eq!(test_data[510..512], test_data[48..50]);
         assert_eq!(test_data[1022..1024], test_data[48..50]);
 
-        apply_fixup_values(&mut test_data, 48, 3)?;
+        NtfsFixupValues::apply_fixup_values(&mut test_data, 48, 3)?;
 
         assert_eq!(test_data[510..512], test_data[50..52]);
         assert_eq!(test_data[1022..1024], test_data[52..54]);
@@ -200,7 +202,7 @@ mod tests {
         let mut test_data: Vec<u8> = get_test_data();
         test_data[1022] = 0xff;
 
-        let result = apply_fixup_values(&mut test_data, 48, 3);
+        let result = NtfsFixupValues::apply_fixup_values(&mut test_data, 48, 3);
 
         assert!(result.is_err());
     }

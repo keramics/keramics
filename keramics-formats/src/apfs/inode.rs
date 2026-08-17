@@ -113,17 +113,33 @@ impl ApfsInode {
         self.data_stream_identifier = bytes_to_u64_le!(data, 8);
 
         let timestamp: i64 = bytes_to_i64_le!(data, 16);
-        self.modification_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
 
+        self.modification_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::ApfsTime(ApfsTime::new(timestamp))
+        };
         let timestamp: i64 = bytes_to_i64_le!(data, 24);
-        self.creation_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
 
+        self.creation_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::ApfsTime(ApfsTime::new(timestamp))
+        };
         let timestamp: i64 = bytes_to_i64_le!(data, 32);
-        self.change_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
 
+        self.change_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::ApfsTime(ApfsTime::new(timestamp))
+        };
         let timestamp: i64 = bytes_to_i64_le!(data, 40);
-        self.access_time = DateTime::ApfsTime(ApfsTime::new(timestamp));
 
+        self.access_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::ApfsTime(ApfsTime::new(timestamp))
+        };
         self.number_of_links = bytes_to_u32_le!(data, 56);
         self.owner_identifier = bytes_to_u32_le!(data, 72);
         self.group_identifier = bytes_to_u32_le!(data, 76);
@@ -132,7 +148,7 @@ impl ApfsInode {
         if data_size >= 96 {
             let mut extended_fields: ApfsExtendedFields = ApfsExtendedFields::new();
 
-            match extended_fields.read_data(&data, 92) {
+            match extended_fields.read_data(&data[92..]) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to read extended fields");

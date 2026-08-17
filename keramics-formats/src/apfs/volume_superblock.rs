@@ -13,13 +13,16 @@
 
 use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
-use keramics_types::{ByteString, bytes_to_u32_le, bytes_to_u64_le};
+use keramics_types::{ByteString, bytes_to_u64_le};
 
-use super::change_information::ApfsChangeInformation;
 use super::constants::*;
-use super::encryption_state::ApfsEncryptionState;
 use super::object_checksum::ApfsObjectChecksum;
 use super::object_header::ApfsObjectHeader;
+
+#[cfg(feature = "debug-trace")]
+use super::change_information::ApfsChangeInformation;
+#[cfg(feature = "debug-trace")]
+use super::encryption_state::ApfsEncryptionState;
 
 #[derive(LayoutMap)]
 #[layout_map(
@@ -190,13 +193,6 @@ impl ApfsVolumeSuperblock {
                 "Mismatch between stored: 0x{:016x} and calculated: 0x{:016x} checksums",
                 self.object_header.checksum, calculated_checksum
             )));
-        }
-        let maximum_number_of_volumes: u32 = bytes_to_u32_le!(data, 180);
-
-        if maximum_number_of_volumes > 100 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported maximum number of volumes"
-            ));
         }
         self.feature_flags = bytes_to_u64_le!(data, 40);
         self.read_only_compatible_feature_flags = bytes_to_u64_le!(data, 48);

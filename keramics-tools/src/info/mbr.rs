@@ -155,7 +155,7 @@ impl MbrInfo {
             mbr_volume_system.disk_identity
         );
         println!(
-            "    Bytes per sector\t\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {}",
             mbr_volume_system.bytes_per_sector
         );
         let number_of_partitions: usize = mbr_volume_system.get_number_of_partitions();

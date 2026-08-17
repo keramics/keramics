@@ -122,6 +122,7 @@ impl StorageMediaImage {
     }
 
     /// Retrieves the stored MD5 hash.
+    #[allow(dead_code)]
     pub fn get_md5_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
         match self {
             Self::Ewf { ewf_image } => match ewf_image.read() {
@@ -136,6 +137,7 @@ impl StorageMediaImage {
     }
 
     /// Retrieves the stored SHA1 hash.
+    #[allow(dead_code)]
     pub fn get_sha1_hash(&self) -> Result<Option<Vec<u8>>, ErrorTrace> {
         match self {
             Self::Ewf { ewf_image } => match ewf_image.read() {

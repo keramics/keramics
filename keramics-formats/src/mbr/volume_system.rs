@@ -301,7 +301,7 @@ impl MbrVolumeSystem {
         let mut next_extended_boot_record_offset: u64 = 0;
         let mut next_extended_boot_record_lba: u64 = 0;
 
-        if let Some(mut partition_entry) = extended_boot_record.partition_entries.get(1) {
+        if let Some(partition_entry) = extended_boot_record.partition_entries.get(1) {
             if partition_entry.partition_type != 0 {
                 if partition_entry.partition_type != 0x05 {
                     return Err(keramics_core::error_trace_new!(format!(
@@ -318,7 +318,7 @@ impl MbrVolumeSystem {
             }
         }
         for index in 2..4 {
-            if let Some(mut partition_entry) = extended_boot_record.partition_entries.get(index) {
+            if let Some(partition_entry) = extended_boot_record.partition_entries.get(index) {
                 if partition_entry.partition_type != 0 {
                     return Err(keramics_core::error_trace_new!(format!(
                         "Unsupported partition entry: {} - unsupported type: 0x{:02x}",

@@ -19,6 +19,7 @@ use keramics_formats::Path;
 use keramics_formats::apfs::{ApfsContainer, ApfsFileEntry, ApfsFileSystem, ApfsVolume};
 use keramics_types::{ByteString, Uuid};
 
+use crate::enums::DisplayPathType;
 use crate::formatters::ByteSize;
 
 use super::posix::PosixFileModeInfo;
@@ -644,6 +645,7 @@ impl ApfsInfo {
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_identifier(
         data_stream: &DataStreamReference,
+        volume_number: usize,
         apfs_entry_identifier: u64,
     ) -> Result<(), ErrorTrace> {
         let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
@@ -653,16 +655,21 @@ impl ApfsInfo {
                 return Err(error);
             }
         };
-        // TODO: refactor into function get_file_system_by_path
-        let number_of_volumes: usize = apfs_container.get_number_of_volumes();
-
-        let volume_index: usize = if number_of_volumes == 1 {
-            // Strip/check for volume prefix in path
-            0
+        let volume_index: usize = if volume_number > 0 {
+            volume_number - 1
         } else {
-            // TODO: handle a number of volumes of 0
-            // TODO: determine volume based on path
-            todo!();
+            let number_of_volumes: usize = apfs_container.get_number_of_volumes();
+
+            if number_of_volumes == 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "No volumes found in container"
+                ));
+            } else if number_of_volumes > 1 {
+                return Err(keramics_core::error_trace_new!(
+                    "Container has more than one volume"
+                ));
+            }
+            0
         };
         let apfs_volume: ApfsVolume = match apfs_container.get_volume_by_index(volume_index) {
             Ok(volume) => volume,
@@ -716,6 +723,7 @@ impl ApfsInfo {
     /// Prints information about a specific file entry.
     pub fn print_file_entry_by_path(
         data_stream: &DataStreamReference,
+        volume_number: usize,
         path: &Path,
     ) -> Result<(), ErrorTrace> {
         let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
@@ -725,16 +733,22 @@ impl ApfsInfo {
                 return Err(error);
             }
         };
-        // TODO: refactor into function get_file_system_by_path
-        let number_of_volumes: usize = apfs_container.get_number_of_volumes();
-
-        let volume_index: usize = if number_of_volumes == 1 {
-            // Strip/check for volume prefix in path
-            0
+        // TODO: add support to determine volume from path.
+        let volume_index: usize = if volume_number > 0 {
+            volume_number - 1
         } else {
-            // TODO: handle a number of volumes of 0
-            // TODO: determine volume based on path
-            todo!();
+            let number_of_volumes: usize = apfs_container.get_number_of_volumes();
+
+            if number_of_volumes == 0 {
+                return Err(keramics_core::error_trace_new!(
+                    "No volumes found in container"
+                ));
+            } else if number_of_volumes > 1 {
+                return Err(keramics_core::error_trace_new!(
+                    "Container has more than one volume"
+                ));
+            }
+            0
         };
         let apfs_volume: ApfsVolume = match apfs_container.get_volume_by_index(volume_index) {
             Ok(volume) => volume,
@@ -779,7 +793,11 @@ impl ApfsInfo {
     }
 
     /// Prints the file system hierarchy.
-    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    pub fn print_hierarchy(
+        data_stream: &DataStreamReference,
+        volume_number: usize,
+        volume_path_type: &DisplayPathType,
+    ) -> Result<(), ErrorTrace> {
         let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
             Ok(container) => container,
             Err(mut error) => {
@@ -790,25 +808,32 @@ impl ApfsInfo {
         println!("Apple File System (APFS) hierarchy:");
 
         for (volume_index, result) in apfs_container.volumes().enumerate() {
+            if volume_number != 0 && volume_number != volume_index + 1 {
+                continue;
+            }
             let apfs_volume: ApfsVolume = match result {
                 Ok(volume) => volume,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to retrieve volume: {}", volume_index)
+                        format!("Unable to retrieve volume: {}", volume_index + 1)
                     );
                     return Err(error);
                 }
             };
-            let volume_identifier: &Uuid = apfs_volume.get_identifier();
-            let volume_path_component: String = format!("{{{}}}", volume_identifier);
-
+            let volume_path_component: String = match volume_path_type {
+                DisplayPathType::Identifier => format!("apfs{{{}}}", apfs_volume.get_identifier()),
+                DisplayPathType::Index => format!("apfs{}", volume_index + 1),
+            };
             let apfs_file_system: ApfsFileSystem = match apfs_volume.get_file_system() {
                 Ok(file_system) => file_system,
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
                         error,
-                        format!("Unable to retrieve file system of volume: {}", volume_index)
+                        format!(
+                            "Unable to retrieve file system of volume: {}",
+                            volume_index + 1
+                        )
                     );
                     return Err(error);
                 }
@@ -817,8 +842,11 @@ impl ApfsInfo {
                 Ok(result) => match result {
                     Some(file_entry) => file_entry,
                     None => {
-                        println!("No root directory found");
-                        return Ok(());
+                        if volume_number != 0 {
+                            println!("No root directory found");
+                            return Ok(());
+                        }
+                        continue;
                     }
                 },
                 Err(mut error) => {
@@ -869,8 +897,8 @@ impl ApfsInfo {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to retrieve sub file entry: {}",
-                            sub_file_entry_index
+                            "Unable to retrieve sub file entry: {} of path: {}",
+                            sub_file_entry_index, path
                         )
                     );
                     return Err(error);
@@ -882,8 +910,8 @@ impl ApfsInfo {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to print hierarchy of sub file entry: {}",
-                            sub_file_entry_index
+                            "Unable to print hierarchy of sub file entry: {} of path: {}",
+                            sub_file_entry_index, path
                         )
                     );
                     return Err(error);

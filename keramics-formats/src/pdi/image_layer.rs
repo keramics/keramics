@@ -35,7 +35,7 @@ pub struct PdiImageLayer {
     file_resolver: FileResolverReference,
 
     /// Identifier.
-    pub identifier: Uuid,
+    pub(super) identifier: Uuid,
 
     /// Extents.
     extents: Vec<PdiImageExtent>,
@@ -53,7 +53,7 @@ pub struct PdiImageLayer {
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    pub(super) media_size: u64,
 }
 
 impl PdiImageLayer {
@@ -149,6 +149,16 @@ impl PdiImageLayer {
                 extent_index
             ))),
         }
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> &Uuid {
+        &self.identifier
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
     }
 
     /// Opens an image layer.
@@ -444,6 +454,32 @@ mod tests {
         Ok(image_layer)
     }
 
+    // TODO: add test for add_extent
+    // TODO: add test for get_extent_file
+
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let image_layer: PdiImageLayer = get_image_layer()?;
+
+        let identifier: &Uuid = image_layer.get_identifier();
+        assert_eq!(
+            identifier.to_string(),
+            "5fbaabe3-6958-40ff-92a7-860e329aab41"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let image_layer: PdiImageLayer = get_image_layer()?;
+
+        let media_size: u64 = image_layer.get_media_size();
+        assert_eq!(media_size, 33554432);
+
+        Ok(())
+    }
+
+    // TODO: add test for open
     // TODO: add test for read_data_from_extents
     // TODO: add test for set_parent
 

@@ -151,7 +151,7 @@ impl fmt::Display for VmdkImageLayerInfo {
 
         writeln!(
             formatter,
-            "        Bytes per sector\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {}",
             self.bytes_per_sector
         )?;
 
@@ -289,7 +289,7 @@ mod tests {
             "    Content identifier\t\t\t\t: 0x4c069322\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",
-            "        Bytes per sector\t\t\t: 512 bytes\n",
+            "        Bytes per sector\t\t\t: 512\n",
             "\n"
         );
         assert_lines_eq(test_struct.to_string().as_str(), expected_string);

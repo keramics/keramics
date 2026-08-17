@@ -12,6 +12,7 @@
  */
 
 /// Apple File System (APFS) B-Tree entry.
+#[derive(Clone)]
 pub struct ApfsBtreeEntry {
     /// Key data offset.
     pub key_data_offset: usize,

@@ -14,16 +14,20 @@
 mod block_allocation_table;
 mod block_range;
 pub(crate) mod constants;
-mod descriptor_extent;
-mod descriptor_image;
-mod descriptor_snapshot;
 mod enums;
 mod extent_file;
 mod image;
 mod image_extent;
 mod image_layer;
+mod segment_descriptor;
+mod segment_file_descriptor;
+mod snapshot_descriptor;
 mod sparse_file;
 mod sparse_file_header;
 
+pub use enums::PdiSegmentFileType;
 pub use image::PdiImage;
 pub use image_layer::PdiImageLayer;
+pub use segment_descriptor::PdiSegmentDescriptor;
+pub use segment_file_descriptor::PdiSegmentFileDescriptor;
+pub use snapshot_descriptor::PdiSnapshotDescriptor;

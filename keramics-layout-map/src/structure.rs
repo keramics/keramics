@@ -856,6 +856,7 @@ impl StructureLayout {
         let name_format_string: String = format!("{} {{{{\n", self.name);
 
         quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!(#name_format_string));
@@ -968,6 +969,7 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1019,6 +1021,7 @@ mod tests {
             .push(StructureLayoutMember::Sequence(sequence));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1074,6 +1077,7 @@ mod tests {
             .push(StructureLayoutMember::Sequence(sequence));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1117,6 +1121,7 @@ mod tests {
             .push(StructureLayoutMember::BitFields(group));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1163,6 +1168,7 @@ mod tests {
             .push(StructureLayoutMember::BitFields(group));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1227,6 +1233,7 @@ mod tests {
             .push(StructureLayoutMember::Group(group));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1281,6 +1288,7 @@ mod tests {
             .push(StructureLayoutMember::Field(field));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));
@@ -1340,6 +1348,7 @@ mod tests {
             .push(StructureLayoutMember::Sequence(sequence));
 
         let expected_token_stream = quote! {
+            #[cfg(feature = "debug-trace")]
             pub fn debug_read_data(data: &[u8]) -> String {
                 let mut string_parts: Vec<String> = Vec::new();
                 string_parts.push(format!("TestStruct {{\n"));

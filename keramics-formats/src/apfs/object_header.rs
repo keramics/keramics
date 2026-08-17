@@ -15,7 +15,7 @@ use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u32_le, bytes_to_u64_le};
 
-#[derive(LayoutMap)]
+#[derive(Clone, LayoutMap)]
 #[layout_map(
     structure(
         byte_order = "little",

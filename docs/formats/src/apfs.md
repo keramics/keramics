@@ -145,7 +145,7 @@ The object type (o_type) value consists of a type and flags.
 | 0x0000000b | OBJECT_TYPE_OMAP | [Object map](#object_map) |
 | 0x0000000c | OBJECT_TYPE_CHECKPOINT_MAP | Checkpoint map |
 | 0x0000000d | OBJECT_TYPE_FS | [Volume (or file system) superblock](#volume_superblock) |
-| 0x0000000e | OBJECT_TYPE_FS | [File system tree](#file_system) |
+| 0x0000000e | OBJECT_TYPE_FS | [File system tree](#file_system_tree) |
 | 0x0000000f | OBJECT_TYPE_BLOCKREFTREE | [Extent-reference tree](#extent_reference_tree) |
 | 0x00000010 | OBJECT_TYPE_SNAPMETATREE | [Snapshot metadata tree](#snapshot_metadata_tree) |
 | 0x00000011 | OBJECT_TYPE_NX_REAPER | [Reaper](#reaper) |
@@ -1228,7 +1228,7 @@ Current no read-only compatible feature flags are defined
 | 0x0010 | APFS_VOL_ROLE_PREBOOT | Preboot |
 | 0x0020 | APFS_VOL_ROLE_INSTALLER | Installer |
 
-## File system {#file_system}
+## File system B-tree {#file_system_tree}
 
 The file system structures are stored in a [B-tree](#btree).
 
@@ -1512,7 +1512,7 @@ The extended attribute value data (j_xattr_val_t) is of variable size and consis
 | --- | --- | --- |
 | 0x0001 | XATTR_DATA_STREAM | Extended attribute data is stored in a data stream, where the attribute data contains an 8-byte file system object identifier of the corresponding [data stream](#extended_attribute_data_stream) |
 | 0x0002 | XATTR_DATA_EMBEDDED | Extended attribute data is stored directly in the record |
-| 0x0004 | XATTR_FILE_SYSTEM_OWNED | Extended attribute record is owned by the file system |
+| 0x0004 | XATTR_FILE_SYSTEM_OWNED | Extended attribute is part of the file system, such as "com.apple.fs.symlink" |
 | 0x0008 | XATTR_RESERVED_8 | Unknown (Reserved) |
 
 #### Extended attribute data stream {#extended_attribute_data_stream}
@@ -1522,7 +1522,7 @@ The extended attribute data stream (j_xattr_dstream_t) is 48 bytes in size and c
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | 0 | 8 | | Data stream file system object identifier (xattr_obj_id), which contains the file system object identifier of the file extents that make up the data stream |
-| 8 | 48 | | [Data stream descriptor](#data_stream_descriptor) |
+| 8 | 40 | | [Data stream descriptor](#data_stream_descriptor) |
 
 ### Sibling link {#sibling_link}
 
@@ -1905,7 +1905,7 @@ The file content size is stored in an INO_EXT_TYPE_DSTREAM
 [inode extended field type](#inode_extended_field_types).
 
 The file content data can be located through the [file extents](#file_extent) for the data stream
-file system object identifier in the [file system tree](#file_system).
+file system object identifier in the [file system tree](#file_system_tree).
 
 If the volume is encrypted the file content is encrypted with the encryption identifier in defined
 by the [file extent](#file_extent).
@@ -2084,3 +2084,5 @@ TODO describe evict_mapping_val_t
 
 * [Apple File System Reference](https://developer.apple.com/support/downloads/Apple-File-System-Reference.pdf),
   by Apple
+
+<!-- rumdl-enable MD013 -->

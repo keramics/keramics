@@ -142,15 +142,18 @@ impl ExtAttributesBlock {
         }
         let mut data: Vec<u8> = vec![0; data_size];
 
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-
-        DebugTrace::print_data("ExtAttributesBlock", offset, &data, data_size, true);
-        DebugTrace::print_structure(ExtAttributesBlockHeader::debug_read_data, &data[0..32]);
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "ExtAttributesBlock",
+            data_stream,
+            &mut data,
+            data_size,
+            position,
+        );
+        keramics_core::debug_trace_structure!(ExtAttributesBlockHeader::debug_read_data(&data));
 
         let mut header: ExtAttributesBlockHeader = ExtAttributesBlockHeader::new();
 
-        match header.read_data(&data[0..32]) {
+        match header.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(

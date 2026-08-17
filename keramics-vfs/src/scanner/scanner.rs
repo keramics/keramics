@@ -76,6 +76,9 @@ pub struct VfsScanner {
     /// Phase 3 volume system format signature scanner.
     phase3_volume_system_scanner: FormatScanner,
 
+    /// Sub volume system (or volume-system-in-volume-system) format signature scanner.
+    sub_volume_system_scanner: FormatScanner,
+
     /// Storage media image format signature scanner.
     storage_media_image_scanner: FormatScanner,
 }
@@ -89,6 +92,7 @@ impl VfsScanner {
             phase1_volume_system_scanner: FormatScanner::new(),
             phase2_volume_system_scanner: FormatScanner::new(),
             phase3_volume_system_scanner: FormatScanner::new(),
+            sub_volume_system_scanner: FormatScanner::new(),
             storage_media_image_scanner: FormatScanner::new(),
         }
     }
@@ -105,6 +109,7 @@ impl VfsScanner {
         self.storage_media_image_scanner.add_vhd_signatures();
         self.storage_media_image_scanner.add_vhdx_signatures();
         self.storage_media_image_scanner.add_vmdk_signatures();
+
         match self.storage_media_image_scanner.build() {
             Ok(_) => {}
             Err(mut error) => {
@@ -129,6 +134,7 @@ impl VfsScanner {
         self.phase1_volume_system_scanner.add_apfs_signatures();
         self.phase1_volume_system_scanner.add_apm_signatures();
         self.phase1_volume_system_scanner.add_gpt_signatures();
+
         match self.phase1_volume_system_scanner.build() {
             Ok(_) => {}
             Err(mut error) => {
@@ -141,6 +147,7 @@ impl VfsScanner {
         }
         self.phase2_volume_system_scanner.add_fat_signatures();
         self.phase2_volume_system_scanner.add_ntfs_signatures();
+
         match self.phase2_volume_system_scanner.build() {
             Ok(_) => {}
             Err(mut error) => {
@@ -152,6 +159,7 @@ impl VfsScanner {
             }
         }
         self.phase3_volume_system_scanner.add_mbr_signatures();
+
         match self.phase3_volume_system_scanner.build() {
             Ok(_) => {}
             Err(mut error) => {
@@ -162,10 +170,23 @@ impl VfsScanner {
                 return Err(error);
             }
         }
+        self.sub_volume_system_scanner.add_apfs_signatures();
+
+        match self.sub_volume_system_scanner.build() {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to build sub volume system scanner"
+                );
+                return Err(error);
+            }
+        }
         self.file_system_scanner.add_ext_signatures();
         self.file_system_scanner.add_fat_signatures();
         self.file_system_scanner.add_hfs_signatures();
         self.file_system_scanner.add_ntfs_signatures();
+
         match self.file_system_scanner.build() {
             Ok(_) => {}
             Err(mut error) => {
@@ -326,7 +347,31 @@ impl VfsScanner {
                 "Unsupported VFS location type"
             )),
             VfsType::Apm | VfsType::Gpt | VfsType::Mbr => {
-                self.scan_for_file_system_format_vfs(&data_stream)
+                let mut result: Option<VfsType> = match self
+                    .scan_for_sub_volume_system_format_vfs(&data_stream)
+                {
+                    Ok(scan_results) => scan_results,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to scan data stream for volume-system-in-volume-system formats"
+                        );
+                        return Err(error);
+                    }
+                };
+                if result.is_none() {
+                    result = match self.scan_for_file_system_format_vfs(&data_stream) {
+                        Ok(scan_results) => scan_results,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to scan data stream for file system formats"
+                            );
+                            return Err(error);
+                        }
+                    };
+                }
+                Ok(result)
             }
             VfsType::Ewf
             | VfsType::SparseBundle
@@ -1108,6 +1153,52 @@ impl VfsScanner {
         Ok(())
     }
 
+    /// Scans a data stream for a supported volume-system-in-volume-system format.
+    fn scan_for_sub_volume_system_format(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<FormatIdentifier>, ErrorTrace> {
+        match self.sub_volume_system_scanner.scan_data_stream(data_stream) {
+            Ok(mut scan_results) => {
+                if scan_results.len() > 1 {
+                    return Err(keramics_core::error_trace_new!(
+                        "Found multiple volume-system-in-volume-system format signatures"
+                    ));
+                }
+                Ok(scan_results.drain().next())
+            }
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for non-overlapping volume system format signatures"
+                );
+                Err(error)
+            }
+        }
+    }
+
+    /// Scans a data stream for a supported volume-system-in-volume-system format and maps it to a VFS type.
+    fn scan_for_sub_volume_system_format_vfs(
+        &self,
+        data_stream: &DataStreamReference,
+    ) -> Result<Option<VfsType>, ErrorTrace> {
+        match self.scan_for_sub_volume_system_format(&data_stream) {
+            Ok(Some(FormatIdentifier::Apfs)) => Ok(Some(VfsType::ApfsContainer)),
+            Ok(Some(format_identifier)) => Err(keramics_core::error_trace_new!(format!(
+                "Found unsupported volume-system-in-volume-system format signature: {}",
+                format_identifier
+            ))),
+            Ok(None) => Ok(None),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    "Unable to scan data stream for volume-system-in-volume-system system formats"
+                );
+                Err(error)
+            }
+        }
+    }
+
     /// Scans a data stream for a supported volume system format.
     pub fn scan_for_volume_system_format(
         &self,
@@ -1137,12 +1228,13 @@ impl VfsScanner {
             Some(FormatIdentifier::Apfs) => return Ok(Some(FormatIdentifier::Apfs)),
             Some(FormatIdentifier::Apm) => return Ok(Some(FormatIdentifier::Apm)),
             Some(FormatIdentifier::Gpt) => return Ok(Some(FormatIdentifier::Gpt)),
-            None => {}
-            _ => {
-                return Err(keramics_core::error_trace_new!(
-                    "Found unsupported non-overlapping volume system format signature"
-                ));
+            Some(format_identifier) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Found unsupported non-overlapping volume system format signature: {}",
+                    format_identifier
+                ),));
             }
+            None => {}
         }
         let format_identifier: Option<FormatIdentifier> = match self
             .phase2_volume_system_scanner
@@ -1167,10 +1259,11 @@ impl VfsScanner {
         match &format_identifier {
             Some(FormatIdentifier::Fat) => return Ok(None),
             Some(FormatIdentifier::Ntfs) => return Ok(None),
-            Some(_) => {
-                return Err(keramics_core::error_trace_new!(
-                    "Found unsupported exclusion volume system format signature"
-                ));
+            Some(format_identifier) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Found unsupported exclusion volume system format signature: {}",
+                    format_identifier
+                )));
             }
             None => {}
         }

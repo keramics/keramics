@@ -26,7 +26,7 @@ use super::enums::DecmpfsCompressionMethod;
         field(name = "compression_method", data_type = "u32"),
         field(name = "uncompressed_data_size", data_type = "u64"),
     ),
-    methods("debug_read_data")
+    methods("debug_read_data", "read_at_position")
 )]
 /// Apple File System Compression (decmpfs) header.
 pub struct DecmpfsHeader {
@@ -77,6 +77,10 @@ impl DecmpfsHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::io::SeekFrom;
+
+    use keramics_core::{DataStreamReference, open_fake_data_stream};
 
     fn get_test_data() -> Vec<u8> {
         return vec![
@@ -130,5 +134,19 @@ mod tests {
         let mut test_struct = DecmpfsHeader::new();
         let result = test_struct.read_data(&test_data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_read_at_position() -> Result<(), ErrorTrace> {
+        let test_data: Vec<u8> = get_test_data();
+        let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
+
+        let mut test_struct = DecmpfsHeader::new();
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+
+        assert_eq!(test_struct.compression_method, 7);
+        assert_eq!(test_struct.uncompressed_data_size, 16);
+
+        Ok(())
     }
 }

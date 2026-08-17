@@ -17,8 +17,8 @@
 
 use std::cmp::min;
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::formatters::debug_format_array;
+use keramics_core::{DebugTrace, DebugTraceScope, ErrorTrace};
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_le, bytes_to_u16_le, bytes_to_u32_le, bytes_to_u64_le};
 
@@ -441,9 +441,6 @@ impl LzfseDecoder {
 
 /// Context for decompressing LZFSE compressed data.
 pub struct LzfseContext {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Context for decompressing LZVN compressed data.
     lzvn_context: LzvnContext,
 
@@ -455,7 +452,6 @@ impl LzfseContext {
     /// Creates a new context.
     pub fn new() -> Self {
         Self {
-            mediator: Mediator::current(),
             lzvn_context: LzvnContext::new(),
             uncompressed_data_size: 0,
         }
@@ -603,74 +599,72 @@ impl LzfseContext {
             }
             let block_marker: u32 = bytes_to_u32_le!(compressed_data, compressed_data_offset);
 
-            match block_marker {
-                LZFSE_END_OF_STREAM_BLOCK_MARKER => {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    block_marker: {}{}{}{} (end-of-stream)\n",
+            DebugTrace::static_scope(|debug_trace| {
+                let value_string: String = match block_marker {
+                    LZFSE_END_OF_STREAM_BLOCK_MARKER => {
+                        format!(
+                            "{}{}{}{} (end-of-stream)",
                             compressed_data[compressed_data_offset] as char,
                             compressed_data[compressed_data_offset + 1] as char,
                             compressed_data[compressed_data_offset + 2] as char,
                             compressed_data[compressed_data_offset + 3] as char,
-                        ));
+                        )
                     }
-                    break;
-                }
-                LZFSE_UNCOMPRESSED_BLOCK_MARKER => {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    block_marker: {}{}{}{} (uncompressed)\n",
+                    LZFSE_UNCOMPRESSED_BLOCK_MARKER => {
+                        format!(
+                            "{}{}{}{} (uncompressed)",
                             compressed_data[compressed_data_offset] as char,
                             compressed_data[compressed_data_offset + 1] as char,
                             compressed_data[compressed_data_offset + 2] as char,
                             compressed_data[compressed_data_offset + 3] as char,
-                        ));
+                        )
                     }
-                }
-                LZFSE_COMPRESSED_BLOCK_V1_MARKER => {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    block_marker: {}{}{}{} (compressed version 1)\n",
+                    LZFSE_COMPRESSED_BLOCK_V1_MARKER => {
+                        format!(
+                            "{}{}{}{} (compressed version 1)",
                             compressed_data[compressed_data_offset] as char,
                             compressed_data[compressed_data_offset + 1] as char,
                             compressed_data[compressed_data_offset + 2] as char,
                             compressed_data[compressed_data_offset + 3] as char,
-                        ));
+                        )
                     }
-                }
-                LZFSE_COMPRESSED_BLOCK_V2_MARKER => {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    block_marker: {}{}{}{} (compressed version 2)\n",
+                    LZFSE_COMPRESSED_BLOCK_V2_MARKER => {
+                        format!(
+                            "{}{}{}{} (compressed version 2)",
                             compressed_data[compressed_data_offset] as char,
                             compressed_data[compressed_data_offset + 1] as char,
                             compressed_data[compressed_data_offset + 2] as char,
                             compressed_data[compressed_data_offset + 3] as char,
-                        ));
+                        )
                     }
-                }
-                LZFSE_COMPRESSED_BLOCK_LZVN_MARKER => {
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print(format!(
-                            "    block_marker: {}{}{}{} (compressed LZVN)\n",
+                    LZFSE_COMPRESSED_BLOCK_LZVN_MARKER => {
+                        format!(
+                            "{}{}{}{} (compressed LZVN)",
                             compressed_data[compressed_data_offset] as char,
                             compressed_data[compressed_data_offset + 1] as char,
                             compressed_data[compressed_data_offset + 2] as char,
                             compressed_data[compressed_data_offset + 3] as char,
-                        ));
+                        )
                     }
-                }
-                _ => {
-                    if self.mediator.debug_output {
-                        self.mediator
-                            .debug_print(format!("    block_marker: 0x{:08x}\n", block_marker));
+                    _ => {
+                        format!("0x{:08x}", block_marker)
                     }
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Unsupported block marker: 0x{:08x}",
-                        block_marker
-                    )));
-                }
-            };
+                };
+                debug_trace.print_field("block_marker", value_string);
+            });
+            if block_marker == LZFSE_END_OF_STREAM_BLOCK_MARKER {
+                break;
+            }
+            if block_marker != LZFSE_UNCOMPRESSED_BLOCK_MARKER
+                && block_marker != LZFSE_COMPRESSED_BLOCK_V1_MARKER
+                && block_marker != LZFSE_COMPRESSED_BLOCK_V2_MARKER
+                && block_marker != LZFSE_COMPRESSED_BLOCK_LZVN_MARKER
+            {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Unsupported block marker: 0x{:08x}",
+                    block_marker
+                )));
+            }
             compressed_data_offset += 4;
 
             if 4 > compressed_data_size - compressed_data_offset {
@@ -678,144 +672,148 @@ impl LzfseContext {
                     "Invalid compressed data value too small"
                 ));
             }
-            let uncompressed_block_size: u32 =
-                bytes_to_u32_le!(compressed_data, compressed_data_offset);
-            compressed_data_offset += 4;
+            DebugTrace::scope(|debug_trace| {
+                let uncompressed_block_size: u32 =
+                    bytes_to_u32_le!(compressed_data, compressed_data_offset);
+                compressed_data_offset += 4;
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "    uncompressed_block_size: {}\n",
-                    uncompressed_block_size
-                ));
-            }
-            if uncompressed_block_size as usize > uncompressed_data_size - uncompressed_data_offset
-            {
-                return Err(keramics_core::error_trace_new!(
-                    "Invalid uncompressed data value too small"
-                ));
-            }
-            match block_marker {
-                LZFSE_UNCOMPRESSED_BLOCK_MARKER => {
-                    if uncompressed_block_size as usize
-                        > compressed_data_size - compressed_data_offset
-                    {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid compressed data value too small"
-                        ));
-                    }
-                    let compressed_data_end_offset: usize =
-                        compressed_data_offset + uncompressed_block_size as usize;
-                    let uncompressed_data_end_offset: usize =
-                        uncompressed_data_offset + uncompressed_block_size as usize;
+                debug_trace.print_field("uncompressed_block_size", uncompressed_block_size);
 
-                    if self.mediator.debug_output {
-                        self.mediator.debug_print("    uncompressed block data:\n");
-                        self.mediator.debug_print_data(
+                if uncompressed_block_size as usize
+                    > uncompressed_data_size - uncompressed_data_offset
+                {
+                    return Err(keramics_core::error_trace_new!(
+                        "Invalid uncompressed data value too small"
+                    ));
+                }
+                match block_marker {
+                    LZFSE_UNCOMPRESSED_BLOCK_MARKER => {
+                        if uncompressed_block_size as usize
+                            > compressed_data_size - compressed_data_offset
+                        {
+                            return Err(keramics_core::error_trace_new!(
+                                "Invalid compressed data value too small"
+                            ));
+                        }
+                        let compressed_data_end_offset: usize =
+                            compressed_data_offset + uncompressed_block_size as usize;
+                        let uncompressed_data_end_offset: usize =
+                            uncompressed_data_offset + uncompressed_block_size as usize;
+
+                        debug_trace.print_data(
+                            "LzfseUncompressedBlock",
+                            compressed_data_offset as u64,
                             &compressed_data[compressed_data_offset..compressed_data_end_offset],
+                            uncompressed_block_size as usize,
                             true,
                         );
+                        uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
+                            .copy_from_slice(
+                                &compressed_data
+                                    [compressed_data_offset..compressed_data_end_offset],
+                            );
+
+                        compressed_data_offset = compressed_data_end_offset;
+                        uncompressed_data_offset = uncompressed_data_end_offset;
                     }
-                    uncompressed_data[uncompressed_data_offset..uncompressed_data_end_offset]
-                        .copy_from_slice(
+                    LZFSE_COMPRESSED_BLOCK_V1_MARKER | LZFSE_COMPRESSED_BLOCK_V2_MARKER => {
+                        let mut decoder: LzfseDecoder = LzfseDecoder::new();
+
+                        if block_marker == LZFSE_COMPRESSED_BLOCK_V1_MARKER {
+                            self.read_block_v1_header(
+                                debug_trace,
+                                compressed_data,
+                                &mut compressed_data_offset,
+                                compressed_data_size,
+                                &mut decoder,
+                                &mut frequency_table,
+                            )?;
+                        } else {
+                            self.read_block_v2_header(
+                                debug_trace,
+                                compressed_data,
+                                &mut compressed_data_offset,
+                                compressed_data_size,
+                                &mut decoder,
+                                &mut frequency_table,
+                            )?;
+                        }
+                        self.build_value_decoder_table(
+                            LZFSE_NUMBER_OF_L_VALUE_STATES,
+                            LZFSE_NUMBER_OF_L_VALUE_SYMBOLS,
+                            &frequency_table[0..20],
+                            &LZFSE_L_VALUE_BITS_TABLE,
+                            &LZFSE_L_VALUE_BASE_TABLE,
+                            &mut decoder.l_value_decoder_table,
+                        )?;
+                        self.build_value_decoder_table(
+                            LZFSE_NUMBER_OF_M_VALUE_STATES,
+                            LZFSE_NUMBER_OF_M_VALUE_SYMBOLS,
+                            &frequency_table[20..40],
+                            &LZFSE_M_VALUE_BITS_TABLE,
+                            &LZFSE_M_VALUE_BASE_TABLE,
+                            &mut decoder.m_value_decoder_table,
+                        )?;
+                        self.build_value_decoder_table(
+                            LZFSE_NUMBER_OF_D_VALUE_STATES,
+                            LZFSE_NUMBER_OF_D_VALUE_SYMBOLS,
+                            &frequency_table[40..104],
+                            &LZFSE_D_VALUE_BITS_TABLE,
+                            &LZFSE_D_VALUE_BASE_TABLE,
+                            &mut decoder.d_value_decoder_table,
+                        )?;
+                        self.build_decoder_table(
+                            LZFSE_NUMBER_OF_LITERAL_STATES,
+                            LZFSE_NUMBER_OF_LITERAL_SYMBOLS,
+                            &frequency_table[104..360],
+                            &mut decoder.literal_decoder_table,
+                        )?;
+                        self.decompress_block(
+                            debug_trace,
+                            &decoder,
+                            compressed_data,
+                            &mut compressed_data_offset,
+                            compressed_data_size,
+                            uncompressed_data,
+                            &mut uncompressed_data_offset,
+                            uncompressed_data_size,
+                        )?;
+                    }
+                    LZFSE_COMPRESSED_BLOCK_LZVN_MARKER => {
+                        if 4 > compressed_data_size - compressed_data_offset {
+                            return Err(keramics_core::error_trace_new!(
+                                "Invalid compressed data value too small"
+                            ));
+                        }
+                        let compressed_block_size: u32 =
+                            bytes_to_u32_le!(compressed_data, compressed_data_offset);
+                        compressed_data_offset += 4;
+
+                        if compressed_block_size as usize
+                            > compressed_data_size - compressed_data_offset
+                        {
+                            return Err(keramics_core::error_trace_new!(
+                                "Invalid compressed data value too small"
+                            ));
+                        }
+                        let compressed_data_end_offset: usize =
+                            compressed_data_offset + compressed_block_size as usize;
+                        let uncompressed_data_end_offset: usize =
+                            uncompressed_data_offset + uncompressed_block_size as usize;
+
+                        self.lzvn_context.decompress(
                             &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                        );
-
-                    compressed_data_offset = compressed_data_end_offset;
-                    uncompressed_data_offset = uncompressed_data_end_offset;
-                }
-                LZFSE_COMPRESSED_BLOCK_V1_MARKER | LZFSE_COMPRESSED_BLOCK_V2_MARKER => {
-                    let mut decoder: LzfseDecoder = LzfseDecoder::new();
-
-                    if block_marker == LZFSE_COMPRESSED_BLOCK_V1_MARKER {
-                        self.read_block_v1_header(
-                            compressed_data,
-                            &mut compressed_data_offset,
-                            compressed_data_size,
-                            &mut decoder,
-                            &mut frequency_table,
+                            &mut uncompressed_data
+                                [uncompressed_data_offset..uncompressed_data_end_offset],
                         )?;
-                    } else {
-                        self.read_block_v2_header(
-                            compressed_data,
-                            &mut compressed_data_offset,
-                            compressed_data_size,
-                            &mut decoder,
-                            &mut frequency_table,
-                        )?;
+
+                        compressed_data_offset = compressed_data_end_offset;
+                        uncompressed_data_offset = uncompressed_data_end_offset;
                     }
-                    self.build_value_decoder_table(
-                        LZFSE_NUMBER_OF_L_VALUE_STATES,
-                        LZFSE_NUMBER_OF_L_VALUE_SYMBOLS,
-                        &frequency_table[0..20],
-                        &LZFSE_L_VALUE_BITS_TABLE,
-                        &LZFSE_L_VALUE_BASE_TABLE,
-                        &mut decoder.l_value_decoder_table,
-                    )?;
-                    self.build_value_decoder_table(
-                        LZFSE_NUMBER_OF_M_VALUE_STATES,
-                        LZFSE_NUMBER_OF_M_VALUE_SYMBOLS,
-                        &frequency_table[20..40],
-                        &LZFSE_M_VALUE_BITS_TABLE,
-                        &LZFSE_M_VALUE_BASE_TABLE,
-                        &mut decoder.m_value_decoder_table,
-                    )?;
-                    self.build_value_decoder_table(
-                        LZFSE_NUMBER_OF_D_VALUE_STATES,
-                        LZFSE_NUMBER_OF_D_VALUE_SYMBOLS,
-                        &frequency_table[40..104],
-                        &LZFSE_D_VALUE_BITS_TABLE,
-                        &LZFSE_D_VALUE_BASE_TABLE,
-                        &mut decoder.d_value_decoder_table,
-                    )?;
-                    self.build_decoder_table(
-                        LZFSE_NUMBER_OF_LITERAL_STATES,
-                        LZFSE_NUMBER_OF_LITERAL_SYMBOLS,
-                        &frequency_table[104..360],
-                        &mut decoder.literal_decoder_table,
-                    )?;
-                    self.decompress_block(
-                        &decoder,
-                        compressed_data,
-                        &mut compressed_data_offset,
-                        compressed_data_size,
-                        uncompressed_data,
-                        &mut uncompressed_data_offset,
-                        uncompressed_data_size,
-                    )?;
+                    _ => {}
                 }
-                LZFSE_COMPRESSED_BLOCK_LZVN_MARKER => {
-                    if 4 > compressed_data_size - compressed_data_offset {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid compressed data value too small"
-                        ));
-                    }
-                    let compressed_block_size: u32 =
-                        bytes_to_u32_le!(compressed_data, compressed_data_offset);
-                    compressed_data_offset += 4;
-
-                    if compressed_block_size as usize
-                        > compressed_data_size - compressed_data_offset
-                    {
-                        return Err(keramics_core::error_trace_new!(
-                            "Invalid compressed data value too small"
-                        ));
-                    }
-                    let compressed_data_end_offset: usize =
-                        compressed_data_offset + compressed_block_size as usize;
-                    let uncompressed_data_end_offset: usize =
-                        uncompressed_data_offset + uncompressed_block_size as usize;
-
-                    self.lzvn_context.decompress(
-                        &compressed_data[compressed_data_offset..compressed_data_end_offset],
-                        &mut uncompressed_data
-                            [uncompressed_data_offset..uncompressed_data_end_offset],
-                    )?;
-
-                    compressed_data_offset = compressed_data_end_offset;
-                    uncompressed_data_offset = uncompressed_data_end_offset;
-                }
-                _ => {}
-            };
+                Ok(())
+            })?;
         }
         self.uncompressed_data_size = uncompressed_data_offset;
 
@@ -825,6 +823,7 @@ impl LzfseContext {
     /// Decompress a LZFSE compressed block.
     fn decompress_block(
         &self,
+        debug_trace: &mut DebugTraceScope,
         decoder: &LzfseDecoder,
         compressed_data: &[u8],
         compressed_data_offset: &mut usize,
@@ -845,7 +844,7 @@ impl LzfseContext {
 
         let mut literal_values: [u8; LZFSE_MAXIMUM_NUMBER_OF_LITERALS] =
             [0; LZFSE_MAXIMUM_NUMBER_OF_LITERALS];
-        self.read_literal_values(decoder, &mut bitstream, &mut literal_values)?;
+        self.read_literal_values(debug_trace, decoder, &mut bitstream, &mut literal_values)?;
 
         data_offset = data_end_offset;
 
@@ -858,6 +857,7 @@ impl LzfseContext {
         let mut bitstream: LzfseBitstream = LzfseBitstream::new(compressed_data, data_end_offset);
 
         self.read_lmd_values(
+            debug_trace,
             decoder,
             &mut bitstream,
             &literal_values,
@@ -873,6 +873,7 @@ impl LzfseContext {
     /// Read a LZFSE block version 1 header.
     fn read_block_v1_header(
         &self,
+        debug_trace: &mut DebugTraceScope,
         compressed_data: &[u8],
         compressed_data_offset: &mut usize,
         compressed_data_size: usize,
@@ -889,58 +890,51 @@ impl LzfseContext {
         let mut block_header: LzfseBlockV1Header = LzfseBlockV1Header::new();
         let data_end_offset: usize = data_offset + 42;
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "LzfseBlockV1Header data of size: 42 at offset: {} (0x{:08x})\n",
-                data_offset, data_offset
-            ));
-            self.mediator
-                .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-            self.mediator
-                .debug_print(LzfseBlockV1Header::debug_read_data(
-                    &compressed_data[data_offset..data_end_offset],
-                ));
-        }
+        debug_trace.print_data(
+            "LzfseBlockV1Header",
+            data_offset as u64,
+            &compressed_data[data_offset..data_end_offset],
+            42,
+            true,
+        );
+        #[cfg(feature = "debug-trace")]
+        debug_trace.print_structure(
+            LzfseBlockV1Header::debug_read_data,
+            &compressed_data[data_offset..data_end_offset],
+        );
         block_header.read_data(&compressed_data[data_offset..data_end_offset], decoder)?;
         data_offset = data_end_offset;
 
         let data_end_offset: usize = data_offset + 720;
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "LzfseFrequencyTable data of size: 720 at offset: {} (0x{:08x})\n",
-                data_offset, data_offset
-            ));
-            self.mediator
-                .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-            self.mediator.debug_print("LzfseFrequencyTable {\n");
-            self.mediator.debug_print("    values: [\n");
-        }
+        debug_trace.print_data(
+            "LzfseFrequencyTable",
+            data_offset as u64,
+            &compressed_data[data_offset..data_end_offset],
+            720,
+            true,
+        );
         let mut data_offset: usize = 42;
 
-        for (frequency_table_index, frequency_table_entry) in
-            frequency_table.iter_mut().enumerate().take(360)
-        {
+        for frequency_table_entry in frequency_table.iter_mut().take(360) {
             let frequency_value: u16 = bytes_to_u16_le!(compressed_data, data_offset);
             data_offset += 2;
 
-            if self.mediator.debug_output {
-                if frequency_table_index % 16 == 0 {
-                    self.mediator
-                        .debug_print(format!("    {}", frequency_value));
-                } else if frequency_table_index % 16 == 15 {
-                    self.mediator
-                        .debug_print(format!(", {},\n", frequency_value));
-                } else {
-                    self.mediator.debug_print(format!(", {}", frequency_value));
-                }
-            }
             *frequency_table_entry = frequency_value;
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print("    ],\n");
-            self.mediator.debug_print("}\n");
-        }
+        debug_trace.print_start("LzfseFrequencyTable");
+        debug_trace.print_field(
+            "values",
+            debug_format_array(
+                &frequency_table
+                    .iter()
+                    .map(|&element| element.to_string())
+                    .collect::<Vec<String>>()
+                    .as_slice(),
+            ),
+        );
+        debug_trace.print_end();
+
         *compressed_data_offset = data_offset;
 
         Ok(())
@@ -949,6 +943,7 @@ impl LzfseContext {
     /// Read a LZFSE block version 2 header.
     fn read_block_v2_header(
         &self,
+        debug_trace: &mut DebugTraceScope,
         compressed_data: &[u8],
         compressed_data_offset: &mut usize,
         compressed_data_size: usize,
@@ -965,19 +960,20 @@ impl LzfseContext {
                 "Invalid compressed data value too small"
             ));
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "LzfseBlockV2Header data of size: 24 at offset: {} (0x{:08x})\n",
-                data_offset, data_offset
-            ));
-            self.mediator
-                .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-            self.mediator
-                .debug_print(LzfseBlockV2Header::debug_read_data(
-                    &compressed_data[data_offset..data_end_offset],
-                ));
-        }
+        debug_trace.print_data(
+            "LzfseBlockV2Header",
+            data_offset as u64,
+            &compressed_data[data_offset..data_end_offset],
+            24,
+            true,
+        );
+        #[cfg(feature = "debug-trace")]
+        debug_trace.print_structure(
+            LzfseBlockV2Header::debug_read_data,
+            &compressed_data[data_offset..data_end_offset],
+        );
         block_header.read_data(&compressed_data[data_offset..data_end_offset], decoder)?;
+
         if block_header.header_size as usize > compressed_data_size - data_offset {
             return Err(keramics_core::error_trace_new!(
                 "Invalid compressed data value too small"
@@ -989,23 +985,17 @@ impl LzfseContext {
             let compressed_data_size: usize = block_header.header_size as usize - 32;
             data_end_offset += compressed_data_size;
 
-            if self.mediator.debug_output {
-                self.mediator.debug_print(format!(
-                    "LzfseCompressedFrequencyTable data of size: {} at offset: {} (0x{:08x})\n",
-                    compressed_data_size, data_offset, data_offset
-                ));
-                self.mediator
-                    .debug_print_data(&compressed_data[data_offset..data_end_offset], true);
-                self.mediator.debug_print("LzfseFrequencyTable {\n");
-                self.mediator.debug_print("    values: [\n");
-            }
+            keramics_core::debug_trace_data!(
+                "LzfseCompressedFrequencyTable",
+                data_offset,
+                &compressed_data[data_offset..data_end_offset],
+                compressed_data_size,
+            );
             // TODO: use bitstream to read compressed data
             let mut number_of_bits: usize = 0;
             let mut value_32bit: u32 = 0;
 
-            for (frequency_table_index, frequency_table_entry) in
-                frequency_table.iter_mut().enumerate().take(360)
-            {
+            for frequency_table_entry in frequency_table.iter_mut().take(360) {
                 while number_of_bits <= 24 && data_offset < data_end_offset {
                     value_32bit |= (compressed_data[data_offset] as u32) << number_of_bits;
                     data_offset += 1;
@@ -1020,26 +1010,23 @@ impl LzfseContext {
                     14 => (((value_32bit >> 4) & 0x000003ff) + 24) as u16,
                     _ => LZFSE_FREQUENCY_VALUE_TABLE[table_index as usize],
                 };
-                if self.mediator.debug_output {
-                    if frequency_table_index % 16 == 0 {
-                        self.mediator
-                            .debug_print(format!("        {}", frequency_value));
-                    } else if frequency_table_index % 16 == 15 {
-                        self.mediator
-                            .debug_print(format!(", {},\n", frequency_value));
-                    } else {
-                        self.mediator.debug_print(format!(", {}", frequency_value));
-                    }
-                }
                 *frequency_table_entry = frequency_value;
 
                 value_32bit >>= frequency_value_size;
                 number_of_bits -= frequency_value_size as usize;
             }
-            if self.mediator.debug_output {
-                self.mediator.debug_print("\n    ],\n");
-                self.mediator.debug_print("}\n");
-            }
+            debug_trace.print_start("LzfseFrequencyTable");
+            debug_trace.print_field(
+                "values",
+                debug_format_array(
+                    &frequency_table
+                        .iter()
+                        .map(|&element| element.to_string())
+                        .collect::<Vec<String>>()
+                        .as_slice(),
+                ),
+            );
+            debug_trace.print_end();
         }
         *compressed_data_offset = data_offset;
 
@@ -1049,6 +1036,7 @@ impl LzfseContext {
     /// Read literal values.
     fn read_literal_values(
         &self,
+        debug_trace: &mut DebugTraceScope,
         decoder: &LzfseDecoder,
         bitstream: &mut LzfseBitstream,
         literal_values: &mut [u8],
@@ -1097,31 +1085,28 @@ impl LzfseContext {
                 let literal_state: i32 = (decoder_entry.delta as i32) + (value as i32);
                 let literal_values_index: usize = literal_index as usize + literal_states_index;
 
-                if self.mediator.debug_output {
-                    self.mediator
-                        .debug_print(format!("    value: 0x{:02x}\n", value));
-                    self.mediator.debug_print(format!(
-                        "    literal_values[{}]: 0x{:02x}\n",
-                        literal_values_index, decoder_entry.symbol
-                    ));
-                    self.mediator.debug_print(format!(
-                        "    literal_states[{}]: {}\n",
-                        literal_states_index, literal_state
-                    ));
-                }
+                debug_trace.print_field("value", format!("0x{:02x}", value));
+                debug_trace.print_field(
+                    format!("literal_values[{}]", literal_values_index).as_str(),
+                    format!("0x{:02x}", decoder_entry.symbol),
+                );
+                debug_trace.print_field(
+                    format!("literal_states[{}]", literal_states_index).as_str(),
+                    literal_state,
+                );
                 literal_values[literal_values_index] = decoder_entry.symbol;
                 *literal_state_entry = literal_state as u16;
             }
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print("\n");
-        }
+        debug_trace.print("\n");
+
         Ok(())
     }
 
     /// Read L, M and D values.
     fn read_lmd_values(
         &self,
+        debug_trace: &mut DebugTraceScope,
         decoder: &LzfseDecoder,
         bitstream: &mut LzfseBitstream,
         literal_values: &[u8],
@@ -1172,12 +1157,9 @@ impl LzfseContext {
             l_value_state = (value_decoder_entry.delta as i32)
                 + (value >> (value_decoder_entry.value_bits as u32)) as i32;
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    l_value: {}\n", l_value));
-                self.mediator
-                    .debug_print(format!("    l_value_state: {}\n", l_value_state));
-            }
+            debug_trace.print_field("l_value", l_value);
+            debug_trace.print_field("l_value_state", l_value_state);
+
             // TODO: refactor to decoder.get_m_value?
             if m_value_state > LZFSE_NUMBER_OF_M_VALUE_STATES as i32 {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -1201,12 +1183,9 @@ impl LzfseContext {
             m_value_state = (value_decoder_entry.delta as i32)
                 + (value >> (value_decoder_entry.value_bits as u32)) as i32;
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    m_value: {}\n", m_value));
-                self.mediator
-                    .debug_print(format!("    m_value_state: {}\n", m_value_state));
-            }
+            debug_trace.print_field("m_value", m_value);
+            debug_trace.print_field("m_value_state", m_value_state);
+
             // TODO: refactor to decoder.get_d_value?
             if d_value_state > LZFSE_NUMBER_OF_D_VALUE_STATES as i32 {
                 return Err(keramics_core::error_trace_new!(format!(
@@ -1230,12 +1209,9 @@ impl LzfseContext {
             d_value_state = (value_decoder_entry.delta as i32)
                 + (value >> (value_decoder_entry.value_bits as u32)) as i32;
 
-            if self.mediator.debug_output {
-                self.mediator
-                    .debug_print(format!("    d_value: {}\n", d_value));
-                self.mediator
-                    .debug_print(format!("    d_value_state: {}\n", d_value_state));
-            }
+            debug_trace.print_field("d_value", d_value);
+            debug_trace.print_field("d_value_state", d_value_state);
+
             if d_value != 0 {
                 active_d_value = d_value;
             }
@@ -1280,9 +1256,8 @@ impl LzfseContext {
             }
             remaining_data_size -= m_value as usize;
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print("\n");
-        }
+        debug_trace.print("\n");
+
         *uncompressed_data_offset = data_offset;
 
         Ok(())

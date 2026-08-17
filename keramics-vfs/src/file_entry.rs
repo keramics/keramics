@@ -655,15 +655,12 @@ impl VfsFileEntry {
     pub fn get_number_of_data_forks(&self) -> Result<usize, ErrorTrace> {
         let result: usize = match self {
             VfsFileEntry::Apfs(apfs_file_entry) => {
-                let has_data_fork: bool = apfs_file_entry.has_data_fork();
-                let has_resource_fork: bool = apfs_file_entry.has_resource_fork();
+                let file_type: u16 = apfs_file_entry.get_file_mode() & 0xf000;
 
-                if has_data_fork && has_resource_fork {
-                    2
-                } else if has_data_fork || has_resource_fork {
-                    1
-                } else {
+                if file_type != APFS_FILE_MODE_TYPE_REGULAR_FILE {
                     0
+                } else {
+                    1
                 }
             }
             VfsFileEntry::ApfsContainer(apfs_container_file_entry) => 0,
@@ -777,36 +774,14 @@ impl VfsFileEntry {
         data_fork_index: usize,
     ) -> Result<VfsDataFork, ErrorTrace> {
         let result: Result<Option<VfsDataFork>, ErrorTrace> = match self {
-            VfsFileEntry::Apfs(apfs_file_entry) => {
-                let has_data_fork: bool = apfs_file_entry.has_data_fork();
-                let resource_fork_index: usize = if has_data_fork { 1 } else { 0 };
-
-                if has_data_fork && data_fork_index == 0 {
-                    match apfs_file_entry.get_data_fork()? {
-                        Some(apfs_fork) => Ok(Some(VfsDataFork::Apfs(apfs_fork))),
-                        None => Ok(None),
-                    }
-                } else if apfs_file_entry.has_resource_fork()
-                    && data_fork_index == resource_fork_index
-                {
-                    match apfs_file_entry.get_resource_fork()? {
-                        Some(apfs_fork) => Ok(Some(VfsDataFork::Apfs(apfs_fork))),
-                        None => Ok(None),
-                    }
-                } else {
-                    Err(keramics_core::error_trace_new!(format!(
-                        "Invalid data fork index: {}",
-                        data_fork_index
-                    )))
-                }
-            }
             VfsFileEntry::ApfsContainer(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Invalid data fork index: {}",
                     data_fork_index
                 )));
             }
-            VfsFileEntry::Apm(_)
+            VfsFileEntry::Apfs(_)
+            | VfsFileEntry::Apm(_)
             | VfsFileEntry::Ewf(_)
             | VfsFileEntry::Ext(_)
             | VfsFileEntry::Fake(_)

@@ -15,7 +15,7 @@ use std::sync::Arc;
 
 use keramics_core::ErrorTrace;
 
-use super::block_tree_node::{BlockTreeNode, BlockTreeNodeType};
+use super::block_tree_node::{BlockTreeNode, BlockTreeNodeElements, BlockTreeNodeType};
 
 /// Block tree.
 pub(crate) struct BlockTree<T> {
@@ -59,16 +59,9 @@ impl<T> BlockTree<T> {
         } else {
             BlockTreeNodeType::Branch
         };
-        let mut root_node: BlockTreeNode<T> = BlockTreeNode::<T>::new(&node_type, 0, element_size);
+        let root_node: BlockTreeNode<T> =
+            BlockTreeNode::<T>::new(&node_type, 0, element_size, elements_per_node);
 
-        match node_type {
-            BlockTreeNodeType::Branch => {
-                root_node.sub_nodes = (0..elements_per_node).map(|_| None).collect();
-            }
-            BlockTreeNodeType::Leaf => {
-                root_node.values = (0..elements_per_node).map(|_| None).collect();
-            }
-        };
         self.root_node = Some(root_node);
     }
 
@@ -83,33 +76,24 @@ impl<T> BlockTree<T> {
                 return Err(keramics_core::error_trace_new!("Missing root node"));
             }
         };
-        while node.node_type == BlockTreeNodeType::Branch {
+        while let BlockTreeNodeElements::Branch(sub_nodes) = &node.elements {
             let sub_node_index: u64 = (offset - node.offset) / node.element_size;
 
-            if node.sub_nodes[sub_node_index as usize].is_none() {
-                return Ok(None);
-            }
-            node = match node.sub_nodes[sub_node_index as usize].as_ref() {
-                Some(node) => node,
-                None => {
-                    return Err(keramics_core::error_trace_new!(format!(
-                        "Missing sub node: {}",
-                        sub_node_index
-                    )));
-                }
+            node = match &sub_nodes.get(sub_node_index as usize) {
+                Some(Some(node)) => node,
+                _ => return Ok(None),
             };
         }
-        let value_index: usize = ((offset - node.offset) / node.element_size) as usize;
+        match &node.elements {
+            BlockTreeNodeElements::Leaf(values) => {
+                let value_index: usize = ((offset - node.offset) / node.element_size) as usize;
 
-        if value_index >= node.values.len() || node.values[value_index].is_none() {
-            return Ok(None);
-        }
-        match node.values[value_index].as_ref() {
-            Some(node) => Ok(Some(node)),
-            None => Err(keramics_core::error_trace_new!(format!(
-                "Missing value: {}",
-                value_index
-            ))),
+                match &values.get(value_index) {
+                    Some(Some(value)) => Ok(Some(value.as_ref())),
+                    _ => Ok(None),
+                }
+            }
+            _ => Err(keramics_core::error_trace_new!("Missing leaf node")),
         }
     }
 
@@ -195,15 +179,13 @@ mod tests {
         assert_eq!(test_node.node_type, BlockTreeNodeType::Branch);
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
-        assert_eq!(test_node.sub_nodes.len(), 8);
-        assert_eq!(test_node.values.len(), 0);
+        assert_eq!(test_node.elements.len(), 8);
 
-        let test_node: &BlockTreeNode<u32> = test_node.sub_nodes[1].as_ref().unwrap();
+        let test_node: &BlockTreeNode<u32> = &test_node.get_sub_node(1).unwrap();
         assert_eq!(test_node.node_type, BlockTreeNodeType::Leaf);
         assert_eq!(test_node.offset, 131072);
         assert_eq!(test_node.element_size, 512);
-        assert_eq!(test_node.sub_nodes.len(), 0);
-        assert_eq!(test_node.values.len(), 256);
+        assert_eq!(test_node.elements.len(), 256);
 
         Ok(())
     }
@@ -219,8 +201,7 @@ mod tests {
         assert_eq!(test_node.node_type, BlockTreeNodeType::Leaf);
         assert_eq!(test_node.offset, 0);
         assert_eq!(test_node.element_size, 131072);
-        assert_eq!(test_node.sub_nodes.len(), 0);
-        assert_eq!(test_node.values.len(), 8);
+        assert_eq!(test_node.elements.len(), 8);
 
         Ok(())
     }

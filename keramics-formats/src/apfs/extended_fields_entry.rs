@@ -20,7 +20,7 @@ use keramics_types::bytes_to_u16_le;
     structure(
         byte_order = "little",
         field(name = "field_type", data_type = "u8"),
-        field(name = "flags", data_type = "u8"),
+        field(name = "flags", data_type = "u8", format = "hex"),
         field(name = "data_size", data_type = "u16"),
     ),
     methods("debug_read_data")

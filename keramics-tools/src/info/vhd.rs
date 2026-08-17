@@ -100,7 +100,7 @@ impl fmt::Display for VhdFileInfo {
 
         writeln!(
             formatter,
-            "        Bytes per sector\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {}",
             self.bytes_per_sector
         )?;
         writeln!(formatter)
@@ -180,7 +180,7 @@ mod tests {
             "    Identifier\t\t\t\t\t: 4f75d18f-d5ef-438e-b326-d60da6c9ed67\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 4.0 MiB (4212736 bytes)\n",
-            "        Bytes per sector\t\t\t: 512 bytes\n",
+            "        Bytes per sector\t\t\t: 512\n",
             "\n"
         );
         assert_lines_eq(test_struct.to_string().as_str(), expected_string);

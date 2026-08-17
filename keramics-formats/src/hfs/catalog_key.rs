@@ -43,6 +43,7 @@ impl HfsCatalogKey {
     }
 
     /// Reads the catalog key for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(format: &HfsFormat, data: &[u8]) -> String {
         match format {
             HfsFormat::Hfs => HfsStandardCatalogKey::debug_read_data(data),

@@ -11,24 +11,23 @@
  * under the License.
  */
 
-use keramics_types::Uuid;
+#![no_main]
 
-/// Parallels Disk Image (PDI) descriptor snapshot.
-#[derive(Debug)]
-pub(super) struct PdiDescriptorSnapshot {
-    /// Identifier.
-    pub identifier: Uuid,
+use libfuzzer_sys::fuzz_target;
 
-    /// Parent identifier.
-    pub parent_identifier: Option<Uuid>,
-}
+use keramics_core::{DataStreamReference, open_fake_data_stream};
+use keramics_formats::apfs::ApfsContainer;
 
-impl PdiDescriptorSnapshot {
-    /// Creates a new descriptor snapshot.
-    pub fn new(identifier: Uuid, parent_identifier: Option<Uuid>) -> Self {
-        Self {
-            identifier,
-            parent_identifier,
+// Apple File System (APFS) fuzz target.
+fuzz_target!(|data: &[u8]| {
+    let mut apfs_container: ApfsContainer = ApfsContainer::new();
+
+    let data_stream: DataStreamReference = open_fake_data_stream(&data);
+    _ = apfs_container.read_data_stream(&data_stream);
+
+    if let Ok(apfs_volume) = apfs_container.get_volume_by_index(0) {
+        if let Ok(apfs_file_system) = apfs_volume.get_file_system() {
+            _ = apfs_file_system.get_root_directory();
         }
     }
-}
+});

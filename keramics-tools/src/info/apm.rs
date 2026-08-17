@@ -180,7 +180,7 @@ impl fmt::Display for ApmVolumeSystemInfo {
 
         writeln!(
             formatter,
-            "    Bytes per sector\t\t\t\t: {} bytes",
+            "    Bytes per sector\t\t\t\t: {}",
             self.bytes_per_sector
         )?;
         writeln!(

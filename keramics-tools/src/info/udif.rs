@@ -126,7 +126,7 @@ impl fmt::Display for UdifImageInfo {
 
         writeln!(
             formatter,
-            "        Bytes per sector\t\t\t: {} bytes",
+            "        Bytes per sector\t\t\t: {}",
             self.bytes_per_sector
         )?;
         writeln!(formatter)
@@ -245,7 +245,7 @@ mod tests {
             "        Compression method\t\t\t: zlib\n",
             "    Media information:\n",
             "        Media size\t\t\t\t: 1.9 MiB (1964032 bytes)\n",
-            "        Bytes per sector\t\t\t: 512 bytes\n",
+            "        Bytes per sector\t\t\t: 512\n",
             "\n"
         );
         assert_lines_eq(test_struct.to_string().as_str(), expected_string);

@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::collections::HashMap;
 use std::io::SeekFrom;
 
@@ -19,7 +19,6 @@ use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStream, DataStreamReference, ErrorTrace};
 use keramics_types::Uuid;
 
-use crate::block_tree::BlockTree;
 use crate::fake_file_resolver::FakeFileResolver;
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
@@ -76,8 +75,8 @@ pub struct EwfImage {
     /// Chunk size.
     chunk_size: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<EwfBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<EwfBlockRange>,
 
     /// Decompressed chunk cache.
     chunk_cache: LruCache<u64, Vec<u8>>,
@@ -119,7 +118,7 @@ impl EwfImage {
             bytes_per_sector: 0,
             number_of_sectors: 0,
             chunk_size: 0,
-            block_tree: BlockTree::<EwfBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
             chunk_cache: LruCache::new(64),
             error_granularity: 0,
             media_type: EwfMediaType::Unknown,
@@ -340,29 +339,38 @@ impl EwfImage {
     fn read_data_from_blocks(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut media_offset: u64 = offset;
+        let mut current_offset: u64 = offset;
 
+        let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let media_end_offset: u64 = block_range.media_offset + (self.chunk_size as u64);
+
+            if current_offset >= media_end_offset {
+                Ordering::Less
+            } else if current_offset < block_range.media_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for media offset: {} (0x{:08x})",
+                    current_offset, current_offset
+                )));
+            }
+        };
         while data_offset < read_size {
-            if media_offset >= self.media_size {
+            if current_offset >= self.media_size {
                 break;
             }
-            let block_range: &EwfBlockRange = match self.block_tree.get_value(media_offset) {
-                Ok(Some(value)) => value,
-                Ok(None) => {
+            let block_range: &EwfBlockRange = match self.block_ranges.get(range_index) {
+                Some(block_range) => block_range,
+                None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        media_offset, media_offset
+                        "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                        range_index, current_offset, current_offset,
                     )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            media_offset, media_offset
-                        )
-                    );
-                    return Err(error);
                 }
             };
             if !self
@@ -409,19 +417,17 @@ impl EwfImage {
                         )));
                     }
                 };
-            let range_relative_offset: u64 = media_offset - block_range.media_offset;
+            let range_relative_offset: u64 = current_offset - block_range.media_offset;
             let range_remainder_size: u64 = (self.chunk_size as u64) - range_relative_offset;
 
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
+            let range_read_size: usize =
+                min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
-            let range_read_count: usize = match block_range.range_type {
+
+            match block_range.range_type {
                 EwfBlockRangeType::Compressed => {
                     let chunk_media_offset: u64 =
-                        (media_offset / (self.chunk_size as u64)) * (self.chunk_size as u64);
+                        (current_offset / (self.chunk_size as u64)) * (self.chunk_size as u64);
 
                     if !self.chunk_cache.contains(&chunk_media_offset) {
                         let compressed_chunk_offset: u64 = block_range.data_offset;
@@ -462,8 +468,6 @@ impl EwfImage {
 
                     data[data_offset..data_end_offset]
                         .copy_from_slice(&range_data[range_data_offset..range_data_end_offset]);
-
-                    range_read_size
                 }
                 EwfBlockRangeType::InFile => {
                     let chunk_data_offset: u64 = block_range.data_offset + range_relative_offset;
@@ -487,15 +491,11 @@ impl EwfImage {
                         }
                     }
                     // TODO: read full chunk and calculate and compare checksum
-
-                    range_read_size
                 }
-            };
-            if range_read_count == 0 {
-                break;
             }
-            data_offset += range_read_count;
-            media_offset += range_read_count as u64;
+            data_offset = data_end_offset;
+            current_offset += range_read_size as u64;
+            range_index += 1;
         }
         Ok(data_offset)
     }
@@ -945,20 +945,8 @@ impl EwfImage {
                 chunk_data_size,
                 block_range_type,
             );
-            match self.block_tree.insert_value(
-                safe_block_media_offset,
-                self.chunk_size as u64,
-                block_range,
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
+            self.block_ranges.push(block_range);
+
             safe_block_media_offset += self.chunk_size as u64;
 
             // handle > 2 GiB segment file solution in EnCase 6.7 (chunk data offset overflow)
@@ -1012,20 +1000,8 @@ impl EwfImage {
             last_chunk_data_size,
             block_range_type,
         );
-        match self.block_tree.insert_value(
-            safe_block_media_offset,
-            self.chunk_size as u64,
-            block_range,
-        ) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    "Unable to insert block range into block tree"
-                );
-                return Err(error);
-            }
-        }
+        self.block_ranges.push(block_range);
+
         *block_media_offset = safe_block_media_offset + (self.chunk_size as u64);
 
         Ok(())
@@ -1104,16 +1080,6 @@ impl EwfImage {
         self.chunk_size = self.sectors_per_chunk * self.bytes_per_sector;
         self.media_size = (self.number_of_sectors as u64) * (self.bytes_per_sector as u64);
 
-        let block_tree_data_size: u64 = if self.number_of_chunks == 0 {
-            self.media_size.next_multiple_of(self.chunk_size as u64)
-        } else {
-            (self.number_of_chunks as u64) * (self.chunk_size as u64)
-        };
-        self.block_tree = BlockTree::<EwfBlockRange>::new(
-            block_tree_data_size,
-            self.sectors_per_chunk as u64,
-            self.bytes_per_sector as u64,
-        );
         Ok(())
     }
 }

@@ -19,12 +19,14 @@ use clap::{Args, Parser, Subcommand};
 use clap_num::maybe_hex;
 
 use keramics_core::ErrorTrace;
-use keramics_core::mediator::Mediator;
 use keramics_formats::{Path, PathComponent};
 use keramics_vfs::{
     VfsLocation, VfsResolver, VfsResolverReference, VfsScanContext, VfsScanNode, VfsScanOptions,
     VfsScanner, new_os_vfs_location,
 };
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::mediator::Mediator;
 
 mod writer;
 
@@ -33,6 +35,7 @@ use crate::writer::DataStreamWriter;
 #[derive(Parser)]
 #[command(version, about = "Extract data streams from a storage media image", long_about = None)]
 struct CommandLineArguments {
+    #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
@@ -213,11 +216,13 @@ fn main() -> ExitCode {
         println!("No file system found in source");
         return ExitCode::FAILURE;
     }
-    Mediator {
-        debug_output: arguments.debug,
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
     }
-    .make_current();
-
     let source_file_name: &str = match arguments.source.file_name() {
         Some(os_str) => match os_str.to_str() {
             Some(value) => value,

@@ -10,6 +10,10 @@ license = { workspace = true }
 repository = { workspace = true }
 version = { workspace = true }
 
+[features]
+debug-trace = []
+default = []
+
 [[bin]]
 name = "keramicsexport"
 path = "src/export_tool.rs"

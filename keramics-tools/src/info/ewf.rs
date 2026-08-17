@@ -123,6 +123,8 @@ impl fmt::Display for EwfImageInfo {
         }
         // TODO: print compression method
 
+        writeln!(formatter)?;
+
         writeln!(formatter, "    Media information:")?;
 
         // TODO: print media type (combine with is physical)
@@ -309,6 +311,7 @@ mod tests {
             "Expert Witness Compression Format (EWF) information:\n",
             "    Sectors per chunk\t\t\t\t: 64\n",
             "    Error granularity\t\t\t\t: 64 sectors\n",
+            "\n",
             "    Media information:\n",
             "        Media type\t\t\t\t: fixed disk\n",
             "        Media size\t\t\t\t: 4.0 MiB (4194304 bytes)\n",

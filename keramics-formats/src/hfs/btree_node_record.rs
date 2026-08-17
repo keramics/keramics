@@ -12,6 +12,7 @@
  */
 
 /// Hierarchical File System (HFS) B-tree node record.
+#[derive(Clone)]
 pub struct HfsBtreeNodeRecord {
     /// Offset.
     pub offset: usize,

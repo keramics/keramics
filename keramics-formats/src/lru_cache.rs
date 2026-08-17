@@ -13,6 +13,9 @@
 
 use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
+use std::sync::RwLock;
+
+use keramics_core::ErrorTrace;
 
 /// LRU cache entry.
 struct LruCacheEntry<V> {
@@ -49,7 +52,7 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
         }
     }
 
-    /// Determines if a specific valud is caches.
+    /// Determines if a specific value is cached.
     pub fn contains(&self, key: &K) -> bool {
         self.values.contains_key(key)
     }
@@ -79,6 +82,60 @@ impl<K: Hash + Eq + Clone, V> LruCache<K, V> {
         let entry: LruCacheEntry<V> = LruCacheEntry::new(value);
         self.values.insert(key.clone(), entry);
         self.usage.push_back(key);
+    }
+}
+
+/// Variant of LRU cache that can be shared across threads.
+pub struct SharedLruCache<K: Hash + Eq, V> {
+    /// Cache.
+    cache: RwLock<LruCache<K, V>>,
+}
+
+impl<K: Hash + Eq + Clone, V: Clone> SharedLruCache<K, V> {
+    /// Creates a new cache.
+    pub fn new(number_of_entries: usize) -> Self {
+        Self {
+            cache: RwLock::new(LruCache::new(number_of_entries)),
+        }
+    }
+
+    /// Determines if a specific value is cached.
+    pub fn contains(&self, key: &K) -> Result<bool, ErrorTrace> {
+        match self.cache.read() {
+            Ok(cache) => Ok(cache.contains(key)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on cache",
+                    error
+                ));
+            }
+        }
+    }
+
+    /// Retrieves a specific value from the cache.
+    pub fn get(&self, key: &K) -> Result<Option<V>, ErrorTrace> {
+        match self.cache.write() {
+            Ok(mut cache) => Ok(cache.get(key).cloned()),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on cache",
+                    error
+                ));
+            }
+        }
+    }
+
+    /// Inserts a specific value into the cache.
+    pub fn insert(&self, key: K, value: V) -> Result<(), ErrorTrace> {
+        match self.cache.write() {
+            Ok(mut cache) => Ok(cache.insert(key, value)),
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain write lock on cache",
+                    error
+                ));
+            }
+        }
     }
 }
 

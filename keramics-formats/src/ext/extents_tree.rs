@@ -246,13 +246,25 @@ impl ExtExtentsTree {
 
         keramics_core::debug_trace_data!("ExtExtentsTreeNode", offset, &data, self.block_size);
 
-        self.read_node_data(
+        match self.read_node_data(
             &data,
             data_stream,
             logical_block_number,
             block_ranges,
             parent_depth,
-        )
+        ) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read node at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                Err(error)
+            }
+        }
     }
 }
 
