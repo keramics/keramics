@@ -144,7 +144,7 @@ impl BlockReader for NtfsBlockReader {
                 Ok(range_index) => range_index,
                 Err(_) => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for media offset: {} (0x{:08x})",
+                        "Missing block range for offset: {} (0x{:08x})",
                         current_offset, current_offset
                     )));
                 }
@@ -178,7 +178,6 @@ impl BlockReader for NtfsBlockReader {
                     block_range.virtual_cluster_offset + block_range.size,
                     self.valid_data_size,
                 );
-
                 let range_relative_offset: u64 =
                     current_offset - block_range.virtual_cluster_offset;
                 let range_remainder_size: u64 = (range_logical_end_offset
@@ -204,6 +203,8 @@ impl BlockReader for NtfsBlockReader {
                         data[data_offset..data_end_offset].fill(0);
                     }
                 }
+                range_index += 1;
+
                 range_read_size
             };
             if read_count == 0 {
@@ -211,7 +212,6 @@ impl BlockReader for NtfsBlockReader {
             }
             data_offset += read_count;
             current_offset += read_count as u64;
-            range_index += 1;
         }
         Ok(data_offset)
     }

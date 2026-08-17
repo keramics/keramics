@@ -80,7 +80,7 @@ impl BlockReader for ApfsBlockReader {
             Ok(extent_index) => extent_index,
             Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing extent for media offset: {} (0x{:08x})",
+                    "Missing extent for offset: {} (0x{:08x})",
                     current_offset, current_offset
                 )));
             }

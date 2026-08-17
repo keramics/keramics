@@ -11,6 +11,7 @@
  * under the License.
  */
 
+use std::cmp::min;
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -256,27 +257,25 @@ impl SparseImageFile {
     }
 
     /// Reads media data based on the block ranges in the block tree.
-    fn read_data_from_bands(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
+    fn read_data_from_bands(&mut self, data: &mut [u8], offset: u64) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut media_offset: u64 = self.current_offset;
-        let band_number: u64 = media_offset / (self.band_size as u64);
+        let mut current_offset: u64 = offset;
+
+        let band_number: u64 = current_offset / (self.band_size as u64);
         let band_offset: u64 = band_number * (self.band_size as u64);
-        let mut range_relative_offset: u64 = media_offset - band_offset;
+        let mut range_relative_offset: u64 = current_offset - band_offset;
         let mut range_remainder_size: u64 = (self.band_size as u64) - range_relative_offset;
 
         while data_offset < read_size {
-            if media_offset >= self.media_size {
+            if current_offset >= self.media_size {
                 break;
             }
-            let mut range_read_size: usize = read_size - data_offset;
-
-            if (range_read_size as u64) > range_remainder_size {
-                range_read_size = range_remainder_size as usize;
-            }
+            let range_read_size: usize =
+                min(read_size - data_offset, range_remainder_size as usize);
             let data_end_offset: usize = data_offset + range_read_size;
 
-            let range_read_count: usize = match self.block_tree.get_value(media_offset) {
+            let range_read_count: usize = match self.block_tree.get_value(current_offset) {
                 Ok(Some(block_range)) => {
                     let data_stream: &DataStreamReference = match self.data_stream.as_ref() {
                         Some(data_stream) => data_stream,
@@ -284,12 +283,11 @@ impl SparseImageFile {
                             return Err(keramics_core::error_trace_new!("Missing data stream"));
                         }
                     };
-                    let read_count: usize = keramics_core::data_stream_read_at_position!(
+                    keramics_core::data_stream_read_at_position!(
                         data_stream,
                         &mut data[data_offset..data_end_offset],
                         SeekFrom::Start(block_range.data_offset + range_relative_offset)
-                    );
-                    read_count
+                    )
                 }
                 Ok(None) => {
                     data[data_offset..data_end_offset].fill(0);
@@ -301,7 +299,7 @@ impl SparseImageFile {
                         error,
                         format!(
                             "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            media_offset, media_offset
+                            current_offset, current_offset
                         )
                     );
                     return Err(error);
@@ -311,7 +309,7 @@ impl SparseImageFile {
                 break;
             }
             data_offset += range_read_count;
-            media_offset += range_read_count as u64;
+            current_offset += range_read_count as u64;
 
             range_relative_offset = 0;
             range_remainder_size = self.band_size as u64;
@@ -388,13 +386,14 @@ impl DataStream for SparseImageFile {
         if (read_size as u64) > remaining_media_size {
             read_size = remaining_media_size as usize;
         }
-        let read_count: usize = match self.read_data_from_bands(&mut buf[..read_size]) {
-            Ok(read_count) => read_count,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read data from bands");
-                return Err(error);
-            }
-        };
+        let read_count: usize =
+            match self.read_data_from_bands(&mut buf[..read_size], self.current_offset) {
+                Ok(read_count) => read_count,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(error, "Unable to read data from bands");
+                    return Err(error);
+                }
+            };
         self.current_offset += read_count as u64;
 
         Ok(read_count)

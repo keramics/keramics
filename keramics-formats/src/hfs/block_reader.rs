@@ -83,7 +83,7 @@ impl BlockReader for HfsBlockReader {
             Ok(range_index) => range_index,
             Err(_) => {
                 return Err(keramics_core::error_trace_new!(format!(
-                    "Missing block range for media offset: {} (0x{:08x})",
+                    "Missing block range for offset: {} (0x{:08x})",
                     current_offset, current_offset
                 )));
             }

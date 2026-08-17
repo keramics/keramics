@@ -58,6 +58,10 @@ struct CommandLineArguments {
     /// Enable debug output
     debug: bool,
 
+    #[arg(long, default_value_t = 0)]
+    /// Layer within the storage media image, where 1 represents the first layer
+    image_layer: usize,
+
     #[arg(long)]
     /// Password to unlock storage media image
     password: Vec<String>,
@@ -191,7 +195,12 @@ impl ImageTool {
     }
 
     /// Output file entries in bodyfile format.
-    fn generate_bodyfile(&self, source: &str, calculate_md5: bool) -> Result<(), ErrorTrace> {
+    fn generate_bodyfile(
+        &self,
+        source: &str,
+        calculate_md5: bool,
+        image_layer: usize,
+    ) -> Result<(), ErrorTrace> {
         let mut vfs_scanner: VfsScanner = VfsScanner::new();
 
         match vfs_scanner.build() {
@@ -203,9 +212,10 @@ impl ImageTool {
                 ));
             }
         }
-        let vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+        let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
 
         // TODO: set scanner options.
+        vfs_scan_options.image_layer = image_layer;
 
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = new_os_vfs_location(source);
@@ -721,6 +731,20 @@ impl ImageTool {
                     Some(partition_number) => format!("/p{}", partition_number),
                     None => path.to_string(),
                 },
+                VfsFileEntry::Pdi(pdi_file_entry) => {
+                    let path_string: String = match pdi_file_entry.get_layer_number() {
+                        Some(layer_number) => format!("/pdi{}", layer_number),
+                        _ => path.to_string(),
+                    };
+                    match pdi_file_entry.get_identifier() {
+                        Some(identifier) => format!(
+                            "{} (alias: /pdi{{{}}})",
+                            path_string,
+                            identifier.to_string()
+                        ),
+                        _ => path_string,
+                    }
+                }
                 _ => path.to_string(),
             },
             None => path.to_string(),
@@ -821,7 +845,7 @@ impl ImageTool {
     }
 
     /// Scans and prints the hierarchy of volumes, partitions and file systems.
-    fn scan_for_hierarchy(&self, source: &str) -> Result<(), ErrorTrace> {
+    fn scan_for_hierarchy(&self, source: &str, image_layer: usize) -> Result<(), ErrorTrace> {
         let mut vfs_scanner: VfsScanner = VfsScanner::new();
 
         match vfs_scanner.build() {
@@ -833,9 +857,10 @@ impl ImageTool {
                 ));
             }
         }
-        let vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
+        let mut vfs_scan_options: VfsScanOptions = VfsScanOptions::new();
 
         // TODO: set scanner options.
+        vfs_scan_options.image_layer = image_layer;
 
         let mut vfs_scan_context: VfsScanContext = VfsScanContext::new();
         let vfs_location: VfsLocation = new_os_vfs_location(source);
@@ -907,7 +932,11 @@ fn main() -> ExitCode {
         Some(Commands::Bodyfile(command_arguments)) => {
             image_tool.set_volume_path_type(&command_arguments.volume_path_type);
 
-            match image_tool.generate_bodyfile(source, command_arguments.calculate_md5) {
+            match image_tool.generate_bodyfile(
+                source,
+                command_arguments.calculate_md5,
+                arguments.image_layer,
+            ) {
                 Ok(_) => {}
                 Err(error) => {
                     println!("Unable to generate bodyfile of: {}\n{}", source, error);
@@ -917,7 +946,7 @@ fn main() -> ExitCode {
         }
         Some(Commands::Hash) => {
             let storage_media_image: StorageMediaImage =
-                match StorageMediaImage::open(&arguments.source) {
+                match StorageMediaImage::open(&arguments.source, arguments.image_layer) {
                     Ok(storage_media_image) => storage_media_image,
                     Err(error) => {
                         println!(
@@ -1172,7 +1201,7 @@ fn main() -> ExitCode {
                 return ExitCode::FAILURE;
             }
         }
-        _ => match image_tool.scan_for_hierarchy(source) {
+        _ => match image_tool.scan_for_hierarchy(source, arguments.image_layer) {
             Ok(_) => {}
             Err(error) => {
                 println!("Unable to determine hierarchy of: {}\n{}", source, error);

@@ -59,6 +59,10 @@ struct CommandLineArguments {
     /// Process storage media image contents
     image: bool,
 
+    #[arg(long, default_value_t = 0)]
+    /// Layer within the storage media image, where 1 represents the first layer
+    image_layer: usize,
+
     #[arg(short, long, default_value_t = 0, value_parser=maybe_hex::<u64>)]
     /// Offset within the source file or storage media
     offset: u64,
@@ -171,9 +175,13 @@ impl InfoTool {
     }
 
     /// Retrieves a data stream.
-    pub fn get_data_stream(&self, path: &PathBuf) -> Result<DataStreamReference, ErrorTrace> {
+    pub fn get_data_stream(
+        &self,
+        path: &PathBuf,
+        image_layer: usize,
+    ) -> Result<DataStreamReference, ErrorTrace> {
         let data_stream: DataStreamReference = if self.image_mode {
-            match StorageMediaImage::open(path) {
+            match StorageMediaImage::open(path, image_layer) {
                 Ok(storage_media_image) => storage_media_image.get_data_stream(),
                 Err(error) => {
                     return Err(keramics_core::error_trace_new_with_error!(
@@ -440,13 +448,14 @@ fn main() -> ExitCode {
     }
     let info_tool: InfoTool = InfoTool::new(&arguments.encoding, arguments.image, arguments.offset);
 
-    let data_stream: DataStreamReference = match info_tool.get_data_stream(&arguments.source) {
-        Ok(data_stream) => data_stream,
-        Err(error) => {
-            println!("Unable to open data stream with error:\n{}", error);
-            return ExitCode::FAILURE;
-        }
-    };
+    let data_stream: DataStreamReference =
+        match info_tool.get_data_stream(&arguments.source, arguments.image_layer) {
+            Ok(data_stream) => data_stream,
+            Err(error) => {
+                println!("Unable to open data stream with error:\n{}", error);
+                return ExitCode::FAILURE;
+            }
+        };
     let format_identifier: FormatIdentifier = if !arguments.image
         && arguments.source.is_dir()
         && arguments.source.extension() == Some("sparsebundle".as_ref())

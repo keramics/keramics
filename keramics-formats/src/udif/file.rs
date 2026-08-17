@@ -450,7 +450,7 @@ mod tests {
             UdifBlockTableReader::new(512, file.data_fork_size);
         file.read_resource_fork(&mut block_table_reader)?;
 
-        assert!(block_table_reader.has_block_ranges());
+        assert!(!block_table_reader.block_ranges.is_empty());
 
         Ok(())
     }
@@ -468,7 +468,7 @@ mod tests {
             UdifBlockTableReader::new(512, file.data_fork_size);
         file.read_xml_plist(&mut block_table_reader)?;
 
-        assert!(block_table_reader.has_block_ranges());
+        assert!(!block_table_reader.block_ranges.is_empty());
 
         Ok(())
     }

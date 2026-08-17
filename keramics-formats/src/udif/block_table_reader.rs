@@ -13,8 +13,6 @@
 
 use keramics_core::ErrorTrace;
 
-use crate::block_tree::BlockTree;
-
 use super::block_range::{UdifBlockRange, UdifBlockRangeType};
 use super::block_table::UdifBlockTable;
 use super::enums::UdifCompressionMethod;
@@ -29,7 +27,7 @@ pub struct UdifBlockTableReader {
     segment_data_size: u64,
 
     /// Block ranges.
-    block_ranges: Vec<UdifBlockRange>,
+    pub(super) block_ranges: Vec<UdifBlockRange>,
 
     /// Current media sector.
     media_sector: u64,
@@ -56,28 +54,6 @@ impl UdifBlockTableReader {
         }
     }
 
-    /// Retrieves the block tree.
-    pub fn get_block_tree(&mut self) -> Result<BlockTree<UdifBlockRange>, ErrorTrace> {
-        let block_tree_data_size: u64 = self.media_sector * (self.bytes_per_sector as u64);
-
-        let mut block_tree: BlockTree<UdifBlockRange> =
-            BlockTree::<UdifBlockRange>::new(block_tree_data_size, 0, self.bytes_per_sector as u64);
-
-        while let Some(block_range) = self.block_ranges.pop() {
-            match block_tree.insert_value(block_range.media_offset, block_range.size, block_range) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-        }
-        Ok(block_tree)
-    }
-
     /// Retrieves the compression method.
     pub fn get_compression_method(&self) -> UdifCompressionMethod {
         match self.compressed_entry_type {
@@ -93,11 +69,6 @@ impl UdifBlockTableReader {
     /// Retrieves the media size.
     pub fn get_media_size(&self) -> u64 {
         self.media_offset
-    }
-
-    /// Determines if the block table reader has block ranges.
-    pub fn has_block_ranges(&self) -> bool {
-        !self.block_ranges.is_empty()
     }
 
     /// Processes a block table.

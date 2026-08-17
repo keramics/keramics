@@ -76,10 +76,10 @@ impl ApfsContainerFileEntry {
     }
 
     /// Retrieves the identifier.
-    pub fn get_identifier(&self) -> Option<Uuid> {
+    pub fn get_identifier(&self) -> Option<&Uuid> {
         match self {
             ApfsContainerFileEntry::Root { .. } => None,
-            ApfsContainerFileEntry::Volume { volume, .. } => Some(volume.get_identifier().clone()),
+            ApfsContainerFileEntry::Volume { volume, .. } => Some(volume.get_identifier()),
         }
     }
 
@@ -234,7 +234,7 @@ mod tests {
         let file_entry = ApfsContainerFileEntry::Root {
             container: apfs_container.clone(),
         };
-        let identifier: Option<Uuid> = file_entry.get_identifier();
+        let identifier: Option<&Uuid> = file_entry.get_identifier();
         assert_eq!(identifier, None);
 
         let apfs_volume: ApfsVolume = apfs_container.get_volume_by_index(0)?;
@@ -244,7 +244,7 @@ mod tests {
             volume: Arc::new(apfs_volume),
             size: volume_size,
         };
-        let identifier: Option<Uuid> = file_entry.get_identifier();
+        let identifier: Option<&Uuid> = file_entry.get_identifier();
         assert_eq!(
             identifier,
             Some(Uuid {
@@ -254,6 +254,7 @@ mod tests {
                 part4: 0xb9c7,
                 part5: 0x71ab9dbe5fe2,
             })
+            .as_ref()
         );
         Ok(())
     }

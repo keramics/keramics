@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 use std::sync::{Arc, RwLock};
 
@@ -19,7 +19,6 @@ use keramics_compression::{AdcContext, Bzip2Context, LzfseContext};
 use keramics_core::{DataStream, ErrorTrace};
 use keramics_types::Uuid;
 
-use crate::block_tree::BlockTree;
 use crate::cdsaencr::{CdsaEncrCredential, CdsaEncrEncryptionType};
 use crate::file_resolver::FileResolverReference;
 use crate::lru_cache::LruCache;
@@ -44,11 +43,8 @@ pub struct UdifImage {
     /// Bytes per sector.
     bytes_per_sector: u16,
 
-    /// Value to indicate the image has block ranges.
-    has_block_ranges: bool,
-
-    /// Block tree.
-    block_tree: BlockTree<UdifBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<UdifBlockRange>,
 
     /// Decompressed block cache.
     block_cache: LruCache<u64, Vec<u8>>,
@@ -77,8 +73,7 @@ impl UdifImage {
             segment_set_identifier: Uuid::new(),
             number_of_segments: 0,
             bytes_per_sector: 0,
-            has_block_ranges: false,
-            block_tree: BlockTree::<UdifBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
             block_cache: LruCache::new(64),
             compression_method: UdifCompressionMethod::None,
             encryption_type: None,
@@ -149,7 +144,7 @@ impl UdifImage {
                 } else {
                     self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                     self.number_of_segments = segment_stream.number_of_segments;
-                    let mut block_table_reader: UdifBlockTableReader = match segment_stream
+                    let block_table_reader: UdifBlockTableReader = match segment_stream
                         .read_metadata(self.bytes_per_sector)
                     {
                         Ok(block_table_reader) => block_table_reader,
@@ -158,22 +153,9 @@ impl UdifImage {
                             return Err(error);
                         }
                     };
-                    self.has_block_ranges = block_table_reader.has_block_ranges();
-
-                    if self.has_block_ranges {
-                        self.block_tree = match block_table_reader.get_block_tree() {
-                            Ok(block_tree) => block_tree,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to determine block tree"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    }
                     self.media_size = block_table_reader.get_media_size();
                     self.compression_method = block_table_reader.get_compression_method();
+                    self.block_ranges = block_table_reader.block_ranges;
 
                     if self.media_size
                         > (segment_stream.number_of_sectors * (self.bytes_per_sector as u64))
@@ -263,32 +245,41 @@ impl UdifImage {
     fn read_data_from_blocks(&mut self, data: &mut [u8]) -> Result<usize, ErrorTrace> {
         let read_size: usize = data.len();
         let mut data_offset: usize = 0;
-        let mut media_offset: u64 = self.current_offset;
+        let mut current_offset: u64 = self.current_offset;
 
+        let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let range_end_offset: u64 = block_range.media_offset + block_range.size;
+
+            if current_offset >= range_end_offset {
+                Ordering::Less
+            } else if current_offset < block_range.media_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for offset: {} (0x{:08x})",
+                    current_offset, current_offset
+                )));
+            }
+        };
         while data_offset < read_size {
-            if media_offset >= self.media_size {
+            if current_offset >= self.media_size {
                 break;
             }
-            let block_range: &UdifBlockRange = match self.block_tree.get_value(media_offset) {
-                Ok(Some(block_range)) => block_range,
-                Ok(None) => {
+            let block_range: &UdifBlockRange = match self.block_ranges.get(range_index) {
+                Some(block_range) => block_range,
+                None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        media_offset, media_offset
+                        "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                        range_index, current_offset, current_offset,
                     )));
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            media_offset, media_offset
-                        )
-                    );
-                    return Err(error);
-                }
             };
-            let range_relative_offset: u64 = media_offset - block_range.media_offset;
+            let range_relative_offset: u64 = current_offset - block_range.media_offset;
             let range_remainder_size: u64 = block_range.size - range_relative_offset;
 
             let range_read_size: usize =
@@ -360,8 +351,9 @@ impl UdifImage {
                     data[data_offset..data_end_offset].fill(0);
                 }
             }
-            data_offset += range_read_size;
-            media_offset += range_read_size as u64;
+            data_offset = data_end_offset;
+            current_offset += range_read_size as u64;
+            range_index += 1;
         }
         Ok(data_offset)
     }
@@ -374,7 +366,7 @@ impl UdifImage {
                     self.segment_set_identifier = segment_stream.segment_set_identifier.clone();
                     self.number_of_segments = segment_stream.number_of_segments;
 
-                    let mut block_table_reader: UdifBlockTableReader = match segment_stream
+                    let block_table_reader: UdifBlockTableReader = match segment_stream
                         .read_metadata(self.bytes_per_sector)
                     {
                         Ok(block_table_reader) => block_table_reader,
@@ -383,22 +375,9 @@ impl UdifImage {
                             return Err(error);
                         }
                     };
-                    self.has_block_ranges = block_table_reader.has_block_ranges();
-
-                    if self.has_block_ranges {
-                        self.block_tree = match block_table_reader.get_block_tree() {
-                            Ok(block_tree) => block_tree,
-                            Err(mut error) => {
-                                keramics_core::error_trace_add_frame!(
-                                    error,
-                                    "Unable to determine block tree"
-                                );
-                                return Err(error);
-                            }
-                        };
-                    }
                     self.media_size = block_table_reader.get_media_size();
                     self.compression_method = block_table_reader.get_compression_method();
+                    self.block_ranges = block_table_reader.block_ranges;
 
                     if self.media_size
                         > (segment_stream.number_of_sectors * (self.bytes_per_sector as u64))
@@ -454,7 +433,13 @@ impl DataStream for UdifImage {
         if (read_size as u64) > remaining_media_size {
             read_size = remaining_media_size as usize;
         }
-        let read_count: usize = if self.has_block_ranges {
+        let read_count: usize = if self.block_ranges.is_empty() {
+            keramics_core::data_stream_read_at_position!(
+                &self.segment_stream,
+                &mut buf[..read_size],
+                SeekFrom::Start(self.current_offset)
+            )
+        } else {
             match self.read_data_from_blocks(&mut buf[..read_size]) {
                 Ok(read_count) => read_count,
                 Err(mut error) => {
@@ -462,12 +447,6 @@ impl DataStream for UdifImage {
                     return Err(error);
                 }
             }
-        } else {
-            keramics_core::data_stream_read_at_position!(
-                &self.segment_stream,
-                &mut buf[..read_size],
-                SeekFrom::Start(self.current_offset)
-            )
         };
         self.current_offset += read_count as u64;
 

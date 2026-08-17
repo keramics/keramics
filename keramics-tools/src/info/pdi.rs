@@ -157,6 +157,8 @@ impl PdiInfo {
             let number_of_files: usize = segment.get_number_of_files();
             println!("        Number of files\t\t\t\t: {}", number_of_files);
 
+            println!();
+
             for file_index in 0..number_of_files {
                 let segment_file: &PdiSegmentFileDescriptor =
                     match segment.get_file_by_index(file_index) {
@@ -185,8 +187,9 @@ impl PdiInfo {
                     _ => "Unknown",
                 };
                 println!("            Type\t\t\t\t: {}", file_type_string);
+
+                println!();
             }
-            println!();
         }
         for snapshot_index in 0..image_information.number_of_snapshots {
             let snapshot: &PdiSnapshotDescriptor =

@@ -152,7 +152,7 @@ impl StorageMediaImage {
     }
 
     /// Opens a storage media image.
-    pub fn open(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+    pub fn open(path: &PathBuf, image_layer: usize) -> Result<StorageMediaImage, ErrorTrace> {
         if path.is_dir() && path.extension() == Some("sparsebundle".as_ref()) {
             match Self::open_sparsebundle_image(path) {
                 Ok(storage_media_image) => return Ok(storage_media_image),
@@ -189,13 +189,13 @@ impl StorageMediaImage {
                 ));
             }
             Ok(Some(FormatIdentifier::Ewf)) => return Self::open_ewf_image(path),
-            Ok(Some(FormatIdentifier::Pdi)) => return Self::open_pdi_image(path),
-            Ok(Some(FormatIdentifier::Qcow)) => return Self::open_qcow_image(path),
+            Ok(Some(FormatIdentifier::Pdi)) => return Self::open_pdi_image(path, image_layer),
+            Ok(Some(FormatIdentifier::Qcow)) => return Self::open_qcow_image(path, image_layer),
             Ok(Some(FormatIdentifier::SparseImage)) => return Self::open_sparseimage_file(path),
             Ok(Some(FormatIdentifier::Udif)) => return Self::open_udif_image(path),
-            Ok(Some(FormatIdentifier::Vhd)) => return Self::open_vhd_image(path),
-            Ok(Some(FormatIdentifier::Vhdx)) => return Self::open_vhdx_image(path),
-            Ok(Some(FormatIdentifier::Vmdk)) => return Self::open_vmdk_image(path),
+            Ok(Some(FormatIdentifier::Vhd)) => return Self::open_vhd_image(path, image_layer),
+            Ok(Some(FormatIdentifier::Vhdx)) => return Self::open_vhdx_image(path, image_layer),
+            Ok(Some(FormatIdentifier::Vmdk)) => return Self::open_vmdk_image(path, image_layer),
             Ok(Some(format_identifier)) => {
                 return Err(keramics_core::error_trace_new!(format!(
                     "Unsupported format: {}",
@@ -287,7 +287,7 @@ impl StorageMediaImage {
     }
 
     /// Opens a PDI image.
-    fn open_pdi_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+    fn open_pdi_image(path: &PathBuf, image_layer: usize) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, _) = match Self::get_base_path_and_file_name(path) {
             Ok(result) => result,
             Err(mut error) => {
@@ -326,17 +326,33 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = pdi_image.get_number_of_layers();
 
-        match pdi_image.get_layer_by_index(number_of_layers - 1) {
+        if number_of_layers == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported PDI image - no image layers found"
+            ));
+        }
+        let layer_index: usize = if image_layer == 0 {
+            number_of_layers - 1
+        } else {
+            image_layer - 1
+        };
+        match pdi_image.get_layer_by_index(layer_index) {
             Ok(pdi_image_layer) => Ok(Self::Pdi { pdi_image_layer }),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve image layer: {}", layer_index)
+                );
                 Err(error)
             }
         }
     }
 
     /// Opens a QCOW image.
-    fn open_qcow_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+    fn open_qcow_image(
+        path: &PathBuf,
+        image_layer: usize,
+    ) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
             Ok(result) => result,
             Err(mut error) => {
@@ -377,10 +393,23 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = qcow_image.get_number_of_layers();
 
-        match qcow_image.get_layer_by_index(number_of_layers - 1) {
+        if number_of_layers == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported QCOW image - no image layers found"
+            ));
+        }
+        let layer_index: usize = if image_layer == 0 {
+            number_of_layers - 1
+        } else {
+            image_layer - 1
+        };
+        match qcow_image.get_layer_by_index(layer_index) {
             Ok(qcow_image_layer) => Ok(Self::Qcow { qcow_image_layer }),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve image layer: {}", layer_index)
+                );
                 Err(error)
             }
         }
@@ -621,7 +650,7 @@ impl StorageMediaImage {
     }
 
     /// Opens a VHD image.
-    fn open_vhd_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+    fn open_vhd_image(path: &PathBuf, image_layer: usize) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
             Ok(result) => result,
             Err(mut error) => {
@@ -662,12 +691,22 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = vhd_image.get_number_of_layers();
 
-        match vhd_image.get_layer_by_index(number_of_layers - 1) {
+        if number_of_layers == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHD image - no image layers found"
+            ));
+        }
+        let layer_index: usize = if image_layer == 0 {
+            number_of_layers - 1
+        } else {
+            image_layer - 1
+        };
+        match vhd_image.get_layer_by_index(layer_index) {
             Ok(vhd_image_layer) => Ok(Self::Vhd { vhd_image_layer }),
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    "Unable to retrieve top VHD image layer"
+                    format!("Unable to retrieve image layer: {}", layer_index)
                 );
                 Err(error)
             }
@@ -675,7 +714,10 @@ impl StorageMediaImage {
     }
 
     /// Opens a VHDX image.
-    fn open_vhdx_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+    fn open_vhdx_image(
+        path: &PathBuf,
+        image_layer: usize,
+    ) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
             Ok(result) => result,
             Err(mut error) => {
@@ -716,17 +758,33 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = vhdx_image.get_number_of_layers();
 
-        match vhdx_image.get_layer_by_index(number_of_layers - 1) {
+        if number_of_layers == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VHDX image - no image layers found"
+            ));
+        }
+        let layer_index: usize = if image_layer == 0 {
+            number_of_layers - 1
+        } else {
+            image_layer - 1
+        };
+        match vhdx_image.get_layer_by_index(layer_index) {
             Ok(vhdx_image_layer) => Ok(Self::Vhdx { vhdx_image_layer }),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve image layer: {}", layer_index)
+                );
                 Err(error)
             }
         }
     }
 
     /// Opens a VMDK image.
-    fn open_vmdk_image(path: &PathBuf) -> Result<StorageMediaImage, ErrorTrace> {
+    fn open_vmdk_image(
+        path: &PathBuf,
+        image_layer: usize,
+    ) -> Result<StorageMediaImage, ErrorTrace> {
         let (base_path, file_name) = match Self::get_base_path_and_file_name(path) {
             Ok(result) => result,
             Err(mut error) => {
@@ -767,10 +825,23 @@ impl StorageMediaImage {
         }
         let number_of_layers: usize = vmdk_image.get_number_of_layers();
 
-        match vmdk_image.get_layer_by_index(number_of_layers - 1) {
+        if number_of_layers == 0 {
+            return Err(keramics_core::error_trace_new!(
+                "Unsupported VMDK image - no image layers found"
+            ));
+        }
+        let layer_index: usize = if image_layer == 0 {
+            number_of_layers - 1
+        } else {
+            image_layer - 1
+        };
+        match vmdk_image.get_layer_by_index(layer_index) {
             Ok(vmdk_image_layer) => Ok(Self::Vmdk { vmdk_image_layer }),
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve top image layer");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Unable to retrieve image layer: {}", layer_index)
+                );
                 Err(error)
             }
         }

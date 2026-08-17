@@ -59,6 +59,9 @@ impl VfsScanOptionGroup {
 
 /// Virtual File System (VFS) scan options.
 pub struct VfsScanOptions {
+    /// Image layer.
+    pub image_layer: usize,
+
     /// Partitions to include in scan.
     pub(super) partitions: VfsScanOptionGroup,
 
@@ -70,6 +73,7 @@ impl VfsScanOptions {
     /// Creates a new scan options.
     pub fn new() -> Self {
         Self {
+            image_layer: 0,
             partitions: VfsScanOptionGroup::NotSet,
             sector_size: 512,
         }
