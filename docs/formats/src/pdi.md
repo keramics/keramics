@@ -156,7 +156,7 @@ The "StorageData" XML element contains the following values.
 | --- | --- |
 | Storage | One or more "Storage" XML sub elements |
 
-> Note that a split disks contains multiple "Storage" XML sub elements.
+> Note that a split disk contains multiple "Storage" XML sub elements.
 
 #### Storage
 
