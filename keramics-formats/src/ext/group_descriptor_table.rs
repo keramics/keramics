@@ -142,7 +142,19 @@ impl ExtGroupDescriptorTable {
 
         keramics_core::debug_trace_data!("ExtGroupDescriptorTable", offset, &data, data_size);
 
-        self.read_data(&data)
+        match self.read_data(&data) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read group descriptor at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                Err(error)
+            }
+        }
     }
 }
 

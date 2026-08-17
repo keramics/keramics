@@ -34,6 +34,7 @@ impl ZlibDataHeader {
     }
 
     /// Reads the data header for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(data: &[u8]) -> String {
         let mut string_parts: Vec<String> = vec![String::from("ZlibDataHeader {\n")];
 

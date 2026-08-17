@@ -18,7 +18,6 @@ use std::process::ExitCode;
 use clap::Parser;
 
 use keramics_core::formatters::format_as_string;
-use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_formats::{Path, PathComponent};
 use keramics_hashes::{
@@ -31,6 +30,9 @@ use keramics_vfs::{
     new_os_vfs_location,
 };
 
+#[cfg(feature = "debug-trace")]
+use keramics_core::mediator::Mediator;
+
 mod display_path;
 mod enums;
 
@@ -40,6 +42,7 @@ use crate::enums::{DigestHashType, DisplayPathType};
 #[derive(Parser)]
 #[command(version, about = "Calculate digest hashes of data streams", long_about = None)]
 struct CommandLineArguments {
+    #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
@@ -363,11 +366,13 @@ impl HashTool {
 fn main() -> ExitCode {
     let arguments = CommandLineArguments::parse();
 
-    Mediator {
-        debug_output: arguments.debug,
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
     }
-    .make_current();
-
     let hash_tool: HashTool = HashTool::new(
         &arguments.digest_hash_type,
         &arguments.volume_path_type,

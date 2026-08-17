@@ -17,6 +17,8 @@ use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_i32_be, bytes_to_u16_be, bytes_to_u32_be};
 
 use super::catalog_file_record::HfsCatalogFileRecord;
+
+#[cfg(feature = "debug-trace")]
 use super::fork_descriptor::HfsForkDescriptor;
 
 #[derive(LayoutMap)]
@@ -77,34 +79,46 @@ impl HfsExtendedCatalogFileRecord {
         file_record.identifier = bytes_to_u32_be!(data, 8);
 
         let timestamp: u32 = bytes_to_u32_be!(data, 12);
-        if timestamp > 0 {
-            file_record.creation_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        file_record.creation_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 16);
-        if timestamp > 0 {
-            file_record.modification_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        file_record.modification_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 20);
-        if timestamp == 0 {
-            file_record.change_time = Some(DateTime::NotSet);
+
+        file_record.change_time = if timestamp == 0 {
+            Some(DateTime::NotSet)
         } else {
-            file_record.change_time = Some(DateTime::HfsTime(HfsTime::new(timestamp)));
-        }
+            Some(DateTime::HfsTime(HfsTime::new(timestamp)))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 24);
-        if timestamp == 0 {
-            file_record.access_time = Some(DateTime::NotSet);
+
+        file_record.access_time = if timestamp == 0 {
+            Some(DateTime::NotSet)
         } else {
-            file_record.access_time = Some(DateTime::HfsTime(HfsTime::new(timestamp)));
-        }
+            Some(DateTime::HfsTime(HfsTime::new(timestamp)))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 28);
-        if timestamp > 0 {
-            file_record.backup_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        file_record.backup_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         file_record.owner_identifier = Some(bytes_to_u32_be!(data, 32));
         file_record.group_identifier = Some(bytes_to_u32_be!(data, 36));
         file_record.file_mode = Some(bytes_to_u16_be!(data, 42));
 
         let special_permissions: u32 = bytes_to_u32_be!(data, 44);
+
         if file_record.flags & 0x0020 != 0 && &data[48..56] == b"hlnkhfs+" {
             file_record.link_reference = Some(special_permissions);
         } else {
@@ -112,11 +126,12 @@ impl HfsExtendedCatalogFileRecord {
         }
         if file_record.flags & 0x0080 != 0 {
             let timestamp: i32 = bytes_to_i32_be!(data, 68);
-            if timestamp == 0 {
-                file_record.added_time = Some(DateTime::NotSet);
+
+            file_record.added_time = if timestamp == 0 {
+                Some(DateTime::NotSet)
             } else {
-                file_record.added_time = Some(DateTime::PosixTime32(PosixTime32::new(timestamp)));
-            }
+                Some(DateTime::PosixTime32(PosixTime32::new(timestamp)))
+            };
         }
         match file_record.data_fork_descriptor.read_data(&data[88..168]) {
             Ok(_) => {}
@@ -231,7 +246,6 @@ mod tests {
         assert_eq!(test_struct.file_mode, Some(0o100644));
         assert_eq!(test_struct.special_permissions, Some(2));
         assert_eq!(test_struct.link_reference, None);
-
         assert_eq!(
             test_struct.added_time,
             Some(DateTime::PosixTime32(PosixTime32 {

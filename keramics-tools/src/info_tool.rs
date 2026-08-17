@@ -19,12 +19,14 @@ use std::sync::{Arc, RwLock};
 use clap::{Args, Parser, Subcommand};
 use clap_num::maybe_hex;
 
-use keramics_core::mediator::Mediator;
 use keramics_core::{DataStreamReference, ErrorTrace, open_os_data_stream};
 use keramics_encodings::CharacterEncoding;
 use keramics_formats::cdsaencr::{CdsaEncrContainer, CdsaEncrCredential};
 use keramics_formats::{FormatIdentifier, FormatScanner, Path};
 use keramics_vfs::{VfsCredential, VfsCredentialStore};
+
+#[cfg(feature = "debug-trace")]
+use keramics_core::mediator::Mediator;
 
 mod enums;
 mod formatters;
@@ -32,7 +34,7 @@ mod info;
 mod range_stream;
 mod storage_media_image;
 
-use crate::enums::EncodingType;
+use crate::enums::{DisplayPathType, EncodingType};
 use crate::info::{
     ApfsInfo, ApmInfo, CdsaEncrInfo, EwfInfo, ExtInfo, FatInfo, GptInfo, HfsInfo, MbrInfo,
     NtfsInfo, PdiInfo, QcowInfo, SparseBundleInfo, SparseImageInfo, UdifInfo, VhdInfo, VhdxInfo,
@@ -44,6 +46,7 @@ use crate::storage_media_image::StorageMediaImage;
 #[derive(Parser)]
 #[command(version, about = "Provides information about file formats", long_about = None)]
 struct CommandLineArguments {
+    #[cfg(feature = "debug-trace")]
     #[arg(long, default_value_t = false)]
     /// Enable debug output
     debug: bool,
@@ -63,6 +66,10 @@ struct CommandLineArguments {
     #[arg(long)]
     /// Password to unlock format
     password: Vec<String>,
+
+    #[arg(long, default_value_t = 0)]
+    /// Volume within the format, where 1 represents the first volume
+    volume: usize,
 
     /// Path of the source file
     source: PathBuf,
@@ -94,6 +101,9 @@ struct EntryCommandArguments {
 struct HierarchyCommandArguments {
     // TODO: allow to set the path component/segment separator
     // TODO: allow to set the data stream name separator
+    /// Volume or partition path type
+    #[arg(long, default_value_t = DisplayPathType::Index, value_enum)]
+    volume_path_type: DisplayPathType,
 }
 
 #[derive(Args, Debug)]
@@ -458,16 +468,20 @@ fn main() -> ExitCode {
             }
         }
     };
-    Mediator {
-        debug_output: arguments.debug,
+    #[cfg(feature = "debug-trace")]
+    {
+        Mediator {
+            debug_output: arguments.debug,
+        }
+        .make_current();
     }
-    .make_current();
-
     let result: Result<(), ErrorTrace> = match arguments.command {
         Some(Commands::Entry(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Apfs => {
-                ApfsInfo::print_file_entry_by_identifier(&data_stream, command_arguments.entry)
-            }
+            FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_identifier(
+                &data_stream,
+                arguments.volume,
+                command_arguments.entry,
+            ),
             FormatIdentifier::Ext => ExtInfo::print_file_entry_by_identifier(
                 &data_stream,
                 command_arguments.entry,
@@ -488,7 +502,11 @@ fn main() -> ExitCode {
             ))),
         },
         Some(Commands::Hierarchy(command_arguments)) => match &format_identifier {
-            FormatIdentifier::Apfs => ApfsInfo::print_hierarchy(&data_stream),
+            FormatIdentifier::Apfs => ApfsInfo::print_hierarchy(
+                &data_stream,
+                arguments.volume,
+                &command_arguments.volume_path_type,
+            ),
             FormatIdentifier::Ext => {
                 ExtInfo::print_hierarchy(&data_stream, info_tool.character_encoding.as_ref())
             }
@@ -506,7 +524,9 @@ fn main() -> ExitCode {
             let path: Path = Path::from(&command_arguments.path);
 
             match &format_identifier {
-                FormatIdentifier::Apfs => ApfsInfo::print_file_entry_by_path(&data_stream, &path),
+                FormatIdentifier::Apfs => {
+                    ApfsInfo::print_file_entry_by_path(&data_stream, arguments.volume, &path)
+                }
                 FormatIdentifier::Ext => ExtInfo::print_file_entry_by_path(
                     &data_stream,
                     &path,

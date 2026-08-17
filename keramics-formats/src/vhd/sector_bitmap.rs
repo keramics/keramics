@@ -98,11 +98,14 @@ impl VhdSectorBitmap {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.size];
 
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "VhdSectorBitmap",
+            data_stream,
+            &mut data,
+            self.size,
+            position,
+        );
         // TODO: debug print ranges.
-        keramics_core::debug_trace_data!("VhdSectorBitmap", offset, &data, self.size);
 
         self.read_data(&data)
     }

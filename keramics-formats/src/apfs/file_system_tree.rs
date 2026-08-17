@@ -22,6 +22,7 @@ use keramics_types::{
 };
 
 use crate::indexed_hash_map::IndexedHashMap;
+use crate::lru_cache::SharedLruCache;
 use crate::path_component::PathComponent;
 
 use super::attribute_record::ApfsAttributeRecord;
@@ -36,16 +37,20 @@ use super::file_system_key_with_extent::ApfsFileSystemKeyWithExtent;
 use super::file_system_key_with_name::ApfsFileSystemKeyWithName;
 use super::file_system_key_with_name_and_hash::ApfsFileSystemKeyWithNameAndHash;
 use super::inode::ApfsInode;
+use super::name_hash::ApfsNameHash;
 use super::object_map_tree::ApfsObjectMapTree;
 use super::object_map_value::ApfsObjectMapValue;
 
 /// Apple File System (APFS) file system B-tree.
 pub struct ApfsFileSystemTree {
     /// Block size.
-    pub block_size: u32,
+    block_size: u32,
 
     /// Root (node) block number.
-    pub root_block_number: u64,
+    root_block_number: u64,
+
+    /// Node cache.
+    node_cache: SharedLruCache<u64, ApfsBtreeNode>,
 
     /// Case folding mappings.
     case_folding_mappings: Utf16CharacterMappings,
@@ -60,6 +65,7 @@ impl ApfsFileSystemTree {
         Self {
             block_size: 0,
             root_block_number: 0,
+            node_cache: SharedLruCache::new(256),
             case_folding_mappings: Utf16CharacterMappings::from(
                 APFS_UTF16_CASE_MAPPINGS.as_slice(),
             ),
@@ -169,16 +175,6 @@ impl ApfsFileSystemTree {
         if node.object_header.object_type == 0x00000000 {
             return Ok(());
         }
-        match self.check_node(block_number, &node) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Check of node: {} failed", block_number)
-                );
-                return Err(error);
-            }
-        }
         let is_branch: bool = node.is_branch();
 
         let mut last_entry_index: usize = 0;
@@ -213,10 +209,10 @@ impl ApfsFileSystemTree {
             {
                 break;
             }
-            if !is_branch {
-                if key.object_identifier == object_identifier
-                    && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE
-                {
+            if key.object_identifier == object_identifier
+                && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_EXTENDED_ATTRIBUTE
+            {
+                if !is_branch {
                     let (name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
                     {
                         Ok(result) => result,
@@ -240,28 +236,28 @@ impl ApfsFileSystemTree {
                             return Err(error);
                         }
                     }
-                }
-            } else if entry_index > 0 {
-                match self.get_attributes_by_identifier_from_sub_node(
-                    data_stream,
-                    object_map_tree,
-                    &node,
-                    last_entry_index,
-                    object_identifier,
-                    object_transaction_identifier,
-                    attributes,
-                    read_node_block_numbers,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve attributes from entry: {}",
-                                last_entry_index
-                            )
-                        );
-                        return Err(error);
+                } else if entry_index > 0 {
+                    match self.get_attributes_by_identifier_from_sub_node(
+                        data_stream,
+                        object_map_tree,
+                        &node,
+                        last_entry_index,
+                        object_identifier,
+                        object_transaction_identifier,
+                        attributes,
+                        read_node_block_numbers,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve attributes from entry: {}",
+                                    last_entry_index
+                                )
+                            );
+                            return Err(error);
+                        }
                     }
                 }
             }
@@ -436,16 +432,6 @@ impl ApfsFileSystemTree {
         if node.object_header.object_type == 0x00000000 {
             return Ok(());
         }
-        match self.check_node(block_number, &node) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Check of node: {} failed", block_number)
-                );
-                return Err(error);
-            }
-        }
         let is_branch: bool = node.is_branch();
 
         let mut last_entry_index: usize = 0;
@@ -480,10 +466,10 @@ impl ApfsFileSystemTree {
             {
                 break;
             }
-            if !is_branch {
-                if key.object_identifier == parent_object_identifier
-                    && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
-                {
+            if key.object_identifier == parent_object_identifier
+                && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
+            {
+                if !is_branch {
                     let (name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
                     {
                         Ok(result) => result,
@@ -507,28 +493,28 @@ impl ApfsFileSystemTree {
                             return Err(error);
                         }
                     }
-                }
-            } else if entry_index > 0 {
-                match self.get_directory_entries_by_identifier_from_sub_node(
-                    data_stream,
-                    object_map_tree,
-                    &node,
-                    last_entry_index,
-                    parent_object_identifier,
-                    object_transaction_identifier,
-                    directory_entries,
-                    read_node_block_numbers,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve directory entries from entry: {}",
-                                last_entry_index
-                            )
-                        );
-                        return Err(error);
+                } else if entry_index > 0 {
+                    match self.get_directory_entries_by_identifier_from_sub_node(
+                        data_stream,
+                        object_map_tree,
+                        &node,
+                        last_entry_index,
+                        parent_object_identifier,
+                        object_transaction_identifier,
+                        directory_entries,
+                        read_node_block_numbers,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve directory entries from entry: {}",
+                                    last_entry_index
+                                )
+                            );
+                            return Err(error);
+                        }
                     }
                 }
             }
@@ -675,8 +661,13 @@ impl ApfsFileSystemTree {
                 }
             }
         };
-        // TODO: calculate name_hash
-
+        let name_hash: u32 = match ApfsNameHash::calculate(&name_string) {
+            Ok(name_hash) => name_hash,
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(error, "Unable to calculate name hash");
+                return Err(error);
+            }
+        };
         let mut read_node_block_numbers: HashSet<u64> = HashSet::new();
 
         match self.get_directory_entry_by_name_from_node(
@@ -685,6 +676,7 @@ impl ApfsFileSystemTree {
             self.root_block_number,
             parent_object_identifier,
             &name_string,
+            name_hash,
             object_transaction_identifier,
             &mut read_node_block_numbers,
         ) {
@@ -710,6 +702,7 @@ impl ApfsFileSystemTree {
         block_number: u64,
         parent_object_identifier: u64,
         name: &Utf16String,
+        name_hash: u32,
         object_transaction_identifier: u64,
         read_node_block_numbers: &mut HashSet<u64>,
     ) -> Result<Option<ApfsDirectoryEntry>, ErrorTrace> {
@@ -731,16 +724,6 @@ impl ApfsFileSystemTree {
         };
         if node.object_header.object_type == 0x00000000 {
             return Ok(None);
-        }
-        match self.check_node(block_number, &node) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Check of node: {} failed", block_number)
-                );
-                return Err(error);
-            }
         }
         let is_branch: bool = node.is_branch();
 
@@ -779,53 +762,60 @@ impl ApfsFileSystemTree {
             if key.object_identifier == parent_object_identifier
                 && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_DIRECTORY_RECORD
             {
-                let (key_name, _): (ByteString, u32) = match self.read_name(&key_data, entry_index)
-                {
-                    Ok(result) => result,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!("Unable to read entry: {} name", entry_index)
-                        );
-                        return Err(error);
-                    }
-                };
-                let utf16_string: Utf16String = if self.use_case_folding {
-                    match Utf16String::from_byte_string_with_case_folding(
-                        &key_name,
-                        &self.case_folding_mappings,
-                    ) {
-                        Ok(utf16_string) => utf16_string,
+                let (key_name, key_name_hash): (ByteString, u32) =
+                    match self.read_name(&key_data, entry_index) {
+                        Ok(result) => result,
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                format!(
-                                    "Unable determine UTF-16 string with case folding from key: {} name",
-                                    entry_index
-                                )
+                                format!("Unable to read entry: {} name", entry_index)
                             );
                             return Err(error);
                         }
-                    }
+                    };
+                let mut result: Ordering = if key_name_hash == 0 && name_hash == 0 {
+                    Ordering::Equal
                 } else {
-                    match Utf16String::from_byte_string(&key_name) {
-                        Ok(utf16_string) => utf16_string,
-                        Err(mut error) => {
-                            keramics_core::error_trace_add_frame!(
-                                error,
-                                format!(
-                                    "Unable determine UTF-16 string from key: {} name",
-                                    entry_index
-                                )
-                            );
-                            return Err(error);
-                        }
-                    }
+                    key_name_hash.cmp(&name_hash)
                 };
-                let result: Ordering = utf16_string.cmp(name);
-
-                // Note that the order of the keys is not alphabetical given the name size and hash.
                 if result == Ordering::Equal {
+                    let utf16_string: Utf16String = if self.use_case_folding {
+                        match Utf16String::from_byte_string_with_case_folding(
+                            &key_name,
+                            &self.case_folding_mappings,
+                        ) {
+                            Ok(utf16_string) => utf16_string,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable determine UTF-16 string with case folding from key: {} name",
+                                        entry_index
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
+                    } else {
+                        match Utf16String::from_byte_string(&key_name) {
+                            Ok(utf16_string) => utf16_string,
+                            Err(mut error) => {
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable determine UTF-16 string from key: {} name",
+                                        entry_index
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        }
+                    };
+                    result = utf16_string.cmp(name);
+                }
+                if result == Ordering::Greater {
+                    break;
+                } else if result == Ordering::Equal {
                     if is_branch {
                         last_entry_index = entry_index;
 
@@ -867,6 +857,7 @@ impl ApfsFileSystemTree {
                 last_entry_index,
                 parent_object_identifier,
                 name,
+                name_hash,
                 object_transaction_identifier,
                 read_node_block_numbers,
             ) {
@@ -896,6 +887,7 @@ impl ApfsFileSystemTree {
         entry_index: usize,
         parent_object_identifier: u64,
         name: &Utf16String,
+        name_hash: u32,
         object_transaction_identifier: u64,
         read_node_block_numbers: &mut HashSet<u64>,
     ) -> Result<Option<ApfsDirectoryEntry>, ErrorTrace> {
@@ -944,6 +936,7 @@ impl ApfsFileSystemTree {
             object_map_value.physical_address,
             parent_object_identifier,
             name,
+            name_hash,
             object_transaction_identifier,
             read_node_block_numbers,
         ) {
@@ -1022,16 +1015,6 @@ impl ApfsFileSystemTree {
         if node.object_header.object_type == 0x00000000 {
             return Ok(());
         }
-        match self.check_node(block_number, &node) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Check of node: {} failed", block_number)
-                );
-                return Err(error);
-            }
-        }
         let is_branch: bool = node.is_branch();
 
         let mut last_entry_index: usize = 0;
@@ -1066,10 +1049,10 @@ impl ApfsFileSystemTree {
             {
                 break;
             }
-            if !is_branch {
-                if key.object_identifier == object_identifier
-                    && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT
-                {
+            if key.object_identifier == object_identifier
+                && key.data_type == APFS_FILE_SYSTEM_DATA_TYPE_FILE_EXTENT
+            {
+                if !is_branch {
                     match self.read_extent(&node, &key_data, entry_index) {
                         Ok(extent) => {
                             extents.push(extent);
@@ -1082,28 +1065,28 @@ impl ApfsFileSystemTree {
                             return Err(error);
                         }
                     }
-                }
-            } else if entry_index > 0 {
-                match self.get_extents_by_identifier_from_sub_node(
-                    data_stream,
-                    object_map_tree,
-                    &node,
-                    last_entry_index,
-                    object_identifier,
-                    object_transaction_identifier,
-                    extents,
-                    read_node_block_numbers,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            format!(
-                                "Unable to retrieve extents from entry: {}",
-                                last_entry_index
-                            )
-                        );
-                        return Err(error);
+                } else if entry_index > 0 {
+                    match self.get_extents_by_identifier_from_sub_node(
+                        data_stream,
+                        object_map_tree,
+                        &node,
+                        last_entry_index,
+                        object_identifier,
+                        object_transaction_identifier,
+                        extents,
+                        read_node_block_numbers,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to retrieve extents from entry: {}",
+                                    last_entry_index
+                                )
+                            );
+                            return Err(error);
+                        }
                     }
                 }
             }
@@ -1270,24 +1253,71 @@ impl ApfsFileSystemTree {
         data_stream: &DataStreamReference,
         block_number: u64,
     ) -> Result<ApfsBtreeNode, ErrorTrace> {
-        let node_offset: u64 = block_number * (self.block_size as u64);
-
-        let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
-
-        match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
-            Ok(_) => {}
+        let result: bool = match self.node_cache.contains(&block_number) {
+            Ok(result) => result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!(
-                        "Unable to read file system B-tree root node at offset: {} (0x{:08x}))",
-                        node_offset, node_offset
-                    )
+                    format!("Unable to determine if node: {} is cached", block_number)
                 );
                 return Err(error);
             }
+        };
+        if !result {
+            let node_offset: u64 = block_number * (self.block_size as u64);
+
+            let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
+
+            match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read node: {} at offset: {} (0x{:08x}))",
+                            block_number, node_offset, node_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            if node.object_header.object_type != 0x00000000 {
+                match self.check_node(block_number, &node) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!("Check of node: {} failed", block_number)
+                        );
+                        return Err(error);
+                    }
+                }
+            }
+            match self.node_cache.insert(block_number, node) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to insert node: {} in cache", block_number)
+                    );
+                    return Err(error);
+                }
+            }
         }
-        Ok(node)
+        match self.node_cache.get(&block_number) {
+            Ok(Some(node)) => Ok(node),
+            Ok(None) => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve node: {} from cache",
+                block_number
+            ))),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Failed to retrieve node: {} from cache", block_number)
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves specific value data from a node.

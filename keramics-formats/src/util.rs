@@ -17,9 +17,10 @@ pub fn calculate_alignment_padding(data_offset: usize, alignment_size: usize) ->
     let padding_size: usize = data_offset % alignment_size;
 
     if padding_size == 0 {
-        return 0;
+        0
+    } else {
+        alignment_size - padding_size
     }
-    alignment_size - padding_size
 }
 
 #[cfg(test)]

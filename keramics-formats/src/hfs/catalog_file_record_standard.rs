@@ -80,17 +80,26 @@ impl HfsStandardCatalogFileRecord {
         file_record.resource_fork_descriptor.size = bytes_to_u32_be!(data, 36) as u64;
 
         let timestamp: u32 = bytes_to_u32_be!(data, 44);
-        if timestamp > 0 {
-            file_record.creation_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        file_record.creation_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 48);
-        if timestamp > 0 {
-            file_record.modification_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        file_record.modification_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 52);
-        if timestamp > 0 {
-            file_record.backup_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        file_record.backup_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         for data_offset in (74..86).step_by(4) {
             let data_end_offset = data_offset + 4;
 

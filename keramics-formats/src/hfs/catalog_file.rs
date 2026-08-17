@@ -152,6 +152,9 @@ impl HfsCatalogFile {
                     return Err(error);
                 }
             }
+            if key.parent_identifier > parent_identifier {
+                break;
+            }
             if !is_branch {
                 if key.parent_identifier == parent_identifier {
                     let mut data_offset: usize = key.size as usize;
@@ -207,7 +210,7 @@ impl HfsCatalogFile {
                     }
                 }
             } else if record_index > 0 {
-                if key.parent_identifier >= parent_identifier {
+                if key.parent_identifier == parent_identifier {
                     let data_offset: usize = last_key.size as usize;
 
                     if data_offset + 4 > last_record_data.len() {
@@ -244,9 +247,6 @@ impl HfsCatalogFile {
                         }
                     }
                 }
-            }
-            if key.parent_identifier > parent_identifier {
-                break;
             }
             last_key = key;
             last_record_data = record_data;

@@ -35,6 +35,7 @@ impl ExtGroupDescriptor {
     }
 
     /// Reads the group descriptor for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(format_version: u8, data: &[u8]) -> String {
         if format_version == 4 {
             Ext4GroupDescriptor::debug_read_data(data)

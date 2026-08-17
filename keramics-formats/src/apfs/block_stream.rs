@@ -44,7 +44,7 @@ mod tests {
             physical_block_number: 95,
             encryption_identifier: 0,
         }];
-        block_reader.open(&extents)?;
+        block_reader.open(extents)?;
 
         Ok(ApfsBlockStream::new(block_reader))
     }

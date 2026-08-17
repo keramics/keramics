@@ -31,6 +31,7 @@ impl Mediator {
     }
 
     /// Retrieves the current mediator.
+    #[cfg_attr(feature = "no-inline", inline(never))]
     pub fn current() -> Arc<Mediator> {
         CURRENT_MEDIATOR.with(|mediator| mediator.read().unwrap().clone())
     }

@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
 use super::block_range::{ExtBlockRange, ExtBlockRangeType};
@@ -29,8 +28,8 @@ pub struct ExtBlockReader {
     /// Block size.
     block_size: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<ExtBlockRange>,
+    /// Block ranges.
+    block_ranges: Vec<ExtBlockRange>,
 
     /// The size.
     size: u64,
@@ -42,7 +41,7 @@ impl ExtBlockReader {
         Self {
             data_stream: data_stream.clone(),
             block_size,
-            block_tree: BlockTree::<ExtBlockRange>::new(0, 0, 0),
+            block_ranges: Vec::new(),
             size,
         }
     }
@@ -53,30 +52,8 @@ impl ExtBlockReader {
         number_of_blocks: u64,
         block_ranges: &[ExtBlockRange],
     ) -> Result<(), ErrorTrace> {
-        let block_tree_data_size: u64 = number_of_blocks * (self.block_size as u64);
-        self.block_tree =
-            BlockTree::<ExtBlockRange>::new(block_tree_data_size, 0, self.block_size as u64);
+        self.block_ranges = block_ranges.to_vec();
 
-        for block_range in block_ranges.iter() {
-            let range_logical_offset: u64 =
-                block_range.logical_block_number * (self.block_size as u64);
-            let range_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
-
-            match self.block_tree.insert_value(
-                range_logical_offset,
-                range_size,
-                block_range.clone(),
-            ) {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to insert block range into block tree"
-                    );
-                    return Err(error);
-                }
-            }
-        }
         Ok(())
     }
 }
@@ -93,39 +70,48 @@ impl BlockReader for ExtBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
+        let block_number: u64 = current_offset / (self.block_size as u64);
+
+        let mut range_index: usize = match self.block_ranges.binary_search_by(|block_range| {
+            let range_end_block_number: u64 =
+                block_range.logical_block_number + block_range.number_of_blocks;
+
+            if block_number >= range_end_block_number {
+                Ordering::Less
+            } else if block_number < block_range.logical_block_number {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing block range for media offset: {} (0x{:08x})",
+                    current_offset, current_offset
+                )));
+            }
+        };
         while data_offset < read_size {
             if current_offset >= self.size {
                 break;
             }
-            let block_range: &ExtBlockRange = match self.block_tree.get_value(current_offset) {
-                Ok(Some(value)) => value,
-                Ok(None) => {
+            let block_range: &ExtBlockRange = match self.block_ranges.get(range_index) {
+                Some(block_range) => block_range,
+                None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing block range for offset: {} (0x{:08x})",
-                        current_offset, current_offset
+                        "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                        range_index, current_offset, current_offset,
                     )));
                 }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve block range for offset: {} (0x{:08x})",
-                            current_offset, current_offset
-                        )
-                    );
-                    return Err(error);
-                }
             };
-            let range_logical_offset: u64 =
-                block_range.logical_block_number * (self.block_size as u64);
-            let range_size: u64 = block_range.number_of_blocks * (self.block_size as u64);
-
-            let range_relative_offset: u64 = current_offset - range_logical_offset;
-            let range_remainder_size: u64 = range_size - range_relative_offset;
+            let range_relative_offset: u64 =
+                current_offset - (block_range.logical_block_number * (self.block_size as u64));
+            let range_remainder_size: u64 =
+                (block_range.number_of_blocks * (self.block_size as u64)) - range_relative_offset;
 
             let range_read_size: usize =
                 min(read_size - data_offset, range_remainder_size as usize);
-
             let data_end_offset: usize = data_offset + range_read_size;
 
             match block_range.range_type {
@@ -142,9 +128,10 @@ impl BlockReader for ExtBlockReader {
                 ExtBlockRangeType::Sparse => {
                     data[data_offset..data_end_offset].fill(0);
                 }
-            };
+            }
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
+            range_index += 1;
         }
         Ok(data_offset)
     }

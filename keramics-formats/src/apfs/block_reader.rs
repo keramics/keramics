@@ -11,12 +11,11 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
 
-use crate::block_tree::BlockTree;
 use crate::traits::BlockReader;
 
 use super::extent::ApfsExtent;
@@ -29,8 +28,8 @@ pub struct ApfsBlockReader {
     /// Block size.
     block_size: u32,
 
-    /// Block tree.
-    block_tree: BlockTree<ApfsExtent>,
+    /// Extents.
+    extents: Vec<ApfsExtent>,
 
     /// The size.
     size: u64,
@@ -42,41 +41,15 @@ impl ApfsBlockReader {
         Self {
             data_stream: data_stream.clone(),
             block_size,
-            block_tree: BlockTree::<ApfsExtent>::new(0, 0, 0),
+            extents: Vec::new(),
             size,
         }
     }
 
     /// Opens a block stream.
-    pub(super) fn open(&mut self, extents: &[ApfsExtent]) -> Result<(), ErrorTrace> {
-        let block_tree_data_size: u64 = self.size.next_multiple_of(self.block_size as u64);
-        self.block_tree =
-            BlockTree::<ApfsExtent>::new(block_tree_data_size, 0, self.block_size as u64);
+    pub(super) fn open(&mut self, extents: Vec<ApfsExtent>) -> Result<(), ErrorTrace> {
+        self.extents = extents;
 
-        for (extent_index, extent) in extents.iter().enumerate() {
-            if extent.logical_offset >= block_tree_data_size {
-                break;
-            }
-            let extent_size: u64 = min(extent.size, block_tree_data_size - extent.logical_offset);
-            match self
-                .block_tree
-                .insert_value(extent.logical_offset, extent_size, extent.clone())
-            {
-                Ok(_) => {}
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to insert extent: {} [{} - {}] into block tree",
-                            extent_index,
-                            extent.logical_offset,
-                            extent.logical_offset + extent_size,
-                        )
-                    );
-                    return Err(error);
-                }
-            }
-        }
         Ok(())
     }
 }
@@ -93,27 +66,36 @@ impl BlockReader for ApfsBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
+        let mut extent_index: usize = match self.extents.binary_search_by(|extent| {
+            let extent_end_offset: u64 = extent.logical_offset + extent.size;
+
+            if current_offset >= extent_end_offset {
+                Ordering::Less
+            } else if current_offset < extent.logical_offset {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(extent_index) => extent_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing extent for media offset: {} (0x{:08x})",
+                    current_offset, current_offset
+                )));
+            }
+        };
         while data_offset < read_size {
             if current_offset >= self.size {
                 break;
             }
-            let extent: &ApfsExtent = match self.block_tree.get_value(current_offset) {
-                Ok(Some(value)) => value,
-                Ok(None) => {
+            let extent: &ApfsExtent = match self.extents.get(extent_index) {
+                Some(extent) => extent,
+                None => {
                     return Err(keramics_core::error_trace_new!(format!(
-                        "Missing extent for offset: {} (0x{:08x})",
-                        current_offset, current_offset
+                        "Unable to retrieve extent: {} for offset: {} (0x{:08x})",
+                        extent_index, current_offset, current_offset,
                     )));
-                }
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        format!(
-                            "Unable to retrieve extent for offset: {} (0x{:08x})",
-                            current_offset, current_offset
-                        )
-                    );
-                    return Err(error);
                 }
             };
             let range_relative_offset: u64 = current_offset - extent.logical_offset;
@@ -133,6 +115,7 @@ impl BlockReader for ApfsBlockReader {
             );
             data_offset = data_end_offset;
             current_offset += range_read_size as u64;
+            extent_index += 1;
         }
         Ok(data_offset)
     }
@@ -162,7 +145,7 @@ mod tests {
             physical_block_number: 95,
             encryption_identifier: 0,
         }];
-        block_reader.open(&extents)?;
+        block_reader.open(extents)?;
 
         Ok(())
     }

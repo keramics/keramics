@@ -240,7 +240,7 @@ impl HfsFileEntry {
         let mut block_reader: HfsBlockReader =
             HfsBlockReader::new(&self.data_stream, self.block_size, fork_descriptor.size);
 
-        match block_reader.open(block_ranges.number_of_blocks, &block_ranges.ranges) {
+        match block_reader.open(block_ranges.ranges) {
             Ok(_) => {}
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(error, "Unable to open block reader");

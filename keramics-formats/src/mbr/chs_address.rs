@@ -72,10 +72,6 @@ impl MbrChsAddress {
 mod tests {
     use super::*;
 
-    use std::io::SeekFrom;
-
-    use keramics_core::{DataStreamReference, open_fake_data_stream};
-
     fn get_test_data() -> Vec<u8> {
         return vec![0x02, 0xc1, 0x00];
     }

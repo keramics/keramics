@@ -79,12 +79,23 @@ impl Fat32ShortNameDirectoryEntry {
                 }
             }
         }
-        directory_entry.creation_time =
-            DateTime::FatTimeDate10Ms(FatTimeDate10Ms::from_bytes(&data[13..18]));
-        directory_entry.access_time = DateTime::FatDate(FatDate::from_bytes(&data[18..20]));
-        directory_entry.modification_time =
-            DateTime::FatTimeDate(FatTimeDate::from_bytes(&data[22..26]));
-
+        if &data[13..18] == &[0; 5] {
+            directory_entry.creation_time = DateTime::NotSet;
+        } else {
+            directory_entry.creation_time =
+                DateTime::FatTimeDate10Ms(FatTimeDate10Ms::from_bytes(&data[13..18]));
+        }
+        if &data[18..20] == &[0; 2] {
+            directory_entry.access_time = DateTime::NotSet;
+        } else {
+            directory_entry.access_time = DateTime::FatDate(FatDate::from_bytes(&data[18..20]));
+        }
+        if &data[22..26] == &[0; 4] {
+            directory_entry.access_time = DateTime::NotSet;
+        } else {
+            directory_entry.modification_time =
+                DateTime::FatTimeDate(FatTimeDate::from_bytes(&data[22..26]));
+        }
         let lower_16bit: u16 = bytes_to_u16_le!(data, 26);
         let upper_16bit: u16 = bytes_to_u16_le!(data, 20);
         directory_entry.data_start_cluster = ((upper_16bit as u32) << 16) | (lower_16bit as u32);

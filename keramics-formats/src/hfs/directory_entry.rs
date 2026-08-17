@@ -131,7 +131,9 @@ impl HfsDirectoryEntry {
             HfsCatalogFileEntryRecord::File(catalog_file_record) => {
                 catalog_file_record.link_reference.as_ref()
             }
-            HfsCatalogFileEntryRecord::Folder(_) => None,
+            HfsCatalogFileEntryRecord::Folder(catalog_folder_record) => {
+                catalog_folder_record.link_reference.as_ref()
+            }
         }
     }
 

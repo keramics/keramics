@@ -379,8 +379,8 @@ impl FatInfo {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to retrieve sub file entry: {}",
-                            sub_file_entry_index
+                            "Unable to retrieve sub file entry: {} of path: {}",
+                            sub_file_entry_index, path
                         )
                     );
                     return Err(error);
@@ -392,8 +392,8 @@ impl FatInfo {
                     keramics_core::error_trace_add_frame!(
                         error,
                         format!(
-                            "Unable to print hierarchy of sub file entry: {}",
-                            sub_file_entry_index
+                            "Unable to print hierarchy of sub file entry: {} of path: {}",
+                            sub_file_entry_index, path
                         )
                     );
                     return Err(error);

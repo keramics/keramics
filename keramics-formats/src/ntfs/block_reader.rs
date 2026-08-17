@@ -11,7 +11,7 @@
  * under the License.
  */
 
-use std::cmp::min;
+use std::cmp::{Ordering, min};
 use std::io::SeekFrom;
 
 use keramics_core::{DataStreamReference, ErrorTrace};
@@ -50,20 +50,6 @@ impl NtfsBlockReader {
             size: 0,
             valid_data_size: 0,
         }
-    }
-
-    /// Retrieves a specific block range.
-    fn get_block_range(&self, virtual_cluster_offset: u64) -> Option<&NtfsBlockRange> {
-        for block_range in self.block_ranges.iter() {
-            let block_end_offset: u64 = block_range.virtual_cluster_offset + block_range.size;
-
-            if virtual_cluster_offset >= block_range.virtual_cluster_offset
-                && virtual_cluster_offset < block_end_offset
-            {
-                return Some(block_range);
-            }
-        }
-        None
     }
 
     /// Opens a block stream.
@@ -141,6 +127,29 @@ impl BlockReader for NtfsBlockReader {
         let mut data_offset: usize = 0;
         let mut current_offset: u64 = offset;
 
+        let mut range_index: usize = if current_offset >= self.valid_data_size {
+            0
+        } else {
+            match self.block_ranges.binary_search_by(|block_range| {
+                let range_end_offset: u64 = block_range.virtual_cluster_offset + block_range.size;
+
+                if current_offset >= range_end_offset {
+                    Ordering::Less
+                } else if current_offset < block_range.virtual_cluster_offset {
+                    Ordering::Greater
+                } else {
+                    Ordering::Equal
+                }
+            }) {
+                Ok(range_index) => range_index,
+                Err(_) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Missing block range for media offset: {} (0x{:08x})",
+                        current_offset, current_offset
+                    )));
+                }
+            }
+        };
         while data_offset < read_size {
             if current_offset >= self.size {
                 break;
@@ -156,29 +165,28 @@ impl BlockReader for NtfsBlockReader {
 
                 range_read_size
             } else {
-                let block_range: &NtfsBlockRange = match self.get_block_range(current_offset) {
+                let block_range: &NtfsBlockRange = match self.block_ranges.get(range_index) {
                     Some(block_range) => block_range,
                     None => {
                         return Err(keramics_core::error_trace_new!(format!(
-                            "Missing block range for offset: {}",
-                            current_offset
+                            "Unable to retrieve block range: {} for offset: {} (0x{:08x})",
+                            range_index, current_offset, current_offset,
                         )));
                     }
                 };
-                let mut range_logical_end_offset: u64 =
-                    block_range.virtual_cluster_offset + block_range.size;
-                if range_logical_end_offset > self.valid_data_size {
-                    range_logical_end_offset = self.valid_data_size;
-                };
+                let range_logical_end_offset: u64 = min(
+                    block_range.virtual_cluster_offset + block_range.size,
+                    self.valid_data_size,
+                );
+
                 let range_relative_offset: u64 =
                     current_offset - block_range.virtual_cluster_offset;
                 let range_remainder_size: u64 = (range_logical_end_offset
                     - block_range.virtual_cluster_offset)
                     - range_relative_offset;
-                let read_remainder_size: usize = read_size - data_offset;
-                let range_read_size: usize =
-                    min(read_remainder_size, range_remainder_size as usize);
 
+                let range_read_size: usize =
+                    min(read_size - data_offset, range_remainder_size as usize);
                 let data_end_offset: usize = data_offset + range_read_size;
 
                 match block_range.range_type {
@@ -203,6 +211,7 @@ impl BlockReader for NtfsBlockReader {
             }
             data_offset += read_count;
             current_offset += read_count as u64;
+            range_index += 1;
         }
         Ok(data_offset)
     }

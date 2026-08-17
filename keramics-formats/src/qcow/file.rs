@@ -295,13 +295,13 @@ impl QcowFile {
         }
         let mut data: Vec<u8> = vec![0; backing_file_name_size as usize];
 
-        let offset: u64 = keramics_core::data_stream_read_exact_at_position!(
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "QcowBackingFile",
             data_stream,
             &mut data,
+            backing_file_name_size,
             SeekFrom::Start(backing_file_name_offset)
         );
-        keramics_core::debug_trace_data!("QcowBackingFile", offset, &data, data.len());
-
         self.backing_file_name = Some(ByteString::from(data.as_slice()));
 
         Ok(())

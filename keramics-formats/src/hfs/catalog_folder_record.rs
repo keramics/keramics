@@ -54,6 +54,12 @@ pub struct HfsCatalogFolderRecord {
     /// File mode.
     pub file_mode: Option<u16>,
 
+    /// Special permissions.
+    pub special_permissions: Option<u32>,
+
+    /// Link reference.
+    pub link_reference: Option<u32>,
+
     /// Added date and time.
     pub added_time: Option<DateTime>,
 }
@@ -73,11 +79,14 @@ impl HfsCatalogFolderRecord {
             owner_identifier: None,
             group_identifier: None,
             file_mode: None,
+            special_permissions: None,
+            link_reference: None,
             added_time: None,
         }
     }
 
     /// Reads the catalog folder record for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(format: &HfsFormat, data: &[u8]) -> String {
         match format {
             HfsFormat::Hfs => HfsStandardCatalogFolderRecord::debug_read_data(data),
@@ -189,6 +198,8 @@ mod tests {
         assert_eq!(test_struct.owner_identifier, Some(501));
         assert_eq!(test_struct.group_identifier, Some(20));
         assert_eq!(test_struct.file_mode, Some(0o40755));
+        assert_eq!(test_struct.special_permissions, Some(0));
+        assert_eq!(test_struct.link_reference, None);
         assert_eq!(test_struct.added_time, None);
 
         Ok(())

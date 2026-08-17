@@ -12,6 +12,7 @@
  */
 
 use std::collections::HashMap;
+use std::fmt::Write;
 
 use keramics_core::ErrorTrace;
 use keramics_encodings::CharacterDecoder;
@@ -20,13 +21,27 @@ use keramics_vfs::{VfsFileEntry, VfsLocation, VfsResolver, VfsResolverReference,
 
 use crate::enums::DisplayPathType;
 
+const C0_CONTROL_CHARACTERS: [&'static str; 32] = [
+    "\\x00", "\\x01", "\\x02", "\\x03", "\\x04", "\\x05", "\\x06", "\\x07", "\\x08", "\\x09",
+    "\\x0a", "\\x0b", "\\x0c", "\\x0d", "\\x0e", "\\x0f", "\\x10", "\\x11", "\\x12", "\\x13",
+    "\\x14", "\\x15", "\\x16", "\\x17", "\\x18", "\\x19", "\\x1a", "\\x1b", "\\x1c", "\\x1d",
+    "\\x1e", "\\x1f",
+];
+
+static C1_CONTROL_CHARACTERS: [&'static str; 33] = [
+    "\\x7f", "\\x80", "\\x81", "\\x82", "\\x83", "\\x84", "\\x85", "\\x86", "\\x87", "\\x88",
+    "\\x89", "\\x8a", "\\x8b", "\\x8c", "\\x8d", "\\x8e", "\\x8f", "\\x90", "\\x91", "\\x92",
+    "\\x93", "\\x94", "\\x95", "\\x96", "\\x97", "\\x98", "\\x99", "\\x9a", "\\x9b", "\\x9c",
+    "\\x9d", "\\x9e", "\\x9f",
+];
+
 /// Helper for creating human readable path representations.
 pub struct DisplayPath {
     /// VFS resolver reference.
     vfs_resolver: VfsResolverReference,
 
     /// Character translation table.
-    pub translation_table: HashMap<u32, String>,
+    pub translation_table: HashMap<u32, &'static str>,
 
     /// Volume or partition path type
     volume_path_type: DisplayPathType,
@@ -61,53 +76,57 @@ impl DisplayPath {
     pub fn escape_path_component(&self, path_component: &PathComponent) -> String {
         match path_component {
             PathComponent::ByteString(byte_string) => {
+                let mut escaped_string: String = String::with_capacity(byte_string.len() * 2);
+
                 let mut character_decoder: CharacterDecoder = byte_string.get_character_decoder();
-
-                let mut string_parts: Vec<String> = Vec::new();
-
                 while let Some(result) = character_decoder.next() {
                     match result {
                         Ok(code_points) => {
                             for code_point in code_points {
-                                let string: String = match char::from_u32(code_point as u32) {
+                                match char::from_u32(code_point) {
                                     Some(unicode_character) => {
-                                        match self
-                                            .translation_table
-                                            .get(&(unicode_character as u32))
-                                        {
-                                            Some(escaped_character) => escaped_character.clone(),
-                                            None => unicode_character.to_string(),
+                                        match self.translation_table.get(&code_point) {
+                                            Some(escaped_character) => {
+                                                escaped_string.push_str(escaped_character)
+                                            }
+                                            None => escaped_string.push(unicode_character),
                                         }
                                     }
-                                    None => format!("\\U{{{:08x}}}", code_point),
-                                };
-                                string_parts.push(string);
+                                    None => {
+                                        _ = write!(escaped_string, "\\U{{{:08x}}}", code_point);
+                                    }
+                                }
                             }
                         }
                         Err(error) => return format!("{}", error),
                     }
                 }
-                string_parts.join("")
+                escaped_string
             }
             PathComponent::Current => String::from("."),
             PathComponent::OsString(_) => todo!(),
             PathComponent::Parent => String::from(".."),
             PathComponent::Root => String::new(),
             PathComponent::String(string) => self.escape_string(string),
-            PathComponent::Ucs2String(ucs2_string) => ucs2_string
-                .elements
-                .iter()
-                .map(|element| match char::from_u32(*element as u32) {
-                    Some(unicode_character) => {
-                        match self.translation_table.get(&(unicode_character as u32)) {
-                            Some(escaped_character) => escaped_character.clone(),
-                            None => unicode_character.to_string(),
+            PathComponent::Ucs2String(ucs2_string) => {
+                let mut escaped_string: String =
+                    String::with_capacity(ucs2_string.elements.len() * 2);
+
+                for element in &ucs2_string.elements {
+                    let code_point: u32 = *element as u32;
+
+                    match char::from_u32(code_point) {
+                        Some(unicode_character) => match self.translation_table.get(&code_point) {
+                            Some(escaped_character) => escaped_string.push_str(escaped_character),
+                            None => escaped_string.push(unicode_character),
+                        },
+                        None => {
+                            _ = write!(escaped_string, "\\U{:08x}", element);
                         }
                     }
-                    None => format!("\\U{:08x}", element),
-                })
-                .collect::<Vec<String>>()
-                .join(""),
+                }
+                escaped_string
+            }
             PathComponent::Utf16String(utf16_string) => {
                 let string: String = utf16_string.to_string();
 
@@ -118,63 +137,106 @@ impl DisplayPath {
 
     /// Escapes unprintable characters in a string.
     fn escape_string(&self, string: &str) -> String {
-        let mut string_parts: Vec<String> = Vec::new();
+        let mut escaped_string: String = String::with_capacity(string.len() * 2);
 
         for character_value in string.chars() {
-            let safe_character: String = match self.translation_table.get(&(character_value as u32))
-            {
-                Some(escaped_character) => escaped_character.clone(),
-                None => character_value.to_string(),
-            };
-            string_parts.push(safe_character);
+            match self.translation_table.get(&(character_value as u32)) {
+                Some(escaped_character) => escaped_string.push_str(escaped_character),
+                None => escaped_string.push(character_value),
+            }
         }
-        string_parts.join("")
+        escaped_string
     }
 
     /// Retrieves a character translation table.
-    fn get_character_translation_table() -> HashMap<u32, String> {
-        let mut translation_table: HashMap<u32, String> = HashMap::new();
+    fn get_character_translation_table() -> HashMap<u32, &'static str> {
+        let mut translation_table: HashMap<u32, &'static str> = HashMap::new();
 
         // Escape C0 control characters as \x##
         for character_value in 0x00..0x20 {
-            let escaped_character: String = format!("\\x{:02x}", character_value);
-            translation_table.insert(character_value, escaped_character);
+            translation_table.insert(
+                character_value,
+                C0_CONTROL_CHARACTERS[character_value as usize],
+            );
         }
         // Escape / as \/
-        translation_table.insert('/' as u32, String::from("\\/"));
+        translation_table.insert('/' as u32, "\\/");
 
         // Escape : as \:
-        translation_table.insert(':' as u32, String::from("\\:"));
+        translation_table.insert(':' as u32, "\\:");
 
         // Escape \ as \\
-        translation_table.insert('\\' as u32, String::from("\\\\"));
+        translation_table.insert('\\' as u32, "\\\\");
 
         // Escape C1 control character as \x##
         for character_value in 0x7f..0xa0 {
-            let escaped_character: String = format!("\\x{:02x}", character_value);
-            translation_table.insert(character_value, escaped_character);
+            translation_table.insert(
+                character_value,
+                C1_CONTROL_CHARACTERS[(character_value - 0x7f) as usize],
+            );
         }
         // Escape undefined Unicode characters as \U########
-        let character_values: Vec<u32> = vec![
-            0xfdd0, 0xfdd1, 0xfdd2, 0xfdd3, 0xfdd4, 0xfdd5, 0xfdd6, 0xfdd7, 0xfdd8, 0xfdd9, 0xfdda,
-            0xfddb, 0xfddc, 0xfddd, 0xfdde, 0xfddf, 0xfffe, 0xffff, 0x1fffe, 0x1ffff, 0x2fffe,
-            0x2ffff, 0x3fffe, 0x3ffff, 0x4fffe, 0x4ffff, 0x5fffe, 0x5ffff, 0x6fffe, 0x6ffff,
-            0x7fffe, 0x7ffff, 0x8fffe, 0x8ffff, 0x9fffe, 0x9ffff, 0xafffe, 0xaffff, 0xbfffe,
-            0xbffff, 0xcfffe, 0xcffff, 0xdfffe, 0xdffff, 0xefffe, 0xeffff, 0xffffe, 0xfffff,
-            0x10fffe, 0x10ffff,
-        ];
-        for character_value in character_values.iter() {
-            let escaped_character: String = format!("\\U{:08x}", character_value);
-            translation_table.insert(*character_value, escaped_character);
-        }
+        translation_table.insert(0x0000fdd0, "\\U0000fdd0");
+        translation_table.insert(0x0000fdd1, "\\U0000fdd1");
+        translation_table.insert(0x0000fdd2, "\\U0000fdd2");
+        translation_table.insert(0x0000fdd3, "\\U0000fdd3");
+        translation_table.insert(0x0000fdd4, "\\U0000fdd4");
+        translation_table.insert(0x0000fdd5, "\\U0000fdd5");
+        translation_table.insert(0x0000fdd6, "\\U0000fdd6");
+        translation_table.insert(0x0000fdd7, "\\U0000fdd7");
+        translation_table.insert(0x0000fdd8, "\\U0000fdd8");
+        translation_table.insert(0x0000fdd9, "\\U0000fdd9");
+        translation_table.insert(0x0000fdda, "\\U0000fdda");
+        translation_table.insert(0x0000fddb, "\\U0000fddb");
+        translation_table.insert(0x0000fddc, "\\U0000fddc");
+        translation_table.insert(0x0000fddd, "\\U0000fddd");
+        translation_table.insert(0x0000fdde, "\\U0000fdde");
+        translation_table.insert(0x0000fddf, "\\U0000fddf");
+        translation_table.insert(0x0000fffe, "\\U0000fffe");
+        translation_table.insert(0x0000ffff, "\\U0000ffff");
+        translation_table.insert(0x0001fffe, "\\U0001fffe");
+        translation_table.insert(0x0001ffff, "\\U0001ffff");
+        translation_table.insert(0x0002fffe, "\\U0002fffe");
+        translation_table.insert(0x0002ffff, "\\U0002ffff");
+        translation_table.insert(0x0003fffe, "\\U0003fffe");
+        translation_table.insert(0x0003ffff, "\\U0003ffff");
+        translation_table.insert(0x0004fffe, "\\U0004fffe");
+        translation_table.insert(0x0004ffff, "\\U0004ffff");
+        translation_table.insert(0x0005fffe, "\\U0005fffe");
+        translation_table.insert(0x0005ffff, "\\U0005ffff");
+        translation_table.insert(0x0006fffe, "\\U0006fffe");
+        translation_table.insert(0x0006ffff, "\\U0006ffff");
+        translation_table.insert(0x0007fffe, "\\U0007fffe");
+        translation_table.insert(0x0007ffff, "\\U0007ffff");
+        translation_table.insert(0x0008fffe, "\\U0008fffe");
+        translation_table.insert(0x0008ffff, "\\U0008ffff");
+        translation_table.insert(0x0009fffe, "\\U0009fffe");
+        translation_table.insert(0x0009ffff, "\\U0009ffff");
+        translation_table.insert(0x000afffe, "\\U000afffe");
+        translation_table.insert(0x000affff, "\\U000affff");
+        translation_table.insert(0x000bfffe, "\\U000bfffe");
+        translation_table.insert(0x000bffff, "\\U000bffff");
+        translation_table.insert(0x000cfffe, "\\U000cfffe");
+        translation_table.insert(0x000cffff, "\\U000cffff");
+        translation_table.insert(0x000dfffe, "\\U000dfffe");
+        translation_table.insert(0x000dffff, "\\U000dffff");
+        translation_table.insert(0x000efffe, "\\U000efffe");
+        translation_table.insert(0x000effff, "\\U000effff");
+        translation_table.insert(0x000ffffe, "\\U000ffffe");
+        translation_table.insert(0x000fffff, "\\U000fffff");
+        translation_table.insert(0x0010fffe, "\\U0010fffe");
+        translation_table.insert(0x0010ffff, "\\U0010ffff");
+
         // Escape observed non-printable Unicode characters as \U########
-        let character_values: Vec<u32> = vec![
-            0x2028, 0x2029, 0xe000, 0xf8ff, 0xf0000, 0xffffd, 0x100000, 0x10fffd,
-        ];
-        for character_value in character_values.iter() {
-            let escaped_character: String = format!("\\U{:08x}", character_value);
-            translation_table.insert(*character_value, escaped_character);
-        }
+        translation_table.insert(0x00002028, "\\U00002028");
+        translation_table.insert(0x00002029, "\\U00002029");
+        translation_table.insert(0x0000e000, "\\U0000e000");
+        translation_table.insert(0x0000f8ff, "\\U0000f8ff");
+        translation_table.insert(0x000f0000, "\\U000f0000");
+        translation_table.insert(0x000ffffd, "\\U000ffffd");
+        translation_table.insert(0x00100000, "\\U00100000");
+        translation_table.insert(0x0010fffd, "\\U0010fffd");
+
         translation_table
     }
 
@@ -184,25 +246,52 @@ impl DisplayPath {
         vfs_location: &VfsLocation,
     ) -> Result<String, ErrorTrace> {
         let display_path: Option<String> = match vfs_location {
-            VfsLocation::Layer { vfs_type, .. } => match vfs_type {
-                VfsType::Gpt => match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
-                    Ok(vfs_file_entry) => match vfs_file_entry {
-                        Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
-                            match gpt_file_entry.get_identifier() {
-                                Some(identifier) => Some(format!("/gpt{{{}}}", identifier)),
-                                None => None,
+            VfsLocation::Layer {
+                parent, vfs_type, ..
+            } => match vfs_type {
+                VfsType::ApfsContainer | VfsType::Gpt => {
+                    match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
+                        Ok(vfs_file_entry) => match vfs_file_entry {
+                            Some(VfsFileEntry::ApfsContainer(apfs_container_file_entry)) => {
+                                match apfs_container_file_entry.get_identifier() {
+                                    Some(identifier) => {
+                                        let path_string: String =
+                                            format!("/apfs{{{}}}", identifier);
+
+                                        match self.get_path(parent) {
+                                            Ok(parent_display_path) => Some(format!(
+                                                "{}{}",
+                                                parent_display_path, path_string
+                                            )),
+                                            Err(mut error) => {
+                                                keramics_core::error_trace_add_frame!(
+                                                    error,
+                                                    "Unable to retrieve parent display path"
+                                                );
+                                                return Err(error);
+                                            }
+                                        }
+                                    }
+                                    None => None,
+                                }
                             }
+                            Some(VfsFileEntry::Gpt(gpt_file_entry)) => {
+                                match gpt_file_entry.get_identifier() {
+                                    Some(identifier) => Some(format!("/gpt{{{}}}", identifier)),
+                                    None => None,
+                                }
+                            }
+                            _ => None,
+                        },
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve file entry"
+                            );
+                            return Err(error);
                         }
-                        _ => None,
-                    },
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve file entry"
-                        );
-                        return Err(error);
                     }
-                },
+                }
                 _ => None,
             },
             _ => None,
@@ -224,8 +313,12 @@ impl DisplayPath {
                 let path_string: String = path.to_string();
 
                 match vfs_type {
-                    VfsType::Apm => Some(path_string.replace("apm", "p")),
-                    VfsType::Ext | VfsType::Fat | VfsType::Ntfs => match self.get_path(parent) {
+                    VfsType::Apfs
+                    | VfsType::ApfsContainer
+                    | VfsType::Ext
+                    | VfsType::Fat
+                    | VfsType::Hfs
+                    | VfsType::Ntfs => match self.get_path(parent) {
                         Ok(parent_display_path) => {
                             Some(format!("{}{}", parent_display_path, path_string))
                         }
@@ -237,6 +330,7 @@ impl DisplayPath {
                             return Err(error);
                         }
                     },
+                    VfsType::Apm => Some(path_string.replace("apm", "p")),
                     VfsType::Gpt | VfsType::Mbr => {
                         match self.vfs_resolver.get_file_entry_by_location(vfs_location) {
                             Ok(vfs_file_entry) => match vfs_file_entry {
@@ -288,6 +382,7 @@ impl DisplayPath {
     }
 
     /// Sets the volume path type.
+    #[allow(dead_code)]
     pub fn set_volume_path_type(&mut self, volume_path_type: &DisplayPathType) {
         self.volume_path_type = volume_path_type.clone();
     }

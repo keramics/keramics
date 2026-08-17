@@ -14,7 +14,6 @@
 use std::cmp::Ordering;
 use std::sync::Arc;
 
-use keramics_core::mediator::{Mediator, MediatorReference};
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u64_le};
 
@@ -37,9 +36,6 @@ use super::standard_information::NtfsStandardInformation;
 
 /// New Technologies File System (NTFS) directory index.
 pub struct NtfsDirectoryIndex {
-    /// Mediator.
-    mediator: MediatorReference,
-
     /// Case folding mappings.
     pub case_folding_mappings: Arc<Ucs2CharacterMappings>,
 
@@ -63,7 +59,6 @@ impl NtfsDirectoryIndex {
         case_folding_mappings: &Arc<Ucs2CharacterMappings>,
     ) -> Self {
         Self {
-            mediator: Mediator::current(),
             case_folding_mappings: case_folding_mappings.clone(),
             index: NtfsIndex::new(cluster_block_size),
             root_node_data: Vec::new(),
@@ -536,14 +531,12 @@ impl NtfsDirectoryIndex {
     ) -> Result<u64, ErrorTrace> {
         let index_value_end_offset: usize = index_value_offset + value_data_size;
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "NtfsDirectoryIndexBranchValueData data of size: {} at offset: {} (0x{:08x})\n",
-                value_data_size, index_value_offset, index_value_offset,
-            ));
-            self.mediator
-                .debug_print_data(&data[index_value_offset..index_value_end_offset], true);
-        }
+        keramics_core::debug_trace_data!(
+            "NtfsDirectoryIndexBranchValueData",
+            index_value_offset,
+            &data[index_value_offset..index_value_end_offset],
+            value_data_size,
+        );
         if value_data_size < 8 {
             return Err(keramics_core::error_trace_new!(format!(
                 "Invalid index branch value data size: {} value out of bounds",
@@ -564,19 +557,13 @@ impl NtfsDirectoryIndex {
     ) -> Result<NtfsFileName, ErrorTrace> {
         let key_data_end_offset: usize = key_data_offset + key_data_size;
 
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "NtfsDirectoryIndexValueKey data of size: {} at offset: {} (0x{:08x})\n",
-                key_data_size, key_data_offset, key_data_offset,
-            ));
-            self.mediator
-                .debug_print_data(&data[key_data_offset..key_data_end_offset], true);
-        }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(NtfsFileName::debug_read_data(
-                &data[key_data_offset..key_data_end_offset],
-            ));
-        }
+        keramics_core::debug_trace_data_and_structure!(
+            "NtfsDirectoryIndexValueKey",
+            key_data_offset,
+            &data[key_data_offset..key_data_end_offset],
+            key_data_size,
+            NtfsFileName::debug_read_data(&data[key_data_offset..key_data_end_offset]),
+        );
         let mut file_name: NtfsFileName = NtfsFileName::new();
 
         match file_name.read_data(&data[key_data_offset..key_data_end_offset]) {
@@ -595,12 +582,10 @@ impl NtfsDirectoryIndex {
         data: &[u8],
         index_node_offset: usize,
     ) -> Result<(usize, usize), ErrorTrace> {
-        if self.mediator.debug_output {
-            self.mediator
-                .debug_print(NtfsIndexNodeHeader::debug_read_data(
-                    &data[index_node_offset..],
-                ));
-        }
+        keramics_core::debug_trace_structure!(NtfsIndexNodeHeader::debug_read_data(
+            &data[index_node_offset..]
+        ));
+
         let mut index_node_header: NtfsIndexNodeHeader = NtfsIndexNodeHeader::new();
 
         match index_node_header.read_data(&data[index_node_offset..]) {
@@ -644,18 +629,13 @@ impl NtfsDirectoryIndex {
                 "Invalid index value offset value out of bounds"
             ));
         }
-        if self.mediator.debug_output {
-            self.mediator.debug_print(format!(
-                "NtfsIndexValue data of size: 16 at offset: {} (0x{:08x})\n",
-                index_value_offset, index_value_offset,
-            ));
-            self.mediator
-                .debug_print_data(&data[index_value_offset..index_value_end_offset], true);
-
-            self.mediator.debug_print(NtfsIndexValue::debug_read_data(
-                &data[index_value_offset..index_value_end_offset],
-            ));
-        }
+        keramics_core::debug_trace_data_and_structure!(
+            "NtfsIndexValue",
+            index_value_offset,
+            &data[index_value_offset..index_value_end_offset],
+            16,
+            NtfsIndexValue::debug_read_data(&data[index_value_offset..index_value_end_offset]),
+        );
         let mut index_value: NtfsIndexValue = NtfsIndexValue::new();
 
         match index_value.read_data(&data[index_value_offset..]) {

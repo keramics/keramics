@@ -15,6 +15,8 @@ use keramics_core::ErrorTrace;
 use keramics_layout_map::LayoutMap;
 use keramics_types::{bytes_to_u16_le, bytes_to_u64_le};
 
+use super::data_stream_descriptor::ApfsDataStreamDescriptor;
+
 #[derive(LayoutMap)]
 #[layout_map(
     structure(
@@ -25,7 +27,6 @@ use keramics_types::{bytes_to_u16_le, bytes_to_u64_le};
     methods("debug_read_data")
 )]
 /// Apple File System (APFS) attribute record.
-#[derive(Clone)]
 pub struct ApfsAttributeRecord {
     /// Flags.
     pub flags: u16,
@@ -33,11 +34,14 @@ pub struct ApfsAttributeRecord {
     /// Data size.
     pub data_size: u16,
 
-    /// Data stream object identifier.
-    pub data_stream_object_identifier: u64,
+    /// Data stream (object) identifier.
+    pub data_stream_identifier: u64,
 
     /// Inline data.
     pub inline_data: Vec<u8>,
+
+    /// Data stream descriptor.
+    pub data_stream_descriptor: Option<ApfsDataStreamDescriptor>,
 }
 
 impl ApfsAttributeRecord {
@@ -46,8 +50,9 @@ impl ApfsAttributeRecord {
         Self {
             flags: 0,
             data_size: 0,
-            data_stream_object_identifier: 0,
+            data_stream_identifier: 0,
             inline_data: Vec::new(),
+            data_stream_descriptor: None,
         }
     }
 
@@ -73,9 +78,25 @@ impl ApfsAttributeRecord {
             if data_size < 52 {
                 return Err(keramics_core::error_trace_new!("Unsupported data size"));
             }
-            self.data_stream_object_identifier = bytes_to_u64_le!(data, 4);
+            self.data_stream_identifier = bytes_to_u64_le!(data, 4);
 
-            // TODO: read data stream attribute
+            keramics_core::debug_trace_structure!(ApfsDataStreamDescriptor::debug_read_data(
+                &data[12..]
+            ));
+            let mut data_stream_descriptor: ApfsDataStreamDescriptor =
+                ApfsDataStreamDescriptor::new();
+
+            match data_stream_descriptor.read_data(&data[12..]) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read data stream descriptor"
+                    );
+                    return Err(error);
+                }
+            }
+            self.data_stream_descriptor = Some(data_stream_descriptor);
         } else if self.flags & 0x0002 != 0 {
             let data_end_offset: usize = 4 + (self.data_size as usize);
 

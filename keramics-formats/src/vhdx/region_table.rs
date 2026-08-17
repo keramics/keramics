@@ -113,11 +113,13 @@ impl VhdxRegionTable {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 65536];
 
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-
-        keramics_core::debug_trace_data!("VhdxRegionTable", offset, &data, 65536);
-
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "VhdxRegionTable",
+            data_stream,
+            &mut data,
+            65536,
+            position,
+        );
         self.read_data(&data)
     }
 }

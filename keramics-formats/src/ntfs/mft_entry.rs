@@ -16,7 +16,7 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, ErrorTrace};
 
 use super::constants::*;
-use super::fixup_values::apply_fixup_values;
+use super::fixup_values::NtfsFixupValues;
 use super::mft_attribute::NtfsMftAttribute;
 use super::mft_attributes::NtfsMftAttributes;
 use super::mft_entry_header::NtfsMftEntryHeader;
@@ -166,7 +166,7 @@ impl NtfsMftEntry {
             )));
         }
         // TODO: set is_corrupted (or equiv) when fix-up values are corrupted.
-        match apply_fixup_values(
+        match NtfsFixupValues::apply_fixup_values(
             data,
             mft_entry_header.fixup_values_offset as usize,
             mft_entry_header.number_of_fixup_values,

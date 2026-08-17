@@ -24,6 +24,13 @@ doc = false
 required-features = ["fuzzing"]
 
 [[bin]]
+name = "apfs"
+path = "fuzz_targets/apfs.rs"
+test = false
+doc = false
+required-features = ["fuzzing"]
+
+[[bin]]
 name = "apm"
 path = "fuzz_targets/apm.rs"
 test = false

@@ -11,30 +11,23 @@
  * under the License.
  */
 
-/// Apple File System (APFS) B-Tree entry.
-#[derive(Clone)]
-pub struct ApfsBtreeEntry {
-    /// Key data offset.
-    pub key_data_offset: usize,
+#![no_main]
 
-    /// Key data size.
-    pub key_data_size: usize,
+use libfuzzer_sys::fuzz_target;
 
-    /// Value data offset.
-    pub value_data_offset: usize,
+use keramics_core::{DataStreamReference, open_fake_data_stream};
+use keramics_formats::apfs::ApfsContainer;
 
-    /// Value data size.
-    pub value_data_size: usize,
-}
+// Apple File System (APFS) fuzz target.
+fuzz_target!(|data: &[u8]| {
+    let mut apfs_container: ApfsContainer = ApfsContainer::new();
 
-impl ApfsBtreeEntry {
-    /// Creates a new B-tree entry.
-    pub fn new() -> Self {
-        Self {
-            key_data_offset: 0,
-            key_data_size: 0,
-            value_data_offset: 0,
-            value_data_size: 0,
+    let data_stream: DataStreamReference = open_fake_data_stream(&data);
+    _ = apfs_container.read_data_stream(&data_stream);
+
+    if let Ok(apfs_volume) = apfs_container.get_volume_by_index(0) {
+        if let Ok(apfs_file_system) = apfs_volume.get_file_system() {
+            _ = apfs_file_system.get_root_directory();
         }
     }
-}
+});

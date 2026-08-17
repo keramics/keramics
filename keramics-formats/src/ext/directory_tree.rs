@@ -174,7 +174,19 @@ impl ExtDirectoryTree {
 
         keramics_core::debug_trace_data!("ExtDirectoryTreeNode", offset, &data, self.block_size);
 
-        self.read_node_data(&data, 0, self.block_size as usize, entries)
+        match self.read_node_data(&data, 0, self.block_size as usize, entries) {
+            Ok(_) => Ok(()),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read node at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                Err(error)
+            }
+        }
     }
 }
 

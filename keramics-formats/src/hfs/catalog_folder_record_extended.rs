@@ -68,38 +68,59 @@ impl HfsExtendedCatalogFolderRecord {
         folder_record.identifier = bytes_to_u32_be!(data, 8);
 
         let timestamp: u32 = bytes_to_u32_be!(data, 12);
-        if timestamp > 0 {
-            folder_record.creation_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
-        let timestamp: u32 = bytes_to_u32_be!(data, 16);
-        if timestamp > 0 {
-            folder_record.modification_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
-        let timestamp: u32 = bytes_to_u32_be!(data, 20);
-        if timestamp > 0 {
-            folder_record.change_time = Some(DateTime::HfsTime(HfsTime::new(timestamp)));
-        }
-        let timestamp: u32 = bytes_to_u32_be!(data, 24);
-        if timestamp == 0 {
-            folder_record.access_time = Some(DateTime::NotSet);
+
+        folder_record.creation_time = if timestamp == 0 {
+            DateTime::NotSet
         } else {
-            folder_record.access_time = Some(DateTime::HfsTime(HfsTime::new(timestamp)));
-        }
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
+        let timestamp: u32 = bytes_to_u32_be!(data, 16);
+
+        folder_record.modification_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
+        let timestamp: u32 = bytes_to_u32_be!(data, 20);
+
+        folder_record.change_time = if timestamp == 0 {
+            Some(DateTime::NotSet)
+        } else {
+            Some(DateTime::HfsTime(HfsTime::new(timestamp)))
+        };
+        let timestamp: u32 = bytes_to_u32_be!(data, 24);
+
+        folder_record.access_time = if timestamp == 0 {
+            Some(DateTime::NotSet)
+        } else {
+            Some(DateTime::HfsTime(HfsTime::new(timestamp)))
+        };
         let timestamp: u32 = bytes_to_u32_be!(data, 28);
-        if timestamp > 0 {
-            folder_record.backup_time = DateTime::HfsTime(HfsTime::new(timestamp));
-        }
+
+        folder_record.backup_time = if timestamp == 0 {
+            DateTime::NotSet
+        } else {
+            DateTime::HfsTime(HfsTime::new(timestamp))
+        };
         folder_record.owner_identifier = Some(bytes_to_u32_be!(data, 32));
         folder_record.group_identifier = Some(bytes_to_u32_be!(data, 36));
         folder_record.file_mode = Some(bytes_to_u16_be!(data, 42));
 
+        let special_permissions: u32 = bytes_to_u32_be!(data, 44);
+
+        if folder_record.flags & 0x0020 != 0 && &data[48..56] == b"hlnkhfs+" {
+            folder_record.link_reference = Some(special_permissions);
+        } else {
+            folder_record.special_permissions = Some(special_permissions);
+        }
         if folder_record.flags & 0x0080 != 0 {
             let timestamp: i32 = bytes_to_i32_be!(data, 68);
-            if timestamp == 0 {
-                folder_record.added_time = Some(DateTime::NotSet);
+
+            folder_record.added_time = if timestamp == 0 {
+                Some(DateTime::NotSet)
             } else {
-                folder_record.added_time = Some(DateTime::PosixTime32(PosixTime32::new(timestamp)));
-            }
+                Some(DateTime::PosixTime32(PosixTime32::new(timestamp)))
+            };
         }
         Ok(())
     }
@@ -154,6 +175,8 @@ mod tests {
         assert_eq!(test_struct.owner_identifier, Some(501));
         assert_eq!(test_struct.group_identifier, Some(20));
         assert_eq!(test_struct.file_mode, Some(0o40755));
+        assert_eq!(test_struct.special_permissions, Some(0));
+        assert_eq!(test_struct.link_reference, None);
         assert_eq!(test_struct.added_time, None);
 
         Ok(())

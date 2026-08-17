@@ -17,6 +17,8 @@ use std::io::SeekFrom;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_types::bytes_to_u64_le;
 
+use crate::lru_cache::SharedLruCache;
+
 use super::btree_node::ApfsBtreeNode;
 use super::object_map_key::ApfsObjectMapKey;
 use super::object_map_value::ApfsObjectMapValue;
@@ -28,6 +30,9 @@ pub struct ApfsObjectMapTree {
 
     /// Root (node) block number.
     pub root_block_number: u64,
+
+    /// Node cache.
+    node_cache: SharedLruCache<u64, ApfsBtreeNode>,
 }
 
 impl ApfsObjectMapTree {
@@ -36,6 +41,7 @@ impl ApfsObjectMapTree {
         Self {
             block_size: 0,
             root_block_number: 0,
+            node_cache: SharedLruCache::new(64),
         }
     }
 
@@ -81,24 +87,69 @@ impl ApfsObjectMapTree {
         data_stream: &DataStreamReference,
         block_number: u64,
     ) -> Result<ApfsBtreeNode, ErrorTrace> {
-        let node_offset: u64 = block_number * (self.block_size as u64);
-
-        let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
-
-        match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
-            Ok(_) => {}
+        let result: bool = match self.node_cache.contains(&block_number) {
+            Ok(result) => result,
             Err(mut error) => {
                 keramics_core::error_trace_add_frame!(
                     error,
-                    format!(
-                        "Unable to read object map B-tree root node at offset: {} (0x{:08x}))",
-                        node_offset, node_offset
-                    )
+                    format!("Unable to determine if node: {} is cached", block_number)
                 );
                 return Err(error);
             }
+        };
+        if !result {
+            let node_offset: u64 = block_number * (self.block_size as u64);
+
+            let mut node: ApfsBtreeNode = ApfsBtreeNode::new();
+
+            match node.read_at_position(&data_stream, SeekFrom::Start(node_offset)) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!(
+                            "Unable to read node: {} at offset: {} (0x{:08x}))",
+                            block_number, node_offset, node_offset
+                        )
+                    );
+                    return Err(error);
+                }
+            }
+            match self.check_node(block_number, &node) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Check of node: {} failed", block_number)
+                    );
+                    return Err(error);
+                }
+            }
+            match self.node_cache.insert(block_number, node) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Unable to insert node: {} in cache", block_number)
+                    );
+                    return Err(error);
+                }
+            }
         }
-        Ok(node)
+        match self.node_cache.get(&block_number) {
+            Ok(Some(node)) => Ok(node),
+            Ok(None) => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve node: {} from cache",
+                block_number
+            ))),
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!("Failed to retrieve node: {} from cache", block_number)
+                );
+                Err(error)
+            }
+        }
     }
 
     /// Retrieves a specific object map value.
@@ -174,16 +225,6 @@ impl ApfsObjectMapTree {
                 return Err(error);
             }
         };
-        match self.check_node(block_number, &node) {
-            Ok(_) => {}
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(
-                    error,
-                    format!("Check of node: {} failed", block_number)
-                );
-                return Err(error);
-            }
-        }
         let mut last_key: ApfsObjectMapKey = ApfsObjectMapKey::new();
         let mut last_entry_index: usize = 0;
 

@@ -77,11 +77,13 @@ impl FatBootRecord {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 512];
 
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-
-        keramics_core::debug_trace_data!("FatBootRecord", offset, &data, 512);
-
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "FatBootRecord",
+            data_stream,
+            &mut data,
+            512,
+            position,
+        );
         if data[17..21] == [0; 4] && data[22..24] == [0; 2] {
             keramics_core::debug_trace_structure!(Fat32BootRecord::debug_read_data(&data));
 

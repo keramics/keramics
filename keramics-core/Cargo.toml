@@ -10,6 +10,11 @@ license = { workspace = true }
 repository = { workspace = true }
 version = { workspace = true }
 
+[features]
+debug-trace = []
+default = []
+no-inline = []
+
 [lib]
 name = "keramics_core"
 path = "src/lib.rs"

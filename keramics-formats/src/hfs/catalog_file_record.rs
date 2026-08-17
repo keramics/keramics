@@ -95,6 +95,7 @@ impl HfsCatalogFileRecord {
     }
 
     /// Reads the catalog file record for debugging.
+    #[cfg(feature = "debug-trace")]
     pub fn debug_read_data(format: &HfsFormat, data: &[u8]) -> String {
         match format {
             HfsFormat::Hfs => HfsStandardCatalogFileRecord::debug_read_data(data),
@@ -279,7 +280,6 @@ mod tests {
         assert_eq!(test_struct.file_mode, Some(0o100644));
         assert_eq!(test_struct.special_permissions, Some(2));
         assert_eq!(test_struct.link_reference, None);
-
         assert_eq!(
             test_struct.added_time,
             Some(DateTime::PosixTime32(PosixTime32 {

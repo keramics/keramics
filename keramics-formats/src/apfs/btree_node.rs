@@ -24,6 +24,7 @@ use super::object_checksum::ApfsObjectChecksum;
 use super::object_header::ApfsObjectHeader;
 
 /// Apple File System (APFS) B-tree node.
+#[derive(Clone)]
 pub struct ApfsBtreeNode {
     /// Object header.
     pub object_header: ApfsObjectHeader,
@@ -277,11 +278,13 @@ impl ApfsBtreeNode {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; 4096];
 
-        let offset: u64 =
-            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position);
-
-        keramics_core::debug_trace_data!("ApfsBtreeNode", offset, &data, data.len());
-
+        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
+            "ApfsBtreeNode",
+            data_stream,
+            &mut data,
+            4096,
+            position,
+        );
         match self.read_data(&data) {
             Ok(_) => {}
             Err(mut error) => {
