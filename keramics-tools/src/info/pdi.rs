@@ -172,7 +172,10 @@ impl PdiInfo {
                 println!("        Segment file: {}", file_index + 1);
 
                 let snapshot_identifier: &Uuid = segment_file.get_snapshot_identifier();
-                println!("            Snapshot identifier\t\t\t: {}", snapshot_identifier);
+                println!(
+                    "            Snapshot identifier\t\t\t: {}",
+                    snapshot_identifier
+                );
 
                 println!("            Path\t\t\t\t: {}", segment_file.get_path());
 
