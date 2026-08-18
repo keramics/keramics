@@ -103,6 +103,10 @@ struct EntryCommandArguments {
 
 #[derive(Args, Debug)]
 struct HierarchyCommandArguments {
+    /// Path to start with
+    #[arg(long)]
+    path: Option<String>,
+
     // TODO: allow to set the path component/segment separator
     // TODO: allow to set the data stream name separator
     /// Volume or partition path type
@@ -515,13 +519,22 @@ fn main() -> ExitCode {
                 &data_stream,
                 arguments.volume,
                 &command_arguments.volume_path_type,
+                command_arguments.path.as_ref(),
             ),
-            FormatIdentifier::Ext => {
-                ExtInfo::print_hierarchy(&data_stream, info_tool.character_encoding.as_ref())
+            FormatIdentifier::Ext => ExtInfo::print_hierarchy(
+                &data_stream,
+                info_tool.character_encoding.as_ref(),
+                command_arguments.path.as_ref(),
+            ),
+            FormatIdentifier::Fat => {
+                FatInfo::print_hierarchy(&data_stream, command_arguments.path.as_ref())
             }
-            FormatIdentifier::Fat => FatInfo::print_hierarchy(&data_stream),
-            FormatIdentifier::Hfs => HfsInfo::print_hierarchy(&data_stream),
-            FormatIdentifier::Ntfs => NtfsInfo::print_hierarchy(&data_stream),
+            FormatIdentifier::Hfs => {
+                HfsInfo::print_hierarchy(&data_stream, command_arguments.path.as_ref())
+            }
+            FormatIdentifier::Ntfs => {
+                NtfsInfo::print_hierarchy(&data_stream, command_arguments.path.as_ref())
+            }
             _ => Err(keramics_core::error_trace_new!(format!(
                 "Unsupported format: {}",
                 format_identifier

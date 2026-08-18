@@ -806,7 +806,6 @@ impl LzfseContext {
                             &mut uncompressed_data
                                 [uncompressed_data_offset..uncompressed_data_end_offset],
                         )?;
-
                         compressed_data_offset = compressed_data_end_offset;
                         uncompressed_data_offset = uncompressed_data_end_offset;
                     }

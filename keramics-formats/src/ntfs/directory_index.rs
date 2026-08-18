@@ -178,7 +178,8 @@ impl NtfsDirectoryIndex {
             .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_BITMAP)
         {
             Some(mft_attribute) => {
-                let mut bitmap: NtfsBitmap = NtfsBitmap::new(self.index.cluster_block_size);
+                let mut bitmap: NtfsBitmap =
+                    NtfsBitmap::new(self.index.cluster_block_size, self.index.index_entry_size);
 
                 match bitmap.initialize(data_stream, mft_attribute) {
                     Ok(_) => {}
@@ -356,8 +357,26 @@ impl NtfsDirectoryIndex {
                         return Err(error);
                     }
                 };
-            // TODO: skip if sub node is not allocated.
-
+            match &self.bitmap {
+                Some(bitmap) => match bitmap.check_if_block_is_allocated(sub_node_vcn) {
+                    Ok(result) => {
+                        if !result {
+                            return Ok(None);
+                        }
+                    }
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            format!(
+                                "Unable to determine if sub block: {} is allocated",
+                                sub_node_vcn
+                            ),
+                        );
+                        return Err(error);
+                    }
+                },
+                None => {}
+            }
             let index_entry: NtfsIndexEntry = match self
                 .index
                 .get_entry_at_cluster_block(data_stream, sub_node_vcn)

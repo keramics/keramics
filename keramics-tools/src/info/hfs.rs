@@ -380,7 +380,10 @@ impl HfsInfo {
     }
 
     /// Prints the file system hierarchy.
-    pub fn print_hierarchy(data_stream: &DataStreamReference) -> Result<(), ErrorTrace> {
+    pub fn print_hierarchy(
+        data_stream: &DataStreamReference,
+        path: Option<&String>,
+    ) -> Result<(), ErrorTrace> {
         let hfs_file_system: HfsFileSystem = match Self::open_file_system(data_stream) {
             Ok(hfs_file_system) => hfs_file_system,
             Err(mut error) => {
@@ -390,15 +393,42 @@ impl HfsInfo {
         };
         println!("Hierarchical File System (HFS) hierarchy:");
 
-        let mut file_entry: HfsFileEntry = match hfs_file_system.get_root_directory() {
-            Ok(file_entry) => file_entry,
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve root directory");
-                return Err(error);
-            }
+        let mut file_entry: HfsFileEntry = match path {
+            Some(path) => match hfs_file_system.get_file_entry_by_path(&Path::from(path)) {
+                Ok(Some(file_entry)) => file_entry,
+                Ok(None) => {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Unable to retrieve file entry for path: {}",
+                        path
+                    )));
+                }
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        format!("Failed to retrieve file entry for path: {}", path)
+                    );
+                    return Err(error);
+                }
+            },
+            None => match hfs_file_system.get_root_directory() {
+                Ok(file_entry) => file_entry,
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to retrieve root directory"
+                    );
+                    return Err(error);
+                }
+            },
         };
-        let mut path_components: Vec<String> = Vec::new();
-
+        let mut path_components: Vec<String> = match path {
+            Some(path) => path
+                .split('/')
+                .skip(1)
+                .map(|component| component.to_string())
+                .collect::<Vec<String>>(),
+            None => Vec::new(),
+        };
         match Self::print_hierarchy_file_entry(&mut file_entry, &mut path_components) {
             Ok(_) => {}
             Err(mut error) => {
