@@ -673,7 +673,7 @@ impl VfsFileEntry {
                     1
                 }
             }
-            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => 0,
+            VfsFileEntry::ApfsContainer(_) => 0,
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry {
                 ApmFileEntry::Partition { .. } => 1,
                 ApmFileEntry::Root { .. } => 0,

@@ -179,5 +179,50 @@ impl NtfsIndex {
 mod tests {
     use super::*;
 
-    // TODO: add tests.
+    use std::path::PathBuf;
+
+    use keramics_core::open_os_data_stream;
+
+    use crate::tests::get_test_data_path;
+
+    fn get_test_mft_attribute_data() -> Vec<u8> {
+        return vec![
+            0xa0, 0x00, 0x00, 0x00, 0x50, 0x00, 0x00, 0x00, 0x01, 0x04, 0x40, 0x00, 0x00, 0x00,
+            0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x48, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x24, 0x00, 0x49, 0x00, 0x33, 0x00,
+            0x30, 0x00, 0x21, 0x01, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ];
+    }
+
+    #[test]
+    fn test_get_entry_at_cluster_block() -> Result<(), ErrorTrace> {
+        let path_string: String = get_test_data_path("ntfs/ntfs.raw");
+        let path_buf: PathBuf = PathBuf::from(path_string.as_str());
+        let data_stream: DataStreamReference = open_os_data_stream(&path_buf)?;
+
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut index_allocation_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        index_allocation_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut index: NtfsIndex = NtfsIndex::new(4096);
+        index.initialize(4096, &index_allocation_attribute)?;
+
+        index.get_entry_at_cluster_block(&data_stream, 0)?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_initialize() -> Result<(), ErrorTrace> {
+        let test_mft_attribute_data: Vec<u8> = get_test_mft_attribute_data();
+        let mut index_allocation_attribute: NtfsMftAttribute = NtfsMftAttribute::new();
+        index_allocation_attribute.read_data(&test_mft_attribute_data)?;
+
+        let mut index: NtfsIndex = NtfsIndex::new(4096);
+        index.initialize(4096, &index_allocation_attribute)?;
+
+        Ok(())
+    }
 }

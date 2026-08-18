@@ -94,6 +94,7 @@ impl VfsFileSystem {
     }
 
     /// Retrieves the type.
+    #[allow(dead_code)]
     pub(super) fn get_type(&self) -> VfsType {
         match self {
             VfsFileSystem::Apfs(_) => VfsType::Apfs,
@@ -226,22 +227,6 @@ impl VfsFileSystem {
             VfsFileSystem::Vhd(vhd_file_system) => Ok(vhd_file_system.file_entry_exists(path)),
             VfsFileSystem::Vhdx(vhdx_file_system) => Ok(vhdx_file_system.file_entry_exists(path)),
             VfsFileSystem::Vmdk(vmdk_file_system) => Ok(vmdk_file_system.file_entry_exists(path)),
-        }
-    }
-
-    /// Retrieves a data stream with the specified location.
-    #[inline(always)]
-    pub(crate) fn get_data_stream_by_location(
-        &self,
-        location: &VfsLocation,
-    ) -> Result<Option<DataStreamReference>, ErrorTrace> {
-        match self.get_file_entry_by_location(location) {
-            Ok(Some(mut file_entry)) => file_entry.get_data_stream(),
-            Ok(None) => Ok(None),
-            Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to retrieve file entry");
-                Err(error)
-            }
         }
     }
 

@@ -61,14 +61,6 @@ impl HfsBtreeNode {
         }
     }
 
-    /// Retrieves the offset of a specific record.
-    pub fn get_record_offset_by_index(&self, record_index: usize) -> u64 {
-        match self.records.get(record_index) {
-            Some(node_record) => self.offset + (node_record.offset as u64),
-            None => self.offset,
-        }
-    }
-
     /// Reads the B-tree node descriptor from a buffer.
     fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         keramics_core::debug_trace_data_and_structure!(

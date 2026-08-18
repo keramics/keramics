@@ -29,15 +29,18 @@ use keramics_layout_map::LayoutMap;
     methods("debug_read_data")
 )]
 /// Apple File System (APFS) encryption state.
+#[allow(dead_code)]
 pub struct ApfsEncryptionState {}
 
 impl ApfsEncryptionState {
     /// Creates a new encryption state.
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {}
     }
 
     /// Reads the encryption state from a buffer.
+    #[allow(dead_code)]
     pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
         if data.len() < 20 {
             return Err(keramics_core::error_trace_new!("Unsupported data size"));

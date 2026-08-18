@@ -20,6 +20,7 @@ use keramics_types::{Ucs2CharacterMappings, Ucs2String, bytes_to_u64_le};
 use crate::path_component::PathComponent;
 use crate::util::calculate_alignment_padding;
 
+use super::bitmap::NtfsBitmap;
 use super::constants::*;
 use super::directory_entries::NtfsDirectoryEntries;
 use super::directory_entry::NtfsDirectoryEntry;
@@ -42,6 +43,9 @@ pub struct NtfsDirectoryIndex {
     /// Index.
     index: NtfsIndex,
 
+    /// Bitmap.
+    bitmap: Option<NtfsBitmap>,
+
     /// Root node data.
     root_node_data: Vec<u8>,
 
@@ -61,6 +65,7 @@ impl NtfsDirectoryIndex {
         Self {
             case_folding_mappings: case_folding_mappings.clone(),
             index: NtfsIndex::new(cluster_block_size),
+            bitmap: None,
             root_node_data: Vec::new(),
             is_initialized: false,
             use_case_folding: true,
@@ -68,7 +73,11 @@ impl NtfsDirectoryIndex {
     }
 
     /// Initializes the directory index.
-    pub fn initialize(&mut self, mft_attributes: &NtfsMftAttributes) -> Result<(), ErrorTrace> {
+    pub fn initialize(
+        &mut self,
+        data_stream: &DataStreamReference,
+        mft_attributes: &NtfsMftAttributes,
+    ) -> Result<(), ErrorTrace> {
         let i30_index_name: Option<Ucs2String> = Some(Ucs2String::from("$I30"));
         let i30_attribute_group: &NtfsMftAttributeGroup =
             match mft_attributes.get_attribute_group(&i30_index_name) {
@@ -156,18 +165,32 @@ impl NtfsDirectoryIndex {
                 .index
                 .initialize(index_root_header.index_entry_size, mft_attribute)
             {
-                Ok(standard_information) => standard_information,
+                Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(error, "Unable to initialize index");
                     return Err(error);
                 }
             },
             None => {}
-        };
+        }
+        // Note that the $BITMAP attribute is optional.
+        match mft_attributes
+            .get_attribute_for_group(i30_attribute_group, NTFS_ATTRIBUTE_TYPE_BITMAP)
+        {
+            Some(mft_attribute) => {
+                let mut bitmap: NtfsBitmap = NtfsBitmap::new(self.index.cluster_block_size);
 
-        // The $BITMAP attribute is optional.
-
-        // TODO: keep reference of $INDEX_ROOT attribute instead of cloning the data.
+                match bitmap.initialize(data_stream, mft_attribute) {
+                    Ok(_) => {}
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(error, "Unable to initialize bitmap");
+                        return Err(error);
+                    }
+                }
+                self.bitmap = Some(bitmap);
+            }
+            None => {}
+        }
         self.root_node_data = i30_index_root_attribute.resident_data.clone();
         self.is_initialized = true;
 
@@ -447,39 +470,58 @@ impl NtfsDirectoryIndex {
                         Err(mut error) => {
                             keramics_core::error_trace_add_frame!(
                                 error,
-                                "Unable to read index branch value"
+                                format!(
+                                    "Unable to read index branch value at offset: {} (0x{:08x})",
+                                    index_value_offset, index_value_offset
+                                ),
                             );
                             return Err(error);
                         }
                     };
-                // TODO: skip if sub node is not allocated.
-
-                let index_entry: NtfsIndexEntry = match self
-                    .index
-                    .get_entry_at_cluster_block(data_stream, sub_node_vcn)
-                {
-                    Ok(index_entry) => index_entry,
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve index entry"
-                        );
-                        return Err(error);
-                    }
+                let is_allocated: bool = match &self.bitmap {
+                    Some(bitmap) => match bitmap.check_if_block_is_allocated(sub_node_vcn) {
+                        Ok(result) => result,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to determine if sub block: {} is allocated",
+                                    sub_node_vcn
+                                ),
+                            );
+                            return Err(error);
+                        }
+                    },
+                    None => true,
                 };
-                match self.get_directory_entries_from_node(
-                    &index_entry.data,
-                    24,
-                    data_stream,
-                    entries,
-                ) {
-                    Ok(_) => {}
-                    Err(mut error) => {
-                        keramics_core::error_trace_add_frame!(
-                            error,
-                            "Unable to retrieve directory entries from sub node"
-                        );
-                        return Err(error);
+                if is_allocated {
+                    let index_entry: NtfsIndexEntry = match self
+                        .index
+                        .get_entry_at_cluster_block(data_stream, sub_node_vcn)
+                    {
+                        Ok(index_entry) => index_entry,
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve index entry"
+                            );
+                            return Err(error);
+                        }
+                    };
+                    match self.get_directory_entries_from_node(
+                        &index_entry.data,
+                        24,
+                        data_stream,
+                        entries,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                "Unable to retrieve directory entries from sub node"
+                            );
+                            return Err(error);
+                        }
                     }
                 }
             } else if value_data_size > 0 {

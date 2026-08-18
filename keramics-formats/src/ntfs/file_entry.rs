@@ -510,7 +510,10 @@ impl NtfsFileEntry {
             return Ok(None);
         }
         if !self.directory_index.is_initialized {
-            match self.directory_index.initialize(&self.mft_attributes) {
+            match self
+                .directory_index
+                .initialize(&self.data_stream, &self.mft_attributes)
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -709,7 +712,10 @@ impl NtfsFileEntry {
             ));
         }
         if !self.directory_index.is_initialized {
-            match self.directory_index.initialize(&self.mft_attributes) {
+            match self
+                .directory_index
+                .initialize(&self.data_stream, &self.mft_attributes)
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
