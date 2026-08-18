@@ -65,7 +65,7 @@ pub struct ExtFileEntry {
     sub_directory_entries: ExtDirectoryEntries,
 
     /// Value to indicate the sub directory entries were read.
-    read_sub_directory_entries: bool,
+    sub_directory_entries_read: bool,
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
@@ -93,7 +93,7 @@ impl ExtFileEntry {
             name,
             block_ranges: Vec::new(),
             sub_directory_entries: ExtDirectoryEntries::new(),
-            read_sub_directory_entries: false,
+            sub_directory_entries_read: false,
             symbolic_link_target: None,
             attributes_block_is_read: false,
         }
@@ -483,7 +483,7 @@ impl ExtFileEntry {
         &mut self,
         sub_file_entry_name: &PathComponent,
     ) -> Result<Option<ExtFileEntry>, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -631,7 +631,7 @@ impl ExtFileEntry {
                 }
             }
         }
-        self.read_sub_directory_entries = true;
+        self.sub_directory_entries_read = true;
 
         Ok(())
     }
@@ -640,7 +640,7 @@ impl ExtFileEntry {
 impl FileEntryIterator for ExtFileEntry {
     /// Retrieves the number of sub file entries.
     fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -660,7 +660,7 @@ impl FileEntryIterator for ExtFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<ExtFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {

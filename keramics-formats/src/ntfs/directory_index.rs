@@ -345,7 +345,9 @@ impl NtfsDirectoryIndex {
                 index_value_offset += alignment_padding;
             }
         }
-        if is_branch {
+        if !is_branch {
+            Ok(None)
+        } else {
             let sub_node_vcn: u64 =
                 match self.read_index_branch_value(data, index_value_offset, value_data_size) {
                     Ok(index_branch_value) => index_branch_value,
@@ -357,13 +359,9 @@ impl NtfsDirectoryIndex {
                         return Err(error);
                     }
                 };
-            match &self.bitmap {
+            let is_allocated: bool = match &self.bitmap {
                 Some(bitmap) => match bitmap.check_if_block_is_allocated(sub_node_vcn) {
-                    Ok(result) => {
-                        if !result {
-                            return Ok(None);
-                        }
-                    }
+                    Ok(result) => result,
                     Err(mut error) => {
                         keramics_core::error_trace_add_frame!(
                             error,
@@ -375,35 +373,40 @@ impl NtfsDirectoryIndex {
                         return Err(error);
                     }
                 },
-                None => {}
-            }
-            let index_entry: NtfsIndexEntry = match self
-                .index
-                .get_entry_at_cluster_block(data_stream, sub_node_vcn)
-            {
-                Ok(index_entry) => index_entry,
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(error, "Unable to retrieve index entry");
-                    return Err(error);
-                }
+                None => true,
             };
-            match self.get_directory_entry_by_name_from_node(
-                &index_entry.data,
-                24,
-                data_stream,
-                name,
-            ) {
-                Ok(result) => Ok(result),
-                Err(mut error) => {
-                    keramics_core::error_trace_add_frame!(
-                        error,
-                        "Unable to retrieve directory entry from node"
-                    );
-                    return Err(error);
+            if !is_allocated {
+                Ok(None)
+            } else {
+                let index_entry: NtfsIndexEntry = match self
+                    .index
+                    .get_entry_at_cluster_block(data_stream, sub_node_vcn)
+                {
+                    Ok(index_entry) => index_entry,
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve index entry"
+                        );
+                        return Err(error);
+                    }
+                };
+                match self.get_directory_entry_by_name_from_node(
+                    &index_entry.data,
+                    24,
+                    data_stream,
+                    name,
+                ) {
+                    Ok(result) => Ok(result),
+                    Err(mut error) => {
+                        keramics_core::error_trace_add_frame!(
+                            error,
+                            "Unable to retrieve directory entry from node"
+                        );
+                        return Err(error);
+                    }
                 }
             }
-        } else {
-            Ok(None)
         }
     }
 

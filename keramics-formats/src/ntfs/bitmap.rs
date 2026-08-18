@@ -70,7 +70,7 @@ impl NtfsBitmap {
     pub fn check_if_block_is_allocated(&self, block_number: u64) -> Result<bool, ErrorTrace> {
         let block_offset: u64 = block_number * (self.cluster_block_size as u64);
 
-        let mut range_index: usize = match self.bitmap_ranges.binary_search_by(|bitmap_range| {
+        let range_index: usize = match self.bitmap_ranges.binary_search_by(|bitmap_range| {
             if block_offset >= bitmap_range.end_offset {
                 Ordering::Less
             } else if block_offset < bitmap_range.start_offset {
@@ -102,6 +102,8 @@ impl NtfsBitmap {
         data_stream: &DataStreamReference,
         bitmap_attribute: &NtfsMftAttribute,
     ) -> Result<(), ErrorTrace> {
+        let mut bitmap_offset: u64 = 0;
+
         if bitmap_attribute.is_resident() {
             keramics_core::debug_trace_data!(
                 "NtfsBitmapData",
@@ -109,7 +111,7 @@ impl NtfsBitmap {
                 &bitmap_attribute.resident_data,
                 &bitmap_attribute.data_size
             );
-            match self.read_data(&bitmap_attribute.resident_data, 0) {
+            match self.read_data(&bitmap_attribute.resident_data, &mut bitmap_offset) {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -168,8 +170,6 @@ impl NtfsBitmap {
                     )));
                 }
             }
-            let mut bitmap_offset: u64 = 0;
-
             for block_range in block_ranges.iter() {
                 if block_range.range_type == NtfsBlockRangeType::Sparse {
                     bitmap_offset += block_range.size;
@@ -184,7 +184,7 @@ impl NtfsBitmap {
                     match self.read_at_position(
                         data_stream,
                         SeekFrom::Start(block_offset),
-                        bitmap_offset,
+                        &mut bitmap_offset,
                     ) {
                         Ok(_) => {}
                         Err(mut error) => {
@@ -199,7 +199,6 @@ impl NtfsBitmap {
                         }
                     }
                     block_offset += self.cluster_block_size as u64;
-                    bitmap_offset += self.cluster_block_size as u64;
                 }
             }
         }
@@ -212,8 +211,9 @@ impl NtfsBitmap {
     }
 
     /// Reads the bitmap from a buffer.
-    fn read_data(&mut self, data: &[u8], mut range_offset: u64) -> Result<(), ErrorTrace> {
+    fn read_data(&mut self, data: &[u8], bitmap_offset: &mut u64) -> Result<(), ErrorTrace> {
         let mut offset: u64 = 0;
+        let mut range_offset: u64 = *bitmap_offset;
         let mut range_bit_value: u8 = data[0] & 0x01;
 
         for byte_value in data.iter() {
@@ -239,6 +239,8 @@ impl NtfsBitmap {
             offset,
             range_bit_value != 0,
         ));
+        *bitmap_offset = range_offset;
+
         Ok(())
     }
 
@@ -247,7 +249,7 @@ impl NtfsBitmap {
         &mut self,
         data_stream: &DataStreamReference,
         position: SeekFrom,
-        bitmap_offset: u64,
+        bitmap_offset: &mut u64,
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.cluster_block_size as usize];
 
@@ -582,7 +584,8 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
 
         let mut test_struct = NtfsBitmap::new(4096, 4096);
-        test_struct.read_data(&test_data, 0)?;
+        let mut bitmap_offset: u64 = 0;
+        test_struct.read_data(&test_data, &mut bitmap_offset)?;
 
         assert_eq!(test_struct.bitmap_ranges.len(), 10);
         assert_eq!(test_struct.bitmap_ranges[2].start_offset, 16384);
@@ -598,7 +601,8 @@ mod tests {
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
         let mut test_struct = NtfsBitmap::new(4096, 4096);
-        test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 0)?;
+        let mut bitmap_offset: u64 = 0;
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0), &mut bitmap_offset)?;
 
         assert_eq!(test_struct.bitmap_ranges.len(), 10);
         assert_eq!(test_struct.bitmap_ranges[2].start_offset, 16384);

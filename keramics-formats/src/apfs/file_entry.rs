@@ -75,7 +75,7 @@ pub struct ApfsFileEntry {
     sub_directory_entries: IndexedHashMap<ByteString, ApfsDirectoryEntry>,
 
     /// Value to indicate the sub directory entries were read.
-    read_sub_directory_entries: bool,
+    sub_directory_entries_read: bool,
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
@@ -108,7 +108,7 @@ impl ApfsFileEntry {
             compressed_data_header: None,
             extents: Vec::new(),
             sub_directory_entries: IndexedHashMap::new(),
-            read_sub_directory_entries: false,
+            sub_directory_entries_read: false,
             symbolic_link_target: None,
             attributes: IndexedHashMap::new(),
         }
@@ -627,7 +627,7 @@ impl ApfsFileEntry {
                 return Err(error);
             }
         }
-        self.read_sub_directory_entries = true;
+        self.sub_directory_entries_read = true;
 
         Ok(())
     }
@@ -636,7 +636,7 @@ impl ApfsFileEntry {
 impl FileEntryIterator for ApfsFileEntry {
     /// Retrieves the number of sub file entries.
     fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -656,7 +656,7 @@ impl FileEntryIterator for ApfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<ApfsFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {

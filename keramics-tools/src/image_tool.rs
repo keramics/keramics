@@ -578,20 +578,25 @@ impl ImageTool {
 
                     // TODO: print index names
                     for attribute_index in 0..number_of_attributes {
-                        let attribute: NtfsAttribute =
-                            match ntfs_file_entry.get_attribute_by_index(attribute_index) {
-                                Ok(attribute) => attribute,
-                                Err(mut error) => {
-                                    keramics_core::error_trace_add_frame!(
-                                        error,
-                                        format!(
-                                            "Unable to retrieve NTFS MFT entry: {} attribute: {}",
-                                            ntfs_file_entry.mft_entry_number, attribute_index
-                                        )
-                                    );
-                                    return Err(error);
-                                }
-                            };
+                        let attribute: NtfsAttribute = match ntfs_file_entry
+                            .get_attribute_by_index(attribute_index)
+                        {
+                            Ok(attribute) => attribute,
+                            Err(mut error) => {
+                                let file_reference: u64 = ntfs_file_entry.get_file_reference();
+
+                                keramics_core::error_trace_add_frame!(
+                                    error,
+                                    format!(
+                                        "Unable to retrieve NTFS MFT entry: {}-{} attribute: {}",
+                                        file_reference & 0x0000ffffffffffff,
+                                        file_reference >> 48,
+                                        attribute_index
+                                    )
+                                );
+                                return Err(error);
+                            }
+                        };
                         match attribute {
                             NtfsAttribute::FileName { file_name } => {
                                 if file_name.parent_file_reference != parent_file_reference

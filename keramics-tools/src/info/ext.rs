@@ -960,7 +960,7 @@ impl ExtInfo {
         let mut path_components: Vec<String> = match path {
             Some(path) => path
                 .split('/')
-                .skip(1)
+                .skip(2)
                 .map(|component| component.to_string())
                 .collect::<Vec<String>>(),
             None => Vec::new(),
