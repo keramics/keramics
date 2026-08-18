@@ -11,8 +11,7 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
-use keramics_core::mediator::{Mediator, MediatorReference};
+use keramics_core::{DebugTrace, ErrorTrace};
 
 use super::data_run::{NtfsDataRun, NtfsDataRunType};
 
@@ -61,18 +60,6 @@ impl NtfsClusterGroup {
                 };
             data_offset += read_count;
 
-            // TODO: move into NtfsDataRun
-            let mediator: MediatorReference = Mediator::current();
-            if mediator.debug_output {
-                mediator.debug_print("NtfsDataRun {\n");
-                mediator.debug_print(format!("    block_number: {},\n", data_run.block_number));
-                mediator.debug_print(format!(
-                    "    number_of_blocks: {},\n",
-                    data_run.number_of_blocks
-                ));
-                mediator.debug_print(format!("    run_type: {:#?},\n", data_run.run_type));
-                mediator.debug_print("}\n\n");
-            }
             match &data_run.run_type {
                 NtfsDataRunType::EndOfList => break,
                 NtfsDataRunType::InFile => {
@@ -82,6 +69,11 @@ impl NtfsClusterGroup {
             };
             self.data_runs.push(data_run);
         }
+        DebugTrace::static_scope(|debug_trace| {
+            debug_trace.print_start("NtfsClusterGroup");
+            debug_trace.print_field("data_runs", format!("{:#?}", self.data_runs));
+            debug_trace.print_end();
+        });
         Ok(data_offset - data_runs_offset)
     }
 }

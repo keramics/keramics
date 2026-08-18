@@ -798,6 +798,7 @@ impl ApfsInfo {
         data_stream: &DataStreamReference,
         volume_number: usize,
         volume_path_type: &DisplayPathType,
+        path: Option<&String>,
     ) -> Result<(), ErrorTrace> {
         let apfs_container: ApfsContainer = match Self::open_container(data_stream) {
             Ok(container) => container,
@@ -806,6 +807,10 @@ impl ApfsInfo {
                 return Err(error);
             }
         };
+        // TODO: handle volume index/identifier in combination with path
+        if path.is_some() {
+            todo!();
+        }
         println!("Apple File System (APFS) hierarchy:");
 
         for (volume_index, result) in apfs_container.volumes().enumerate() {

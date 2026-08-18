@@ -46,13 +46,10 @@ pub struct NtfsFileEntry {
     mft: Arc<NtfsMasterFileTable>,
 
     /// The MFT entry number.
-    pub mft_entry_number: u64,
+    pub(super) mft_entry_number: u64,
 
     /// The MFT entry.
     mft_entry: NtfsMftEntry,
-
-    /// The sequence number.
-    pub sequence_number: u16,
 
     /// The name.
     name: Option<Ucs2String>,
@@ -73,7 +70,7 @@ pub struct NtfsFileEntry {
     has_sub_directory_entries: bool,
 
     /// Value to indicate the sub directory entries were read.
-    read_sub_directory_entries: bool,
+    sub_directory_entries_read: bool,
 }
 
 impl NtfsFileEntry {
@@ -87,7 +84,6 @@ impl NtfsFileEntry {
         name: Option<Ucs2String>,
         directory_entry: Option<NtfsDirectoryEntry>,
     ) -> Self {
-        let sequence_number: u16 = mft_entry.sequence_number;
         let cluster_block_size: u32 = mft.cluster_block_size;
 
         Self {
@@ -95,14 +91,13 @@ impl NtfsFileEntry {
             mft: mft.clone(),
             mft_entry_number,
             mft_entry,
-            sequence_number,
             name,
             mft_attributes: NtfsMftAttributes::new(),
             directory_entry,
             directory_index: NtfsDirectoryIndex::new(cluster_block_size, case_folding_mappings),
             sub_directory_entries: NtfsDirectoryEntries::new(),
             has_sub_directory_entries: false,
-            read_sub_directory_entries: false,
+            sub_directory_entries_read: false,
         }
     }
 
@@ -428,7 +423,7 @@ impl NtfsFileEntry {
         if !self.has_sub_directory_entries {
             return Ok(0);
         }
-        if !self.read_sub_directory_entries {
+        if !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -448,7 +443,7 @@ impl NtfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<NtfsFileEntry, ErrorTrace> {
-        if !self.read_sub_directory_entries {
+        if !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -739,7 +734,7 @@ impl NtfsFileEntry {
                 return Err(error);
             }
         }
-        self.read_sub_directory_entries = true;
+        self.sub_directory_entries_read = true;
 
         Ok(())
     }

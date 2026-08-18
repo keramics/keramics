@@ -77,7 +77,7 @@ pub struct HfsFileEntry {
     sub_directory_entries: IndexedHashMap<HfsString, HfsDirectoryEntry>,
 
     /// Value to indicate the sub directory entries were read.
-    read_sub_directory_entries: bool,
+    sub_directory_entries_read: bool,
 
     /// Symbolic link target.
     symbolic_link_target: Option<ByteString>,
@@ -109,7 +109,7 @@ impl HfsFileEntry {
             indirect_node: None,
             compressed_data_header: None,
             sub_directory_entries: IndexedHashMap::new(),
-            read_sub_directory_entries: false,
+            sub_directory_entries_read: false,
             symbolic_link_target: None,
             attributes: IndexedHashMap::new(),
         }
@@ -740,7 +740,7 @@ impl HfsFileEntry {
                 return Err(error);
             }
         }
-        self.read_sub_directory_entries = true;
+        self.sub_directory_entries_read = true;
 
         Ok(())
     }
@@ -749,7 +749,7 @@ impl HfsFileEntry {
 impl FileEntryIterator for HfsFileEntry {
     /// Retrieves the number of sub file entries.
     fn get_number_of_sub_file_entries(&mut self) -> Result<usize, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -769,7 +769,7 @@ impl FileEntryIterator for HfsFileEntry {
         &mut self,
         sub_file_entry_index: usize,
     ) -> Result<HfsFileEntry, ErrorTrace> {
-        if self.is_directory() && !self.read_sub_directory_entries {
+        if self.is_directory() && !self.sub_directory_entries_read {
             match self.read_sub_directory_entries() {
                 Ok(_) => {}
                 Err(mut error) => {
