@@ -581,7 +581,7 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = NtfsBitmap::new(4096);
+        let mut test_struct = NtfsBitmap::new(4096, 4096);
         test_struct.read_data(&test_data, 0)?;
 
         assert_eq!(test_struct.bitmap_ranges.len(), 10);
@@ -597,7 +597,7 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = NtfsBitmap::new(4096);
+        let mut test_struct = NtfsBitmap::new(4096, 4096);
         test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 0)?;
 
         assert_eq!(test_struct.bitmap_ranges.len(), 10);
