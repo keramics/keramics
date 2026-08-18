@@ -115,12 +115,12 @@ impl VhdInfo {
     fn get_file_information(vhd_file: &VhdFile) -> VhdFileInfo {
         let mut file_information: VhdFileInfo = VhdFileInfo::new();
 
-        file_information.disk_type = vhd_file.disk_type.clone();
-        file_information.identifier = vhd_file.identifier.clone();
-        file_information.parent_identifier = vhd_file.parent_identifier.clone();
-        file_information.parent_name = vhd_file.parent_name.clone();
-        file_information.media_size = vhd_file.media_size;
-        file_information.bytes_per_sector = vhd_file.bytes_per_sector;
+        file_information.disk_type = vhd_file.get_disk_type().clone();
+        file_information.identifier = vhd_file.get_identifier().clone();
+        file_information.parent_identifier = vhd_file.get_parent_identifier().cloned();
+        file_information.parent_name = vhd_file.get_parent_name().cloned();
+        file_information.media_size = vhd_file.get_media_size();
+        file_information.bytes_per_sector = vhd_file.get_bytes_per_sector();
 
         file_information
     }

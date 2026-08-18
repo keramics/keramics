@@ -22,6 +22,7 @@ use keramics_types::{ByteString, Uuid};
 use crate::enums::DisplayPathType;
 use crate::formatters::ByteSize;
 
+use super::constants::*;
 use super::posix::PosixFileModeInfo;
 
 /// Apple File System (APFS) container feature flags information.
@@ -253,7 +254,7 @@ impl ApfsFileEntryInfo {
     fn get_date_time_string(date_time: &DateTime) -> String {
         match date_time {
             DateTime::ApfsTime(apfs_time) => apfs_time.to_iso8601_string(),
-            DateTime::NotSet => String::from("Not set (0)"),
+            DateTime::NotSet => String::from(NOT_SET_VALUE),
             _ => return String::from("Unsupported date time"),
         }
     }

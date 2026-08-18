@@ -82,7 +82,7 @@ fn read_media_fixed() -> Result<(), ErrorTrace> {
     let mut file: VhdFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "acb42a740c63c1f72e299463375751c8");
 
     Ok(())
@@ -94,7 +94,7 @@ fn read_media_dynamic() -> Result<(), ErrorTrace> {
     let mut file: VhdFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "4ce30a0c21dd037023a5692d85ade033");
 
     Ok(())
@@ -106,7 +106,7 @@ fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
     let mut file: VhdFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     // Note that the VHD has 18432 bytes of additional storage media data due to the image
     // creation process.
     assert_eq!(md5_hash.as_str(), "a30f111f411d3f3d567b13f0c909e58c");
@@ -125,7 +125,7 @@ fn read_media_differential() -> Result<(), ErrorTrace> {
     file.set_parent(&Arc::new(RwLock::new(parent_file)))?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "4241cbc76e0e17517fb564238edbe415");
 
     Ok(())

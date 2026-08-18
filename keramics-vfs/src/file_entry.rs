@@ -630,20 +630,30 @@ impl VfsFileEntry {
                     Err(error)
                 }
             },
-            VfsFileEntry::Ntfs(ntfs_file_entry) => match ntfs_file_entry.get_symbolic_link_target()
-            {
-                Some(name) => {
-                    let path_components: Vec<PathComponent> = name
-                        .elements
-                        .split(|value| *value == 0x005c)
-                        .skip(2) // Strip leading "\\??\\".
-                        .map(|component| PathComponent::Ucs2String(Ucs2String::from(component)))
-                        .collect::<Vec<PathComponent>>();
+            VfsFileEntry::Ntfs(ntfs_file_entry) => {
+                match ntfs_file_entry.get_symbolic_link_target() {
+                    Some(name) => {
+                        let mut path_components: Vec<PathComponent> = name
+                            .elements
+                            .split(|value| *value == 0x005c)
+                            .skip(2) // Strip leading "\\??\\".
+                            .map(|component| PathComponent::Ucs2String(Ucs2String::from(component)))
+                            .collect::<Vec<PathComponent>>();
 
-                    Ok(Some(Path::from(path_components)))
+                        // Strip trailing empty path component.
+                        if path_components.last().map_or(false, |path_component| {
+                            match path_component {
+                                PathComponent::Ucs2String(ucs2_string) => ucs2_string.is_empty(),
+                                _ => false,
+                            }
+                        }) {
+                            path_components.pop();
+                        }
+                        Ok(Some(Path::from(path_components)))
+                    }
+                    None => Ok(None),
                 }
-                None => Ok(None),
-            },
+            }
             VfsFileEntry::Os(os_file_entry) => match os_file_entry.get_symbolic_link_target() {
                 Some(link_target) => Ok(Some(Path::from(&link_target))),
                 None => Ok(None),
@@ -663,7 +673,7 @@ impl VfsFileEntry {
                     1
                 }
             }
-            VfsFileEntry::ApfsContainer(apfs_container_file_entry) => 0,
+            VfsFileEntry::ApfsContainer(_) => 0,
             VfsFileEntry::Apm(apm_file_entry) => match apm_file_entry {
                 ApmFileEntry::Partition { .. } => 1,
                 ApmFileEntry::Root { .. } => 0,

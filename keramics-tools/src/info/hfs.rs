@@ -22,6 +22,7 @@ use keramics_formats::hfs::{
 
 use crate::formatters::ByteSize;
 
+use super::constants::*;
 use super::posix::PosixFileModeInfo;
 
 /// Hierarchical File System (HFS) file entry information.
@@ -86,7 +87,7 @@ impl HfsFileEntryInfo {
     fn get_date_time_string(date_time: &DateTime) -> String {
         match date_time {
             DateTime::HfsTime(hfs_time) => hfs_time.to_iso8601_string(),
-            DateTime::NotSet => String::from("Not set (0)"),
+            DateTime::NotSet => String::from(NOT_SET_VALUE),
             _ => return String::from("Unsupported date time"),
         }
     }

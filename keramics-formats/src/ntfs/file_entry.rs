@@ -176,12 +176,16 @@ impl NtfsFileEntry {
 
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
-        match self
-            .mft_attributes
-            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
-        {
-            Some(data_attribute) => data_attribute.data_size,
-            None => 0,
+        if self.mft_entry.base_record_file_reference != 0 {
+            0
+        } else {
+            match self
+                .mft_attributes
+                .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
+            {
+                Some(data_attribute) => data_attribute.data_size,
+                None => 0,
+            }
         }
     }
 
@@ -506,7 +510,10 @@ impl NtfsFileEntry {
             return Ok(None);
         }
         if !self.directory_index.is_initialized {
-            match self.directory_index.initialize(&self.mft_attributes) {
+            match self
+                .directory_index
+                .initialize(&self.data_stream, &self.mft_attributes)
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(
@@ -705,7 +712,10 @@ impl NtfsFileEntry {
             ));
         }
         if !self.directory_index.is_initialized {
-            match self.directory_index.initialize(&self.mft_attributes) {
+            match self
+                .directory_index
+                .initialize(&self.data_stream, &self.mft_attributes)
+            {
                 Ok(_) => {}
                 Err(mut error) => {
                     keramics_core::error_trace_add_frame!(

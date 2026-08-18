@@ -156,6 +156,8 @@ impl FakeFileEntry {
         &self,
         sub_file_entry_index: usize,
     ) -> Result<Arc<FakeFileEntry>, ErrorTrace> {
+        _ = sub_file_entry_index;
+
         todo!();
     }
 

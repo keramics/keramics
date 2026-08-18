@@ -22,6 +22,7 @@ use keramics_types::ByteString;
 
 use crate::formatters::ByteSize;
 
+use super::constants::*;
 use super::posix::PosixFileModeInfo;
 
 /// Extended File System (ext) compatible feature flags information.
@@ -122,14 +123,14 @@ impl<'a> fmt::Display for ExtDateTimeInfo<'a> {
     /// Formats date and time information for display.
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         match self.date_time {
-            DateTime::NotSet => write!(formatter, "Not set (0)"),
+            DateTime::NotSet => write!(formatter, "{}", NOT_SET_VALUE),
             DateTime::PosixTime32(posix_time32) => {
                 write!(formatter, "{}", posix_time32.to_iso8601_string())
             }
             DateTime::PosixTime64Ns(posix_time64ns) => {
                 write!(formatter, "{}", posix_time64ns.to_iso8601_string())
             }
-            _ => return write!(formatter, "Unsupported date time"),
+            _ => write!(formatter, "Unsupported date time"),
         }
     }
 }
@@ -1045,7 +1046,7 @@ mod tests {
         let date_time: DateTime = DateTime::NotSet;
         let test_struct: ExtDateTimeInfo = ExtDateTimeInfo::new(&date_time);
         let string: String = test_struct.to_string();
-        assert_eq!(string, "Not set (0)");
+        assert_eq!(string, NOT_SET_VALUE);
     }
 
     #[test]

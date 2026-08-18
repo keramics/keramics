@@ -14,6 +14,7 @@
 mod attribute;
 mod attribute_list;
 mod attribute_list_entry;
+mod bitmap;
 mod block_range;
 mod block_reader;
 mod block_stream;

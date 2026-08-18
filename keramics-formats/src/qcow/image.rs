@@ -28,7 +28,7 @@ pub struct QcowImage {
     layers: Vec<Arc<RwLock<QcowFile>>>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    bytes_per_sector: u16,
 }
 
 impl QcowImage {
@@ -38,6 +38,11 @@ impl QcowImage {
             layers: Vec::new(),
             bytes_per_sector: 0,
         }
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
     }
 
     /// Retrieves the number of layers.
@@ -168,10 +173,21 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let image: QcowImage = get_image()?;
+
+        let bytes_per_sector: u16 = image.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_number_of_layers() -> Result<(), ErrorTrace> {
         let image: QcowImage = get_image()?;
 
-        assert_eq!(image.get_number_of_layers(), 1);
+        let number_of_layers: usize = image.get_number_of_layers();
+        assert_eq!(number_of_layers, 1);
 
         Ok(())
     }

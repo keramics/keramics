@@ -180,7 +180,6 @@ impl NtfsMftAttribute {
             keramics_core::debug_trace_structure!(NtfsMftAttributeResident::debug_read_data(
                 &data[data_offset..]
             ));
-
             match resident_attribute.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {
@@ -196,7 +195,6 @@ impl NtfsMftAttribute {
             keramics_core::debug_trace_structure!(NtfsMftAttributeNonResident::debug_read_data(
                 &data[data_offset..]
             ));
-
             match non_resident_attribute.read_data(&data[data_offset..]) {
                 Ok(_) => {}
                 Err(mut error) => {

@@ -113,14 +113,15 @@ impl PdiFileSystem {
                     };
                 let media_size: u64;
                 let identifier: Uuid;
+
                 match image_layer.read() {
-                    Ok(pdi_file) => {
-                        media_size = pdi_file.get_media_size();
-                        identifier = pdi_file.get_identifier().clone();
+                    Ok(pdi_image_layer) => {
+                        media_size = pdi_image_layer.get_media_size();
+                        identifier = pdi_image_layer.get_identifier().clone();
                     }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on image layer",
+                            format!("Unable to obtain read lock on image layer: {}", layer_index),
                             error
                         ));
                     }

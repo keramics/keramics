@@ -11,201 +11,248 @@
  * under the License.
  */
 
-use keramics_core::ErrorTrace;
-use keramics_layout_map::LayoutMap;
-use keramics_types::{ByteString, bytes_to_u64_le};
+use std::cmp::Ordering;
+use std::io::SeekFrom;
 
-use super::constants::*;
-use super::object_checksum::ApfsObjectChecksum;
-use super::object_header::ApfsObjectHeader;
+use keramics_core::{DataStreamReference, ErrorTrace};
 
-#[cfg(feature = "debug-trace")]
-use super::change_information::ApfsChangeInformation;
-#[cfg(feature = "debug-trace")]
-use super::encryption_state::ApfsEncryptionState;
+use super::block_range::{NtfsBlockRange, NtfsBlockRangeType};
+use super::data_run::NtfsDataRunType;
+use super::mft_attribute::NtfsMftAttribute;
 
-#[derive(LayoutMap)]
-#[layout_map(
-    structure(
-        byte_order = "little",
-        field(name = "object_header", data_type = "Struct<ApfsObjectHeader; 32>"),
-        field(name = "signature", data_type = "ByteString<4>"),
-        field(name = "file_system_index", data_type = "u32"),
-        field(name = "feature_flags", data_type = "u64", format = "hex"),
-        field(
-            name = "read_only_compatible_feature_flags",
-            data_type = "u64",
-            format = "hex"
-        ),
-        field(name = "incompatible_feature_flags", data_type = "u64", format = "hex"),
-        field(name = "umount_time", data_type = "ApfsTime"),
-        field(name = "number_of_reserved_blocks", data_type = "u64"),
-        field(name = "number_of_quota_blocks", data_type = "u64"),
-        field(name = "number_of_allocated_blocks", data_type = "u64"),
-        field(
-            name = "encryption_state",
-            data_type = "Struct<ApfsEncryptionState; 20>"
-        ),
-        field(
-            name = "file_system_root_tree_object_type",
-            data_type = "u32",
-            format = "hex"
-        ),
-        field(
-            name = "extent_reference_tree_object_type",
-            data_type = "u32",
-            format = "hex"
-        ),
-        field(
-            name = "snapshot_metadata_tree_object_type",
-            data_type = "u32",
-            format = "hex"
-        ),
-        field(name = "object_map_block_number", data_type = "u64"),
-        field(name = "file_system_root_object_identifier", data_type = "u64"),
-        field(name = "extent_reference_tree_block_number", data_type = "u64"),
-        field(name = "snapshot_metadata_tree_block_number", data_type = "u64"),
-        field(name = "rollback_transaction_identifier", data_type = "u64"),
-        field(name = "rollback_object_identifier", data_type = "u64"),
-        field(name = "next_file_system_object_identifier", data_type = "u64"),
-        field(name = "number_of_files", data_type = "u64"),
-        field(name = "number_of_directories", data_type = "u64"),
-        field(name = "number_of_symbolic_links", data_type = "u64"),
-        field(name = "number_of_other_objects", data_type = "u64"),
-        field(name = "number_of_snapshots", data_type = "u64"),
-        field(name = "total_number_of_blocks_allocated", data_type = "u64"),
-        field(name = "total_number_of_blocks_freed", data_type = "u64"),
-        field(name = "volume_identifier", data_type = "Uuid", byte_order = "big"),
-        field(name = "modification_time", data_type = "ApfsTime"),
-        field(name = "volume_flags", data_type = "u64", format = "hex"),
-        field(
-            name = "creation_change_information",
-            data_type = "Struct<ApfsChangeInformation; 48>"
-        ),
-        field(
-            name = "modification_change_information",
-            data_type = "[Struct<ApfsChangeInformation; 48>; 8]"
-        ),
-        field(name = "volume_label", data_type = "ByteString<256>"),
-        field(name = "next_document_identifier", data_type = "u32"),
-        field(name = "volume_role_flags", data_type = "u16"),
-        field(name = "unknown1", data_type = "u16"),
-        field(name = "active_snapshot_transaction_identifier", data_type = "u64"),
-        field(name = "encryption_progress_state", data_type = "u64"),
-        field(name = "largest_clone_object_identifier", data_type = "u64"),
-        field(name = "largest_clone_transaction_identifier", data_type = "u64"),
-        field(
-            name = "extended_snapshot_metadata_object_identifier",
-            data_type = "u64"
-        ),
-        field(
-            name = "volume_group_identifier",
-            data_type = "Uuid",
-            byte_order = "big"
-        ),
-        field(name = "integrity_metadata_object_identifier", data_type = "u64"),
-        field(name = "extent_tree_object_identifier", data_type = "u64"),
-        field(name = "extent_tree_object_type", data_type = "u32", format = "hex"),
-        field(name = "unknown2", data_type = "u32", format = "hex"),
-        field(name = "unknown3", data_type = "u64"),
-        field(name = "unknown4", data_type = "[u8; 80]"),
-        field(name = "unknown5", data_type = "[u8; 2960]"),
-    ),
-    methods("debug_read_data", "read_at_position")
-)]
-/// Apple File System (APFS) volume superblock.
-pub struct ApfsVolumeSuperblock {
-    /// Object header.
-    pub object_header: ApfsObjectHeader,
+/// New Technologies File System (NTFS) bitmap.
+pub struct NtfsBitmapRange {
+    /// Start block number.
+    pub start_block_number: u64,
 
-    /// Features flags.
-    pub feature_flags: u64,
+    /// End block number.
+    pub end_block_number: u64,
 
-    /// Read-only compatible feature flags.
-    pub read_only_compatible_feature_flags: u64,
-
-    /// Incompatible feature flags.
-    pub incompatible_feature_flags: u64,
-
-    /// Number of allocated blocks.
-    pub number_of_allocated_blocks: u64,
-
-    /// Object map block number.
-    pub object_map_block_number: u64,
-
-    /// File system root object identifier.
-    pub file_system_root_object_identifier: u64,
-
-    /// Volume flags.
-    pub volume_flags: u64,
-
-    /// Volume identifier.
-    pub volume_identifier: Vec<u8>,
-
-    /// Volume label.
-    pub volume_label: ByteString,
+    /// Value to indicate the bit was set.
+    pub is_set: bool,
 }
 
-impl ApfsVolumeSuperblock {
-    /// Creates a new superblock.
-    pub fn new() -> Self {
+impl NtfsBitmapRange {
+    /// Creates a new bitmap range.
+    pub fn new(start_block_number: u64, end_block_number: u64, is_set: bool) -> Self {
         Self {
-            object_header: ApfsObjectHeader::new(),
-            feature_flags: 0,
-            read_only_compatible_feature_flags: 0,
-            incompatible_feature_flags: 0,
-            number_of_allocated_blocks: 0,
-            object_map_block_number: 0,
-            file_system_root_object_identifier: 0,
-            volume_flags: 0,
-            volume_identifier: Vec::new(),
-            volume_label: ByteString::new(),
+            start_block_number,
+            end_block_number,
+            is_set,
+        }
+    }
+}
+
+/// New Technologies File System (NTFS) bitmap.
+pub struct NtfsBitmap {
+    /// Cluster block size.
+    cluster_block_size: u32,
+
+    /// The bitmap ranges.
+    bitmap_ranges: Vec<NtfsBitmapRange>,
+}
+
+impl NtfsBitmap {
+    /// Creates a new bitmap.
+    pub fn new(cluster_block_size: u32) -> Self {
+        Self {
+            cluster_block_size,
+            bitmap_ranges: Vec::new(),
         }
     }
 
-    /// Reads the superblock from a buffer.
-    pub fn read_data(&mut self, data: &[u8]) -> Result<(), ErrorTrace> {
-        if data.len() < 4096 {
-            return Err(keramics_core::error_trace_new!("Unsupported data size"));
+    /// Checks if a block is allocated.
+    pub fn check_if_block_is_allocated(&self, block_number: u64) -> Result<bool, ErrorTrace> {
+        let mut range_index: usize = match self.bitmap_ranges.binary_search_by(|bitmap_range| {
+            if block_number >= bitmap_range.end_block_number {
+                Ordering::Less
+            } else if block_number < bitmap_range.start_block_number {
+                Ordering::Greater
+            } else {
+                Ordering::Equal
+            }
+        }) {
+            Ok(range_index) => range_index,
+            Err(_) => {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Missing bitmap range for block: {}",
+                    block_number
+                )));
+            }
+        };
+        match self.bitmap_ranges.get(range_index) {
+            Some(bitmap_range) => Ok(bitmap_range.is_set),
+            None => Err(keramics_core::error_trace_new!(format!(
+                "Unable to retrieve bitmap range: {} for block: {}",
+                range_index, block_number
+            ))),
         }
-        if &data[32..36] != APFS_VOLUME_SUPERBLOCK_SIGNATURE {
-            return Err(keramics_core::error_trace_new!("Unsupported signature"));
+    }
+
+    /// Initializes the index.
+    pub fn initialize(
+        &mut self,
+        data_stream: &DataStreamReference,
+        bitmap_attribute: &NtfsMftAttribute,
+    ) -> Result<(), ErrorTrace> {
+        if bitmap_attribute.is_resident() {
+            match self.read_data(&bitmap_attribute.resident_data, 0) {
+                Ok(_) => {}
+                Err(mut error) => {
+                    keramics_core::error_trace_add_frame!(
+                        error,
+                        "Unable to read bitmap from resident data"
+                    );
+                    return Err(error);
+                }
+            }
+        } else {
+            if bitmap_attribute.is_compressed() {
+                return Err(keramics_core::error_trace_new!(
+                    "Unsupported compressed $BITMAP attribute"
+                ));
+            }
+            let mut block_ranges: Vec<NtfsBlockRange> = Vec::new();
+            let mut virtual_cluster_number: u64 = 0;
+            let mut virtual_cluster_offset: u64 = 0;
+
+            for cluster_group in bitmap_attribute.data_cluster_groups.iter() {
+                if cluster_group.first_vcn != virtual_cluster_number {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "$BITMAP attribute cluster group first VNC: {} does not match expected value: {}",
+                        cluster_group.first_vcn, virtual_cluster_number
+                    )));
+                }
+                for data_run in cluster_group.data_runs.iter() {
+                    let range_size: u64 =
+                        data_run.number_of_blocks * (self.cluster_block_size as u64);
+
+                    let range_type: NtfsBlockRangeType = match &data_run.run_type {
+                        NtfsDataRunType::InFile => NtfsBlockRangeType::InFile,
+                        _ => {
+                            return Err(keramics_core::error_trace_new!(
+                                "Unsupported data run type"
+                            ));
+                        }
+                    };
+                    let block_range: NtfsBlockRange = NtfsBlockRange::new(
+                        virtual_cluster_offset,
+                        data_run.block_number,
+                        range_size,
+                        range_type,
+                    );
+                    block_ranges.push(block_range);
+
+                    virtual_cluster_number += data_run.number_of_blocks as u64;
+                    virtual_cluster_offset += range_size;
+                }
+                if cluster_group.last_vcn != 0xffffffffffffffff
+                    && cluster_group.last_vcn + 1 != virtual_cluster_number
+                {
+                    return Err(keramics_core::error_trace_new!(format!(
+                        "Cluster group last VNC: {} does not match expected value",
+                        cluster_group.last_vcn
+                    )));
+                }
+            }
+            let mut bitmap_block_number: u64 = 0;
+
+            for block_range in block_ranges.iter() {
+                if block_range.range_type == NtfsBlockRangeType::Sparse {
+                    bitmap_block_number += block_range.size / (self.cluster_block_size as u64);
+                    continue;
+                }
+                let mut block_offset: u64 =
+                    block_range.cluster_block_number * (self.cluster_block_size as u64);
+
+                for range_block_index in
+                    (0..block_range.size).step_by(self.cluster_block_size as usize)
+                {
+                    match self.read_at_position(
+                        data_stream,
+                        SeekFrom::Start(block_offset),
+                        bitmap_block_number,
+                    ) {
+                        Ok(_) => {}
+                        Err(mut error) => {
+                            keramics_core::error_trace_add_frame!(
+                                error,
+                                format!(
+                                    "Unable to read bitmap block at offset: {} (0x{:08x})",
+                                    block_offset, block_offset
+                                )
+                            );
+                            return Err(error);
+                        }
+                    }
+                    block_offset += self.cluster_block_size as u64;
+                    bitmap_block_number += 1;
+                }
+            }
         }
-        match self.object_header.read_data(&data) {
+        Ok(())
+    }
+
+    /// Reads the bitmap from a buffer.
+    fn read_data(&mut self, data: &[u8], mut range_block_number: u64) -> Result<(), ErrorTrace> {
+        let mut block_number: u64 = 0;
+        let mut range_bit_value: u8 = data[0] & 0x01;
+
+        for byte_value in data.iter() {
+            let mut bit_values: u8 = *byte_value;
+            for _ in 0..8 {
+                let bit_value: u8 = bit_values & 0x01;
+                bit_values >>= 1;
+
+                if bit_value != range_bit_value {
+                    self.bitmap_ranges.push(NtfsBitmapRange::new(
+                        range_block_number,
+                        block_number,
+                        range_bit_value != 0,
+                    ));
+                    range_block_number = block_number;
+                    range_bit_value = bit_value;
+                }
+                block_number += 1;
+            }
+        }
+        self.bitmap_ranges.push(NtfsBitmapRange::new(
+            range_block_number,
+            block_number,
+            range_bit_value != 0,
+        ));
+        Ok(())
+    }
+
+    /// Reads the bitmap from a specific position in a data stream.
+    fn read_at_position(
+        &mut self,
+        data_stream: &DataStreamReference,
+        position: SeekFrom,
+        bitmap_block_number: u64,
+    ) -> Result<(), ErrorTrace> {
+        let mut data: Vec<u8> = vec![0; self.cluster_block_size as usize];
+
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position,);
+
+        keramics_core::debug_trace_data!("NtfsBitmapBlock", offset, &data, self.cluster_block_size);
+
+        // TODO: debug print ranges.
+
+        match self.read_data(&data, bitmap_block_number) {
             Ok(_) => {}
             Err(mut error) => {
-                keramics_core::error_trace_add_frame!(error, "Unable to read object header");
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read bitmap block data at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
                 return Err(error);
             }
         }
-        if self.object_header.object_type != 0x0000000d {
-            return Err(keramics_core::error_trace_new!("Unsupported object type"));
-        }
-        if self.object_header.object_subtype != 0x00000000 {
-            return Err(keramics_core::error_trace_new!(
-                "Unsupported object subtype"
-            ));
-        }
-        if self.object_header.checksum != 0 {
-            let calculated_checksum: u64 = ApfsObjectChecksum::calculate(&data[8..4096]);
-
-            if self.object_header.checksum != calculated_checksum {
-                return Err(keramics_core::error_trace_new!(format!(
-                    "Mismatch between stored: 0x{:016x} and calculated: 0x{:016x} checksums",
-                    self.object_header.checksum, calculated_checksum
-                )));
-            }
-        }
-        self.feature_flags = bytes_to_u64_le!(data, 40);
-        self.read_only_compatible_feature_flags = bytes_to_u64_le!(data, 48);
-        self.incompatible_feature_flags = bytes_to_u64_le!(data, 56);
-        self.number_of_allocated_blocks = bytes_to_u64_le!(data, 88);
-        self.object_map_block_number = bytes_to_u64_le!(data, 128);
-        self.file_system_root_object_identifier = bytes_to_u64_le!(data, 136);
-        self.volume_flags = bytes_to_u64_le!(data, 264);
-        self.volume_identifier = data[240..256].to_vec();
-        self.volume_label.read_data(&data[704..960]);
-
         Ok(())
     }
 }
@@ -214,38 +261,20 @@ impl ApfsVolumeSuperblock {
 mod tests {
     use super::*;
 
-    use std::io::SeekFrom;
-
-    use keramics_core::{DataStreamReference, open_fake_data_stream};
+    use keramics_core::open_fake_data_stream;
 
     fn get_test_data() -> Vec<u8> {
         return vec![
-            0x3b, 0x96, 0xe2, 0x8a, 0x11, 0xdd, 0xec, 0x62, 0x02, 0x04, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x41, 0x50, 0x53, 0x42, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
+            0xf7, 0xff, 0x7f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0xf8, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0x0f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x91, 0xcd, 0xbb, 0xb5, 0x04, 0xfe,
-            0xc7, 0x18, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x54, 0x00, 0x46, 0x19,
-            0x01, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x40, 0x02, 0x00,
-            0x00, 0x40, 0x89, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x04, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x86, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x58, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+            0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x45, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x15, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x13, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x1f, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0xb0, 0xa6, 0x68, 0x53, 0x26, 0xca, 0x48, 0x85, 0x9c, 0x31, 0x76, 0x44,
-            0x39, 0x0c, 0xd3, 0xaa, 0xbe, 0x06, 0x49, 0x3f, 0x02, 0xfe, 0xc7, 0x18, 0x01, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x6e, 0x65, 0x77, 0x66, 0x73, 0x5f, 0x61, 0x70,
-            0x66, 0x73, 0x20, 0x28, 0x32, 0x38, 0x31, 0x31, 0x2e, 0x31, 0x32, 0x31, 0x2e, 0x31,
-            0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x65, 0x28, 0xaf, 0xc8,
-            0x01, 0xfe, 0xc7, 0x18, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x61, 0x70,
-            0x66, 0x73, 0x5f, 0x6b, 0x65, 0x78, 0x74, 0x20, 0x28, 0x32, 0x38, 0x31, 0x31, 0x2e,
-            0x31, 0x32, 0x31, 0x2e, 0x31, 0x29, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x3d, 0xee, 0xb9, 0xb5, 0x04, 0xfe, 0xc7, 0x18, 0x05, 0x00, 0x00, 0x00,
+            0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -270,8 +299,6 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x53, 0x69, 0x6e, 0x67, 0x6c, 0x65, 0x56, 0x6f, 0x6c, 0x75,
-            0x6d, 0x65, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -288,19 +315,37 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x10, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x40, 0x02, 0x00, 0x00, 0x40, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x10, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -520,74 +565,15 @@ mod tests {
     fn test_read_data() -> Result<(), ErrorTrace> {
         let test_data: Vec<u8> = get_test_data();
 
-        let mut test_struct = ApfsVolumeSuperblock::new();
-        test_struct.read_data(&test_data)?;
+        let mut test_struct = NtfsBitmap::new(4096);
+        test_struct.read_data(&test_data, 0)?;
 
-        assert_eq!(test_struct.object_header.checksum, 0x62ecdd118ae2963b);
-        assert_eq!(test_struct.object_header.identifier, 1026);
-        assert_eq!(test_struct.object_header.transaction_identifier, 6);
-        assert_eq!(test_struct.object_header.object_type, 0x0000000d);
-        assert_eq!(test_struct.object_header.object_subtype, 0x00000000);
-        assert_eq!(test_struct.feature_flags, 0x00000002);
-        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
-        assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
-        assert_eq!(test_struct.number_of_allocated_blocks, 22);
-        assert_eq!(test_struct.object_map_block_number, 137);
-        assert_eq!(test_struct.file_system_root_object_identifier, 1028);
-        assert_eq!(test_struct.volume_flags, 0x00000001);
-        assert_eq!(test_struct.volume_identifier, &test_data[240..256]);
-        assert_eq!(test_struct.volume_label, ByteString::from("SingleVolume"));
+        assert_eq!(test_struct.bitmap_ranges.len(), 10);
+        assert_eq!(test_struct.bitmap_ranges[2].start_block_number, 4);
+        assert_eq!(test_struct.bitmap_ranges[2].end_block_number, 23);
+        assert_eq!(test_struct.bitmap_ranges[2].is_set, true);
 
         Ok(())
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_data_size() {
-        let mut test_struct = ApfsVolumeSuperblock::new();
-
-        let test_data: Vec<u8> = get_test_data();
-        let result = test_struct.read_data(&test_data[0..4095]);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_signature() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[32] = 0xff;
-
-        let mut test_struct = ApfsVolumeSuperblock::new();
-        let result = test_struct.read_data(&test_data);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_object_type() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[24] = 0xff;
-
-        let mut test_struct = ApfsVolumeSuperblock::new();
-        let result = test_struct.read_data(&test_data);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_unsupported_object_subtype() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[28] = 0xff;
-
-        let mut test_struct = ApfsVolumeSuperblock::new();
-        let result = test_struct.read_data(&test_data);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_read_data_with_checksum_mismatch() {
-        let mut test_data: Vec<u8> = get_test_data();
-        test_data[0] = 0xff;
-
-        let mut test_struct = ApfsVolumeSuperblock::new();
-        let result = test_struct.read_data(&test_data);
-        assert!(result.is_err());
     }
 
     #[test]
@@ -595,23 +581,13 @@ mod tests {
         let test_data: Vec<u8> = get_test_data();
         let data_stream: DataStreamReference = open_fake_data_stream(&test_data);
 
-        let mut test_struct = ApfsVolumeSuperblock::new();
-        test_struct.read_at_position(&data_stream, SeekFrom::Start(0))?;
+        let mut test_struct = NtfsBitmap::new(4096);
+        test_struct.read_at_position(&data_stream, SeekFrom::Start(0), 0)?;
 
-        assert_eq!(test_struct.object_header.checksum, 0x62ecdd118ae2963b);
-        assert_eq!(test_struct.object_header.identifier, 1026);
-        assert_eq!(test_struct.object_header.transaction_identifier, 6);
-        assert_eq!(test_struct.object_header.object_type, 0x0000000d);
-        assert_eq!(test_struct.object_header.object_subtype, 0x00000000);
-        assert_eq!(test_struct.feature_flags, 0x00000002);
-        assert_eq!(test_struct.read_only_compatible_feature_flags, 0x00000000);
-        assert_eq!(test_struct.incompatible_feature_flags, 0x00000001);
-        assert_eq!(test_struct.number_of_allocated_blocks, 22);
-        assert_eq!(test_struct.object_map_block_number, 137);
-        assert_eq!(test_struct.file_system_root_object_identifier, 1028);
-        assert_eq!(test_struct.volume_flags, 0x00000001);
-        assert_eq!(test_struct.volume_identifier, &test_data[240..256]);
-        assert_eq!(test_struct.volume_label, ByteString::from("SingleVolume"));
+        assert_eq!(test_struct.bitmap_ranges.len(), 10);
+        assert_eq!(test_struct.bitmap_ranges[2].start_block_number, 4);
+        assert_eq!(test_struct.bitmap_ranges[2].end_block_number, 23);
+        assert_eq!(test_struct.bitmap_ranges[2].is_set, true);
 
         Ok(())
     }

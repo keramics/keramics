@@ -62,6 +62,7 @@ impl HfsBtreeNode {
     }
 
     /// Retrieves the offset of a specific record.
+    #[allow(dead_code)]
     pub fn get_record_offset_by_index(&self, record_index: usize) -> u64 {
         match self.records.get(record_index) {
             Some(node_record) => self.offset + (node_record.offset as u64),

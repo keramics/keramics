@@ -42,7 +42,7 @@ pub struct VhdxFile {
     data_stream: Option<DataStreamReference>,
 
     /// Format version.
-    pub format_version: u16,
+    format_version: u16,
 
     /// Block allocation table.
     block_allocation_table: Option<VhdxBlockAllocationTable>,
@@ -51,25 +51,25 @@ pub struct VhdxFile {
     block_tree: BlockTree<VhdxBlockRange>,
 
     /// Disk type.
-    pub disk_type: VhdxDiskType,
+    disk_type: VhdxDiskType,
 
     /// Identifier.
-    pub identifier: Uuid,
+    pub(super) identifier: Uuid,
 
     /// Parent identifier.
-    pub parent_identifier: Option<Uuid>,
+    pub(super) parent_identifier: Option<Uuid>,
 
     /// Parent name.
-    pub parent_name: Option<Ucs2String>,
+    parent_name: Option<Ucs2String>,
 
     /// Parent file.
     parent_file: Option<Arc<RwLock<VhdxFile>>>,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    pub(super) bytes_per_sector: u16,
 
     /// Block size.
-    pub block_size: u32,
+    block_size: u32,
 
     /// Number of entries per chunk;
     entries_per_chunk: u64,
@@ -81,7 +81,7 @@ pub struct VhdxFile {
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    pub(super) media_size: u64,
 }
 
 impl VhdxFile {
@@ -107,6 +107,31 @@ impl VhdxFile {
         }
     }
 
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the disk type.
+    pub fn get_disk_type(&self) -> &VhdxDiskType {
+        &self.disk_type
+    }
+
+    /// Retrieves the format version.
+    pub fn get_format_version(&self) -> u16 {
+        self.format_version
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> &Uuid {
+        &self.identifier
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
+    }
+
     /// Retrieves the parent file name
     pub fn get_parent_file_name(&self) -> Option<Ucs2String> {
         match &self.parent_name {
@@ -124,6 +149,16 @@ impl VhdxFile {
             }
             None => None,
         }
+    }
+
+    /// Retrieves the parent identifier.
+    pub fn get_parent_identifier(&self) -> Option<&Uuid> {
+        self.parent_identifier.as_ref()
+    }
+
+    /// Retrieves the parent name.
+    pub fn get_parent_name(&self) -> Option<&Ucs2String> {
+        self.parent_name.as_ref()
     }
 
     /// Reads a file from a data stream.
@@ -903,6 +938,58 @@ mod tests {
     }
 
     #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let bytes_per_sector: u16 = file.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_disk_type() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let disk_type: &VhdxDiskType = file.get_disk_type();
+        assert_eq!(disk_type, &VhdxDiskType::Fixed);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let format_version: u16 = file.get_format_version();
+        assert_eq!(format_version, 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let identifier: &Uuid = file.get_identifier();
+        assert_eq!(
+            identifier.to_string(),
+            "ee10a932-6284-f448-aaab-ab839f90ddef"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let media_size: u64 = file.get_media_size();
+        assert_eq!(media_size, 4194304);
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_parent_file_name() -> Result<(), ErrorTrace> {
         let mut file: VhdxFile = VhdxFile::new();
 
@@ -913,6 +1000,26 @@ mod tests {
 
         let parent_file_name: Option<Ucs2String> = file.get_parent_file_name();
         assert_eq!(parent_file_name, Some(Ucs2String::from("ntfs-parent.vhdx")));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_parent_identifier() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let parent_identifier: Option<&Uuid> = file.get_parent_identifier();
+        assert!(parent_identifier.is_none());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_parent_name() -> Result<(), ErrorTrace> {
+        let file: VhdxFile = get_file()?;
+
+        let parent_name: Option<&Ucs2String> = file.get_parent_name();
+        assert!(parent_name.is_none());
 
         Ok(())
     }

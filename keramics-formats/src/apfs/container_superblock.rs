@@ -171,13 +171,15 @@ impl ApfsContainerSuperblock {
                 "Unsupported object subtype"
             ));
         }
-        let calculated_checksum: u64 = ApfsObjectChecksum::calculate(&data[8..4096]);
+        if self.object_header.checksum != 0 {
+            let calculated_checksum: u64 = ApfsObjectChecksum::calculate(&data[8..4096]);
 
-        if self.object_header.checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:016x} and calculated: 0x{:016x} checksums",
-                self.object_header.checksum, calculated_checksum
-            )));
+            if self.object_header.checksum != calculated_checksum {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:016x} and calculated: 0x{:016x} checksums",
+                    self.object_header.checksum, calculated_checksum
+                )));
+            }
         }
         let maximum_number_of_volumes: u32 = bytes_to_u32_le!(data, 180);
 
@@ -197,6 +199,7 @@ impl ApfsContainerSuperblock {
         self.checkpoint_descriptor_area.block_number = bytes_to_u64_le!(data, 112);
         self.object_map_block_number = bytes_to_u64_le!(data, 160);
 
+        self.volume_object_identifiers.clear();
         for data_offset in (184..984).step_by(8) {
             let volume_object_identifier: u64 = bytes_to_u64_le!(data, data_offset);
             if volume_object_identifier != 0 {

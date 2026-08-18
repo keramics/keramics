@@ -159,7 +159,7 @@ mod tests {
     use crate::tests::get_test_data_path;
 
     fn get_partition() -> Result<GptPartition, ErrorTrace> {
-        let identifier: Uuid = Uuid::new();
+        let identifier: Uuid = Uuid::from_string("0b119671-75ff-4e2a-a31a-0bc83f857fdd")?;
         let type_identifier: Uuid = Uuid::new();
         let mut partition = GptPartition::new(0, 1048576, 65536, &type_identifier, &identifier);
 
@@ -171,7 +171,18 @@ mod tests {
         Ok(partition)
     }
 
-    // TODO: add tests for get_identifier
+    #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let partition: GptPartition = get_partition()?;
+
+        let identifier: &Uuid = partition.get_identifier();
+        assert_eq!(
+            identifier.to_string(),
+            "0b119671-75ff-4e2a-a31a-0bc83f857fdd"
+        );
+        Ok(())
+    }
+
     // TODO: add tests for get_partition_index
     // TODO: add tests for get_type_identifier
 

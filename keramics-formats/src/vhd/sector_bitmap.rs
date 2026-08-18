@@ -62,12 +62,11 @@ impl VhdSectorBitmap {
         let mut range_offset: u64 = 0;
         let mut range_bit_value: u8 = data[0] >> 7;
 
-        for data_offset in 0..data.len() {
-            let mut byte_value: u8 = data[data_offset];
-
+        for byte_value in data.iter() {
+            let mut bit_values: u8 = *byte_value;
             for _ in (0..8).rev() {
-                let bit_value: u8 = byte_value & 0x01;
-                byte_value >>= 1;
+                let bit_value: u8 = bit_values & 0x01;
+                bit_values >>= 1;
 
                 if bit_value != range_bit_value {
                     self.ranges.push(VhdSectorBitmapRange::new(
@@ -75,7 +74,6 @@ impl VhdSectorBitmap {
                         offset,
                         range_bit_value != 0,
                     ));
-
                     range_offset = offset;
                     range_bit_value = bit_value;
                 }
@@ -98,16 +96,27 @@ impl VhdSectorBitmap {
     ) -> Result<(), ErrorTrace> {
         let mut data: Vec<u8> = vec![0; self.size];
 
-        keramics_core::data_stream_read_exact_at_position_with_debug_trace_data!(
-            "VhdSectorBitmap",
-            data_stream,
-            &mut data,
-            self.size,
-            position,
-        );
+        let offset: u64 =
+            keramics_core::data_stream_read_exact_at_position!(data_stream, &mut data, position,);
+
+        keramics_core::debug_trace_data!("VhdSectorBitmap", offset, &data, self.size,);
+
         // TODO: debug print ranges.
 
-        self.read_data(&data)
+        match self.read_data(&data) {
+            Ok(_) => {}
+            Err(mut error) => {
+                keramics_core::error_trace_add_frame!(
+                    error,
+                    format!(
+                        "Unable to read sector bitmap data at offset: {} (0x{:08x})",
+                        offset, offset
+                    )
+                );
+                return Err(error);
+            }
+        }
+        Ok(())
     }
 }
 

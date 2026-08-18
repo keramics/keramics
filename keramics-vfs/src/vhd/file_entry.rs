@@ -16,6 +16,7 @@ use std::sync::Arc;
 use keramics_core::{DataStreamReference, ErrorTrace};
 use keramics_formats::PathComponent;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
+use keramics_types::Uuid;
 
 use crate::enums::VfsFileType;
 
@@ -31,6 +32,9 @@ pub enum VhdFileEntry {
 
         /// Size.
         size: u64,
+
+        /// Identifier.
+        identifier: Uuid,
     },
 
     /// Root file entry.
@@ -54,6 +58,22 @@ impl VhdFileEntry {
         match self {
             VhdFileEntry::Layer { .. } => VfsFileType::File,
             VhdFileEntry::Root { .. } => VfsFileType::Directory,
+        }
+    }
+
+    /// Retrieves the identifier.
+    pub fn get_identifier(&self) -> Option<&Uuid> {
+        match self {
+            VhdFileEntry::Layer { identifier, .. } => Some(&identifier),
+            VhdFileEntry::Root { .. } => None,
+        }
+    }
+
+    /// Retrieves the (image) layer number.
+    pub fn get_layer_number(&self) -> Option<usize> {
+        match self {
+            VhdFileEntry::Layer { index, .. } => Some(index + 1),
+            VhdFileEntry::Root { .. } => None,
         }
     }
 
@@ -92,19 +112,29 @@ impl VhdFileEntry {
             }
             VhdFileEntry::Root { image } => match image.get_layer_by_index(sub_file_entry_index) {
                 Ok(image_layer) => {
-                    let media_size: u64 = match image_layer.read() {
-                        Ok(vhd_file) => vhd_file.media_size,
+                    let media_size: u64;
+                    let identifier: Uuid;
+
+                    match image_layer.read() {
+                        Ok(vhd_file) => {
+                            media_size = vhd_file.get_media_size();
+                            identifier = vhd_file.get_identifier().clone();
+                        }
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to obtain read lock on image layer",
+                                format!(
+                                    "Unable to obtain read lock on image layer: {}",
+                                    sub_file_entry_index
+                                ),
                                 error
                             ));
                         }
-                    };
+                    }
                     Ok(VhdFileEntry::Layer {
                         index: sub_file_entry_index,
                         layer: image_layer.clone(),
                         size: media_size,
+                        identifier,
                     })
                 }
                 Err(mut error) => {
@@ -137,7 +167,7 @@ mod tests {
 
     use crate::tests::get_test_data_path;
 
-    fn get_image() -> Result<VhdImage, ErrorTrace> {
+    fn get_image() -> Result<Arc<VhdImage>, ErrorTrace> {
         let mut image: VhdImage = VhdImage::new();
 
         let path_string: String = get_test_data_path("vhd");
@@ -146,20 +176,48 @@ mod tests {
         let file_name: PathComponent = PathComponent::from("ntfs-differential.vhd");
         image.open(&file_resolver, &file_name)?;
 
-        Ok(image)
+        Ok(Arc::new(image))
+    }
+
+    fn get_layer_file_entry(image: &Arc<VhdImage>) -> Result<VhdFileEntry, ErrorTrace> {
+        let image_layer: VhdImageLayer = image.get_layer_by_index(0)?;
+
+        let media_size: u64;
+        let identifier: Uuid;
+
+        match image_layer.read() {
+            Ok(vhd_file) => {
+                media_size = vhd_file.get_media_size();
+                identifier = vhd_file.get_identifier().clone();
+            }
+            Err(error) => {
+                return Err(keramics_core::error_trace_new_with_error!(
+                    "Unable to obtain read lock on image layer",
+                    error
+                ));
+            }
+        }
+        Ok(VhdFileEntry::Layer {
+            index: 0,
+            layer: image_layer.clone(),
+            size: media_size,
+            identifier,
+        })
+    }
+
+    fn get_root_file_entry(image: &Arc<VhdImage>) -> VhdFileEntry {
+        VhdFileEntry::Root {
+            image: image.clone(),
+        }
     }
 
     // TODO: add tests for get_data_stream
 
     #[test]
     fn test_get_file_type() -> Result<(), ErrorTrace> {
-        let vhd_image: VhdImage = get_image()?;
+        let test_image: Arc<VhdImage> = get_image()?;
 
-        let test_image: Arc<VhdImage> = Arc::new(vhd_image);
-
-        let file_entry = VhdFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
 
         let file_type: VfsFileType = file_entry.get_file_type();
         assert_eq!(file_type, VfsFileType::Directory);
@@ -168,24 +226,49 @@ mod tests {
     }
 
     #[test]
+    fn test_get_identifier() -> Result<(), ErrorTrace> {
+        let test_image: Arc<VhdImage> = get_image()?;
+
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
+        let result: Option<&Uuid> = file_entry.get_identifier();
+        assert!(result.is_none());
+
+        let file_entry: VhdFileEntry = get_layer_file_entry(&test_image)?;
+        let identifier: &Uuid = file_entry.get_identifier().unwrap();
+        assert_eq!(
+            identifier.to_string(),
+            "e7ea9200-8493-954e-a816-9572339be931"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_layer_number() -> Result<(), ErrorTrace> {
+        let test_image: Arc<VhdImage> = get_image()?;
+
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
+
+        let layer_number: Option<usize> = file_entry.get_layer_number();
+        assert_eq!(layer_number, None);
+
+        let file_entry: VhdFileEntry = get_layer_file_entry(&test_image)?;
+
+        let layer_number: Option<usize> = file_entry.get_layer_number();
+        assert_eq!(layer_number, Some(1));
+
+        Ok(())
+    }
+
+    #[test]
     fn test_get_name() -> Result<(), ErrorTrace> {
-        let vhd_image: VhdImage = get_image()?;
+        let test_image: Arc<VhdImage> = get_image()?;
 
-        let test_image: Arc<VhdImage> = Arc::new(vhd_image);
-
-        let file_entry = VhdFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::Root);
 
-        let vhd_image_layer: VhdImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdFileEntry::Layer {
-            index: 0,
-            layer: vhd_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: VhdFileEntry = get_layer_file_entry(&test_image)?;
 
         let name: PathComponent = file_entry.get_name();
         assert_eq!(name, PathComponent::from("vhd1"));
@@ -195,23 +278,14 @@ mod tests {
 
     #[test]
     fn test_get_size() -> Result<(), ErrorTrace> {
-        let vhd_image: VhdImage = get_image()?;
+        let test_image: Arc<VhdImage> = get_image()?;
 
-        let test_image: Arc<VhdImage> = Arc::new(vhd_image);
-
-        let file_entry = VhdFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 0);
 
-        let vhd_image_layer: VhdImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdFileEntry::Layer {
-            index: 0,
-            layer: vhd_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: VhdFileEntry = get_layer_file_entry(&test_image)?;
 
         let size: u64 = file_entry.get_size();
         assert_eq!(size, 4194304);
@@ -221,23 +295,14 @@ mod tests {
 
     #[test]
     fn test_get_number_of_sub_file_entries() -> Result<(), ErrorTrace> {
-        let vhd_image: VhdImage = get_image()?;
+        let test_image: Arc<VhdImage> = get_image()?;
 
-        let test_image: Arc<VhdImage> = Arc::new(vhd_image);
-
-        let file_entry = VhdFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 2);
 
-        let vhd_image_layer: VhdImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdFileEntry::Layer {
-            index: 0,
-            layer: vhd_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: VhdFileEntry = get_layer_file_entry(&test_image)?;
 
         let number_of_sub_file_entries: usize = file_entry.get_number_of_sub_file_entries();
         assert_eq!(number_of_sub_file_entries, 0);
@@ -247,13 +312,9 @@ mod tests {
 
     #[test]
     fn test_get_sub_file_entry_by_index() -> Result<(), ErrorTrace> {
-        let vhd_image: VhdImage = get_image()?;
+        let test_image: Arc<VhdImage> = get_image()?;
 
-        let test_image: Arc<VhdImage> = Arc::new(vhd_image);
-
-        let file_entry = VhdFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
 
         let sub_file_entry: VhdFileEntry = file_entry.get_sub_file_entry_by_index(0)?;
 
@@ -268,22 +329,13 @@ mod tests {
 
     #[test]
     fn test_is_root_file_entry() -> Result<(), ErrorTrace> {
-        let vhd_image: VhdImage = get_image()?;
+        let test_image: Arc<VhdImage> = get_image()?;
 
-        let test_image: Arc<VhdImage> = Arc::new(vhd_image);
-
-        let file_entry = VhdFileEntry::Root {
-            image: test_image.clone(),
-        };
+        let file_entry: VhdFileEntry = get_root_file_entry(&test_image);
 
         assert_eq!(file_entry.is_root_file_entry(), true);
 
-        let vhd_image_layer: VhdImageLayer = test_image.get_layer_by_index(0)?;
-        let file_entry = VhdFileEntry::Layer {
-            index: 0,
-            layer: vhd_image_layer.clone(),
-            size: 4194304,
-        };
+        let file_entry: VhdFileEntry = get_layer_file_entry(&test_image)?;
 
         assert_eq!(file_entry.is_root_file_entry(), false);
 

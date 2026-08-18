@@ -92,7 +92,7 @@ The object header (obj_phys_t) is 32 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
-| 0 | 8 | | [Object checksum](#object_checksum) (o_cksum) |
+| 0 | 8 | | [Object checksum](#object_checksum) (o_cksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier (o_oid) |
 | 16 | 8 | | Object transaction identifier (o_xid), which contains the identifier of the most recent transaction that this object was modified in |
 | 24 | 4 | | [Object type](#object_types) (o_type) |
@@ -223,7 +223,7 @@ A B-tree root or node (or object) consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header (btn_o)*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x00000002 or 0x40000002 | [Object type](#object_types) |
@@ -240,7 +240,7 @@ A B-tree root or node (or object) consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header (btn_o)*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x00000003 or 0x40000003 | [Object type](#object_types) |
@@ -390,7 +390,7 @@ The container superblock (nx_superblock_t) is 4096 bytes in size and consists of
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x80000001 | [Object type](#object_types) |
@@ -510,7 +510,7 @@ The checkpoint map object (checkpoint_map_phys_t) is 4096 bytes in size and cons
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x4000000c | [Object type](#object_types) |
@@ -565,7 +565,7 @@ The object map object (omap_phys_t) is 4096 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x4000000b | [Object type](#object_types) |
@@ -654,7 +654,7 @@ The space manager (spaceman_phys_t) is of variable size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header (sm_o)*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x80000005 | [Object type](#object_types) |
@@ -769,7 +769,7 @@ The chunk information address block (cib_addr_block_t) is of variable size and c
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header (cab_o)*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x40000006 | [Object type](#object_types) |
@@ -791,7 +791,7 @@ The chunk information block (chunk_info_block_t) is of variable size and consist
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header (cib_o)*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x40000007 | [Object type](#object_types) |
@@ -825,7 +825,7 @@ The reaper is of unknown size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x80000011 | [Object type](#object_types) |
@@ -856,7 +856,7 @@ The reaper list entry is of unknown size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x80000012 | [Object type](#object_types) |
@@ -907,7 +907,7 @@ The container key bag object is 32 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x6b657973 ("syek") | [Object type](#object_types) |
@@ -926,7 +926,7 @@ The volume key bag object is 32 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x72656373 ("scer") | [Object type](#object_types) |
@@ -1090,7 +1090,7 @@ The volume superblock (apfs_superblock_t) is 4096 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x0000000d or 0x4000000d (for snapshots) | [Object type](#object_types) |
@@ -1947,7 +1947,7 @@ The EFI jumpstart (nx_efi_jumpstart_t) is of variable size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x00000014 | [Object type](#object_types) |
@@ -1995,7 +1995,7 @@ The snapshot metadata tree object is 32 bytes in size and consists of:
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x40000002 or 0x40000003 | [Object type](#object_types) |
@@ -2057,7 +2057,7 @@ TODO: complete this section.
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
 | <td colspan="4">*Object header*</td> |
-| 0 | 8 | | [Object checksum](#object_checksum) |
+| 0 | 8 | | [Object checksum](#object_checksum), which contains 0 if not set |
 | 8 | 8 | | Object identifier |
 | 16 | 8 | | Object transaction identifier (xid) |
 | 24 | 4 | 0x40000002 | [Object type](#object_types) |

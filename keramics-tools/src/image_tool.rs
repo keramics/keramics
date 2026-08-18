@@ -745,6 +745,34 @@ impl ImageTool {
                         _ => path_string,
                     }
                 }
+                VfsFileEntry::Vhd(vhd_file_entry) => {
+                    let path_string: String = match vhd_file_entry.get_layer_number() {
+                        Some(layer_number) => format!("/vhd{}", layer_number),
+                        _ => path.to_string(),
+                    };
+                    match vhd_file_entry.get_identifier() {
+                        Some(identifier) => format!(
+                            "{} (alias: /vhd{{{}}})",
+                            path_string,
+                            identifier.to_string()
+                        ),
+                        _ => path_string,
+                    }
+                }
+                VfsFileEntry::Vhdx(vhdx_file_entry) => {
+                    let path_string: String = match vhdx_file_entry.get_layer_number() {
+                        Some(layer_number) => format!("/vhdx{}", layer_number),
+                        _ => path.to_string(),
+                    };
+                    match vhdx_file_entry.get_identifier() {
+                        Some(identifier) => format!(
+                            "{} (alias: /vhdx{{{}}})",
+                            path_string,
+                            identifier.to_string()
+                        ),
+                        _ => path_string,
+                    }
+                }
                 _ => path.to_string(),
             },
             None => path.to_string(),
