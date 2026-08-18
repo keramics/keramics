@@ -13,7 +13,7 @@
 
 use std::collections::HashMap;
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub enum PlistObject {
     /// Collection of values without a key.
     Array(Vec<PlistObject>),

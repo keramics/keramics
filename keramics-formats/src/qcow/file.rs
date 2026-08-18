@@ -31,10 +31,10 @@ pub struct QcowFile {
     data_stream: Option<DataStreamReference>,
 
     /// Format version.
-    pub format_version: u32,
+    format_version: u32,
 
     /// Bytes per sector.
-    pub bytes_per_sector: u16,
+    pub(super) bytes_per_sector: u16,
 
     /// File header size.
     file_header_size: u32,
@@ -76,10 +76,10 @@ pub struct QcowFile {
     compression_flag_bit_mask: u64,
 
     /// Compression method.
-    pub compression_method: QcowCompressionMethod,
+    compression_method: QcowCompressionMethod,
 
     /// Encryption method.
-    pub encryption_method: QcowEncryptionMethod,
+    encryption_method: QcowEncryptionMethod,
 
     /// Block tree.
     block_tree: BlockTree<QcowBlockRange>,
@@ -94,7 +94,7 @@ pub struct QcowFile {
     current_offset: u64,
 
     /// Media size.
-    pub media_size: u64,
+    pub(super) media_size: u64,
 }
 
 impl QcowFile {
@@ -130,6 +130,31 @@ impl QcowFile {
     /// Retrieves the backing file name.
     pub fn get_backing_file_name(&self) -> Option<&ByteString> {
         self.backing_file_name.as_ref()
+    }
+
+    /// Retrieves the bytes per sector.
+    pub fn get_bytes_per_sector(&self) -> u16 {
+        self.bytes_per_sector
+    }
+
+    /// Retrieves the compression method.
+    pub fn get_compression_method(&self) -> &QcowCompressionMethod {
+        &self.compression_method
+    }
+
+    /// Retrieves the encryption method.
+    pub fn get_encryption_method(&self) -> &QcowEncryptionMethod {
+        &self.encryption_method
+    }
+
+    /// Retrieves the format version.
+    pub fn get_format_version(&self) -> u32 {
+        self.format_version
+    }
+
+    /// Retrieves the media size.
+    pub fn get_media_size(&self) -> u64 {
+        self.media_size
     }
 
     /// Reads a data stream.
@@ -616,6 +641,56 @@ mod tests {
 
         let backing_file_name: Option<&ByteString> = file.get_backing_file_name();
         assert_eq!(backing_file_name, None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_bytes_per_sector() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file()?;
+
+        let bytes_per_sector: u16 = file.get_bytes_per_sector();
+        assert_eq!(bytes_per_sector, 512);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_compression_method() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file()?;
+
+        let compression_method: &QcowCompressionMethod = file.get_compression_method();
+        assert_eq!(compression_method, &QcowCompressionMethod::Zlib);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_encryption_method() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file()?;
+
+        let encryption_method: &QcowEncryptionMethod = file.get_encryption_method();
+        assert_eq!(encryption_method, &QcowEncryptionMethod::None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_format_version() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file()?;
+
+        let format_version: u32 = file.get_format_version();
+        assert_eq!(format_version, 3);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_media_size() -> Result<(), ErrorTrace> {
+        let file: QcowFile = get_file()?;
+
+        let media_size: u64 = file.get_media_size();
+        assert_eq!(media_size, 4194304);
 
         Ok(())
     }

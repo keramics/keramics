@@ -52,7 +52,7 @@ impl VfsCredentialStore {
     pub fn iter(&self) -> IntoIter<VfsCredential> {
         let credentials: Vec<VfsCredential> = match self.credentials.read() {
             Ok(credentials) => credentials.clone(),
-            Err(error) => Vec::new(),
+            Err(_) => Vec::new(),
         };
         credentials.into_iter()
     }

@@ -76,7 +76,7 @@ impl QcowFileSystem {
 
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        Ok(self.image.bytes_per_sector as u32)
+        Ok(self.image.get_bytes_per_sector() as u32)
     }
 
     /// Retrieves the file entry with the specific location.
@@ -109,15 +109,17 @@ impl QcowFileSystem {
                         return Err(error);
                     }
                 };
-                let media_size: u64 = match image_layer.read() {
-                    Ok(qcow_file) => qcow_file.media_size,
+                let media_size: u64;
+
+                match image_layer.read() {
+                    Ok(qcow_file) => media_size = qcow_file.get_media_size(),
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on image layer",
+                            format!("Unable to obtain read lock on image layer: {}", layer_index),
                             error
                         ));
                     }
-                };
+                }
                 Ok(Some(QcowFileEntry::Layer {
                     index: layer_index,
                     layer: image_layer.clone(),

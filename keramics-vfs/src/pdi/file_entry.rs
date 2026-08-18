@@ -114,6 +114,7 @@ impl PdiFileEntry {
                 Ok(image_layer) => {
                     let media_size: u64;
                     let identifier: Uuid;
+
                     match image_layer.read() {
                         Ok(pdi_image_layer) => {
                             media_size = pdi_image_layer.get_media_size();
@@ -121,7 +122,10 @@ impl PdiFileEntry {
                         }
                         Err(error) => {
                             return Err(keramics_core::error_trace_new_with_error!(
-                                "Unable to obtain read lock on image layer",
+                                format!(
+                                    "Unable to obtain read lock on image layer: {}",
+                                    sub_file_entry_index
+                                ),
                                 error
                             ));
                         }
@@ -230,22 +234,32 @@ mod tests {
         let test_image: Arc<PdiImage> = get_image()?;
 
         let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
-        let identifier: Option<&Uuid> = file_entry.get_identifier();
-        assert_eq!(identifier, None);
+        let result: Option<&Uuid> = file_entry.get_identifier();
+        assert!(result.is_none());
 
         let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
-        let identifier: Option<&Uuid> = file_entry.get_identifier();
+        let identifier: &Uuid = file_entry.get_identifier().unwrap();
         assert_eq!(
-            identifier,
-            Some(Uuid {
-                part1: 0x5fbaabe3,
-                part2: 0x6958,
-                part3: 0x40ff,
-                part4: 0x92a7,
-                part5: 0x860e329aab41,
-            })
-            .as_ref()
+            identifier.to_string(),
+            "5fbaabe3-6958-40ff-92a7-860e329aab41"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_layer_number() -> Result<(), ErrorTrace> {
+        let test_image: Arc<PdiImage> = get_image()?;
+
+        let file_entry: PdiFileEntry = get_root_file_entry(&test_image);
+
+        let layer_number: Option<usize> = file_entry.get_layer_number();
+        assert_eq!(layer_number, None);
+
+        let file_entry: PdiFileEntry = get_layer_file_entry(&test_image)?;
+
+        let layer_number: Option<usize> = file_entry.get_layer_number();
+        assert_eq!(layer_number, Some(1));
+
         Ok(())
     }
 

@@ -82,7 +82,7 @@ fn read_media_fixed() -> Result<(), ErrorTrace> {
     let mut file: VhdxFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "75537374a81c40e51e6a4b812b36ce89");
 
     Ok(())
@@ -94,7 +94,7 @@ fn read_media_dynamic() -> Result<(), ErrorTrace> {
     let mut file: VhdxFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "20158534070142d63ee02c9ad1a9d87e");
 
     Ok(())
@@ -106,7 +106,7 @@ fn read_media_sparse_dynamic() -> Result<(), ErrorTrace> {
     let mut file: VhdxFile = open_file(&path_buf)?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "b1760d0b35a512ef56970df4e6f8c5d6");
 
     Ok(())
@@ -123,7 +123,7 @@ fn read_media_differential() -> Result<(), ErrorTrace> {
     file.set_parent(&Arc::new(RwLock::new(parent_file)))?;
 
     let (media_offset, md5_hash): (u64, String) = read_media_from_file(&mut file)?;
-    assert_eq!(media_offset, file.media_size);
+    assert_eq!(media_offset, file.get_media_size());
     assert_eq!(md5_hash.as_str(), "a25df0058eecd8aa1975a68eeaa0e178");
 
     Ok(())

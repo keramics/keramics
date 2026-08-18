@@ -22,6 +22,7 @@ use keramics_hashes::{DigestHashContext, Md5Context};
 use std::fs::File;
 use std::io::Write;
 
+#[allow(dead_code)]
 fn read_media_from_file_with_output_file(
     file: &mut SparseImageFile,
 ) -> Result<(u64, String), ErrorTrace> {

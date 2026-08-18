@@ -197,6 +197,7 @@ impl ApfsContainerSuperblock {
         self.checkpoint_descriptor_area.block_number = bytes_to_u64_le!(data, 112);
         self.object_map_block_number = bytes_to_u64_le!(data, 160);
 
+        self.volume_object_identifiers.clear();
         for data_offset in (184..984).step_by(8) {
             let volume_object_identifier: u64 = bytes_to_u64_le!(data, data_offset);
             if volume_object_identifier != 0 {

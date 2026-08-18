@@ -232,22 +232,15 @@ mod tests {
 
         let file_entry: GptFileEntry = get_root_file_entry(&gpt_volume_system);
 
-        let identifier: Option<&Uuid> = file_entry.get_identifier();
-        assert_eq!(identifier, None);
+        let result: Option<&Uuid> = file_entry.get_identifier();
+        assert!(result.is_none());
 
         let file_entry: GptFileEntry = get_partition_file_entry(&gpt_volume_system)?;
 
-        let identifier: Option<&Uuid> = file_entry.get_identifier();
+        let identifier: &Uuid = file_entry.get_identifier().unwrap();
         assert_eq!(
-            identifier,
-            Some(Uuid {
-                part1: 0x0b119671,
-                part2: 0x75ff,
-                part3: 0x4e2a,
-                part4: 0xa31a,
-                part5: 0x0bc83f857fdd,
-            })
-            .as_ref()
+            identifier.to_string(),
+            "0b119671-75ff-4e2a-a31a-0bc83f857fdd"
         );
         Ok(())
     }

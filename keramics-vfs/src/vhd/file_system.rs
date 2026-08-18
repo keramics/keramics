@@ -16,6 +16,7 @@ use std::sync::Arc;
 use keramics_core::ErrorTrace;
 use keramics_formats::vhd::{VhdImage, VhdImageLayer};
 use keramics_formats::{FileResolverReference, Path, PathComponent};
+use keramics_types::Uuid;
 
 use crate::file_resolver::new_vfs_file_resolver;
 use crate::location::VfsLocation;
@@ -76,7 +77,7 @@ impl VhdFileSystem {
 
     /// Retrieves the bytes per sector.
     pub(crate) fn get_bytes_per_sector(&self) -> Result<u32, ErrorTrace> {
-        Ok(self.image.bytes_per_sector as u32)
+        Ok(self.image.get_bytes_per_sector() as u32)
     }
 
     /// Retrieves the file entry with the specific location.
@@ -109,19 +110,26 @@ impl VhdFileSystem {
                         return Err(error);
                     }
                 };
-                let media_size: u64 = match image_layer.read() {
-                    Ok(vhd_file) => vhd_file.media_size,
+                let media_size: u64;
+                let identifier: Uuid;
+
+                match image_layer.read() {
+                    Ok(vhd_file) => {
+                        media_size = vhd_file.get_media_size();
+                        identifier = vhd_file.get_identifier().clone();
+                    }
                     Err(error) => {
                         return Err(keramics_core::error_trace_new_with_error!(
-                            "Unable to obtain read lock on image layer",
+                            format!("Unable to obtain read lock on image layer: {}", layer_index),
                             error
                         ));
                     }
-                };
+                }
                 Ok(Some(VhdFileEntry::Layer {
                     index: layer_index,
                     layer: image_layer.clone(),
                     size: media_size,
+                    identifier,
                 }))
             }
             None => {

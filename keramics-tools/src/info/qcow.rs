@@ -125,11 +125,11 @@ impl QcowInfo {
     fn get_file_information(qcow_file: &QcowFile) -> QcowFileInfo {
         let mut file_information: QcowFileInfo = QcowFileInfo::new();
 
-        file_information.format_version = qcow_file.format_version;
-        file_information.compression_method = qcow_file.compression_method.clone();
-        file_information.encryption_method = qcow_file.encryption_method.clone();
+        file_information.format_version = qcow_file.get_format_version();
+        file_information.compression_method = qcow_file.get_compression_method().clone();
+        file_information.encryption_method = qcow_file.get_encryption_method().clone();
         file_information.backing_file_name = qcow_file.get_backing_file_name().cloned();
-        file_information.media_size = qcow_file.media_size;
+        file_information.media_size = qcow_file.get_media_size();
 
         file_information
     }
