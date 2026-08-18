@@ -1,7 +1,7 @@
 # New Technologies File System (NTFS) format
 
-The New Technologies File System (NTFS) format is the primary file system for
-Microsoft Windows versions that are based on Windows NT.
+The New Technologies File System (NTFS) format is the primary file system for Microsoft Windows
+versions that are based on Windows NT.
 
 ## Overview
 
@@ -30,45 +30,41 @@ An New Technologies File System (NTFS) consists of:
 | 3.0 | Introduced in Windows 2000 |
 | 3.1 | Introduced in Windows XP |
 
-> Note that the format versions mentioned above are the version as used by NTFS.
-> Another common versioning schema uses the Windows version, e.g. NTFS 5.0 is the
-> version of NTFS used on Windows XP which is version 3.1 in schema mentioned
-> above.
+> Note that the format versions mentioned above are the version as used by NTFS. Another common
+versioning schema uses the Windows version, e.g. NTFS 5.0 is the version of NTFS used on Windows XP
+which is version 3.1 in schema mentioned above.
 
-Windows does not necessarily uses the latest format version, e.g. Windows 10 (1809)
-has been observed to use NTFS version 1.2 for 64k cluster block size.
+Windows does not necessarily uses the latest format version, e.g. Windows 10 (1809) has been
+observed to use NTFS version 1.2 for 64k cluster block size.
 
 ### Terminology
 
 #### Cluster
 
-NTFS refers to it file system blocks as clusters. Note that these are not the
-same as the physical clusters of a harddisk. For clarity this document will
-refer to these as cluster blocks. In other sources they are also referred to as
-logical clusters.
+NTFS refers to it file system blocks as clusters. Note that these are not the same as the physical
+clusters of a harddisk. For clarity this document will refer to these as cluster blocks. In other
+sources they are also referred to as logical clusters.
 
-Typically a cluster block is 8 sectors (or 8 x 512 = 4096 bytes) in size. A
-cluster block number is relative to the start of the boot record.
+Typically a cluster block is 8 sectors (or 8 x 512 = 4096 bytes) in size. A cluster block number is
+relative to the start of the boot record.
 
 #### Virtual cluster
 
-The term virtual cluster refers to cluster blocks which are relative to the
-start of a data stream.
+The term virtual cluster refers to cluster blocks which are relative to the start of a data stream.
 
 #### Long and short (file) name
 
-In Windows terminology the name of a file (or directory) can either be short or
-long. The short name is an equivalent of the file name in the (DOS) 8.3 format.
-The long name is actual the (full) name of the file. The term long refers to
-the aspect that the name is longer than the short variant. Because most
-documentation refer to the (full) name as the long name, for clarity sake so
+In Windows terminology the name of a file (or directory) can either be short or long. The short
+name is an equivalent of the file name in the (DOS) 8.3 format. The long name is actual the (full)
+name of the file. The term long refers to the aspect that the name is longer than the short
+variant. Because most documentation refer to the (full) name as the long name, for clarity sake so
 will this document.
 
 #### Metadata files
 
-NTFS uses the Master File Table (MFT) to store information about files and
-directories. The MFT entries reference the different volume and file system
-metadata. There are several predefined metadata files.
+NTFS uses the Master File Table (MFT) to store information about files and directories. The MFT
+entries reference the different volume and file system metadata. There are several predefined
+metadata files.
 
 The following metadata files are predefined and use a fixed MFT entry number.
 
@@ -112,8 +108,8 @@ The following metadata files are predefined and use a fixed MFT entry number.
 
 <!-- rumdl-enable MD033 MD056 -->
 
-The following metadata files are predefined, however the MFT entry number is
-commonly used but not fixed.
+The following metadata files are predefined, however the MFT entry number is commonly used but not
+fixed.
 
 | MFT entry number | File name | Description |
 | --- | --- | --- |
@@ -121,8 +117,7 @@ commonly used but not fixed.
 
 ## The boot record
 
-The boot record is stored at the start of the volume (in the $Boot metadata
-file) and contains:
+The boot record is stored at the start of the volume (in the $Boot metadata file) and contains:
 
 * the file system signature
 * the BIOS parameter block
@@ -168,8 +163,8 @@ file) and contains:
 
 ### Boot entry point
 
-The boot entry point often contains a jump instruction to the boot code at
-offset 84 followed by a no-operation, e.g.
+The boot entry point often contains a jump instruction to the boot code at offset 84 followed by a
+no-operation, e.g.
 
 ```text
 eb52   jmp 0x52
@@ -178,8 +173,7 @@ eb52   jmp 0x52
 
 ### Number of sectors per cluster block
 
-The number of sectors per cluster block value as used by mkntfs is defined as
-following:
+The number of sectors per cluster block value as used by mkntfs is defined as following:
 
 * Values 0 to 128 represent sizes of 0 to 128 sectors.
 * Values 244 to 255 represent sizes of `2^(256-n)` sectors.
@@ -193,8 +187,8 @@ The cluster block size can be determined as following:
 cluster block size = bytes per sector x sectors per cluster block
 ```
 
-Different NTFS implementations support different cluster block sizes. Known
-supported cluster block size:
+Different NTFS implementations support different cluster block sizes. Known supported cluster block
+size:
 
 | Cluster block size | Bytes per sector | Supported by |
 | --- | --- | --- |
@@ -213,10 +207,9 @@ supported cluster block size:
 | 1M (1048576) | 256 - 4096 | mkntfs, ntfs3g, Windows 10 (1903) |
 | 2M (2097152) | 512 - 4096 | mkntfs, ntfs3g, Windows 10 (1903) |
 
-> Note that Windows 10 (1903) requires the partition containing the NTFS file
-> system to be aligned with the cluster block size. For example for a cluster
-> block size of 128k the partition must 128 KiB aligned. The default partition
-> partition alignment appears to be 64 KiB.
+> Note that Windows 10 (1903) requires the partition containing the NTFS file system to be aligned
+> with the cluster block size. For example for a cluster block size of 128k the partition must 128
+> KiB aligned. The default partition partition alignment appears to be 64 KiB.
 
 mkntfs restricts the cluster size to:
 
@@ -232,26 +225,23 @@ The Master File Table (MFT) offset can be determined as following:
 mft_offset = boot_record_offset + (mft_cluster_block_number * cluster_block_size)
 ```
 
-The lower 32-bit part of the NTFS volume serial number is the Windows API
-(WINAPI) volume serial number. This can be determined by comparing the output
-of:
+The lower 32-bit part of the NTFS volume serial number is the Windows API (WINAPI) volume serial
+number. This can be determined by comparing the output of:
 
 ```text
 fsutil fsinfo volumeinfo C:
 fsutil fsinfo ntfsinfo C:
 ```
 
-Often the total number of sectors in the boot record will be smaller than the
-underlying partition. A (nearly identical) backup of the boot record is stored
-in last sector of cluster block, that follows the last cluster block of the
-volume. Often this is the 512 bytes after the last sector of the volume, but
-not necessarily. The backup boot record is not included in the total number of
+Often the total number of sectors in the boot record will be smaller than the underlying partition.
+A (nearly identical) backup of the boot record is stored in last sector of cluster block, that
+follows the last cluster block of the volume. Often this is the 512 bytes after the last sector of
+the volume, but not necessarily. The backup boot record is not included in the total number of
 sectors.
 
 ### Master File Table (MFT) and index entry size
 
-The Master File Table (MFT) entry size and index entry size are defined as
-following:
+The Master File Table (MFT) entry size and index entry size are defined as following:
 
 * Values 0 to 127 represent sizes of 0 to 127 cluster blocks.
 * Values 128 to 255 represent sizes of 2^(256-n) bytes or 2^(-n) if considered as a signed byte.
@@ -259,8 +249,8 @@ following:
 
 ### BitLocker Drive Encryption (BDE)
 
-BitLocker Drive Encryption (BDE) uses the file system signature: "-FVE-FS-".
-Where FVE is an abbreviation of Full Volume Encryption.
+BitLocker Drive Encryption (BDE) uses the file system signature: "-FVE-FS-". Where FVE is an
+abbreviation of Full Volume Encryption.
 
 The data structures of BDE on Windows Vista and 7 differ.
 
@@ -282,9 +272,8 @@ TODO: link to BDE format documentation
 
 ### Volume Shadow Snapshots (VSS)
 
-Volume Shadow Snapshots (VSS) uses the GUID
-3808876b-c176-4e48-b7ae-04046e6cc752 (stored in little-endian) to identify its
-data.
+Volume Shadow Snapshots (VSS) uses the GUID 3808876b-c176-4e48-b7ae-04046e6cc752 (stored in
+little-endian) to identify its data.
 
 VSS is largely a stand-alone but has some integration with NTFS.
 
@@ -308,30 +297,28 @@ TODO: link to VSS format documentation
 
 ## The Master File Table (MFT)
 
-The MFT consist of an array of MFT entries. The offset of the MFT table can be
-found in the volume header and the size of the MFT is defined by the MFT entry
-of the $MFT metadata file.
+The MFT consist of an array of MFT entries. The offset of the MFT table can be found in the volume
+header and the size of the MFT is defined by the MFT entry of the $MFT metadata file.
 
-> Note that the MFT can consists of multiple data ranges, defined by the data
-> runs in the $MFT metadata file.
+> Note that the MFT can consists of multiple data ranges, defined by the data runs in the $MFT
+> metadata file.
 
 ### MFT entry
 
-Although the size of a MFT entry is defined in the volume header is commonly
-1024 bytes in size and consists of:
+Although the size of a MFT entry is defined in the volume header is commonly 1024 bytes in size and
+consists of:
 
 * The MFT entry header
 * [The fix-up values](#fix_up_values)
 * An array of MFT attribute values
 * Padding, which should contain 0-byte values
 
-> Note that the MFT entry can be filled entirely with 0-byte values. Seen in
-> Windows XP for MFT entry numbers 16 - 23.
+> Note that the MFT entry can be filled entirely with 0-byte values. Seen in Windows XP for MFT
+> entry numbers 16 - 23.
 
 #### MFT entry header
 
-The MFT entry header (FILE_RECORD_SEGMENT_HEADER) is 42 or 48 bytes in size
-and consists of:
+The MFT entry header (FILE_RECORD_SEGMENT_HEADER) is 42 or 48 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -380,8 +367,8 @@ segment is not used.
 
 ##### Base record file reference
 
-The base record file reference is used to store additional attributes for
-another MFT entry, e.g. for attribute lists.
+The base record file reference is used to store additional attributes for another MFT entry, e.g.
+for attribute lists.
 
 #### MFT entry flags {#mft_entry_flags}
 
@@ -469,14 +456,13 @@ consists of:
 | 0x4000 | ATTRIBUTE_FLAG_ENCRYPTED | Is encrypted |
 | 0x8000 | ATTRIBUTE_FLAG_SPARSE | Is sparse |
 
-TODO: determine the meaning of compression flag in the context of resident
-$INDEX_ROOT. Do the data flags have a different meaning for different
-attributes?
+TODO: determine the meaning of compression flag in the context of resident $INDEX_ROOT. Do the data
+flags have a different meaning for different attributes?
 
 #### Resident MFT attribute
 
-The resident MFT attribute data is present when the non-resident flag is not
-set (0). The resident data is 8 bytes in size and consists of:
+The resident MFT attribute data is present when the non-resident flag is not set (0). The resident
+data is 8 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -489,8 +475,8 @@ TODO: determine the meaning of indexed flag bits, other than the LSB
 
 #### Non-resident MFT attribute
 
-The non-resident MFT attribute data is present when the non-resident flag is
-set (1). The non-resident data is 48 or 56 bytes in size and consists of:
+The non-resident MFT attribute data is present when the non-resident flag is set (1). The
+non-resident data is 48 or 56 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -511,10 +497,9 @@ set (1). The non-resident data is 48 or 56 bytes in size and consists of:
 
 The total size of the data runs should be larger or equal to the data size.
 
-> Note that Windows will fill data beyond the valid data size with 0-byte values.
-> The data size remains unchanged. This applies to compressed and uncompressed
-> data. If the first VCN is zero a valid data size of 0 represents a file
-> entirely filled with 0-byte values.
+> Note that Windows will fill data beyond the valid data size with 0-byte values. The data size
+> remains unchanged. This applies to compressed and uncompressed data. If the first VCN is zero a
+> valid data size of 0 represents a file entirely filled with 0-byte values.
 
 TODO: determine the meaning of a VCN of -1
 
@@ -530,8 +515,8 @@ The attribute name is of variable size and consists of:
 
 #### Data runs
 
-The data runs are stored in a variable size (data) runlist. This runlist
-consists of runlist elements.
+The data runs are stored in a variable size (data) runlist. This runlist consists of runlist
+elements.
 
 A runlist element is of variable size and consists of:
 
@@ -542,57 +527,49 @@ A runlist element is of variable size and consists of:
 | 1 | Size value size | | Data run number of cluster blocks, which contains the number of cluster blocks |
 | ... | Cluster block number value size | | Data run cluster block number |
 
-The data run cluster block number is a singed value, where the MSB is the
-singed bit, e.g. if the data run cluster block contains "dbc8" it corresponds
-to the 64-bit value 0xffffffffffffdbc8.
+The data run cluster block number is a singed value, where the MSB is the singed bit, e.g. if the
+data run cluster block contains "dbc8" it corresponds to the 64-bit value 0xffffffffffffdbc8.
 
-The first data run offset contains the absolute cluster block number where
-successive data run offsets are relative to the last data run offset.
+The first data run offset contains the absolute cluster block number where successive data run
+offsets are relative to the last data run offset.
 
-> Note that the cluster block number byte size is the first nibble when reading
-> the byte stream, but here it is represented as the upper nibble of the first
-> byte.
+> Note that the cluster block number byte size is the first nibble when reading the byte stream,
+> but here it is represented as the upper nibble of the first byte.
 
 The last runlist element is (0, 0), which is stored as a 0-byte value.
 
-According to [NTFS documentation](https://flatcap.github.io/linux-ntfs/ntfs/)
-the size of the runlist is rounded up to the next multitude of 4 bytes, but
-based on analysis of data samples it seems that the size of the trailing data
-can be even larger than 3 and are not always 0-byte values.
+According to [NTFS documentation](https://flatcap.github.io/linux-ntfs/ntfs/) the size of the
+runlist is rounded up to the next multitude of 4 bytes, but based on analysis of data samples it
+seems that the size of the trailing data can be even larger than 3 and are not always 0-byte values.
 
 TODO: provide examples of data runs
 
 ##### Sparse data runs
 
-The MFT attribute data flag (ATTRIBUTE_FLAG_SPARSE) indicates if the data
-stream is sparse or not, where the runlist can contain both sparse and
-non-sparse data runs.
+The MFT attribute data flag (ATTRIBUTE_FLAG_SPARSE) indicates if the data stream is sparse or not,
+where the runlist can contain both sparse and non-sparse data runs.
 
-A sparse data run has a cluster block number value size of 0, representing
-there is no offset (cluster block number). A sparse data run is filled with
-0-byte values.
+A sparse data run has a cluster block number value size of 0, representing there is no offset
+(cluster block number). A sparse data run is filled with 0-byte values.
 
-Compressed data streams also define sparse data runs without setting the
-ATTRIBUTE_FLAG_SPARSE flag.
+Compressed data streams also define sparse data runs without setting the ATTRIBUTE_FLAG_SPARSE flag.
 
-> Note that $BadClus:$Bad also defines a data run with a cluster block number
-> value size of 0, without setting the ATTRIBUTE_FLAG_SPARSE flag.
+> Note that $BadClus:$Bad also defines a data run with a cluster block number value size of 0,
+> without setting the ATTRIBUTE_FLAG_SPARSE flag.
 
 ##### Compresssed data runs
 
-The MFT attribute data flags (0x00ff) indicate if the data stream is compressed
-or not.
+The MFT attribute data flags (0x00ff) indicate if the data stream is compressed or not.
 
-Windows supports compressed data runs for NTFS file systems with a cluster block
-size of 4096 bytes or less.
+Windows supports compressed data runs for NTFS file systems with a cluster block size of 4096 bytes
+or less.
 
-Windows 10 supports Windows Overlay Filter (WOF) compressed data, which stores
-the LZXPRESS Huffman or LZX compressed data in alternate data stream named
-WofCompressedData and links it to the default data stream using a reparse point.
+Windows 10 supports Windows Overlay Filter (WOF) compressed data, which stores the LZXPRESS Huffman
+or LZX compressed data in alternate data stream named WofCompressedData and links it to the default
+data stream using a reparse point.
 
-The data is stored in compression unit blocks. A compression unit typically
-consists of 16 cluster blocks. However the actual value is stored in the
-non-resident MFT attribute.
+The data is stored in compression unit blocks. A compression unit typically consists of 16 cluster
+blocks. However the actual value is stored in the non-resident MFT attribute.
 
 Also see [compression](#compression).
 
@@ -643,25 +620,23 @@ The attribute types are stored in the [$AttrDef metadata file](#attribute_types)
 
 ### Attribute chains {#attribute_chains}
 
-Multiple attributes can be chained to make up a single attribute data stream,
-e.g. the attributes:
+Multiple attributes can be chained to make up a single attribute data stream, e.g. the attributes:
 
 1. $INDEX_ALLOCATION ($I30) VCN: 0
 1. $INDEX_ALLOCATION ($I30) VCN: 596
 
-The first attribute will contain the size of the data defined by all the
-attributes and successive attributes should have a size of 0.
+The first attribute will contain the size of the data defined by all the attributes and successive
+attributes should have a size of 0.
 
-It is assumed that the attributes in a chain must be continuous and defined
-in-order.
+It is assumed that the attributes in a chain must be continuous and defined in-order.
 
 ### The standard information attribute
 
-The standard information attribute ($STANDARD_INFORMATION) contains the basic
-file entry metadata. It is stored as a resident MFT attribute.
+The standard information attribute ($STANDARD_INFORMATION) contains the basic file entry metadata.
+It is stored as a resident MFT attribute.
 
-The standard information data (STANDARD_INFORMATION) is either 48 or 72 bytes
-in size and consists of:
+The standard information data (STANDARD_INFORMATION) is either 48 or 72 bytes in size and consists
+of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -683,8 +658,8 @@ in size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that MFT entries have been observed without a $STANDARD_INFORMATION
-> attribute, but with other attributes such as $FILE_NAME and an $I30 index.
+> Note that MFT entries have been observed without a $STANDARD_INFORMATION attribute, but with
+> other attributes such as $FILE_NAME and an $I30 index.
 
 Recent version of NTFS support case-sentive file names. If a directory is case-sensitive the
 corresponding $STANDARD_INFORMATION attribute will have a maximum number of versions of 0 and a
@@ -692,16 +667,14 @@ version number of 1.
 
 ### The attribute list attribute
 
-The attribute list attribute ($ATTRIBUTE_LIST) is used to store MFT attributes
-outside the MFT entry, e.g. when the MFT entry is too small to store all the
-attributes.
+The attribute list attribute ($ATTRIBUTE_LIST) is used to store MFT attributes outside the MFT
+entry, e.g. when the MFT entry is too small to store all the attributes.
 
-The entries in the list reference the location of MFT attributes. The attribute
-list attribute can be stored as either a resident (for a small amount of data)
-or non-resident MFT attribute.
+The entries in the list reference the location of MFT attributes. The attribute list attribute can
+be stored as either a resident (for a small amount of data) or non-resident MFT attribute.
 
-> Note that MFT entry 0 also can contain an attribute list and allows to store
-> listed attributes beyond the first data run.
+> Note that MFT entry 0 also can contain an attribute list and allows to store listed attributes
+beyond the first data run.
 
 #### The attribute list
 
@@ -711,8 +684,7 @@ An attribute list consists of:
 
 #### The attribute list entry
 
-An attribute list entry (ATTRIBUTE_LIST_ENTRY) is of variable size and
-consists of:
+An attribute list entry (ATTRIBUTE_LIST_ENTRY) is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -728,9 +700,8 @@ consists of:
 
 ### The file name attribute {#file_name_attribute}
 
-The file name attribute ($FILE_NAME) contains the basic file system information,
-like the parent file entry, various date and time values and name. It is stored
-as a resident MFT attribute.
+The file name attribute ($FILE_NAME) contains the basic file system information, like the parent
+file entry, various date and time values and name. It is stored as a resident MFT attribute.
 
 The file name data (FILE_NAME) is of variable size and consists of:
 
@@ -757,15 +728,15 @@ The file name data (FILE_NAME) is of variable size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-An MFT attribute can contain multiple file name attributes, e.g. for a separate
-(long) name and short name.
+An MFT attribute can contain multiple file name attributes, e.g. for a separate (long) name and
+short name.
 
-In several cases on a Vista NTFS volume the MFT entry contained both a DOS &
-Windows and POSIX name space $FILE_NAME attribute. However the directory entry
-index ($I30) of the parent directory only contained the DOS & Windows name.
+In several cases on a Vista NTFS volume the MFT entry contained both a DOS & Windows and POSIX name
+space $FILE_NAME attribute. However the directory entry index ($I30) of the parent directory only
+contained the DOS & Windows name.
 
-In case of a hard link the MFT entry will contain additional file name
-attributes with the parent file reference of each hard link.
+In case of a hard link the MFT entry will contain additional file name attributes with the parent
+file reference of each hard link.
 
 #### Namespace
 
@@ -776,13 +747,12 @@ attributes with the parent file reference of each hard link.
 | 2 | FILE_NAME_DOS, DOS | Case-insensitive sub set of the WINDOWS character set that consists of all upper case ASCII characters except for: `" * + , / : ; < = > ? \`. Note that the name must follow the 8.3 format |
 | 3 | DOS_WINDOWS | Both the DOS and WINDOWS names are identical, which is the same as the DOS character set, with the exception that lower case is used as well |
 
-> Note that the Windows API function CreateFile allows to create case-sensitive
-> file names when the flag FILE_FLAG_POSIX_SEMANTICS is set.
+> Note that the Windows API function CreateFile allows to create case-sensitive file names when the
+> flag FILE_FLAG_POSIX_SEMANTICS is set.
 
 #### Long to short name conversion
 
-A short name can be determined from a long name with the following approach. In
-the long name:
+A short name can be determined from a long name with the following approach. In the long name:
 
 * ignore Unicode characters beyond the first 8-bit (extended ASCII)
 * ignore control characters and spaces (character < 0x20)
@@ -815,16 +785,15 @@ TODO: determine if the behavior is dependent on a setting that can be changed wi
 
 The volume version attribute ($VOLUME_VERSION) contains volume version.
 
-TODO: complete section. Need a pre NTFS version 3.0 volume with this attribute.
-$AttrDef indicates the attribute to be 8 bytes in size.
+TODO: complete section. Need a pre NTFS version 3.0 volume with this attribute. $AttrDef indicates
+the attribute to be 8 bytes in size.
 
 ### The object identifier attribute
 
-The object identifier attribute ($OBJECT_ID) contains distributed link tracker
-properties. It is stored as a resident MFT attribute.
+The object identifier attribute ($OBJECT_ID) contains distributed link tracker properties. It is
+stored as a resident MFT attribute.
 
-The object identifier attribute data is either 16 or 64 bytes in size and
-consists of:
+The object identifier attribute data is either 16 or 64 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -839,16 +808,15 @@ Droid in this context refers to CDomainRelativeObjId.
 
 TODO: determine if this override any value in $Secure:$SDS?
 
-The security descriptor attribute ($SECURITY_DESCRIPTOR) contains a Windows NT
-security descriptor. It can be stored as either a resident (for a small amount
-of data) and non-resident MFT attribute.
+The security descriptor attribute ($SECURITY_DESCRIPTOR) contains a Windows NT security descriptor.
+It can be stored as either a resident (for a small amount of data) and non-resident MFT attribute.
 
 TODO: link to security descriptor format documentation
 
 ### The volume name attribute
 
-The volume name attribute ($VOLUME_NAME) contains the volume label. It is
-stored as a resident MFT attribute.
+The volume name attribute ($VOLUME_NAME) contains the volume label. It is stored as a resident MFT
+attribute.
 
 The volume name attribute data is of variable size and consists of:
 
@@ -860,8 +828,8 @@ The volume name attribute is used in the $Volume metadata file MFT entry.
 
 ### The volume information attribute
 
-The volume information attribute ($VOLUME_INFORMATION) contains information
-about the volume. It is stored as a resident MFT attribute.
+The volume information attribute ($VOLUME_INFORMATION) contains information about the volume. It is
+stored as a resident MFT attribute.
 
 The volume information attribute data is 12 bytes in size and consists of:
 
@@ -892,73 +860,68 @@ The volume information attribute is used in the $Volume metadata file MFT entry.
 
 ### The data stream attribute
 
-The data stream attribute ($DATA) contains the file data. It can be stored as
-either a resident (for a small amount of data) and non-resident MFT attribute.
+The data stream attribute ($DATA) contains the file data. It can be stored as either a resident
+(for a small amount of data) and non-resident MFT attribute.
 
-Multiple data attributes for the same data stream can be used in the attribute
-list to define different parts of the data stream data. The first data stream
-attribute will contain the size of the entire data stream data. Other data
-stream attributes should have a size of 0. Also see [attribute chains](#attribute_chains).
+Multiple data attributes for the same data stream can be used in the attribute list to define
+different parts of the data stream data. The first data stream attribute will contain the size of
+the entire data stream data. Other data stream attributes should have a size of 0. Also see
+[attribute chains](#attribute_chains).
 
 ### The index root attribute
 
-The index root attribute ($INDEX_ROOT) contains the root of the index tree. It
-is stored as a resident MFT attribute.
+The index root attribute ($INDEX_ROOT) contains the root of the index tree. It is stored as a
+resident MFT attribute.
 
 Also see [the index](#index) and [the index root](#index_root).
 
 ### The index allocation attribute
 
-The index allocation attribute ($INDEX_ALLOCATION) contains an array of index
-entries. It is stored as a non-resident MFT attribute.
+The index allocation attribute ($INDEX_ALLOCATION) contains an array of index entries. It is stored
+as a non-resident MFT attribute.
 
-The index allocation attribute itself does not define which attribute type it
-contains in the index value data. For this information it needs the
-corresponding index root attribute.
+The index allocation attribute itself does not define which attribute type it contains in the index
+value data. For this information it needs the corresponding index root attribute.
 
-Multiple index allocation attributes for the same index can be used in the
-attribute list to define different parts of the index allocation data. The
-first index allocation attribute will contain the size of the entire index
-allocation data. Other index allocation attributes should have a size of 0.
+Multiple index allocation attributes for the same index can be used in the attribute list to define
+different parts of the index allocation data. The first index allocation attribute will contain the
+size of the entire index allocation data. Other index allocation attributes should have a size of 0.
 Also see [attribute chains](#attribute_chains).
 
 Also see [the index](#index).
 
 ### The bitmap attribute
 
-The bitmap attribute ($BITMAP) contains the allocation bitmap. It can be stored
-as either a resident (for a small amount of data) and non-resident MFT
-attribute.
+The bitmap attribute ($BITMAP) contains the allocation bitmap. It can be stored as either a
+resident (for a small amount of data) and non-resident MFT attribute.
 
-It is used to maintain information about which entry is used and which is not.
-Every bit in the bitmap represents an entry. The index is stored byte-wise with
-the LSB of the byte corresponds to the first allocation element. The allocation
-element can represent different things:
+It is used to maintain information about which entry is used and which is not. Every bit in the
+bitmap represents an entry. The index is stored byte-wise with the LSB of the byte corresponds to
+the first allocation element. The allocation element can represent different things:
 
 * an MFT entry in the MFT (nameless) bitmap;
 * an index entry in an index ($I30).
 
-The allocation element is allocated if the corresponding bit contains 1 or
-unallocated if 0.
+The allocation element is allocated if the corresponding bit contains 1 or unallocated if 0.
 
 ### The symbolic link attribute
 
 The symbolic link attribute ($SYMBOLIC_LINK) contains a symbolic link.
 
-TODO: complete section. Need a pre NTFS version 3.0 volume with this attribute.
-$AttrDef indicates the attribute is of variable size.
+TODO: complete section. Need a pre NTFS version 3.0 volume with this attribute. $AttrDef indicates
+the attribute is of variable size.
 
 ### The reparse point attribute
 
-The reparse point attribute ($REPARSE_POINT) contains information about a file
-system-level link. It is stored as a resident MFT attribute.
+The reparse point attribute ($REPARSE_POINT) contains information about a file system-level link.
+It is stored as a resident MFT attribute.
 
 Als see [the reparse point](#reparse_point).
 
 ### The (HPFS) extended attribute information
 
-The (HPFS) extended attribute information ($EA_INFORMATION) contains
-information about the extended attribute ($EA).
+The (HPFS) extended attribute information ($EA_INFORMATION) contains information about the extended
+attribute ($EA).
 
 The extended attribute information data is 8 bytes in size and consists of:
 
@@ -1004,8 +967,8 @@ TODO: determine what the NEED_EA flag is used for
 
 The property set attribute ($PROPERTY_SET) contains a property set.
 
-TODO: complete section. Need a pre NTFS version 3.0 volume with this attribute.
-$AttrDef does not seem to always define this attribute.
+TODO: complete section. Need a pre NTFS version 3.0 volume with this attribute. $AttrDef does not
+seem to always define this attribute.
 
 ### The logged utility stream attribute
 
@@ -1031,35 +994,31 @@ The attribute types are stored in the `$AttrDef` metadata file.
 
 ## The index {#index}
 
-The index structures are used for various purposes one of which are the
+The index structures are used for various purposes one of which are the directory entries.
+
+The root of the index is stored in index root. The index root attribute defines which type of
+attribute is stored in the index and the root index node.
+
+If the index is too large part of the index is stored in an index allocation attribute with the
+same attribute name. The index allocation attribute defines a data stream which contains index
+entries. Each index entry contains an index node.
+
+An index consists of a tree, where both the branch and index leaf nodes contain the actual data.
+E.g. in case of a directory entries index, any node that contains index value data make up for the
 directory entries.
 
-The root of the index is stored in index root. The index root attribute defines
-which type of attribute is stored in the index and the root index node.
+The index value data in a branch node signifies the upper bound of the values in the that specific
+branch. E.g. if directory entries index branch node contains the name "textfile.txt" all names in
+that index branch are smaller than "textfile.txt".
 
-If the index is too large part of the index is stored in an index allocation
-attribute with the same attribute name. The index allocation attribute defines
-a data stream which contains index entries. Each index entry contains an index
-node.
+> Note the actual sorting order is dependent on the collation type defined in the index root
+> attribute.
 
-An index consists of a tree, where both the branch and index leaf nodes contain
-the actual data. E.g. in case of a directory entries index, any node that
-contains index value data make up for the directory entries.
+The index allocation attribute is accompanied by a bitmap attribute with the corresponding
+attribute name. The bitmap attribute defines the allocation of virtual cluster blocks within the
+index allocation attribute data stream.
 
-The index value data in a branch node signifies the upper bound of the values
-in the that specific branch. E.g. if directory entries index branch node
-contains the name "textfile.txt" all names in that index branch are smaller
-than "textfile.txt".
-
-> Note the actual sorting order is dependent on the collation type defined in
-> the index root attribute.
-
-The index allocation attribute is accompanied by a bitmap attribute with the
-corresponding attribute name. The bitmap attribute defines the allocation of
-virtual cluster blocks within the index allocation attribute data stream.
-
-> Note that the index allocation attribute can be present even though it is not
-> used.
+> Note that the index allocation attribute can be present even though it is not used.
 
 ### Common used indexes
 
@@ -1094,9 +1053,8 @@ The index root header is 16 bytes in size and consists of:
 | 8 | 4 | | Index entry size |
 | 12 | 4 | | Number of cluster blocks per index entry |
 
-> Note that for NTFS version 1.2 the index entry size does not have to match
-> the index entry size in the volume header. The correct size seems to be the
-> value in the index root header.
+> Note that for NTFS version 1.2 the index entry size does not have to match the index entry size
+> in the volume header. The correct size seems to be the value in the index root header.
 
 #### Collation type {#collation_type}
 
@@ -1133,8 +1091,7 @@ The index entry header is 24 bytes in size and consists of:
 | 8 | 8 | | Metadata transaction journal sequence number, which contains a $LogFile Sequence Number (LSN) |
 | 16 | 8 | | Virtual Cluster Number (VCN) of the index entry |
 
-> Note that there can be more fix-up value than supported by the index entry
-> data size.
+> Note that there can be more fix-up value than supported by the index entry data size.
 
 ### The index node header
 
@@ -1147,8 +1104,8 @@ The index node header is 16 bytes in size and consists of:
 | 8 | 4 | | Allocated index node size, where the value includes the size of the index node header |
 | 12 | 4 | | [Index node flags](#index_node_flags) |
 
-In an index entry (index allocation attribute) the index node size includes the
-size of the fix-up values and the alignment padding following it.
+In an index entry (index allocation attribute) the index node size includes the size of the fix-up
+values and the alignment padding following it.
 
 The remainder of the index node contains remnant data and/or zero-byte values.
 
@@ -1180,8 +1137,8 @@ The index value is of variable size and consists of:
 
 The index values are stored 8 byte aligned.
 
-> Note that some other sources define the index value flags as a 16-bit value
-> followed by 2 bytes of padding.
+> Note that some other sources define the index value flags as a 16-bit value followed by 2 bytes
+> of padding.
 
 #### The index value flags
 
@@ -1196,28 +1153,28 @@ The index values are stored 8 byte aligned.
 
 The MFT attribute name of the directory entry index is: $I30.
 
-The directory entry index value contains a [file name attribute](#file_name_attribute)
-in the index key data.
+The directory entry index value contains a [file name attribute](#file_name_attribute) in the index
+key data.
 
 > Note that the index value data can contain remnant data.
 
-The short and long names of the same file have a separate index values. The
-short name uses the DOS name space and the long name the WINDOWS name space.
-Index values with a single name use either the POSIX or DOS_WINDOWS name space.
+The short and long names of the same file have a separate index values. The short name uses the DOS
+name space and the long name the WINDOWS name space. Index values with a single name use either the
+POSIX or DOS_WINDOWS name space.
 
 A hard link to a file in the same directory has separate index values.
 
 #### Security descriptor hash index value
 
-The MFT attribute name of the security descriptor hash index is: $SDH.
-It appears to only to be used by the $Secure metadata file.
+The MFT attribute name of the security descriptor hash index is: $SDH. It appears to only to be
+used by the $Secure metadata file.
 
 Also see [the security descriptor hash index value](#security_descriptor_hash_index_value).
 
 #### Security descriptor identifier index value
 
-The MFT attribute name of the security descriptor identifier index is: $SII.
-It appears to only to be used by the $Secure metadata file.
+The MFT attribute name of the security descriptor identifier index is: $SII. It appears to only to
+be used by the $Secure metadata file.
 
 <!-- rumdl-disable MD013 -->
 
@@ -1317,8 +1274,8 @@ following attributes:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that if the chunk size equals the size of the uncompressed data the chunk
-> is stored (as-is) uncompressed.
+> Note that if the chunk size equals the size of the uncompressed data the chunk is stored (as-is)
+> uncompressed.
 
 The size of the chunk offset table is:
 
@@ -1326,19 +1283,18 @@ The size of the chunk offset table is:
 number of chunk offsets = uncompressed size / compression unit size
 ```
 
-The offset of the first compressed data chunk is at the end of the chunk offset
-table and is not stored in the chunk offset table.
+The offset of the first compressed data chunk is at the end of the chunk offset table and is not
+stored in the chunk offset table.
 
-If the uncompressed size of a chunk is smaller than the compression unit size
-the chunk is stored uncompressed.
+If the uncompressed size of a chunk is smaller than the compression unit size the chunk is stored
+uncompressed.
 
 Also see [Windows Overlay Filter (WOF) compression method](#wof_compression_method).
 
 ## The reparse point {#reparse_point}
 
-The reparse point is used to create file system-level links. Reparse data is
-stored in the reparse point attribute. The reparse point data
-(REPARSE_DATA_BUFFER) is of variable size and consists of:
+The reparse point is used to create file system-level links. Reparse data is stored in the reparse
+point attribute. The reparse point data (REPARSE_DATA_BUFFER) is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1461,9 +1417,8 @@ TODO: determine if non-native (Microsoft) reparse points are stored with their G
 
 ### Junction or mount point reparse data {#junction_reparse_data}
 
-A reparse point with tag IO_REPARSE_TAG_MOUNT_POINT (0xa0000003) contains
-junction or mount point reparse data. The junction or mount point reparse data
-is of variable size and consists of:
+A reparse point with tag IO_REPARSE_TAG_MOUNT_POINT (0xa0000003) contains junction or mount point
+reparse data. The junction or mount point reparse data is of variable size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1479,8 +1434,8 @@ is of variable size and consists of:
 
 <!-- rumdl-enable MD033 MD056 -->
 
-> Note that it is currently unclear if the names contain an end-of-string
-> character or if they are followed by alignment padding.
+> Note that it is currently unclear if the names contain an end-of-string character or if they are
+> followed by alignment padding.
 
 TODO: determine what character values like 0x0002 represent in the substitute name
 
@@ -1493,9 +1448,8 @@ TODO: determine what character values like 0x0002 represent in the substitute na
 
 ### Symbolic link reparse data {#symbolic_link_reparse_data}
 
-A reparse point with tag IO_REPARSE_TAG_SYMLINK (0xa000000c) contains symbolic
-link reparse data. The symbolic link reparse data is of variable size and
-consists of:
+A reparse point with tag IO_REPARSE_TAG_SYMLINK (0xa000000c) contains symbolic link reparse data.
+The symbolic link reparse data is of variable size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1520,9 +1474,8 @@ consists of:
 
 ### Windows Overlay Filter (WOF) reparse data {#wof_reparse_data}
 
-A reparse point with tag IO_REPARSE_TAG_WOF (0x80000017) contains Windows
-Overlay Filter (WOF) reparse data. The Windows Overlay Filter (WOF) reparse
-data is 16 bytes in size and consists of:
+A reparse point with tag IO_REPARSE_TAG_WOF (0x80000017) contains Windows Overlay Filter (WOF)
+reparse data. The Windows Overlay Filter (WOF) reparse data is 16 bytes in size and consists of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1550,9 +1503,9 @@ TODO: link to LZXPRESS Huffman and LZX documentation
 
 ### Windows Container Isolation (WCI) reparse data {#wci_reparse_data}
 
-A reparse point with tag IO_REPARSE_TAG_WCI (0x80000018) contains Windows
-Container Isolation (WCI) reparse data. The Windows Container Isolation (WCI)
-reparse data is of variable size and consists of:
+A reparse point with tag IO_REPARSE_TAG_WCI (0x80000018) contains Windows Container Isolation (WCI)
+reparse data. The Windows Container Isolation (WCI) reparse data is of variable size and consists
+of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1566,8 +1519,8 @@ reparse data is of variable size and consists of:
 
 The metadata file $Bitmap contains the allocation bitmap.
 
-Every bit in the allocation bitmap represents a block the size of the cluster
-block, where the LSB is the first bit in a byte.
+Every bit in the allocation bitmap represents a block the size of the cluster block, where the LSB
+is the first bit in a byte.
 
 TODO: describe what the $SRAT data stream is used for.
 
@@ -1656,16 +1609,15 @@ TODO: link to security descriptor format documentation
 
 TODO: complete section
 
-The metadata file $LogFile contains the metadata transaction journal and
-consists of:
+The metadata file $LogFile contains the metadata transaction journal and consists of:
 
 * Log File Service restart page header
 * [The fix-up values](#fix_up_values)
 
 ### Log File service restart page header
 
-The Log File service restart page header (LFS_RESTART_PAGE_HEADER) is 30 bytes
-in size and consists of:
+The Log File service restart page header (LFS_RESTART_PAGE_HEADER) is 30 bytes in size and consists
+of:
 
 <!-- rumdl-disable MD033 MD056 -->
 
@@ -1695,11 +1647,10 @@ in size and consists of:
 
 ## USN change journal {#usn_change_journal}
 
-The metadata file $Extend\$UsnJrnl contains the USN change journal. It is a
-sparse file in which NTFS stores records of changes to files and directories.
-Applications make use of the journal to respond to file and directory changes
-as they occur, like e.g. the Windows File Replication Service (FRS) and the
-Windows (Desktop) Search service.
+The metadata file $Extend\$UsnJrnl contains the USN change journal. It is a sparse file in which
+NTFS stores records of changes to files and directories. Applications make use of the journal to
+respond to file and directory changes as they occur, like e.g. the Windows File Replication Service
+(FRS) and the Windows (Desktop) Search service.
 
 The USN change journal consists of:
 
@@ -1720,19 +1671,18 @@ The USN change journal metadata is 32 bytes in size and consists of:
 
 ## USN change journal entries
 
-The $UsnJrnl:$J data stream consists of an array of USN change journal entries.
-The USN change journal entries are stored on a per block-basis and 8-byte
-aligned. Therefore the remainder of the block can contain 0-byte values.
+The $UsnJrnl:$J data stream consists of an array of USN change journal entries. The USN change
+journal entries are stored on a per block-basis and 8-byte aligned. Therefore the remainder of the
+block can contain 0-byte values.
 
 TODO: describe journal block size
 
-Once the stream reaches maximum size the earliest USN change journal entries
-are removed from the stream and replaced with a sparse data run.
+Once the stream reaches maximum size the earliest USN change journal entries are removed from the
+stream and replaced with a sparse data run.
 
 ### USN change journal entry
 
-The USN change journal entry (USN_RECORD_V2) is of variable size and consists
-of:
+The USN change journal entry (USN_RECORD_V2) is of variable size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -1805,8 +1755,7 @@ of:
 
 ### ms-properties
 
-The ms-properties alternate data stream contains a Windows Serialized Property
-Store (SPS).
+The ms-properties alternate data stream contains a Windows Serialized Property Store (SPS).
 
 TODO: link to Windows Serialized Property Store (SPS) format documentation
 
@@ -1830,8 +1779,8 @@ of the origin.
 
 As of Vista Transactional NTFS (TxF) was added.
 
-In TxF the resource manager (RM) keeps track of transactional metadata and log
-files. The TxF related metadata files are stored in the metadata directory:
+In TxF the resource manager (RM) keeps track of transactional metadata and log files. The TxF
+related metadata files are stored in the metadata directory:
 
 ```text
 $Extend\$RmMetadata
@@ -1839,8 +1788,8 @@ $Extend\$RmMetadata
 
 ### Resource manager repair information
 
-The resource manager repair information metadata file:
-$Extend\$RmMetadata\$Repair consists of the following data streams:
+The resource manager repair information metadata file "$Extend\$RmMetadata\$Repair" consists of the
+following data streams:
 
 * the default (unnamed) data stream
 * the $Config data stream, contains the resource manager repair configuration information
@@ -1862,13 +1811,13 @@ The $Repair:$Config data streams contains:
 
 TODO: complete section
 
-The transactional NTFS (TxF) metadata directory: $Extend\$RmMetadata\$Txf is
-used to isolate files for delete or overwrite operations.
+The transactional NTFS (TxF) metadata directory "$Extend\$RmMetadata\$Txf" is used to isolate files
+for delete or overwrite operations.
 
 ### TxF Old Page Stream (TOPS) file
 
-The TxF Old Page Stream (TOPS) file: $Extend\$RmMetadata\$TxfLog\$Tops consists
-of the following data streams:
+The TxF Old Page Stream (TOPS) file "$Extend\$RmMetadata\$TxfLog\$Tops" consists of the following
+data streams:
 
 * the default (unnamed) data stream, contains metadata about the resource manager, such as its GUID,
   its CLFS log policy, and the LSN at which recovery should start
@@ -1899,13 +1848,13 @@ The $Tops default (unnamed) data streams contains:
 
 #### TxF Old Page Stream (TOPS) file data
 
-The $Tops:$T data streams contains the file data that is partially overwritten
-by a transaction. It consists of multiple pending transaction XML-documents.
+The $Tops:$T data streams contains the file data that is partially overwritten by a transaction. It
+consists of multiple pending transaction XML-documents.
 
 TODO: describe start of each sector containing 0x0001
 
-A pending transaction XML-document starts with an UTF-8 byte-order-mark. Is
-roughly contains the following data:
+A pending transaction XML-document starts with an UTF-8 byte-order-mark. Is roughly contains the
+following data:
 
 ```xml
 <?xml version='1.0' encoding='utf-8'?>
@@ -1965,8 +1914,8 @@ roughly contains the following data:
 
 ### Transactional NTFS (TxF) Common Log File System (CLFS) files
 
-TxF uses a Common Log File System (CLFS) log store and the logged utility
-stream attribute named $TXF_DATA.
+TxF uses a Common Log File System (CLFS) log store and the logged utility stream attribute named
+$TXF_DATA.
 
 TODO: link to CLFS format documentation
 
@@ -1990,8 +1939,8 @@ TxF uses a multiplexed log store which contains the following streams:
 
 ### Transactional data logged utility stream attribute
 
-The transactional data ($TXF_DATA) logged utility stream attribute is 56 bytes
-in size and consist of:
+The transactional data ($TXF_DATA) logged utility stream attribute is 56 bytes in size and consist
+of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -2004,8 +1953,8 @@ in size and consist of:
 | 46 | 8 | | Directory index LSN, which contains a CLFS LSN of directory index transaction records |
 | 54 | 2 | | Unknown (Flags?) |
 
-> Note that a single MFT entry can contain multiple Transactional data logged
-> utility stream attributes.
+> Note that a single MFT entry can contain multiple Transactional data logged utility stream
+> attributes.
 
 ## Windows definitions
 
@@ -2033,10 +1982,9 @@ The file attribute flags consist of the following values:
 | 0x00008000 | | Unknown (seen on Windows 95 FAT) |
 | 0x00010000 | FILE_ATTRIBUTE_VIRTUAL | Is virtual |
 
-The following flags are mainly used in the file name attribute and sparsely in
-the standard information attribute. It could be that they have a different
-meaning in both types of attributes or that the standard information flags are
-not updated. For now the latter is assumed.
+The following flags are mainly used in the file name attribute and sparsely in the standard
+information attribute. It could be that they have a different meaning in both types of attributes
+or that the standard information flags are not updated. For now the latter is assumed.
 
 | Value | Identifier | Description |
 | --- | --- | --- |
@@ -2047,11 +1995,9 @@ not updated. For now the latter is assumed.
 
 ### Data steam with inconsistent data flags
 
-An MFT entry contains an $ATTRIBUTE_LIST attribute that contains multiple $DATA
-attributes. The $DATA attributes define a LZNT1 compressed data stream though
-only the first $DATA attribute has the compressed data flag set.
-
-> Note that it is unclear if this is a corruption scenario or not.
+An MFT entry contains an $ATTRIBUTE_LIST attribute that contains multiple $DATA attributes. The
+$DATA attributes define a LZNT1 compressed data stream though only the first $DATA attribute has
+the compressed data flag set.
 
 ```text
 MFT entry: 220 information:
@@ -2101,9 +2047,11 @@ Attribute: 5
     Data flags                     : 0x0001
 ```
 
+> Note that it is unclear if this is a format edge case or corruption scenario.
+
 ### Directory entry with outdated file reference
 
-The directory entry: \ProgramData\McAfee\Common Framework\Task\5.ini
+The directory entry "\ProgramData\McAfee\Common Framework\Task\5.ini"
 
 ```text
 File entry:
@@ -2165,6 +2113,89 @@ Attribute: 3
 
 TODO: determine if $LogFile could be used to recover from this corruption scenario
 
+### Directory entry referencing MFT entry with base record
+
+The directory entry
+"\System Volume Information\DFSR\Config\Replica_F68AA759-069D-48B1-BE6F-205F26A792D0.XML".
+
+```text
+File entry:
+    Path                           : \System Volume Information\DFSR\Config\Replica_F68AA759-069D-48B1-BE6F-205F26A792D0.XML
+    File reference                 : 77019-345
+    Name                           : Replica_F68AA759-069D-48B1-BE6F-205F26A792D0.XML
+    Parent file reference          : 19780-3
+    Size                           : 0
+```
+
+The corresponding MFT entry:
+
+```text
+MFT entry: 77019 information:
+    Is allocated                   : true
+    File reference                 : 77019-345
+    Base record file reference     : 296-623
+    Journal sequence number        : 24747653240
+    Number of attributes           : 1
+
+Attribute: 1
+    Attribute type                 : $DATA (0x00000080)
+    Data VCN range                 : 0 - 249
+    Data size                      : 1023546 bytes
+    Data flags                     : 0x0000
+```
+
+The parent MFT entry:
+
+```text
+MFT entry: 296 information:
+    Is allocated                   : true
+    File reference                 : 296-623
+    Base record file reference     : Not set (0)
+    Journal sequence number        : 24747648692
+    Number of attributes           : 4
+
+Attribute: 1
+    Attribute type                 : $STANDARD_INFORMATION (0x00000010)
+    Creation time                  : Dec 05, 2009 20:39:34.765625000 UTC
+    Modification time              : Apr 08, 2012 17:33:45.756367200 UTC
+    Access time                    : Apr 08, 2012 06:06:11.653828200 UTC
+    Entry modification time        : Apr 08, 2012 17:33:45.756367200 UTC
+    Owner identifier               : 0
+    Security descriptor identifier : 408
+    Update sequence number         : 6855921000
+    File attribute flags           : 0x00000020
+        Should be archived (FILE_ATTRIBUTE_ARCHIVE)
+
+Attribute: 2
+    Attribute type                 : $ATTRIBUTE_LIST (0x00000020)
+    Data size                      : 96 bytes
+    Number of entries              : 3
+    Entry: 0                       : $STANDARD_INFORMATION (0x00000010) in file reference: 296-623
+    Entry: 1                       : $FILE_NAME (0x00000030) in file reference: 296-623
+    Entry: 2                       : $DATA (0x00000080) in file reference: 77019-345
+
+Attribute: 3
+    Attribute type                 : $FILE_NAME (0x00000030)
+    Parent file reference          : 1371-1
+    Creation time                  : Dec 05, 2009 20:39:34.765625000 UTC
+    Modification time              : Apr 08, 2012 06:06:11.653828200 UTC
+    Access time                    : Apr 08, 2012 06:06:11.653828200 UTC
+    Entry modification time        : Apr 08, 2012 06:06:11.653828200 UTC
+    File attribute flags           : 0x00000020
+        Should be archived (FILE_ATTRIBUTE_ARCHIVE)
+    Name space                     : DOS and Windows (3)
+    Name                           : winlogon.log
+
+Attribute: 4
+    Attribute type                 : $DATA (0x00000080)
+    Data VCN range                 : 0 - 249
+    Data size                      : 1023546 bytes
+    Data flags                     : 0x0000
+```
+
+> Note it is currently assumed this is a corruption scenario and the data is part of the attribute
+> list of MFT entry 296 not of the file "Replica_F68AA759-069D-48B1-BE6F-205F26A792D0.XML".
+
 ### LZNT1 compressed block with data size of 0
 
 Not sure if this is a corruption scenario or a data format edge case.
@@ -2208,8 +2239,8 @@ signature value                           : 0
 is compressed flag                        : 0
 ```
 
-It was observed in 2 differnt NTFS implementations that the entire block is
-filled with 0-byte values.
+It was observed in 2 differnt NTFS implementations that the entire block is filled with 0-byte
+values.
 
 TODO: verify behavior of Windows NTFS implementation.
 
@@ -2248,8 +2279,7 @@ Contains the following data:
 1d84fff0  00 00 00 00 00 00 00 00  00 00 00 00 00 00 00 00  |................|
 ```
 
-This relates to a LZNT1 compressed block that appears to be truncated at offset
-16384 (0x00004000).
+This relates to a LZNT1 compressed block that appears to be truncated at offset 16384 (0x00004000).
 
 ```text
 compressed data offset                    : 16384 (0x00004000)

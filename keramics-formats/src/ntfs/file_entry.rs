@@ -176,12 +176,16 @@ impl NtfsFileEntry {
 
     /// Retrieves the size.
     pub fn get_size(&self) -> u64 {
-        match self
-            .mft_attributes
-            .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
-        {
-            Some(data_attribute) => data_attribute.data_size,
-            None => 0,
+        if self.mft_entry.base_record_file_reference != 0 {
+            0
+        } else {
+            match self
+                .mft_attributes
+                .get_attribute_by_name_and_type(&None, NTFS_ATTRIBUTE_TYPE_DATA)
+            {
+                Some(data_attribute) => data_attribute.data_size,
+                None => 0,
+            }
         }
     }
 

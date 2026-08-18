@@ -76,13 +76,15 @@ impl ApfsCheckpointMap {
                 "Unsupported object subtype"
             ));
         }
-        let calculated_checksum: u64 = ApfsObjectChecksum::calculate(&data[8..4096]);
+        if self.object_header.checksum != 0 {
+            let calculated_checksum: u64 = ApfsObjectChecksum::calculate(&data[8..4096]);
 
-        if self.object_header.checksum != calculated_checksum {
-            return Err(keramics_core::error_trace_new!(format!(
-                "Mismatch between stored: 0x{:016x} and calculated: 0x{:016x} checksums",
-                self.object_header.checksum, calculated_checksum
-            )));
+            if self.object_header.checksum != calculated_checksum {
+                return Err(keramics_core::error_trace_new!(format!(
+                    "Mismatch between stored: 0x{:016x} and calculated: 0x{:016x} checksums",
+                    self.object_header.checksum, calculated_checksum
+                )));
+            }
         }
         self.flags = bytes_to_u32_le!(data, 32);
 
