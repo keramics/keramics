@@ -20,6 +20,8 @@ use keramics_formats::fat::{FatFileEntry, FatFileSystem, FatFormat, FatString};
 
 use crate::formatters::ByteSize;
 
+use super::constants::*;
+
 /// File Allocation Table (FAT) file attribute flags information.
 struct FatFileAttributeFlagsInfo {
     /// Flags.
@@ -127,7 +129,7 @@ impl FatFileEntryInfo {
             DateTime::FatDate(fat_date) => fat_date.to_iso8601_string(),
             DateTime::FatTimeDate(fat_date_time) => fat_date_time.to_iso8601_string(),
             DateTime::FatTimeDate10Ms(fat_date_time_10ms) => fat_date_time_10ms.to_iso8601_string(),
-            DateTime::NotSet => String::from("Not set (0)"),
+            DateTime::NotSet => String::from(NOT_SET_VALUE),
             _ => return String::from("Unsupported date time"),
         }
     }

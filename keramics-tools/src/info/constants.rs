@@ -11,8 +11,9 @@
  * under the License.
  */
 
-// pub const LOCKED_VALUE: &'static str = "N/A (locked)";
-pub const NOT_SET_VALUE: &'static str = "N/A (not set)";
+// pub const NA_LOCKED_VALUE: &'static str = "N/A (locked)";
+// pub const NA_NOT_SET_VALUE: &'static str = "N/A (not set)";
+pub const NOT_SET_VALUE: &'static str = "Not set (0)";
 
 pub const GTP_TYPE_IDENTIFIERS: &[(&'static str, &'static str); 135] = &[
     ("00000000-0000-0000-0000-000000000000", "Unused entry"),

@@ -23,15 +23,112 @@ use keramics_formats::ntfs::{
 
 use crate::formatters::ByteSize;
 
+use super::constants::*;
+
 /// Information about a New Technologies File System (NTFS).
 pub struct NtfsInfo {}
 
 impl NtfsInfo {
+    const ATTRIBUTE_TYPES: &[(u32, &'static str); 16] = &[
+        (
+            NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION,
+            "$STANDARD_INFORMATION",
+        ),
+        (NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST, "$ATTRIBUTE_LIST"),
+        (NTFS_ATTRIBUTE_TYPE_FILE_NAME, "$FILE_NAME"),
+        (NTFS_ATTRIBUTE_TYPE_OBJECT_IDENTIFIER, "$OBJECT_ID"),
+        (
+            NTFS_ATTRIBUTE_TYPE_SECURITY_DESCRIPTOR,
+            "$SECURITY_DESCRIPTOR",
+        ),
+        (NTFS_ATTRIBUTE_TYPE_VOLUME_NAME, "$VOLUME_NAME"),
+        (
+            NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION,
+            "$VOLUME_INFORMATION",
+        ),
+        (NTFS_ATTRIBUTE_TYPE_DATA, "$DATA"),
+        (NTFS_ATTRIBUTE_TYPE_INDEX_ROOT, "$INDEX_ROOT"),
+        (NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION, "$INDEX_ALLOCATION"),
+        (NTFS_ATTRIBUTE_TYPE_BITMAP, "$BITMAP"),
+        (NTFS_ATTRIBUTE_TYPE_REPARSE_POINT, "$REPARSE_POINT"),
+        (NTFS_ATTRIBUTE_TYPE_EXTENDED_INFORMATION, "$EA_INFORMATION"),
+        (NTFS_ATTRIBUTE_TYPE_EXTENDED, "$EA"),
+        (NTFS_ATTRIBUTE_TYPE_PROPERTY_SET, "$PROPERTY_SET"),
+        (
+            NTFS_ATTRIBUTE_TYPE_LOGGED_UTILITY_STREAM,
+            "$LOGGED_UTILITY_STREAM",
+        ),
+    ];
+
+    const REPARSE_TAGS: &[(u32, &'static str); 54] = &[
+        (0x00000000, "IO_REPARSE_TAG_RESERVED_ZERO"),
+        (0x00000001, "IO_REPARSE_TAG_RESERVED_ONE"),
+        (0x00000002, "IO_REPARSE_TAG_RESERVED_TWO"),
+        (0x80000005, "IO_REPARSE_TAG_DRIVE_EXTENDER"),
+        (0x80000006, "IO_REPARSE_TAG_HSM2"),
+        (0x80000007, "IO_REPARSE_TAG_SIS"),
+        (0x80000008, "IO_REPARSE_TAG_WIM"),
+        (0x80000009, "IO_REPARSE_TAG_CSV"),
+        (0x8000000a, "IO_REPARSE_TAG_DFS"),
+        (0x8000000b, "IO_REPARSE_TAG_FILTER_MANAGER"),
+        (0x80000012, "IO_REPARSE_TAG_DFSR"),
+        (0x80000013, "IO_REPARSE_TAG_DEDUP"),
+        (0x80000014, "IO_REPARSE_TAG_NFS"),
+        (0x80000015, "IO_REPARSE_TAG_FILE_PLACEHOLDER"),
+        (0x80000016, "IO_REPARSE_TAG_DFM"),
+        (0x80000017, "IO_REPARSE_TAG_WOF"),
+        (0x80000018, "IO_REPARSE_TAG_WCI"),
+        (0x8000001b, "IO_REPARSE_TAG_APPEXECLINK"),
+        (0x8000001e, "IO_REPARSE_TAG_STORAGE_SYNC"),
+        (0x80000020, "IO_REPARSE_TAG_UNHANDLED"),
+        (0x80000021, "IO_REPARSE_TAG_ONEDRIVE"),
+        (0x80000023, "IO_REPARSE_TAG_AF_UNIX"),
+        (0x80000024, "IO_REPARSE_TAG_LX_FIFO"),
+        (0x80000025, "IO_REPARSE_TAG_LX_CHR"),
+        (0x80000036, "IO_REPARSE_TAG_LX_BLK"),
+        (0x9000001c, "IO_REPARSE_TAG_PROJFS"),
+        (0x90001018, "IO_REPARSE_TAG_WCI_1"),
+        (0x9000101a, "IO_REPARSE_TAG_CLOUD_1"),
+        (0x9000201a, "IO_REPARSE_TAG_CLOUD_2"),
+        (0x9000301a, "IO_REPARSE_TAG_CLOUD_3"),
+        (0x9000401a, "IO_REPARSE_TAG_CLOUD_4"),
+        (0x9000501a, "IO_REPARSE_TAG_CLOUD_5"),
+        (0x9000601a, "IO_REPARSE_TAG_CLOUD_6"),
+        (0x9000701a, "IO_REPARSE_TAG_CLOUD_7"),
+        (0x9000801a, "IO_REPARSE_TAG_CLOUD_8"),
+        (0x9000901a, "IO_REPARSE_TAG_CLOUD_9"),
+        (0x9000a01a, "IO_REPARSE_TAG_CLOUD_A"),
+        (0x9000b01a, "IO_REPARSE_TAG_CLOUD_B"),
+        (0x9000c01a, "IO_REPARSE_TAG_CLOUD_C"),
+        (0x9000d01a, "IO_REPARSE_TAG_CLOUD_D"),
+        (0x9000e01a, "IO_REPARSE_TAG_CLOUD_E"),
+        (0x9000f01a, "IO_REPARSE_TAG_CLOUD_F"),
+        (0xa0000003, "IO_REPARSE_TAG_MOUNT_POINT"),
+        (0xa000000c, "IO_REPARSE_TAG_SYMLINK"),
+        (0xa0000010, "IO_REPARSE_TAG_IIS_CACHE"),
+        (0xa0000019, "IO_REPARSE_TAG_GLOBAL_REPARSE"),
+        (0xa000001a, "IO_REPARSE_TAG_CLOUD"),
+        (0xa000001d, "IO_REPARSE_TAG_LX_SYMLINK"),
+        (0xa000001f, "IO_REPARSE_TAG_WCI_TOMBSTONE"),
+        (0xa0000022, "IO_REPARSE_TAG_PROJFS_TOMBSTONE"),
+        (0xa0000027, "IO_REPARSE_TAG_WCI_LINK"),
+        (0xa0001027, "IO_REPARSE_TAG_WCI_LINK_1"),
+        (0xc0000004, "IO_REPARSE_TAG_HSM"),
+        (0xc0000014, "IO_REPARSE_TAG_APPXSTRM"),
+    ];
+
+    /// Retrieves the attribute type as a string.
+    pub fn get_attribute_type_string(attribute_type: &u32) -> Option<&'static str> {
+        Self::ATTRIBUTE_TYPES
+            .binary_search_by(|(key, _)| key.cmp(attribute_type))
+            .map_or_else(|_| None, |index| Some(Self::ATTRIBUTE_TYPES[index].1))
+    }
+
     /// Retrieves the string representation of a date and time value.
     fn get_date_time_string(date_time: &DateTime) -> Result<String, ErrorTrace> {
         match date_time {
             DateTime::Filetime(filetime) => Ok(filetime.to_iso8601_string()),
-            DateTime::NotSet => Ok(String::from("Not set (0)")),
+            DateTime::NotSet => Ok(String::from(NOT_SET_VALUE)),
             _ => return Err(keramics_core::error_trace_new!("Unsupported date time")),
         }
     }
@@ -167,6 +264,13 @@ impl NtfsInfo {
         flags_strings
     }
 
+    /// Retrieves the reparse (point) tag as a string.
+    pub fn get_reparse_tag_string(reparse_tag: &u32) -> Option<&'static str> {
+        Self::REPARSE_TAGS
+            .binary_search_by(|(key, _)| key.cmp(reparse_tag))
+            .map_or_else(|_| None, |index| Some(Self::REPARSE_TAGS[index].1))
+    }
+
     /// Opens a file system.
     pub fn open_file_system(
         data_stream: &DataStreamReference,
@@ -185,38 +289,9 @@ impl NtfsInfo {
 
     /// Prints information about an attribute.
     fn print_attribute(attribute: &NtfsAttribute) -> Result<(), ErrorTrace> {
-        let attribute_types = HashMap::<u32, &'static str>::from([
-            (
-                NTFS_ATTRIBUTE_TYPE_STANDARD_INFORMATION,
-                "$STANDARD_INFORMATION",
-            ),
-            (NTFS_ATTRIBUTE_TYPE_ATTRIBUTE_LIST, "$ATTRIBUTE_LIST"),
-            (NTFS_ATTRIBUTE_TYPE_FILE_NAME, "$FILE_NAME"),
-            (NTFS_ATTRIBUTE_TYPE_OBJECT_IDENTIFIER, "$OBJECT_ID"),
-            (
-                NTFS_ATTRIBUTE_TYPE_SECURITY_DESCRIPTOR,
-                "$SECURITY_DESCRIPTOR",
-            ),
-            (NTFS_ATTRIBUTE_TYPE_VOLUME_NAME, "$VOLUME_NAME"),
-            (
-                NTFS_ATTRIBUTE_TYPE_VOLUME_INFORMATION,
-                "$VOLUME_INFORMATION",
-            ),
-            (NTFS_ATTRIBUTE_TYPE_DATA, "$DATA"),
-            (NTFS_ATTRIBUTE_TYPE_INDEX_ROOT, "$INDEX_ROOT"),
-            (NTFS_ATTRIBUTE_TYPE_INDEX_ALLOCATION, "$INDEX_ALLOCATION"),
-            (NTFS_ATTRIBUTE_TYPE_BITMAP, "$BITMAP"),
-            (NTFS_ATTRIBUTE_TYPE_REPARSE_POINT, "$REPARSE_POINT"),
-            (NTFS_ATTRIBUTE_TYPE_EXTENDED_INFORMATION, "$EA_INFORMATION"),
-            (NTFS_ATTRIBUTE_TYPE_EXTENDED, "$EA"),
-            (NTFS_ATTRIBUTE_TYPE_PROPERTY_SET, "$PROPERTY_SET"),
-            (
-                NTFS_ATTRIBUTE_TYPE_LOGGED_UTILITY_STREAM,
-                "$LOGGED_UTILITY_STREAM",
-            ),
-        ]);
         let attribute_type: u32 = attribute.get_attribute_type();
-        match attribute_types.get(&attribute_type) {
+
+        match Self::get_attribute_type_string(&attribute_type) {
             Some(attribute_type_string) => println!(
                 "Attribute: {} (0x{:08x})",
                 attribute_type_string, attribute_type
@@ -230,7 +305,8 @@ impl NtfsInfo {
 
                 for entry_index in 0..number_of_entries {
                     let entry: &NtfsAttributeListEntry = &attribute_list.entries[entry_index];
-                    match attribute_types.get(&entry.attribute_type) {
+
+                    match Self::get_attribute_type_string(&entry.attribute_type) {
                         Some(attribute_type_string) => {
                             println!(
                                 "    Entry: {}\t\t\t\t\t: {} (0x{:08x}) with file reference: {}-{}",
@@ -273,7 +349,7 @@ impl NtfsInfo {
                 println!("    Name\t\t\t\t\t: {}", file_name.name);
 
                 if file_name.parent_file_reference == 0 {
-                    println!("    Parent file reference\t\t\t: Not set (0)");
+                    println!("    Parent file reference\t\t\t: {}", NOT_SET_VALUE);
                 } else {
                     println!(
                         "    Parent file reference\t\t\t: {}-{}",
@@ -346,9 +422,18 @@ impl NtfsInfo {
             // TODO: add support for $PROPERTY_SET
             NtfsAttribute::ReparsePoint { reparse_point } => {
                 let reparse_tag: u32 = reparse_point.get_reparse_tag();
-                println!("    Reparse tag\t\t\t\t\t: 0x{:08x}", reparse_tag);
-                // TODO: print tag name
 
+                match Self::get_reparse_tag_string(&reparse_tag) {
+                    Some(reparse_tag_string) => {
+                        println!(
+                            "    Reparse tag\t\t\t\t\t: {} (0x{:08x})",
+                            reparse_tag_string, reparse_tag
+                        );
+                    }
+                    None => {
+                        println!("    Reparse tag\t\t\t\t\t: 0x{:08x}", reparse_tag);
+                    }
+                }
                 println!();
             }
             // TODO: add support for $SECURITY_DESCRIPTOR
@@ -525,7 +610,7 @@ impl NtfsInfo {
             );
             let file_reference: u64 = file_entry.get_base_record_file_reference();
             if file_reference == 0 {
-                println!("    Base record file reference\t\t\t: Not set (0)");
+                println!("    Base record file reference\t\t\t: {}", NOT_SET_VALUE);
             } else {
                 println!(
                     "    Base record file reference\t\t\t: {}-{}",
@@ -814,7 +899,7 @@ mod tests {
 
         let date_time: DateTime = DateTime::NotSet;
         let timestamp: String = NtfsInfo::get_date_time_string(&date_time)?;
-        assert_eq!(timestamp, "Not set (0)");
+        assert_eq!(timestamp, NOT_SET_VALUE);
 
         Ok(())
     }

@@ -432,8 +432,7 @@ The MFT attribute consist of:
 
 #### MFT attribute header
 
-The MFT attribute header (ATTRIBUTE_RECORD_HEADER) is 16 bytes in size and
-consists of:
+The MFT attribute header (ATTRIBUTE_RECORD_HEADER) is 16 bytes in size and consists of:
 
 | Offset | Size | Value | Description |
 | --- | --- | --- | --- |
@@ -2194,7 +2193,8 @@ Attribute: 4
 ```
 
 > Note it is currently assumed this is a corruption scenario and the data is part of the attribute
-> list of MFT entry 296 not of the file "Replica_F68AA759-069D-48B1-BE6F-205F26A792D0.XML".
+> list of MFT entry 296 not of the file "Replica_F68AA759-069D-48B1-BE6F-205F26A792D0.XML". The
+> VOLUME_IS_DIRTY volume flag was not set.
 
 ### LZNT1 compressed block with data size of 0
 

@@ -239,7 +239,7 @@ mod tests {
 
         let expected_string: &str = concat!(
             "Universal Disk Image Format (UDIF) information:\n",
-            "    Segment set identifier\t\t\t: N/A (not set)\n",
+            "    Segment set identifier\t\t\t: Not set (0)\n",
             "    Number of segments\t\t\t\t: 1\n",
             "    Compression information:\n",
             "        Compression method\t\t\t: zlib\n",
